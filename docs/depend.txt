@@ -1,0 +1,12 @@
+Ibidas dependencys
+
+Essential
+--------
+ipython
+numpy
+
+
+Optional
+--------
+pygraphviz, gtk: debug tree visualization
+sqlalchemy:      wrapper_sql

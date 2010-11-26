@@ -1,0 +1,15 @@
+dimids:
+- if a dim is shared for a whole tuple, use name of tuple field if available
+  for dimension field (post-processor?)
+- naming for tuples without specifying whole type (post-processor)
+
+- adapt type parser to reps  
+
+- dimension specification has to be only given once:
+  ([d1:4]>bytes[3], [d1]>bytes[3])
+
+
+mapseq, aggregation: ability to specify dimension
+ops: inheritance
+hops: unique, set operations
+
