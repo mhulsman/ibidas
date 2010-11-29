@@ -1,7 +1,8 @@
-import dimensions
-import slices
 import itertools
 import operator
+
+_delay_import_(globals(),"itypes","dimensions")
+_delay_import_(globals(),"slices")
 
 def maxmatchPath(pos_paths, match_path):#{{{
     """Find the maximum match of `match_path` in `pos_paths`

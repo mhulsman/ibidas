@@ -1,9 +1,9 @@
-import wrapper
-import rtypes
-import dimensions
-import slices
-from wrapper_py import Result, rep
 import os
+
+import wrapper
+_delay_import_(globals(),"wrapper_py","Result","rep")
+_delay_import_(globals(),"slices")
+_delay_import_(globals(),"..itypes","rtypes")
 
 
 def read_chipchip(path):

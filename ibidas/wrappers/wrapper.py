@@ -1,5 +1,5 @@
-import representor
-import pass_manager
+import ..representor
+from ..passes import manager
 
 class Indicator(pass_manager.Pass):
     def __eq__(self, other):

@@ -1,17 +1,15 @@
-import util
-import rtypes
-import dimensions
-import slices
-import numpy
-import context
+from collections import defaultdict
 from itertools import chain
-import cutils
+import numpy
 import math
+
 from repops import *
 from repops_dim import *
 from repops_slice import *
-from collections import defaultdict
 
+_delay_import_(globals(),"utils","util","context","cutils")
+_delay_import_(globals(),"itypes","dimensions","rtypes")
+_delay_import_(globals(),"slices")
 
 class RFilter(MultiOpRep):#{{{
     """Filter data based on constraint"""
@@ -62,7 +60,7 @@ class RFilter(MultiOpRep):#{{{
             broadcast_plan, new_dimpath = dim_helpers.planBroadcast(filter_dimpath[:-1], constraint_dims[:-1])
            
             #adapt dimensions of to be filtered slices
-            ndim = dimensions.Dim(dimensions.UNDEFINED, 
+            ndim = dimensions.Dim(UNDEFINED, 
                                   len(constraint_dims) - 1, filter_dimpath[-1].has_missing,
                                   name = "f" + filter_dimpath[-1].name
                                   )
@@ -105,7 +103,7 @@ class RFilter(MultiOpRep):#{{{
                 broadcast_plan, new_dimpath = dim_helpers.planBroadcast(filter_dimpath[:-1], constraint_dims)
                 
                 #adapt dimensions of to be filtered slices
-                ndim = dimensions.Dim(dimensions.UNDEFINED, 
+                ndim = dimensions.Dim(UNDEFINED, 
                                     len(constraint_dims), filter_dimpath[-1].has_missing,
                                     name = "f" + filter_dimpath[-1].name
                                     )
@@ -133,7 +131,7 @@ class RFilter(MultiOpRep):#{{{
                         broadcast_plan, new_dimpath = dim_helpers.planBroadcast(filter_dimpath[:-1], constraint_dims[:-1])
                         
                         #adapt dimensions of to be filtered slices
-                        ndim = dimensions.Dim(dimensions.UNDEFINED, 
+                        ndim = dimensions.Dim(UNDEFINED, 
                                             len(constraint_dims) - 1, filter_dimpath[-1].has_missing,
                                             name = "f" + filter_dimpath[-1].name
                                             )
@@ -244,7 +242,7 @@ class ifilter(MultiOpRep):#{{{
         if(not cslice.dims and isinstance(cslice.type, rtypes.TypeInteger)):
             newbranch.pop()
         else:
-            ndim = dimensions.Dim(dimensions.UNDEFINED, 
+            ndim = dimensions.Dim(UNDEFINED, 
                                   odim.variable, odim.has_missing)
             newbranch[-1] = ndim
         newbranch = tuple(newbranch)
@@ -361,7 +359,7 @@ def _join(lsource, rsource, condition=None, ldim=(), rdim=(),
         assert not nmouter and not nminner, "Multiple right dimensions, but do not match left dimensions"
 
         
-        join_dim = dimensions.Dim(dimensions.UNDEFINED, 
+        join_dim = dimensions.Dim(UNDEFINED, 
                                 variable=oleftbranch[-1].variable or orightbranch[-1].variable, 
                                         has_missing=oleftbranch[-1].has_missing or orightbranch[-1].has_missing)
         leftbranch = list(ldim)
@@ -606,7 +604,7 @@ def exec_set(seq):
     return frozenset(seq)
 
 def check_set(in_type, dim, exec_func):
-    ndim = dimensions.Dim(dimensions.UNDEFINED, 
+    ndim = dimensions.Dim(UNDEFINED, 
                           dim.variable, dim.has_missing)
     return rtypes.TypeSet(dim.has_missing, (ndim,), (in_type,), need_freeze=False)
 
@@ -689,13 +687,13 @@ class Group(MultiOpRep):
             togroup_dims = groupslices[0].dims
        
         odim = togroup_dims[-1]
-        group_dims = [dimensions.Dim(dimensions.UNDEFINED, odim.variable, odim.has_missing, name="g" + slice.name) 
+        group_dims = [dimensions.Dim(UNDEFINED, odim.variable, odim.has_missing, name="g" + slice.name) 
                  for slice in groupslices]
         
         if(not name is None):
-            inner_dim = dimensions.Dim(dimensions.UNDEFINED, len(group_dims), False, name=name)
+            inner_dim = dimensions.Dim(UNDEFINED, len(group_dims), False, name=name)
         else:
-            inner_dim = dimensions.Dim(dimensions.UNDEFINED, len(group_dims), False)
+            inner_dim = dimensions.Dim(UNDEFINED, len(group_dims), False)
     
         match_slices, start_depths = dim_helpers.matchDimPath(source._all_slices.values(), togroup_dims)
        
@@ -806,4 +804,4 @@ class flat(UnaryOpRep):
         self._flat_depths = startdepths
         self._flat_dim = fdim
 
-import wrapper_py
+from wrappers import wrapper_py

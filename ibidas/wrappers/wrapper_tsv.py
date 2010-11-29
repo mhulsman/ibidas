@@ -1,11 +1,12 @@
-import wrapper
-import rtypes
-import dimensions
-import slices
-from wrapper_py import Result, rep
 import os
 import csv
-import util
+
+
+import wrappr
+from ..itypes import rtypes
+
+_delay_import_(globals(),"wrapper_py","Result","rep")
+_delay_import_(globals(),"..utils","util")
 
 def read_tsv(filename, dialect=False, skiprows=-1, type=rtypes.unknown, fieldnames=None):
     return TSVRepresentor(filename, dialect, skiprows, type, fieldnames)

@@ -1,8 +1,5 @@
 import __builtin__
 
-
-
-
 class Context(object):
     """Context objects store all actions on them, which
     can then be replayed on another object with the _apply function below"""

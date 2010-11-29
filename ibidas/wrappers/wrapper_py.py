@@ -1,20 +1,17 @@
-import representor
-import wrapper
-
-import util
-import detector
-import rtypes
-from slices import Slice
-from multi_visitor import VisitorFactory, F_CACHE, NF_ERROR, NF_ELSE
-import nestutils
-import pass_required
 import operator
 from itertools import chain
-from type_attribute_scanner import data_convertor, scanner_protocol
-from type_attribute_freeze import data_freezer
 from collections import defaultdict
-import cutils
 import numpy
+
+import wrapper
+
+from ibidas import representor, util, detector
+from ibidas.slices import Slice
+from ibidas.utils.multi_visitor import VisitorFactory, F_CACHE, NF_ERROR, NF_ELSE
+from ibidas.utils import nestutils, cutils
+from ibidas.types import rtypes
+from ibidas.types.type_attribute_freeze import data_freezer
+from ibidas.passes import required
 
 def rep(data=None, dtype=rtypes.unknown, modifiable=False, 
         type_check=True, unpack=True):#{{{
@@ -108,7 +105,7 @@ def merge_results(*results):
 class PySelectExecutor(VisitorFactory(prefixes=("rep", ), flags=F_CACHE),
                     VisitorFactory(prefixes=("sliceop", "op"), flags=NF_ELSE),
                     wrapper.Executor):
-    after = set([pass_required.RequiredSliceIds])
+    after = set([required.RequiredSliceIds])
 
     @classmethod
     def run(cls, query, pass_results):
@@ -595,8 +592,5 @@ def inner_filter(data, bcast, dims, pack, rtypes, rdims, args):
         constraint_data = (slice(None),) * len(bcast) + (constraint_data,)
     return filter_data[constraint_data]
 
-import repops_slice
-import repops_dim
-import engines
-import representor
+from ibidas import repops_slice, repops_dim, engines, representor
 engines.select_engine.register(PySelectExecutor)

@@ -1,5 +1,5 @@
 import wrapper_tsv
-from wrapper_py import rep
+_delay_import_(globals(),"wrapper_py","rep")
 
 def read_phospho(path):
     fpath = path + 'kinase_all.txt' 

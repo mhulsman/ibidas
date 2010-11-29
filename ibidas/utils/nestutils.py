@@ -1,11 +1,10 @@
 import numpy
-import collections
-import rtypes
-from rtypes import Missing
-import cutils
-import util
-from collections import defaultdict
+from collections import defaultdict, Callable
 from itertools import chain
+
+_delay_import_(globals(),"cutils")
+_delay_import_(globals(),"util")
+_delay_import_(globals(),"missing","Missing")
 
 def nestmap(data, inner_func, depth, outer_rep=numpy.dtype(object)):
     """Map function on nested data.
@@ -20,7 +19,7 @@ def nestmap(data, inner_func, depth, outer_rep=numpy.dtype(object)):
     """
     inner_func = util.filter_missing(inner_func)
     
-    if(isinstance(outer_rep, collections.Callable)):
+    if(isinstance(outer_rep, Callable)):
         outer_func = util.filter_missing(outer_rep)
     else:
         if(outer_rep  == object):

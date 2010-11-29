@@ -1,8 +1,9 @@
-import pass_manager
 from collections import defaultdict
-import repops
 
-class TargetCalc(pass_manager.Pass):
+import manager
+_delay_import_(globals(),"..repops")
+
+class TargetCalc(manager.Pass):
     """Calculates for representor objects in query tree
     the targets (i.e. other representor objects that use their data)"""
 

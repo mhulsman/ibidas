@@ -6,6 +6,7 @@ import collections
 from IPython.Debugger import Tracer; debug_here = Tracer()
 import cPickle, zlib
 
+_delay_import_(globals(),"missing","Missing")
 def save_rep(r, filename):
     f = open(filename, 'wb')
     s = cPickle.dumps(r,protocol=2)
@@ -257,4 +258,3 @@ class farray(numpy.ndarray):
 
 
 
-from rtypes import Missing

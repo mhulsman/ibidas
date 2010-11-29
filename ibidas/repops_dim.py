@@ -1,7 +1,7 @@
-import rtypes
 from repops import *
-import slices
-import util
+
+_delay_import_(globals(),"slices")
+_delay_import_(globals(),"utils","util")
 
 
 def broadcastDims(outer_dims, inner_dims):

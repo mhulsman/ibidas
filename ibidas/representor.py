@@ -1,10 +1,18 @@
-import util
 import sys
-import context
 import copy
-import rtypes
-from collections import defaultdict
 import itertools
+from collections import defaultdict
+
+_delay_import_(globals(),"utils","util","context")
+_delay_import_(globals(),"itypes", "rtypes", "dimensions")
+_delay_import_(globals(),"wrappers","wrapper_py")
+_delay_import_(globlas(),"query_context")
+_delay_import_(globals(),"engines")
+_delay_import_(globals(),"repops")
+_delay_import_(globals(),"repops_rel")
+_delay_import_(globals(),"repops_dim")
+_delay_import_(globals(),"repops_slice")
+_delay_import_(globals(),"slices")
 
 class Representor(object):
     def __init__(self, all_slices, active_slices):
@@ -929,12 +937,4 @@ class Representor(object):
         
         return tuple(reslist[::-1])
 
-import wrapper_py
-import query_context
-import engines
-import repops
-import repops_rel
-import repops_dim
-import repops_slice
-import dimensions
-import slices
+

@@ -3,7 +3,7 @@ import sys
 import getopt
 from IPython.Shell import IPShellEmbed
 
-from ibidas import config
+from ibidas.utils import config
 
 rc_path = "~/.ibidas_rc"
 rc_path = os.path.expanduser(rc_path)

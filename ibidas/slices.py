@@ -1,11 +1,11 @@
-import rtypes
-from type_attribute_freeze import freeze_protocol
-import util
-import dimensions
 import copy
-import typeops
 
+from constants import *
+from utils import util
 
+_delay_import_(globals(),"itypes","dimensions","rtypes")
+_delay_import_(globals(),"itypes.type_attribute_freeze","freeze_protocol")
+_delay_import_(globals(),"typeops")
 
 
 #pylint: disable-msg=E1101
@@ -152,7 +152,7 @@ def sunpack_array(slice):
     assert isinstance(stype, rtypes.TypeArray), "Cannot unpack slice " + \
                             str(slice.name) + " as it is not an array"
     if(not stype.dims):
-        ndims = (dimensions.Dim(dimensions.UNDEFINED, variable=1, 
+        ndims = (dimensions.Dim(UNDEFINED, variable=1, 
                                 has_missing=stype.has_missing),)
     else:
         ndims = stype.dims

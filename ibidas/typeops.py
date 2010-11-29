@@ -1,12 +1,11 @@
-import collections
-from collections import defaultdict
+from collections import defaultdict, Iterable
 import operator
-import casts
-import rtypes
 import numpy
-import cutils
-import util
-import dimensions
+from itypes import rtypes
+
+_delay_import_(globals(),".itypes","dimensions","casts")
+_delay_import_(globals(),"utils","util","cutils")
+
 
 in1_type_ops = defaultdict(set)
 in2_type_ops = defaultdict(set)
@@ -29,25 +28,25 @@ def addOps(in1_type_cls, in2_type_cls, out_type_cls,
              can also be sequence
         operation: an Operation object
     """
-    if(isinstance(in1_type_cls, collections.Iterable)):
+    if(isinstance(in1_type_cls, Iterable)):
         for in1cls in in1_type_cls:
             in1_type_ops[in1cls].add(operation)
     else:
         in1_type_ops[in1_type_cls].add(operation)
     
-    if(isinstance(in2_type_cls, collections.Iterable)):
+    if(isinstance(in2_type_cls, Iterable)):
         for in2cls in in2_type_cls:
             in2_type_ops[in2cls].add(operation)
     else:
         in2_type_ops[in2_type_cls].add(operation)
 
-    if(isinstance(out_type_cls, collections.Iterable)):
+    if(isinstance(out_type_cls, Iterable)):
         for outcls in out_type_cls:
             out_type_ops[outcls].add(operation)
     else:
         out_type_ops[out_type_cls].add(operation)
 
-    if(isinstance(ops, collections.Iterable)
+    if(isinstance(ops, Iterable)
                         and not isinstance(ops, str)):
         for op in ops:
             op_type_ops[op].add(operation)
@@ -335,7 +334,7 @@ def check_arrayarray(in1_type, in2_type, op, out_type):#{{{
     
     odim1 = in1_type.dims[0]
     odim2 = in2_type.dims[0]
-    ndim = dimensions.Dim(dimensions.UNDEFINED, 
+    ndim = dimensions.Dim(UNDEFINED, 
                           odim1.variable or odim2.variable, 
                           odim1.has_missing or odim2.has_missing)
     return rtypes.TypeArray(in1_type.has_missing or in2_type.has_missing, 
@@ -384,7 +383,7 @@ def check_setset(in1_type, in2_type, op, out_type):#{{{
     
     odim1 = in1_type.dims[0]
     odim2 = in2_type.dims[0]
-    ndim = dimensions.Dim(dimensions.UNDEFINED, 
+    ndim = dimensions.Dim(UNDEFINED, 
                           odim1.variable or odim2.variable, 
                           odim1.has_missing or odim2.has_missing)
     return rtypes.TypeSet(in1_type.has_missing or in2_type.has_missing, 

@@ -1,12 +1,11 @@
-import wrapper
-import rtypes
-import dimensions
-import slices
-from wrapper_py import Result
 import urllib
 import xml.dom.minidom
 import csv
 
+import wrapper
+_delay_import_(globals(),"wrapper_py","Result")
+_delay_import_(globals(),"..itypes","rtypes","dimensions")
+_delay_import_(globals(),"slices")
 
 def connect_biomart(url="http://www.biomart.org/biomart/martservice", query=None):
     if(query is None):

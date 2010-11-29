@@ -1,12 +1,12 @@
-import wrapper
-import rtypes
-import dimensions
-import slices
-from wrapper_py import Result, rep
-from wrapper_tsv import read_tsv
 import os
 import csv
-import cutils
+
+import wrapper
+_delay_import_(globals(),"..itypes","rtypes")
+_delay_import_(globals(),"..slices")
+_delay_import_(globals(),"wrapper_py","Result","rep")
+_delay_improt_(globals(),"wrapper_tsv","read_tsv")
+_delay_import_(globals(),"..utils","cutils")
 
 def read_hughes(path):
     experiments = read_tsv(path + "/experiment_list.txt", skiprows=2)

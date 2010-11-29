@@ -1,17 +1,18 @@
-import pass_manager
 from collections import defaultdict
-from multi_visitor import VisitorFactory, NF_ELSE
-import pass_prewalk
-import slices
+
+import manager
+import prewalk
+
+from ..utils.multi_visitor import VisitorFactory, NF_ELSE
 
 class PlanWrapper(VisitorFactory(prefixes=("require", "func"), 
                                       flags=NF_ELSE), 
-                       pass_manager.Pass):
+                       manager.Pass):
     @classmethod
     def run(cls, query, pass_results):
         return
         self = cls()
-        prewalk = pass_results[pass_prewalk.PreOrderWalk]
+        prewalk = pass_results[prewalk.PreOrderWalk]
 
         self.indicator_attr = '_' + query.type + "_indicator"
         

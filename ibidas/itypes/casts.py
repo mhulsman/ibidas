@@ -1,7 +1,7 @@
-import collections
-from collections import defaultdict
-import rtypes
 import operator
+from collections import defaultdict, Iterable
+
+import rtypes
 
 in_type_casts = defaultdict(list)
 cast_exec = defaultdict(dict)
@@ -21,7 +21,7 @@ def addCasts(in_type_cls, out_type_cls, checktypesfunc, simtypefunc):
         checktypefunc: function to check actual types for compatibility
         simtypefunc: function to create best matching out_type if possible
     """
-    if(isinstance(out_type_cls, collections.Iterable)):
+    if(isinstance(out_type_cls, Iterable)):
         if(not isinstance(out_type_cls, set)):
             out_type_cls = set(out_type_cls)
     else:
@@ -29,7 +29,7 @@ def addCasts(in_type_cls, out_type_cls, checktypesfunc, simtypefunc):
     
     checkenv = CheckEnv(out_type_cls, checktypesfunc, simtypefunc) 
     
-    if(isinstance(in_type_cls, collections.Iterable)):
+    if(isinstance(in_type_cls, Iterable)):
         for incls in in_type_cls:
             in_type_casts[incls].append(checkenv)
     else:

@@ -1,4 +1,4 @@
-import sparse_arrays
+_delay_import_(globals(), "..utils","sparse_arrays")
 
 class BaseConvertor(object):
     def __init__(self,objectclss):

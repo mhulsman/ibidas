@@ -1,10 +1,10 @@
-from multi_visitor import VisitorFactory, NF_ELSE
-import util
-import rtypes
-import slices
-import context
+from utils.multi_visitor import VisitorFactory, NF_ELSE
 import repops
-import dim_helpers
+
+_delay_import_(globals(),"slices")
+_delay_import_(globals(), "dim_helpers")
+_delay_import_(globals(),"utils","util","context")
+_delay_import_(globals(),"itypes","rtypes")
 
 def realiasSimilarSlices(rsource, lall_slices, #{{{
                             keep_equal=False, return_newid=False,

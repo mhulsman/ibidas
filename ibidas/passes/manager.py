@@ -1,4 +1,4 @@
-import topological_sort
+from ..utils import topological_sort
 
 class Pass(topological_sort.TopologicalSortable):
     """Pass object. Each pass should inherit from

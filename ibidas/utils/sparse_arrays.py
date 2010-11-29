@@ -3,10 +3,14 @@
 
 import numpy
 import operator
-import cutils
 import array
-from rtypes import Missing
 from itertools import izip_longest
+
+from missing import Missing
+
+_delay_import_(globals(),"cutils")
+#_delay_import_(globals(),"ibidas.itypes","Missing")
+
 class PosSparse(object):
     def __init__(self, val,sorted_pos=None, shape=None):
         val = cutils.darray(val)

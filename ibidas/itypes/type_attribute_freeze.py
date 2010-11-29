@@ -1,10 +1,10 @@
-import rtypes
-from multi_visitor import VisitorFactory, NF_ERROR, NF_ELSE
-from rtypes import Missing
-import cutils
-import util
 import operator
-import sparse_arrays
+
+from ..constants import *
+from ..utils.multi_visitor import VisitorFactory, NF_ERROR, NF_ELSE
+from ..utils.missing import Missing
+
+_delay_import_(globals(),"..utils","cutils","util","sparse_arrays")
 
 class slicetuple(tuple):
     def __new__(self,s):
@@ -20,7 +20,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
 
     #Determine if necessary to freeze a type (or its subtypes)    
     def need_freeze(self, rtype):
-        return (rtype.data_state != rtypes.DATA_FROZEN)
+        return (rtype.data_state != DATA_FROZEN)
     needFreezeTypeUnknown=need_freeze
     needFreezeTypeDict=need_freeze
     needFreezeTypeArray=need_freeze
@@ -39,7 +39,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     #freeze a type and its subtypes (adapt its representation, not the data!)
     def freezeTypeUnknown(self, rtype):
         if self.needFreeze(rtype):
-            return rtype.copy(data_state=rtypes.DATA_FROZEN)
+            return rtype.copy(data_state=DATA_FROZEN)
         else:
             return rtype
 
@@ -53,7 +53,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     
     def freezeTypeDict(self, rtype):
         if(self.needFreeze(rtype)):
-            res = rtype.copy(data_state=rtypes.DATA_FROZEN)
+            res = rtype.copy(data_state=DATA_FROZEN)
             res.subtypes = [self.freezeType(subtype) for subtype in rtype.subtypes]
         else:
             res = rtype
@@ -61,7 +61,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
 
     def freezeTypeArray(self,rtype):
         if(self.needFreeze(rtype)):
-            res = rtype.copy(data_state=rtypes.DATA_FROZEN)
+            res = rtype.copy(data_state=DATA_FROZEN)
             res.subtypes = [self.freezeType(subtype) for subtype in rtype.subtypes]
         else:
             res = rtype
@@ -223,7 +223,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     
     #Determine if necessary to freeze a type (or its subtypes)    
     def need_unfreeze(self, rtype):
-        return (rtype.data_state == rtypes.DATA_FROZEN)
+        return (rtype.data_state == DATA_FROZEN)
     needUnfreezeTypeUnknown=need_unfreeze
     needUnfreezeTypeDict=need_unfreeze
     needUnfreezeTypeSlice=need_unfreeze
@@ -238,7 +238,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     #freeze a type and its subtypes (adapt its representation, not the data!)
     def unfreezeTypeUnknown(self, rtype):
         if self.needUnfreeze(rtype):
-            return rtype.copy(data_state=rtypes.DATA_NORMAL)
+            return rtype.copy(data_state=DATA_NORMAL)
         else:
             return rtype
     

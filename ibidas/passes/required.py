@@ -1,20 +1,21 @@
-import pass_manager
 from collections import defaultdict
-from multi_visitor import VisitorFactory, NF_ELSE
-import pass_prewalk
-import slices
+from ..utils.multi_visitor import VisitorFactory, NF_ELSE
+
+import manager
+import prewalk
+_delay_import_(globals(),"..slices")
 
 class RequiredSliceIds(VisitorFactory(prefixes=("require", "func"), 
                                       flags=NF_ELSE), 
-                       pass_manager.Pass):
+                       manager.Pass):
     """Calculates for representor objects in query tree
     the targets (i.e. other representor objects that use their data)"""
-    after = set([pass_prewalk.PreOrderWalk])
+    after = set([prewalk.PreOrderWalk])
 
     @classmethod
     def run(cls, query, pass_results):
         self = cls()
-        prewalk = pass_results[pass_prewalk.PreOrderWalk]
+        prewalk = pass_results[prewalk.PreOrderWalk]
         required_ids = defaultdict(set)
 
         for rep in prewalk:

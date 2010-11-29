@@ -6,6 +6,7 @@ Date: 20-feb-08"""
 
 import ConfigParser
 import string
+import os
 
 def loadConfig(file, config={}):
     """
@@ -13,12 +14,13 @@ def loadConfig(file, config={}):
     <section>.<option> and the values 
     """
     config = config.copy()
-    cp = ConfigParser.ConfigParser()
-    cp.read(file)
-    for sec in cp.sections():
-        name = string.lower(sec)
-        for opt in cp.options(sec):
-            config[name + "." + string.lower(opt)] = string.strip(cp.get(sec, opt))
+    if(os.path.isfile(rc_path)):    
+        cp = ConfigParser.ConfigParser()
+        cp.read(file)
+        for sec in cp.sections():
+            name = string.lower(sec)
+            for opt in cp.options(sec):
+                config[name + "." + string.lower(opt)] = string.strip(cp.get(sec, opt))
     return config
 
 def writeConfig(filename, config):

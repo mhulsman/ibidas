@@ -1,14 +1,16 @@
-import pass_manager
-from multi_visitor import VisitorFactory, F_CACHE, NF_ROBJ
+import manager
+from ..utils.multi_visitor import VisitorFactory, F_CACHE, NF_ROBJ
+
+_delay_import_(globals(),"..repops")
 
 class DebugVisualizer(VisitorFactory(prefixes=("visit", "target"),
                                      flags=F_CACHE | NF_ROBJ), 
-                      pass_manager.Pass):
+                      manager.Pass):
     @classmethod
     def run(cls, query, pass_results):
         #delayed import, only import if debug is enabled
         import pygraphviz as pg
-        from thirdparty import xdot
+        from ibidas.thirdparty import xdot
         import gtk
         import gtk.gdk
 
@@ -60,5 +62,4 @@ class DebugVisualizer(VisitorFactory(prefixes=("visit", "target"),
             self.graph.add_edge(id(target), id(node), 
                                 color="red", constraint="false")
             
-import repops
 

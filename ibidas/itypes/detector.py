@@ -67,23 +67,24 @@ The parentcls attribute should be used to determine the parent scanner,
 the registerTypeScanner method to register the scanner. 
 """
 
-import sparse_arrays
 import numpy
 import array
-import rtypes
-from rtypes import Missing, DATA_NORMAL, DATA_INPUT, DATA_FROZEN
 from collections import defaultdict
-import cutils
 import operator
-import util
-import dimensions
-import convertors
+
+import rtypes, convertors
+from ..constants import *
+from ..utils import sparse_arrays
+from ..utils.missing import *
+
+_delay_import_(globals(),"dimensions")
+_delay_import_(globals(),"..utils","cutils","util")
 
 _scanchildren = defaultdict(list)
 def registerTypeScanner(newscancls):
     _scanchildren[newscancls.parentcls].append(newscancls)
 
-missing_cls = set([None.__class__, rtypes.MissingType])
+missing_cls = set([None.__class__, MissingType])
 missing_val = set([None, Missing])
 
 
@@ -354,13 +355,14 @@ class DimEqualizer(object):
                 dimrep._setDim(dr.dim)
                 return dr.dim
         if dimrep.length_type == LENGTH_FIXED:
-            ndim = dimensions.Dim(dimrep.lengths, nparents, dimrep.has_missing)
+            ndim = dimensions.Dim(dimrep.lengths, nparents, dimrep.has_missing,name="d"+str(self.dimid()))
         else:
-            ndim = dimensions.Dim(dimensions.UNDEFINED, nparents, dimrep.has_missing)
+            ndim = dimensions.Dim(UNDEFINED, nparents, dimrep.has_missing,name="d"+str(self.dimid()))
         dimrep._setDim(ndim)
         return ndim
 
     def processDims(self):
+        self.dimid = util.seqgen().next
         for dr in self.dimreps:
             if dr.dirty:
                 self._attachDim(dr)
@@ -458,7 +460,7 @@ TypeScanner.parentcls = AnyScanner
 
 
 class TupleScanner(TypeScanner):
-    good_cls = set([tuple, None.__class__, rtypes.MissingType])
+    good_cls = set([tuple, None.__class__, MissingType])
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -467,7 +469,7 @@ class TupleScanner(TypeScanner):
 
     def getType(self):
         fieldnames = ['f' + str(i) for i in xrange(self.max_len)]
-        subtypes = [self.getSubDetector(i).getType() for i in xrange(self.max_len)]
+        subtypes = tuple([self.getSubDetector(i).getType() for i in xrange(self.max_len)])
         cv = self.convertor(self.detector.objectclss.copy()) 
         return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, convertor=cv, data_state=DATA_INPUT)
 
@@ -505,7 +507,7 @@ class NamedTupleScanner(TypeScanner):
 
     def getType(self):
         fieldnames = [name for name in self.names]
-        subtypes = [self.getSubDetector(name).getType() for name in self.names]
+        subtypes = tuple([self.getSubDetector(name).getType() for name in self.names])
         cv = self.convertor(self.detector.objectclss.copy()) 
         return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, convertor=cv, data_state=DATA_INPUT)
 
@@ -514,7 +516,7 @@ class NamedTupleScanner(TypeScanner):
             return False
 
         for cls in self.detector.objectclss:
-            if cls is None.__class__ or cls is rtypes.MissingType:
+            if cls is None.__class__ or cls is MissingType:
                 continue
             if not(issubclass(cls, tuple) and hasattr(cls, '_fields')):
                 return False
@@ -533,7 +535,7 @@ class NamedTupleScanner(TypeScanner):
 registerTypeScanner(NamedTupleScanner)
 
 class DictScanner(TypeScanner):
-    good_cls = set([dict, None.__class__, rtypes.MissingType])
+    good_cls = set([dict, None.__class__, MissingType])
     convertor=convertors.DictConvertor
 
     def __init__(self, detector):
@@ -542,7 +544,7 @@ class DictScanner(TypeScanner):
 
     def getType(self):
         fieldnames = [name for name in self.names]
-        subtypes = [self.getSubDetector(name).getType() for name in self.names]
+        subtypes = tuple([self.getSubDetector(name).getType() for name in self.names])
         cv = self.convertor(self.detector.objectclss.copy()) 
         return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, convertor=cv, data_state=DATA_INPUT)
 
@@ -569,7 +571,7 @@ registerTypeScanner(DictScanner)
 
 
 class ContainerScanner(TypeScanner):
-    good_cls = set([set, frozenset, None.__class__, rtypes.MissingType, list, array.array, numpy.ndarray, sparse_arrays.FullSparse, sparse_arrays.PosSparse])
+    good_cls = set([set, frozenset, None.__class__, MissingType, list, array.array, numpy.ndarray, sparse_arrays.FullSparse, sparse_arrays.PosSparse])
     bad_cls = set([tuple, str])
 
     def __init__(self, detector):
@@ -579,13 +581,13 @@ class ContainerScanner(TypeScanner):
     def getType(self):
         subtype = self.getSubDetector().getType()
         
-        dims = [self.getDimRep(i).dim for i in xrange(self.min_dim)]
+        dims = tuple([self.getDimRep(i).dim for i in xrange(self.min_dim)])
         cv = self.convertor(self.detector.objectclss.copy()) 
         return rtypes.TypeArray(self.detector.hasMissing(), dims, (subtype,), convertor=cv, data_state=DATA_INPUT)
 
     def scan(self, seq):
+        has_missing = self.detector.hasMissing()
         if not self.detector.objectclss.issubset(self.good_cls):
-            has_missing = self.detector.hasMissing()
             if not self.detector.objectclss.isdisjoint(self.bad_cls):
                 return False
 
@@ -646,7 +648,7 @@ registerTypeScanner(ContainerScanner)
 
 class SetScanner(ContainerScanner):
     parentcls = ContainerScanner
-    good_cls = set([set, frozenset, None.__class__, rtypes.MissingType])
+    good_cls = set([set, frozenset, None.__class__, MissingType])
     convertor=convertors.SetConvertor
 
     def getType(self):
@@ -679,7 +681,7 @@ registerTypeScanner(SetScanner)
 
 
 class StringScanner(TypeScanner):
-    good_cls = set([str, unicode, None.__class__, rtypes.MissingType, numpy.string_, numpy.unicode_])
+    good_cls = set([str, unicode, None.__class__, MissingType, numpy.string_, numpy.unicode_])
     unicode_cls = set([unicode, numpy.unicode_])
     convertor=convertors.StringConvertor
 
@@ -696,7 +698,7 @@ class StringScanner(TypeScanner):
         if self.max_nchars < 32:
             d = dimensions.Dim(self.max_nchars, 0, self.detector.hasMissing())
         else:
-            d = dimensions.Dim(dimensions.UNDEFINED, len(self.getDimReps(0)), self.detector.hasMissing())
+            d = dimensions.Dim(UNDEFINED, len(self.getDimReps(0)), self.detector.hasMissing())
 
         dims = (d,)
         cv = self.convertor(self.detector.objectclss.copy()) 
@@ -715,7 +717,7 @@ registerTypeScanner(StringScanner)
 class NumberScanner(TypeScanner):
     __doc__ = 'Number scanner, accepts all number objects.'
     typecls = rtypes.TypeNumber
-    good_cls = set((bool, float, complex, long, int, None.__class__, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.float32, numpy.float64, numpy.complex64, numpy.complex128, numpy.bool_, rtypes.MissingType))
+    good_cls = set((bool, float, complex, long, int, None.__class__, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.float32, numpy.float64, numpy.complex64, numpy.complex128, numpy.bool_, MissingType))
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -742,7 +744,7 @@ class RealScanner(NumberScanner):
     __doc__ = 'Real scanner, accepts all real and integer objects.'
     parentcls = NumberScanner
     typecls = rtypes.TypeReal64
-    good_cls = set((float, bool, None.__class__, numpy.float32, numpy.float64, rtypes.MissingType, long, int, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.bool_))
+    good_cls = set((float, bool, None.__class__, numpy.float32, numpy.float64, MissingType, long, int, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.bool_))
 registerTypeScanner(RealScanner)
 
 
@@ -753,7 +755,7 @@ class IntegerScanner(TypeScanner):
     istepvals = [128, 32768, 2147483648L, 9223372036854775808L]
     inttypes = [rtypes.TypeInt8, rtypes.TypeInt16, rtypes.TypeInt32, rtypes.TypeInt64]
     
-    good_cls = set((bool, long, int, None.__class__, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.bool_, rtypes.MissingType))
+    good_cls = set((bool, long, int, None.__class__, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.bool_, MissingType))
     
     numpy_minmax = {numpy.dtype('bool'): (0, 1), numpy.dtype('int8'): (-128, 127), numpy.dtype('uint8'): (0, 255), numpy.dtype('int16'): (-32768, 32767), numpy.dtype('uint16'): (0, 65535), numpy.dtype('int32'): (-2147483648, 2147483647), numpy.dtype('uint32'): (0, 4294967295L), numpy.dtype('int64'): (-9223372036854775808L, 9223372036854775807L), numpy.dtype('uint64'): (0, 18446744073709551615L)}
     array_minmax = {'b': (-128, 127), 'B': (0, 255), 'h': (-32768, 32767), 'H': (0, 65535), 'i': (-2147483648, 2147483647), 'I': (0, 4294967295L), 'l': (-2147483648, 2147483647), 'L': (0, 4294967295L)}
@@ -800,13 +802,13 @@ registerTypeScanner(IntegerScanner)
 class BoolScanner(TypeScanner):
     parentcls = IntegerScanner
     typecls = rtypes.TypeBool
-    good_cls = set((numpy.bool_, bool, None.__class__, rtypes.MissingType))
+    good_cls = set((numpy.bool_, bool, None.__class__, MissingType))
 registerTypeScanner(BoolScanner)
 
 
 
 class StringRealScanner(RealScanner):
-    good_cls = set([str, unicode, None.__class__, rtypes.MissingType, numpy.string_, numpy.unicode_])
+    good_cls = set([str, unicode, None.__class__, MissingType, numpy.string_, numpy.unicode_])
     parentcls = StringScanner
     convertor=convertors.StringFloatConvertor
 
@@ -826,7 +828,7 @@ registerTypeScanner(StringRealScanner)
 
 
 class StringIntegerScanner(IntegerScanner):
-    good_cls = set([str, unicode, None.__class__, rtypes.MissingType, numpy.string_, numpy.unicode_])
+    good_cls = set([str, unicode, None.__class__, MissingType, numpy.string_, numpy.unicode_])
     parentcls = StringRealScanner
     convertor=convertors.StringIntegerConvertor
 

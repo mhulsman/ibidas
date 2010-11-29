@@ -1,3 +1,5 @@
+_delay_import_(globals(),"repops")
+
 class QueryContext(object):
     """Context object of a query. Encloses representor
     with fixate operation."""
@@ -5,5 +7,3 @@ class QueryContext(object):
         self.root = repops.fixate(representor)
         self.args = args
 
-
-import repops

@@ -9,16 +9,19 @@ import sys, string
 import xml.sax.handler
 import xml.sax
 from collections import deque,defaultdict, namedtuple
-from multi_visitor import DirectVisitorFactory, NF_ELSE
-import wrapper
-from wrapper_py import Result
 import xml.parsers
 import xml.parsers.expat
-import rtypes
-from rtypes import Missing
-import slices
-import repops_dim
 import numpy
+
+from ..utils.multi_visitor import DirectVisitorFactory, NF_ELSE
+import wrapper
+_delay_import_(globals(),"wrapper_py","Result")
+_delay_import_(globals(),"..itypes","rtypes")
+_delay_import_(globals(),"..utils.missing","Missing")
+
+_delay_import_(globals(),"..slices")
+_delay_import_(globals(),"..repops_dim")
+
 def read_psimi(filename):
     return repops_dim.unpack_array(PSIMIRepresentor(filename))
 

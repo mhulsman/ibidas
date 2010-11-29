@@ -41,26 +41,6 @@ Multiple inheritance is allowed, e.g. TypeUInt8(TypeUInt16, TypeInt16)
 It is currently not possible to add types within the hieararchy (e.g.
 a type inbetween TypeUnknown and any of the other types), 
 without modifying the source in this file or some hackish runtime class modification. 
-
-
-Missing values
---------------
-The MissingType class implements a missing type which is used in the 
-internal representation. Types which allow missing values have to set the flag
-'has_missing' to True. 
-
-The only instance from MissingType that should be used is Missing (similar to None).
-This way one can test for equivalence by using 'variable_name is Missing'. 
-
-MissingType implements most type overloads to implement missing value behaviour. 
-E.g., Missing + 3 = Missing,   Missing & False = False, Missing | True = True,
-Missing == Missing = False, etc., similar to SQL NULL. 
-
-!!!To make it possible to have multiple Missing values in the same set, but use the same
-instance, __hash__ returns an incrementing value, and __eq__ returns False. 
-We have to make sure that this keeps working in Python (i.e. that set will not start to 
-use a pointer comparision shortcut). Maybe we can find a better solution in the future. 
-
 """
 
 
@@ -68,123 +48,12 @@ import numpy
 import operator
 from collections import defaultdict
 
-hash_counter = 0
-class MissingType(object):#{{{
-    """MissingType value object, representing not-existing or unknown values.
-       Singleton value is available in rtypes.Missing"""
+from ..constants import *
 
-    __slots__ = []
+_delay_import_(globals(),"dimensions")
+_delay_import_(globals(),"casts")
+_delay_import_(globals(),"type_attribute_freeze")
 
-    def __add__(self, other):
-        return self
-
-    def __radd__(self, other):
-        return self
-
-    def __sub__(self, other):
-        return self
-
-    def __rsub__(self, other):
-        return self
-
-    def __mul__(self, other):
-        return self
-
-    def __rmul__(self, other):
-        return self
-
-    def __mod__(self, other):
-        return self
-
-    def __rmod__(self, other):
-        return self
-
-    def __div__(self, other):
-        return self
-
-    def __rdiv__(self, other):
-        return self
-
-    def __and__(self, other):
-        if(other is False or (isinstance(other,numpy.bool_) and other == False)):
-            return False
-        elif(isinstance(other,numpy.ndarray)):
-            return other.__and__(self)
-        return self
-
-    def __rand__(self, other):
-        if(other is False or (isinstance(other,numpy.bool_) and other == False)):
-            return False
-        elif(isinstance(other,numpy.ndarray)):
-            return other.__rand__(self)
-        return self
-
-    def __or__(self, other):
-        if(other is True or (isinstance(other,numpy.bool_) and other == True)):
-            return True
-        elif(isinstance(other,numpy.ndarray)):
-            return other.__ror__(self)
-        return self
-
-    def __ror__(self, other):
-        if(other is True or (isinstance(other,numpy.bool_) and other == True)):
-            return True
-        elif(isinstance(other,numpy.ndarray)):
-            return other.__or__(self)
-        return self
-
-    def __xor__(self, other):
-        return self
-
-    def __rxor__(self, other):
-        return self
-
-    def __eq__(self, other):
-        return self
-
-    def __ne__(self, other):
-        return self
-
-    def __le__(self, other):
-        return self
-
-    def __ge__(self, other):
-        return self
-
-    def __lt__(self, other):
-        return self
-
-    def __gt__(self, other):
-        return self
-
-    def __invert__(self):
-        return self
-
-    def __pos__(self):
-        return self
-
-    def __neg__(self):
-        return self
-
-    def __abs__(self):
-        return self
-
-    def __nonzero__(self):
-        return False
-    
-    def __hash__(self):
-        global hash_counter
-        hash_counter += 1
-        return hash_counter
-
-    def __repr__(self):
-        return "--"
-
-    def __call__(self, *seq, **kwds):
-        return self
-
-#Singleton value for _MissingType
-Missing = MissingType()
 
 #}}}
 
@@ -193,6 +62,7 @@ __typenames__ = {}
 #children types classes for each parent type class
 __typechildren__ = defaultdict(list)
 
+from ibidas import constants
 
 def addType(newtypecls):
     """Adds a type `newtypecls`
@@ -213,11 +83,6 @@ def addTypeAttribute(name, common_visitor):
     _type_attribute_common[name] = common_visitor
 
 
-#data states, used in rtype to determine current 
-#data form
-DATA_NORMAL=0  #data in normal ibidas format
-DATA_INPUT=1   #data in some input format convertable by scanner
-DATA_FROZEN=2  #data in frozen state, useable for set (can be combined with DATA_NORMAL)
 
 
 class TypeUnknown(object):#{{{
@@ -896,9 +761,9 @@ class TypeString(TypeArray):#{{{
 
     @classmethod
     def commonType(cls, type1, type2):
-        if(type1.dims[0].shape == dimensions.UNDEFINED or
-            type2.dims[0].shape == dimensions.UNDEFINED):
-            shape = dimensions.UNDEFINED
+        if(type1.dims[0].shape == UNDEFINED or
+            type2.dims[0].shape == UNDEFINED):
+            shape = UNDEFINED
         else:
             shape = max(type1.dims[0].shape, type2.dims[0].shape)
         dim = dimensions.Dim(shape)
@@ -912,7 +777,7 @@ class TypeString(TypeArray):#{{{
         """Returns dtype of a numpy container which
            can hold this type efficiently."""
 
-        if(self.dims[0].shape == dimensions.UNDEFINED or self.has_missing or self.dims[0].shape > 32):
+        if(self.dims[0].shape == UNDEFINED or self.has_missing or self.dims[0].shape > 32):
             return numpy.dtype(object)
         else:
             return numpy.dtype(self._dtype + str(self.dims[0].shape))
@@ -1265,16 +1130,16 @@ def _createType(name, last_dims=()):#{{{
                         if(shape == "?"):
                             dim_shape = 1
                         else:
-                            dim_shape = dimensions.UNDEFINED
+                            dim_shape = UNDEFINED
                     elif(shape == "*"):
-                        dim_shape = dimensions.UNDEFINED
+                        dim_shape = UNDEFINED
                     else:
                         dim_shape = int(shape)
                         assert dim_shape > 0, "Shape should be larger " + \
                                         "than 0 (at pos: " + str(pos) + ")"
                 else:
                     dim_variable = 0
-                    dim_shape = dimensions.UNDEFINED
+                    dim_shape = UNDEFINED
                 dimlist.append(dimensions.Dim(dim_shape, 
                                               dim_variable, did = dim_name))
                 begin_pos = pos + 1
@@ -1308,16 +1173,16 @@ def _createType(name, last_dims=()):#{{{
                         if(shape == "?"):
                             dim_shape = 1
                         else:
-                            dim_shape = dimensions.UNDEFINED
+                            dim_shape = UNDEFINED
                     elif(shape == "*"):
-                        dim_shape = dimensions.UNDEFINED
+                        dim_shape = UNDEFINED
                     else:
                         dim_shape = int(shape)
                         assert dim_shape > 0, "Shape should be larger " + \
                                            "than 0 (at pos: " + str(pos) + ")"
                 else:
                     dim_variable = 1
-                    dim_shape = dimensions.UNDEFINED
+                    dim_shape = UNDEFINED
                 begin_pos = pos + 1
                 dimlist.append(dimensions.Dim(dim_shape, 
                                               dim_variable, did = dim_name)) 
@@ -1446,6 +1311,4 @@ TypeStrings = set(TypeString.getDescendantTypes())
 TypeArrays = set(TypeArray.getDescendantTypes())
 
 
-import dimensions
-import casts
-import type_attribute_freeze
+

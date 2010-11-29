@@ -1,7 +1,8 @@
-import util
 import copy
 
-UNDEFINED = -1
+from ..utils import util
+from ..constants import *
+
 
 #pylint: disable-msg=E1101
 dimid = util.seqgen().next

@@ -1,8 +1,9 @@
-import representor
-import context
 import copy
-import slices
-import dim_helpers
+
+import representor
+_delay_import_(globals(),"slices")
+_delay_import_(globals(),"dim_helpers")
+_delay_import_(globals(),"utils","context")
 
 
 def delayable(default_slice="*"):
