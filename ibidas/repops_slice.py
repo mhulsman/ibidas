@@ -131,7 +131,7 @@ def unpack_tuple(source, name="", unpack=True):#{{{
         for pos, nslice in enumerate(nactive_slices):
             while(nslice.type.__class__ is rtypes.TypeArray):
                 all_slices[nslice.id] = nslice
-                nslice = slices.sunpack_array(nslice)
+                nslice = UnpackArraySlice(nslice)
             nactive_slices[pos] = nslice
             all_slices[nslice.id] = nslice
     else:

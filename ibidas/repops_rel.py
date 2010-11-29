@@ -247,7 +247,7 @@ class ifilter(MultiOpRep):#{{{
                                   odim.variable, odim.has_missing)
             newbranch[-1] = ndim
         newbranch = tuple(newbranch)
-        nall_slices, filter_slices = redimSlices3(source._all_slices, 
+        nall_slices, filter_slices = redimSlices(source._all_slices, 
                                         oldbranch, newbranch, return_redim=True)
         for slice in constraint_slices:
             nall_slices[slice.id] = slice
@@ -369,7 +369,7 @@ def _join(lsource, rsource, condition=None, ldim=(), rdim=(),
         rightbranch = leftbranch
 
 
-        lall_slices, lslices = redimSlices3(lsource._all_slices, 
+        lall_slices, lslices = redimSlices(lsource._all_slices, 
                                     oleftbranch, leftbranch, return_redim=True)
         if(type == "LEFT" or type == "OUTER"):
             pass
@@ -396,7 +396,7 @@ def _join(lsource, rsource, condition=None, ldim=(), rdim=(),
     #and take part in the join
     rsource = realiasSimilarSlices(rsource, lall_slices, 
                             keep_equal=True, always_disimilar_ids=rsliceids)
-    rall_slices, rslices = redimSlices3(rsource._all_slices, 
+    rall_slices, rslices = redimSlices(rsource._all_slices, 
                                 orightbranch, rightbranch, return_redim=True)
        
    

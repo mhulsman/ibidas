@@ -1,2 +1,3 @@
 - remove identifyDims from representor
+- dim choice support in map/aggregrate
 

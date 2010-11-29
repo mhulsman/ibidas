@@ -32,7 +32,7 @@ def matchDimSlices(all_slices, dims):
             res[slice.id] = slice
     return res
             
-def redimSlices3(all_slices, from_dims, to_dims, return_redim=False):
+def redimSlices(all_slices, from_dims, to_dims, return_redim=False):
     res = {}
     copied = set()
     variables = any([dim.variable for dim in from_dims])
@@ -58,96 +58,6 @@ def redimSlices3(all_slices, from_dims, to_dims, return_redim=False):
     else:
         return res
 
-
-
-def redimSlices2(all_slices, redim_map, return_redim=False, noredim=set()):#{{{
-    """Redimensionalize slices, from old_branch to new_branch
-
-    Parameters
-    ----------
-    all_slices: slices to redim
-    redim_map: dict
-        key: tuple of dims
-        value: dim that last dim in old should be replaced with.
-             can be dim, tuple of dims (to extend) or None (to delete). 
-                
-                
-    return_redim: return also new redimmed slices
-    """
-    res = {}
-    copied = set()
-
-    for slice in all_slices.values():
-        if(slice.id in noredim):
-            res[slice.id] = slice
-            continue
-
-        nslice = slice.modify(redim_map)
-        if(not nslice is slice):
-            copied.add(nslice)
-        res[nslice.id] = nslice
-    
-    if(return_redim):
-        return (res, copied)
-    else:
-        return res#}}}
-
-def redimSlices(all_slices, old_new_branch_pairs, return_redim=False):#{{{
-    """Redimensionalize slices, from old_branch to new_branch
-
-    Parameters
-    ----------
-    all_slices: slices to redim
-    old_new_branch_pairs: list of tuples(old_branch, new_branch)
-        old_branch: current tuple of nested dimensions. 
-        new_branch: new tuple of dimensions. 
-                    - Can have None to remove a dim
-                    - Can have tuples of dims, to replace one dim with multiple
-        branches should be rooted in top dimension!
-                
-                
-    return_redim: return also new redimmed slices
-    """
-    res = {}
-    copied = set()
-
-    slicelist = all_slices.values()
-    for slice in slicelist:
-        ndims = []
-        change_dim = False
-        for old_branch, new_branch in old_new_branch_pairs:
-            for pos, (dim, odim, ndim) in \
-                        enumerate(zip(slice.dims, old_branch, new_branch)):
-                if(dim == odim):
-                    if(ndim is None):
-                        pass
-                    elif(isinstance(ndim, tuple)):
-                        ndims.extend(ndim)
-                    else:
-                        ndims.append(ndim)
-
-                    if(odim != ndim):
-                        change_dim = True
-                elif(dim == ndim or (isinstance(ndim, tuple) and dim in ndim)):
-                    ndims.append(dim)
-                else:
-                    ndims.extend(slice.dims[pos:])
-                    break
-            else:
-                if(change_dim):
-                    ndims.extend(slice.dims[(pos + 1):])
-            if(change_dim):
-                if(not slice in copied):
-                    slice = slice.copy()
-                    copied.add(slice)
-                slice.dims = tuple(ndims)
-        res[slice.id] = slice
-    
-    if(return_redim):
-        return (res, copied)
-    else:
-        return res#}}}
-
 def unpack_array(source, name = None):#{{{
     """Operation to unpack array typed slices
 
@@ -167,7 +77,7 @@ def unpack_array(source, name = None):#{{{
             nactive_slices.append(slice)
             continue
             
-        nslice = slices.sunpack_array(slice)
+        nslice = slices.UnpackArraySlice(slice)
         nactive_slices.append(nslice)
 
     all_slices = source._all_slices.copy()

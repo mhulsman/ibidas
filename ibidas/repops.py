@@ -92,9 +92,9 @@ def apply_slice(source, name, slicecls, dim_selector, *params, **kwds):
     nactive_slices = []                       #new active slices
     for slice in source._active_slices:
         if(dim_selector is None):
-            nslice = slicecls(name, slice, slice.dims, *params, **kwds)
+            nslice = slicecls(name, slice,*params, **kwds)
         elif(dim_helpers.sliceHasDimPath(slice, dim_selector)):
-            nslice = slicecls(name, slice, dim_selector, *params, **kwds)
+            nslice = slicecls(name, slice,*params, **kwds)
         else:
             nslice = slice
         nactive_slices.append(nslice)
@@ -109,6 +109,6 @@ def apply_slice(source, name, slicecls, dim_selector, *params, **kwds):
     return self
 
 def freeze(source):
-    return apply_slice(source, "freeze", slices.freeze_slice, None)
+    return apply_slice(source, "freeze", slices.FreezeSlice, None)
 
 
