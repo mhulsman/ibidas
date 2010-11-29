@@ -25,16 +25,17 @@ def ximport(name, module, args=[]):
     if(level == 0):
         level = -1
        
-       
-    if(not args):
-        module[name.split('.')[0]] = __import__(name,module,module,[],level)
-    else:
-        try:
-            res = __import__(name,module,module,args,level)
-            for arg in args:
-                module[arg] = getattr(res,arg)
-        except ValueError:
-            for arg in args:
-                res = __import__(name + "." + arg,module,module,args,level)
-                module[arg] = res
-   
+    try: 
+        if(not args):
+            module[name.split('.')[0]] = __import__(name,module,module,[],level)
+        else:
+            try:
+                res = __import__(name,module,module,args,level)
+                for arg in args:
+                    module[arg] = getattr(res,arg)
+            except ValueError:
+                for arg in args:
+                    res = __import__(name + "." + arg,module,module,args,level)
+                    module[arg] = res
+    except ImportError, e:
+        raise ImportError("importing from " + name + "(" + str(level) + "): " + str(args) + " into " + module["__name__"] + " did not succeed: " + e.message)

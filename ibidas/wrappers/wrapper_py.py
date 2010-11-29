@@ -4,14 +4,17 @@ from collections import defaultdict
 import numpy
 
 import wrapper
+from ..utils.multi_visitor import VisitorFactory, F_CACHE, NF_ERROR, NF_ELSE
+from ..itypes import rtypes
+from ..passes import required
+from .. import engines
 
-from ibidas import representor, util, detector
-from ibidas.slices import Slice
-from ibidas.utils.multi_visitor import VisitorFactory, F_CACHE, NF_ERROR, NF_ELSE
-from ibidas.utils import nestutils, cutils
-from ibidas.types import rtypes
-from ibidas.types.type_attribute_freeze import data_freezer
-from ibidas.passes import required
+_delay_import_(globals(),"..representor")
+_delay_import_(globals(),"..utils","util","nestutils","cutils")
+_delay_import_(globals(),"..slices")
+_delay_import_(globals(),"..itypes","detector","type_attribute_freeze")
+_delay_import_(globals(),"..repops_slice")
+_delay_import_(globals(),"..repops_dim")
 
 def rep(data=None, dtype=rtypes.unknown, modifiable=False, 
         type_check=True, unpack=True):#{{{
@@ -25,7 +28,7 @@ def rep(data=None, dtype=rtypes.unknown, modifiable=False,
             scanner = scanner_protocol.getScanner(dtype)
             data_convertor.convert(scanner, [data], dtype)[0]
    
-    nslices = (Slice("data", dtype),)
+    nslices = (slices.Slice("data", dtype),)
     data = {nslices[0].id: data}
 
     res = PyRepresentor(data, nslices)
@@ -592,5 +595,4 @@ def inner_filter(data, bcast, dims, pack, rtypes, rdims, args):
         constraint_data = (slice(None),) * len(bcast) + (constraint_data,)
     return filter_data[constraint_data]
 
-from ibidas import repops_slice, repops_dim, engines, representor
 engines.select_engine.register(PySelectExecutor)

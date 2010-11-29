@@ -6,9 +6,10 @@ import math
 from repops import *
 from repops_dim import *
 from repops_slice import *
+from itypes import rtypes
 
 _delay_import_(globals(),"utils","util","context","cutils")
-_delay_import_(globals(),"itypes","dimensions","rtypes")
+_delay_import_(globals(),"itypes","dimensions")
 _delay_import_(globals(),"slices")
 
 class RFilter(MultiOpRep):#{{{

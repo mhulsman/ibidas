@@ -3,10 +3,12 @@ import copy
 import itertools
 from collections import defaultdict
 
+from itypes import rtypes
+
 _delay_import_(globals(),"utils","util","context")
-_delay_import_(globals(),"itypes", "rtypes", "dimensions")
+_delay_import_(globals(),"itypes", "dimensions")
 _delay_import_(globals(),"wrappers","wrapper_py")
-_delay_import_(globlas(),"query_context")
+_delay_import_(globals(),"query_context")
 _delay_import_(globals(),"engines")
 _delay_import_(globals(),"repops")
 _delay_import_(globals(),"repops_rel")

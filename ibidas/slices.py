@@ -2,8 +2,9 @@ import copy
 
 from constants import *
 from utils import util
+from itypes import rtypes
 
-_delay_import_(globals(),"itypes","dimensions","rtypes")
+_delay_import_(globals(),"itypes","dimensions")
 _delay_import_(globals(),"itypes.type_attribute_freeze","freeze_protocol")
 _delay_import_(globals(),"typeops")
 
