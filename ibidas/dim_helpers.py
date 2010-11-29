@@ -32,7 +32,7 @@ def maxmatchPath(pos_paths, match_path):#{{{
     
     return (cur_path, cur_plan, cur_matched)#}}}
 
-def planPos(plan, nr, startval=0):#{{{
+def planPos(plan, nr):#{{{
     """Generates the positions of the bit flags
     in a plan for source path(s) `nr`. To each 
     position, `startval` is added.
@@ -54,11 +54,9 @@ def planPos(plan, nr, startval=0):#{{{
         match = 2**nr
     assert match, "Match or nr parameter should be given."
     pattern = []
-    curpos = startval
-    for p in plan:
+    for curpos, p in enumerate(plan):
         if(p & match == match):
             pattern.append(curpos)
-        curpos += 1
     return tuple(pattern)#}}}
 
 def planPattern(plan, nr, startval=0):#{{{
@@ -110,61 +108,48 @@ def planBroadcast(*paths):#{{{
     """
     final_dims = []
     plan = []
-    pos = [len(path) for path in paths]
     npaths = [list(path) for path in paths]
-    proceed = [True] * len(paths)
-    _planBroadcastHelper(pos, npaths, proceed, final_dims, plan)
+    _planBroadcastHelper(npaths, final_dims, plan)
     return (tuple(plan), tuple(final_dims))#}}}
 
-def _planBroadcastHelper(pos, paths, proceed, final_dims, plan):#{{{
-    ncol = len(pos)
-    for startcol in xrange(ncol):
-        if(proceed[startcol] and pos[startcol] > 0):
-            break
-    if(not (proceed[startcol] and pos[startcol] > 0)):
-        startcol += 1
-
-    while(startcol < ncol):
-        cdim = paths[startcol][0]
-        del paths[startcol][0]
-        pos[startcol] -= 1
-        cplan = 2**startcol
+def _planBroadcastHelper(paths, final_dims, plan):#{{{
+    curcol = len(paths) - 1
+    while(curcol):
+        if(not paths[curcol]):
+            curcol -=1
+            continue
         
-        match_pos = [0] * ncol
-        match_proceed = [False] * ncol
-        recursive = False
-        for ccol in xrange(startcol + 1, ncol):
+        cdim = paths[curcol][0]
+        cplan = 2 ** curcol
+
+        match_paths = [[]] * len(paths)
+        recursive=False
+        for ccol in xrange(curcol):
             try:
-                npos = paths[ccol].index(cdim,0,pos[ccol])
+                npos = paths[curcol].index(cdim)
                 if(npos > 0):
-                    recursive = True
-                match_pos[ccol] = npos
-                match_proceed[ccol] = True
-                cplan |= 2**ccol
-                pos[ccol] -= (npos + 1)
-                del paths[ccol][npos]
+                    match_paths.append(paths[curcol][:npos]) 
+                    recursive=True
+                cplan |= 2 ** ccol
+                paths[ccol] = paths[ccol][npos:]
             except ValueError:
-                match_pos[ccol] = pos[ccol]
+                pass
         if(recursive):
-            _planBroadcastHelper(match_pos, paths, match_proceed, final_dims, plan)
-            for col in xrange(ncol):
-                if(not match_proceed[col]):
-                    pos[col] = match_pos[col]
+            _planBroadcastHelper(match_paths,final_dims,plan)
+        
         if(cdim.variable):
             var = dim.variable
             pos = 0
             while(var):
                 pos += 1
-                if(plan[-pos] & 2**startcol):
+                if(plan[-pos] & 2**curcol):
                     var -=1
             if(cdim.variable != pos):
                 cdim = cdim.copy(reid=True)
                 cdim.variable = pos
         final_dims.append(cdim)
         plan.append(cplan)
-       
-        while(startcol < ncol and (not proceed[startcol] or pos[startcol] == 0)):
-            startcol += 1#}}}
+#}}}
 
 def pathSuffix(dimpath, minlen = 1): #{{{
     """Returns those dimensions of dimpath that can stand alone
@@ -194,21 +179,24 @@ def broadcastAndMatchDimPath(slices, path_prefix, path_suffix, single_match_suff
     Parameters
     ----------
     slices: slices on which to perform the matching
-    single_match_suffix: only the last dim of the suffix should take part in the broadcasting,
+    path_prefix: part of dim path that can be broadcasted
+    path_suffix: part of dim path that should match exactly
+    single_match_suffix: only the last dim of the suffix should not take part in the broadcasting,
                          but matched slices should contain whole suffix. 
     
     Returns
     -------
     Filter path with best (max) match
     """
-    #find slices that match dimpath, find prev_paths for these matches
+    #find slices that match dimpath suffix, find prev_paths for these matches
     pos_slices, dummy, prev_paths = matchDimPath(slices, path_suffix, return_prev=True)
-    assert pos_slices, "Cannot find any slice to filter"
+    assert pos_slices, "Cannot find any slice that matches dim path suffix"
     
     #last dimension is matched by array or slice
     #find max match with all possible prev paths of this last dimension
     
     #first adapt prev_paths if prefix of the suffix can also be broadcasted on
+    prev_paths = set(prev_paths)
     if(single_match_suffix):
         prev_paths = [ppath + path_suffix[:-1] for ppath in prev_paths]
         path_suffix = path_suffix[-1:]
@@ -227,9 +215,15 @@ def broadcastAndMatchDimPath(slices, path_prefix, path_suffix, single_match_suff
     return filter_dimpath #}}}
 
 def matchDimPath(slices, dimpath, return_prev=False):#{{{
+    """Matches dimpath exactly to dim paths in slices.
+       Returns tuple containing a list of matched slices and 
+       a list containing tuples of matched start positions for each slice
+       if return_prev is given, returns as third parameter the header dim paths in
+       a set.
+    """
     match_slices = []
     start_depths = []
-    ret_prev_set = set()
+    ret_prev = []
     ldpath = len(dimpath)
     for slice in slices:
         pos = 0
@@ -247,17 +241,21 @@ def matchDimPath(slices, dimpath, return_prev=False):#{{{
                 startpos.append(curstart)
                 pos = curstart + len(dimpath)
                 if(return_prev):
-                    ret_prev_set.add(sdims[:curstart])
+                    ret_prev.append(sdims[:curstart])
         if(startpos):
             match_slices.append(slice)
             start_depths.append(tuple(startpos))
 
     if(return_prev):
-        return (tuple(match_slices), tuple(start_depths), ret_prev_set)
+        return (tuple(match_slices), tuple(start_depths), ret_prev)
     else:
         return (tuple(match_slices), tuple(start_depths))#}}}
 
 def redimMatch(match_slices, start_depths, oldpath, newpath, var_adapt=(0,)):#{{{
+    """
+    Takes output of matchDimPath, and adapts oldpath to newpath.
+    Returns new slices and new start posses.
+    """
     nslices = []
     loldpath = len(oldpath)
     dep_redim_cache = {}
@@ -266,7 +264,7 @@ def redimMatch(match_slices, start_depths, oldpath, newpath, var_adapt=(0,)):#{{
 
     for slice, startposs in zip(match_slices, start_depths):
         slice = slice.copy()
-        clendiff = 0
+        clendiff = 0  #current dim pos diff. (caused by exchanging oldpath to newpath)
         lstartposs = len(startposs)
         if(lstartposs > 1):
             nstartposs = []
@@ -275,15 +273,17 @@ def redimMatch(match_slices, start_depths, oldpath, newpath, var_adapt=(0,)):#{{
             clendiff += lendiff
             if(lstartposs > 1):
                 nstartposs.append(startpos)
-
+            
+            #dependent part of the dimensions
             dep = slice.dims[(startpos + loldpath):]
 
+            #modify dependent part
             ndep = []
             for pos, dim in enumerate(dep):
-                if dim.variable - pos > 0:
-                    if(dim in dep_redim_cache):
+                if dim.variable - pos > 0: #falls dependency within exchanged part?
+                    if(dim in dep_redim_cache): #look for new dim in redim cache
                         ndep.append(dep_redim_cache[dim])
-                    else:
+                    else:                       #otherwise, create it. var_adapt param tells us how to handle it.
                         ndim = dim.copy(reid=True)
                         ndim.variable = max(ndim.variable + var_adapt[min(dim.variable - pos - 1, len(var_adapt) - 1)],0)
                         ndep.append(ndim)
@@ -369,27 +369,19 @@ def identifyDimPath(source, dim_selector=None):#{{{
         if None: 
             return unique common dimension if exists
         if string:
-            search for dim with name.
-                if only one fixed dim: return
-                if variable dim with unique path: return
-                otherwise returns None
-            search for slice with name 
-                return identifier for last dim
-        if dim:
-            if only one fixed dim: return
-            if variable dim with unique path: return
-            otherwise returns None
-        if slice
-            return identifier for last dim
+            search for dim with name, use it as selector
+            search for slice with name: if found, use slice as selector
+        
+        if dim: find path, ending with dim, that has all its dependencies
+        if slice: use its dims as selector
         if tuple of dim (names):
-            if empty: same as None
-            searches for dim name, identified by branch in tuple. 
+            
+        if tuple of dim (names):
+            if empty: return False
+            else, matches dims in tuple:
             Starts from last dim, find unique path to fixed dim.
-            If exist, returns, otherwise, returns None
         if int:
-            if there is a unique dim path, use that to index.
-            If positive, dim paths can have variable length as 
-            long as they are equal on the base
+            if there is a unique dim path, use that to find index dim.
     """
     if(isinstance(dim_selector, tuple) and len(dim_selector) == 0):
         dim_selector = None
@@ -461,12 +453,8 @@ def identifyDimPathHelper(source, path):#{{{
     same order of dimenmsions as given in 'path', but not necessarily the
     same dimensions. It however should be unique.
     
-    Returns an identifier for the last dimension if unique path found.
+    Returns an dim path (tuple of dims) if unique path found.
     (See _identifyDim for description).
-
-    Note: paths that have a fixed dimension which is not on the beginning
-    will be shortened such that they start from this fixed dimension. The 
-    beginning of the path will not be matched in that case!
 
     Returns
     -------
@@ -478,17 +466,15 @@ def identifyDimPathHelper(source, path):#{{{
         return False
 
     reslist = []
-    active_dim_dict = source._active_dim_dict
-    active_dim_id_dict = source._active_dim_id_dict
-    parent_dim_id_dict = source._active_dim_id_parent_dict
 
     done = False
     for pos, dim in enumerate(path[::-1]):
+        #make certain dim is an (available dim)
         if(isinstance(dim, dimensions.Dim)):
-            if not dim.id in active_dim_id_dict:
+            if not dim.id in source._active_dim_id_dict:
                 return False
-        else:
-            dims = active_dim_dict[dim]
+        else: #convert str to dim
+            dims = source._active_dim_dict[dim]
             if(len(dims) > 1): #multiple matches for dim name. Try them all.
                 sresults = []
                 for dim in dims:
@@ -501,8 +487,8 @@ def identifyDimPathHelper(source, path):#{{{
                     return True
                 elif(len(sresults) == 0):
                     return False
-                reslist.extend(sresults[0][::-1])
-                break
+                reslist.extend(sresults[0][::-1]) #only one result, add dim path to reslist
+                break #all matching was done recursively, we are done here
             elif(len(dims) == 1):
                 dim = iter(dims).next()
             else:
@@ -512,12 +498,12 @@ def identifyDimPathHelper(source, path):#{{{
             reslist.append(dim)
         else:
             while(True):
-                parentdims = parent_dim_id_dict[reslist[-1].id]
+                parentdims = source._active_dim_id_parent_dict[reslist[-1].id]
                 if(dim in parentdims):
                     reslist.append(dim)
                     break
-                
-                if(len(parentdims) > 1):
+                #if dim not in parentdims, we have to add intermediate dims... 
+                if(len(parentdims) > 1): #multiple paths possible, do it recursively
                     sresults = []
                     for pdim in parentdims:
                         sres = identifyDimPathHelper(source, 
@@ -539,14 +525,18 @@ def identifyDimPathHelper(source, path):#{{{
                     return False
             if(done is True):
                 break
-   
+    
+    #if dims in reslist are variable, we have to make certain their base dimensinos
+    #are available
     add_remaining = 0
     for dim in reslist:
         add_remaining -= 1 
         add_remaining = max(add_remaining, dim.variable)
+
+    #add remaining dimensions 
     while(add_remaining):
         add_remaining -= 1
-        parentdims = parent_dim_id_dict[reslist[-1].id]
+        parentdims = source._active_dim_id_parent_dict[reslist[-1].id]
         if(len(parentdims) > 1):
             return True
         else:
