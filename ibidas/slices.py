@@ -4,9 +4,8 @@ from constants import *
 from utils import util
 from itypes import rtypes
 
-_delay_import_(globals(),"itypes","dimensions")
+_delay_import_(globals(),"itypes","dimensions","typeops")
 _delay_import_(globals(),"itypes.type_attribute_freeze","freeze_protocol")
-_delay_import_(globals(),"typeops")
 
 
 #pylint: disable-msg=E1101
@@ -90,17 +89,17 @@ class Slice(object):
         return res
 
 class OpSlice(Slice):
-    __slots__ = ['source_ids']
+    __slots__ = ['source']
     def __init__(self, source_slices, name, rtype=rtypes.unknown, 
                             dims=(), sid=None, last_id=None):
-        self.source_ids = tuple([slice.id for slice in source_slices])
+        self.source = tuple([slice.id for slice in source_slices])
         Slice.__init__(self, name, rtype, dims, sid, last_id)
 
 class UnpackArraySlice(OpSlice):
     """An slice which is the result of unpacking a source slice."""
     __slots__ = []
 
-    def __init__(self,slice):
+    def __init__(self,slice,ndim=None):
         """Creates a new slice, and sets attributes.
 
         Parameters
@@ -114,9 +113,21 @@ class UnpackArraySlice(OpSlice):
                                     has_missing=stype.has_missing),)
         else:
             ndims = stype.dims
-        
-        OpSlice.__init__(self, (slice,), slice.name, 
-                                        stype.subtypes[0], slice.dims + ndims)
+
+        if(ndim is None):
+            unpack_dims = ndims
+            rest_dims = tuple()
+        else:
+            unpack_dims = ndims[:ndim]
+            rest_dims = ndims[ndim:]
+
+        if(rest_dims):
+            ntype = rtypes.TypeArray(stype.has_missing, rest_dims, stype.subtypes, data_state=DATA_NORMAL)
+            OpSlice.__init__(self, (slice,), slice.name, 
+                                            ntype, slice.dims + unpack_dims)
+        else:
+            OpSlice.__init__(self, (slice,), slice.name, 
+                                            stype.subtypes[0], slice.dims + unpack_dims)
         
 
 class UnpackTupleSlice(OpSlice):#{{{
@@ -131,6 +142,7 @@ class UnpackTupleSlice(OpSlice):#{{{
         ----------
         slice: new slice
         idx:   index of tuple attribute to be unpacked"""
+        slice = ensure_normal_or_frozen(slice)
         stype = slice.type
         assert isinstance(stype, rtypes.TypeTuple), "Cannot unpack slice " + \
                                 str(slice.name) + " as it is not a tuple"
@@ -166,7 +178,7 @@ class PackTupleSlice(OpSlice):
 class PackArraySlice(OpSlice):
     __slots__ = []
 
-    def __init__(self, name, pslice, dim, ndim=1):
+    def __init__(self, pslice, ndim=1):
         assert pslice.dims, "Cannot pack as array a slice without dimension"
         
         dims = pslice.dims[-ndim:]
@@ -180,15 +192,73 @@ class PackArraySlice(OpSlice):
 class PackListSlice(PackArraySlice):
     __slots__ = []
 
-    def __init__(self, name, psclie, dim, ndim=1):
+    def __init__(self, pslice, ndim=1):
         assert ndim == 1, "Python lists do not support multi-dimensional data"
-        PackArraySlice.__init__(self,name,pslice,dim,ndim)
+        PackArraySlice.__init__(self,pslice,dim,ndim)
+
+class RedimSlice(OpSlice):
+    __slots__ = []
+    def __init__(self, slice, ndims,  *params, **kwds):
+        OpSlice.__init__(self,(slice,), slice.name, 
+                                        slice.type, ndims)
+
+class ConvertSlice(OpSlice):
+    __slots__ = ["convertor"]
+
+    def __init__(self, pslice):
+        if(slice.type == rtypes.unknown):
+            ntype = rtypes.TypeAny(True,data_state=DATA_NORMAL)
+        else:
+            assert slice.type.data_state == DATA_INPUT, "Slice has not DATA_INPUT as state"
+            ntype = slice.type.copy(data_state=DATA_NORMAL)
+        self.convertor = convertors.getConvertor(slice.type)
+        OpSlice.__init__(self, (pslice,), pslice.name, ntype, pslice.dims)
+
+
+class FreezeSlice(OpSlice):
+    __slots__ = ["convertor"]
+
+    def __init__(self, pslice):
+        assert slice.type.data_state == DATA_NORMAL, "Slice does not need to frozen"
+        ntype = freeze_protocol.freeze(slice.type)
+        OpSlice.__init__(self, (pslice,), pslice.name, ntype, pslice.dims)
+
+class UnFreezeSlice(OpSlice):
+    __slots__ = ["convertor"]
+
+    def __init__(self, pslice):
+        assert freeze_protocol.need_unfreeze(slice.type), "Slice does not need to be unfrozen"
+        ntype = freeze_protocol.unfreeze(slice.type)
+        OpSlice.__init__(self, (pslice,), pslice.name, ntype, pslice.dims)
+
+def ensure_frozen(slice):
+    if(slice.type == rtypes.unknown or slice.type.data_state == DATA_INPUT):
+        slice = ConvertSlice(slice)
+    
+    if(freeze_protocol.need_freeze(slice.type)):
+        return FreezeSlice(slice)
+    else:
+        return slice
+
+def ensure_normal(slice):
+    if(slice.type == rtypes.unknown or slice.type.data_state == DATA_INPUT):
+        return ConvertSlice(slice)
+    elif(freeze_protocol.need_unfreeze(slice.type)):
+        return UnFreezeSlice(slice)
+    else:
+        return slice
+
+def ensure_normal_or_frozen(slice):
+    if(slice.type == rtypes.unknown or slice.type.data_state == DATA_INPUT):
+        return ConvertSlice(slice)
+    else:
+        return slice
 
 class FuncSlice(OpSlice):
     __slots__ = ["exec_func", "type_func", "params", "kwds"]
-    def __init__(self,name,slice, exec_func, type_func, ndims, ntype,  *params, **kwds):
-        OpSlice.__init__(self,(slice,), slice.name, 
-                                        ntype, ndims)
+    def __init__(self,slice, exec_func, type_func, ndims, ntype,  *params, **kwds):
+        assert slice.type.data_state == DATA_NORMAL, "Data should be in normal state"        
+        OpSlice.__init__(self,(slice,), slice.name, ntype, ndims)
         self.exec_func = exec_func
         self.type_func = type_func
         self.params = params
@@ -197,7 +267,7 @@ class FuncSlice(OpSlice):
 
 class MapSeqSlice(FuncSlice):
     __slots__ = []
-    def __init__(self, name, slice, exec_func, type_func, *params, **kwds): 
+    def __init__(self, slice, exec_func, type_func, *params, **kwds): 
         """Creates a new slice, and sets attributes.
 
         Parameters
@@ -209,11 +279,11 @@ class MapSeqSlice(FuncSlice):
                                     "with at least one dimension"
         
         ntype = type_func(slice.type, exec_func)
-        FuncSlice.__init__(self,name,slice,dim,exec_func, type_func, slice.dims, ntype, *params, **kwds)
+        FuncSlice.__init__(self,slice,dim,exec_func, type_func, slice.dims, ntype, *params, **kwds)
 
 class MapSlice(FuncSlice):
     __slots__ = []
-    def __init__(self, name, slice, exec_func, type_func, *params, **kwds): 
+    def __init__(self, slice, exec_func, type_func, *params, **kwds): 
         """Creates a new slice, and sets attributes.
 
         Parameters
@@ -221,14 +291,13 @@ class MapSlice(FuncSlice):
         slice: Source slice func is applied on.
         exec_func: function to be applied
         type_func: function to determine outtype."""
-        
         ntype = type_func(slice.type, exec_func)
-        FuncSlice.__init__(self,name,slice,dim,exec_func, type_func, slice.dims, ntype, *params, **kwds)
+        FuncSlice.__init__(self,slice,dim,exec_func, type_func, slice.dims, ntype, *params, **kwds)
 
 
 class AggregrateSlice(FuncSlice):
     __slots__ = []
-    def __init__(self, name, slice, exec_func, type_func, *params, ndim = 1, **kwds): 
+    def __init__(self, slice, exec_func, type_func, *params, **kwds): 
         """Creates a new slice, and sets attributes.
 
         Parameters
@@ -236,34 +305,20 @@ class AggregrateSlice(FuncSlice):
         slice: Source slice func is applied on.
         exec_func: function to be applied
         type_func: function to determine outtype."""
-       
+        ndim = kwds.pop("ndim",1)
+
         assert len(slice.dims) >= ndim, "Slice does not have enough dimensions for aggregration"
         ndims = slice.dims[:-ndim]
         ntype = type_func(slice.type, slice.dims[-ndim:], exec_func)
-        FuncSlice.__init__(self,name,slice,dim,exec_func, type_func, ndims, ntype, *params, **kwds)
-
-class FreezeSlice(OpSlice):
-    """An slice which is the result of unpacking a source slice."""
-    __slots__ = []
-    
-    def __init__(self, name, slice):
-        """Creates a new slice, and sets attributes.
-
-        Parameters
-        ----------
-        slice: Source slice to be freezed."""
-
-        if(not freeze_protocol.needFreeze(slice.type)):
-            return slice
-        
-        ntype = freeze_protocol.freeze(slice.type)
-        return FreezeSlice((slice,), slice.name, 
-                                        ntype, slice.dims)
+        FuncSlice.__init__(self, slice,dim,exec_func, type_func, ndims, ntype, *params, **kwds)
 
 class BinOpSlice(OpSlice):
-    __slots__ = ['source1_id', 'source2_id']
+    __slots__ = []
     def __init__(self, slice1, slice2, rtype=rtypes.unknown, dims=(), 
                                     sid=None, last_id=None, outidx=None):
+        assert slice1.type.data_state == DATA_NORMAL, "Data should be in normal state"        
+        assert slice2.type.data_state == DATA_NORMAL, "Data should be in normal state"        
+
         if(slice1.name == slice2.name):
             nname = slice1.name
         else:
@@ -271,8 +326,7 @@ class BinOpSlice(OpSlice):
             if(outidx):
                 nname += str(outidx)
         
-        OpSlice.__init__(self, (slice1, slice2), nname, rtype, 
-                         dims, sid, last_id)
+        OpSlice.__init__(self, (slice1, slice2), nname, rtype, dims, sid, last_id)
 
 class BinElemOpSlice(BinOpSlice):
     __slots__ = ['oper', 'op']

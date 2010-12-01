@@ -17,14 +17,12 @@ def realiasSimilarSlices(rsource, lall_slices, #{{{
     rsource: source of which the fields need to be checked and realised
     lall_slices: dictionary with slices from source against which to compare
     keep_equal: (Optional) only realias if slices have same id but are not equal (dif dims)
-    return_newid: (Optional) also return new ids as a list
     always_disimilar_ids: (Optional) to be used in conjunction with keep_equal. Slices that
                           should be considered unequal. 
 
     Returns
     -------
-    return_newid == False(default):  realised rsource
-    returr_newid == True:            (realised rsource, realised ids)
+    realiased rsource
     """
 
     re_id = []
@@ -38,10 +36,7 @@ def realiasSimilarSlices(rsource, lall_slices, #{{{
                 re_id.append(slice.id)
     if(re_id):
         rsource = realias(rsource, re_id)
-    if(return_newid):
-        return (rsource, re_id)
-    else:
-        return rsource#}}}
+    return rsource#}}}
 
 class ProjectId(repops.UnaryOpRep):#{{{
     """Operation to select a number of slices, based on their id"""
@@ -50,18 +45,18 @@ class ProjectId(repops.UnaryOpRep):#{{{
         Parameters
         ----------
         source: source to project upon
-        selector: given to getActiveSlices to determine which slices to select
+        selector: given to _getActiveSlices to determine which slices to select
         """
         repops.UnaryOpRep.__init__(self, (source,), source._all_slices, 
-                     self.getActiveSlices(source, selector))
+                     self._getActiveSlices(source, selector))
 
-    def getActiveSlices(self, source, sliceids):
+    def _getActiveSlices(self, source, sliceids):
         """Returns slices in source.all_slices (!) with id in sliceids"""
         return tuple([source._all_slices[slice_id] for slice_id in sliceids])
 #}}}
 
 @repops.delayable()
-class project(VisitorFactory(prefixes=("project",), flags=NF_ELSE), #{{{
+class project(VisitorFactory(prefixes=("_project",), flags=NF_ELSE), #{{{
               ProjectId):
     """Project slices from active_slices that are indicated by 'selector'
 
@@ -73,10 +68,10 @@ class project(VisitorFactory(prefixes=("project",), flags=NF_ELSE), #{{{
               boolean index array, list of positions
 
     """
-    def getActiveSlices(self, source, selector):
-        return self.project(selector, source)
+    def _getActiveSlices(self, source, selector):
+        return self._project(selector, source)
 
-    def projectbasestring(self, selector, source):
+    def _projectbasestring(self, selector, source):
         if(selector == "*"):
             return source._active_slices
         nactive_slices = [slice for slice in source._active_slices
@@ -89,10 +84,10 @@ class project(VisitorFactory(prefixes=("project",), flags=NF_ELSE), #{{{
                                     str(selector) + "' found."
         return tuple(nactive_slices)
 
-    def projecttuple(self, selector, source):
-        return sum([self.project(elem, source) for elem in selector], ())
+    def _projecttuple(self, selector, source):
+        return sum([self._project(elem, source) for elem in selector], ())
 
-    def projectelse(self, selector, source):
+    def _projectelse(self, selector, source):
         return util.select(source._active_slices, selector)
 #}}}
 
@@ -114,7 +109,7 @@ def unpack_tuple(source, name="", unpack=True):#{{{
             raise RuntimeError, "No tuple to unpack"
 
     if(not name):
-        nactive_slices = [slices.UnpackTupleSlice(slice, idx)
+        nactive_slices = [slices.ensure_normal_or_frozen(slices.UnpackTupleSlice(slice, idx))
                         for idx in range(len(slice.type.subtypes))]
     else: 
         try:
@@ -123,7 +118,7 @@ def unpack_tuple(source, name="", unpack=True):#{{{
             assert isinstance(name, str), \
                         "Tuple slice name should be a string"
             idx = slice.type.fieldnames.index(name)
-        nactive_slices = [slices.UnpackTupleSlice(slice, idx)]
+        nactive_slices = [slices.ensure_normal_or_frozen(slices.UnpackTupleSlice(slice, idx))]
     
     all_slices = source._all_slices.copy()
     
@@ -131,7 +126,7 @@ def unpack_tuple(source, name="", unpack=True):#{{{
         for pos, nslice in enumerate(nactive_slices):
             while(nslice.type.__class__ is rtypes.TypeArray):
                 all_slices[nslice.id] = nslice
-                nslice = UnpackArraySlice(nslice)
+                nslice = slices.ensure_normal_or_frozen(UnpackArraySlice(nslice))
             nactive_slices[pos] = nslice
             all_slices[nslice.id] = nslice
     else:
@@ -149,14 +144,16 @@ def slice_rename(source, *names, **kwds): #{{{
         assert (len(names) == len(source._active_slices)), \
             "Number of new slice names does not match number of active slices"
         for slice, name in zip(source._active_slices, names):
-            nslice = slice.copy(realias=True)
+            #why do a realias here?? removing...
+            nslice = slice.copy()
             nslice.setName(name)
             nactive_slices.append(nslice)
             nall_slices[nslice.id] = nslice
     else:
         for slice in source._active_slices:
             if(slice.name in kwds):
-                nslice = slice.copy(realias=True)
+                #why do a realias here?? removing...
+                nslice = slice.copy()
                 nslice.name = kwds[slice.name]
                 nall_slices[nslice.id] = nslice
             else:
@@ -207,9 +204,9 @@ def rtuple(source, to_python=False):#{{{
         oslice = slice
         while(len(slice.dims) > len(cdim)):
             if(not to_python):
-                slice = slices.PackArraySlice("array", slice, None)
+                slice = slices.PackArraySlice(slice, ndim=len(slice.dims) - len(cdim))
             else:
-                slice = slices.PackListSlice("list", slice, None)
+                slice = slices.PackListSlice(slice)
             nall_slices[slice.id] = slice
         new_slices[oslice.id] = slice
    

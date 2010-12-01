@@ -1,10 +1,11 @@
 from collections import defaultdict, Iterable
 import operator
 import numpy
-from itypes import rtypes
 
-_delay_import_(globals(),".itypes","dimensions","casts")
-_delay_import_(globals(),"utils","util","cutils")
+import rtypes
+_delay_import_(globals(),"dimensions")
+_delay_import_(globals(),"casts")
+_delay_import_(globals(),"..utils","util","cutils","sparse_arrays")
 
 
 in1_type_ops = defaultdict(set)
@@ -222,7 +223,7 @@ def exec_cmp(data1, data2, type1, type2, typeo, op):
     res = numpy_cmp[op](data1, data2)
     if(typeo):
         if(isinstance(res, numpy.ndarray)):
-            res = numpy.cast[typeo.toNumpy()](res).view(util.farray)
+            res = numpy.cast[typeo.toNumpy()](res).view(sparse_arrays.FullSparse)
         else:
             res = typeo.toNumpy().type(res)
     return res
@@ -235,10 +236,6 @@ addOps(rtypes.TypeNumbers, rtypes.TypeNumbers, rtypes.TypeNumbers,
 def exec_cmpgeneral(data1, data2, type1, type2, typeo, op):
     #a numpy bug gives all true arrays when using
     #bool as outtype in comparison
-    if(isinstance(data1, util.farray)):
-        data1 = data1.view(numpy.ndarray)
-    if(isinstance(data2, util.farray)):
-        data2 = data2.view(numpy.ndarray)
     res = getattr(data1, op)(data2)
     if(res is NotImplemented):
         res = getattr(data2, reverse_op[op])(data1)
@@ -246,7 +243,7 @@ def exec_cmpgeneral(data1, data2, type1, type2, typeo, op):
         raise RuntimeError, "Not implemented error in exec_cmpgeneral"
     if(typeo):
         if(isinstance(res, numpy.ndarray)):
-            res = numpy.cast[typeo.toNumpy()](res).view(util.farray)
+            res = numpy.cast[typeo.toNumpy()](res).view(sparse_arrays.FullSparse)
         else:
             res = typeo.toNumpy().type(res)
     return res
@@ -294,17 +291,17 @@ def exec_object_func(data1, data2, type1, type2, otype, op):
                                       not type2.__class__ is rtypes.TypeArray):
             res = cutils.darray([func(left, right) 
                                  for left, right in zip(data1, data2)], 
-                                 otype.toNumpy()).view(util.farray)
+                                 otype.toNumpy()).view(sparse_arrays.FullSparse)
         else:
             res = cutils.darray([func(left, data2) 
                                  for left in data1], 
-                                 otype.toNumpy()).view(util.farray)
+                                 otype.toNumpy()).view(sparse_arrays.FullSparse)
     else:
         if(isinstance(data2, numpy.ndarray) and 
                                       not type2.__class__ is rtypes.TypeArray):
             res = cutils.darray([func(data1, right) 
                                  for right in data2], 
-                                 otype.toNumpy()).view(util.farray)
+                                 otype.toNumpy()).view(sparse_arrays.FullSparse)
         else:
             res = func(data1, data2)
             
@@ -316,9 +313,9 @@ def exec_arrayarray(data1, data2, type1, type2, typeo, op):
     #a numpy bug gives all true arrays when using
     #bool as outtype in comparison
     if(op == "__add__"):
-        return numpy.concatenate((data1, data2)).view(util.farray)
+        return numpy.concatenate((data1, data2)).view(sparse_arrays.FullSparse)
     elif(op == "__radd__"):
-        return numpy.concatenate((data2, data1)).view(util.farray)
+        return numpy.concatenate((data2, data1)).view(sparse_arrays.FullSparse)
     else:
         raise RuntimeError, "Unrecognized operation " + op
 
@@ -444,7 +441,7 @@ def exec_object_unaryfunc(data1, type1, otype, func):
     if(isinstance(data1, numpy.ndarray) and 
                                     not type1.__class__ is rtypes.TypeArray):
         func = numpy.vectorize(func)
-        res = numpy.cast[otype.toNumpy()](func(data1)).view(util.farray)
+        res = numpy.cast[otype.toNumpy()](func(data1)).view(sparse_arrays.FullSparse)
     else:
         res = func(data1)
             

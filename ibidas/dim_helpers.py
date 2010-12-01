@@ -181,7 +181,7 @@ def broadcastAndMatchDimPath(slices, path_prefix, path_suffix, single_match_suff
     slices: slices on which to perform the matching
     path_prefix: part of dim path that can be broadcasted
     path_suffix: part of dim path that should match exactly
-    single_match_suffix: only the last dim of the suffix should not take part in the broadcasting,
+    single_match_suffix: only the last dim of the suffix should take part in the filter dim path,
                          but matched slices should contain whole suffix. 
     
     Returns
@@ -210,9 +210,8 @@ def broadcastAndMatchDimPath(slices, path_prefix, path_suffix, single_match_suff
         if(first_match_pos > 0):
             prev_path = pathSuffix(prev_path, len(prev_path) - first_match_pos)[1]
 
-    #construct filter path 
-    filter_dimpath = prev_path + path_suffix
-    return filter_dimpath #}}}
+    #construct result path 
+    return prev_path + path_suffix #}}}
 
 def matchDimPath(slices, dimpath, return_prev=False):#{{{
     """Matches dimpath exactly to dim paths in slices.
@@ -302,6 +301,44 @@ def redimMatch(match_slices, start_depths, oldpath, newpath, var_adapt=(0,)):#{{
            nstart_depths.append(startposs)
         nslices.append(slice)
     return (tuple(nslices), tuple(nstart_depths))#}}}
+
+def areDimPathsCompatible(*dimpaths, **kwargs):
+    col_dims = []
+    for dimpath in dimpaths:
+        if(len(col_dims) < len(dimpath)):
+            col_dims.extend(dimpath[len(col_dims):])
+        for pdim, odim in zip(col_dims,dimpath):
+            if(not (odim.shape == pdim.shape or 
+                    odim.shape == UNDEFINED or 
+                    pdim.shape == UNDEFINED)):
+                return False
+            if(odim.variable != pdim.variable):
+                return False
+            if(kwargs.get("check_hasmissing",False) and odim.has_missing != pdim.has_missing):
+                return False
+    return True
+
+def areDimPathsEqual(*dimpaths):
+    return len(set(dimpaths)) == 1
+
+def equalizeDims(*slices,**kwargs):
+    #check first if dims are compatible
+    if(not areDimPathsCompatible([slice.dims for slice in slices],**kwargs)):
+        raise RuntimeError, "Cannot equalize dims!"
+    
+    #collect dim path
+    col_dims = []
+    for slice in slices:
+        if(len(col_dims) < len(slice.dims)):
+            col_dims.extend(slice.dims[len(col_dims):])
+
+    nslices = []
+    for slice in slices:
+        nlength = len(slice.dims)
+        if(not areDimPathsEqual(col_dims[:nlength],slice.dims[:nlength])):
+            slice = slices.RedimSlice(slice,tuple(col_dims[:nlength]))
+        nslices.append(slice) 
+    return nslices        
 
 def commonDimPath(source):#{{{
     """Returns common dimensions shared by all slices"""

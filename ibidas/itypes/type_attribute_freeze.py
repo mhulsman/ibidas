@@ -116,8 +116,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     
 
     def execFreezeTypeUnknown(self, rtype, seq):
-        if(self.needFreeze(rtype)):
-            seq = seq.map(self.ftype,has_missing=rtype.has_missing)
+        seq = seq.map(self.ftype,has_missing=rtype.has_missing)
         return seq
    
     def execFreezeTypeScalar(self,rtype,seq):
@@ -125,31 +124,29 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
 
 
     def execFreezeTypeSlice(self,rtype,seq):
-        if(self.needFreeze(rtype)):
-            seq = seq.map(self.ftypeslice,has_missing=rtype.has_missing)
+        seq = seq.map(self.ftypeslice,has_missing=rtype.has_missing)
         return seq
         
 
     def execFreezeTypeTuple(self,rtype,seq):
-        if(self.needFreeze(rtype)):
-            if(not rtype.subtypes):
-                return self.execFreezeTypeUnknown(rtype,seq)
-            
-            columns = []
-            if(len(rtype.subtypes) > rtype.min_len):
-                l = seq.map(len, otype=int, out_empty = 0, has_missing=self.detector.hasMissing())
+        if(not rtype.subtypes):
+            return self.execFreezeTypeUnknown(rtype,seq)
+        
+        columns = []
+        if(len(rtype.subtypes) > rtype.min_len):
+            l = seq.map(len, otype=int, out_empty = 0, has_missing=self.detector.hasMissing())
 
-            for pos, subtype in enumerate(rtype.subtypes):
-                f = operator.itemgetter(pos)
-                if(pos < rtype.min_len):
-                    subseq = seq.map(f,otype=object,out_empty=Missing,has_missing=rtype.has_missing)
-                else:
-                    subseq = seq.sparse_filter(l > pos).map(f,out_empty=Missing,otype=object,has_missing=True)
-                columns.append(self.execFreeze(subtype, subseq))
+        for pos, subtype in enumerate(rtype.subtypes):
+            f = operator.itemgetter(pos)
+            if(pos < rtype.min_len):
+                subseq = seq.map(f,otype=object,out_empty=Missing,has_missing=rtype.has_missing)
+            else:
+                subseq = seq.sparse_filter(l > pos).map(f,out_empty=Missing,otype=object,has_missing=True)
+            columns.append(self.execFreeze(subtype, subseq))
 
-            nseq = cutils.darray(zip(*columns))
-            nseq.shape = seq.shape
-            seq = sparse_arrays.FullSparse(nseq)
+        nseq = cutils.darray(zip(*columns))
+        nseq.shape = seq.shape
+        seq = sparse_arrays.FullSparse(nseq)
         return seq
     
     #def execFreezeTypeDict(self,rtype,seq):
@@ -199,18 +196,17 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     #    return seq
 
     def execFreezeTypeArray(self,rtype,seq):
-        if(self.needFreeze(rtype)):
-            subtype = rtype.subtypes[0]
-            if(subtype.needFreeze(rtype)):
-                def subfreeze(elem):
-                    elem = self.execFreeze(subtype,elem)
-                    elem = elem.view(util.farray)
-                    return elem
-            else:
-                def subfreeze(elem):
-                    ele = elem.view(util.farray)
-                    return elem
-            seq = seq.map(subfreeze,out_empty=Missing,otype=object,has_missing=rtype.has_missing)
+        subtype = rtype.subtypes[0]
+        if(subtype.needFreeze(rtype)):
+            def subfreeze(elem):
+                elem = self.execFreeze(subtype,elem)
+                elem = elem.view(util.farray)
+                return elem
+        else:
+            def subfreeze(elem):
+                ele = elem.view(util.farray)
+                return elem
+        seq = seq.map(subfreeze,out_empty=Missing,otype=object,has_missing=rtype.has_missing)
         return seq
      
     def execFreezeTypeString(self,rtype,seq):
@@ -264,8 +260,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
         return obj.getSlice()
 
     def execUnfreezeTypeUnknown(self, rtype, seq):
-        if(self.needUnfreeze(rtype)):
-            seq = seq.map(self.uftype,has_missing=rtype.has_missing)
+        seq = seq.map(self.uftype,has_missing=rtype.has_missing)
         return seq
    
     def execUnfreezeTypeScalar(self,rtype,seq):
@@ -273,8 +268,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
 
 
     def execUnfreezeTypeSlice(self,rtype,seq):
-        if(self.needFreeze(rtype)):
-            seq = seq.map(self.uftypeslice,has_missing=rtype.has_missing)
+        seq = seq.map(self.uftypeslice,has_missing=rtype.has_missing)
         return seq
         
     def execUnfreezeTypeTuple(self,rtype,seq):
@@ -282,12 +276,10 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
 
 
     def execUnfreezeTypeArray(self,rtype,seq):
-        
-        if(self.needUnfreeze(rtype)):
-            def subunfreeze(elem):
-                seq = sparse_arrays.FullSparse(elem)
-                return seq
-            seq = seq.map(subunfreeze,out_empty=Missing,otype=object,has_missing=rtype.has_missing)
+        def subunfreeze(elem):
+            seq = sparse_arrays.FullSparse(elem)
+            return seq
+        seq = seq.map(subunfreeze,out_empty=Missing,otype=object,has_missing=rtype.has_missing)
         return seq
      
     def execUnfreezeTypeString(self,rtype,seq):

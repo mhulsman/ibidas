@@ -15,10 +15,10 @@ class RequiredSliceIds(VisitorFactory(prefixes=("require", "func"),
     @classmethod
     def run(cls, query, pass_results):
         self = cls()
-        prewalk = pass_results[prewalk.PreOrderWalk]
+        pwalk = pass_results[prewalk.PreOrderWalk]
         required_ids = defaultdict(set)
 
-        for rep in prewalk:
+        for rep in pwalk:
             #pylint: disable-msg=E1101
             self.require(rep, required_ids[rep], required_ids)
 
@@ -95,15 +95,6 @@ class RequiredSliceIds(VisitorFactory(prefixes=("require", "func"),
         for pos, slice in enumerate(rep._constraint_slices):
             source_ids[rep._sources[pos + 1]].add(slice.id)
    
-    def funcifilter(self, rep, inner_req_ids, source_ids):
-        """Required slices are just copied, as filter
-        performs no realias, but only a redim. It does however need
-        slices from _constraint_slices to change dimensions."""
-        rep.inner_req_ids = inner_req_ids
-        source_ids[rep._sources[0]] |= inner_req_ids
-        for pos, slice in enumerate(rep._constraint_slices):
-            source_ids[rep._sources[pos + 1]].add(slice.id)
-
     def funcGroup(self, rep, inner_req_ids, source_ids):
         """Required slices are just copied, as Group
         performs no realias, but only a redim. It does however need

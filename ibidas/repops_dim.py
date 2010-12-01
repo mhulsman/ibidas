@@ -1,10 +1,12 @@
 from repops import *
 
+_delay_import_(globals(),"itypes","rtypes")
 _delay_import_(globals(),"slices")
 _delay_import_(globals(),"utils","util")
 
 
-def broadcastDims(outer_dims, inner_dims):
+#obsolete
+def broadcastDims(outer_dims, inner_dims):#{{{
     idim_pos = 0
     broadcast_actions = []
     for odim in outer_dims:
@@ -21,18 +23,19 @@ def broadcastDims(outer_dims, inner_dims):
             else:
                 break
     return (tuple(broadcast_actions), outer_dims[:len(broadcast_actions)], inner_dims[:idim_pos], 
-                               outer_dims[len(broadcast_actions):], inner_dims[idim_pos:])
+                               outer_dims[len(broadcast_actions):], inner_dims[idim_pos:])#}}}
 
-
-def matchDimSlices(all_slices, dims):
+#obsolete
+def matchDimSlices(all_slices, dims):#{{{
     res = {}
     
     for slice in all_slices.values():
         if(slice.dims[:len(dims)] == dims):
             res[slice.id] = slice
-    return res
-            
-def redimSlices(all_slices, from_dims, to_dims, return_redim=False):
+    return res#}}}
+          
+#obsolete          
+def redimSlices(all_slices, from_dims, to_dims, return_redim=False):#{{{
     res = {}
     copied = set()
     variables = any([dim.variable for dim in from_dims])
@@ -56,9 +59,9 @@ def redimSlices(all_slices, from_dims, to_dims, return_redim=False):
     if(return_redim):
         return (res, copied)
     else:
-        return res
+        return res#}}}
 
-def unpack_array(source, name = None):#{{{
+def unpack_array(source, name = None, ndim=None):#{{{
     """Operation to unpack array typed slices
 
     Parameters
@@ -72,12 +75,15 @@ def unpack_array(source, name = None):#{{{
         stype = slice.type
 
         #if name param, but does not match
-        if(name and not (stype.dims and
-                            any([name == dim.name for dim in stype.dims]))):
-            nactive_slices.append(slice)
-            continue
-            
-        nslice = slices.UnpackArraySlice(slice)
+        if(isinstance(stype,rtypes.TypeArray)):
+            if(not name is None):
+                dimnames = [dim.name for dim in stype.dims]
+                if(name in dimnames):
+                    dimindex = dimnames.index(name)
+                    nslice = slices.ensure_normal_or_frozen(slices.UnpackArraySlice(slice,ndim=dimindex))
+            else:
+                nslice = slices.ensure_normal_or_frozen(slices.UnpackArraySlice(slice,ndim=ndim))
+                
         nactive_slices.append(nslice)
 
     all_slices = source._all_slices.copy()
@@ -87,7 +93,8 @@ def unpack_array(source, name = None):#{{{
     #initialize object attributes
     self = UnaryOpRep((source,), all_slices, tuple(nactive_slices))
     return self#}}}
- 
+
+#obsolete
 def redim(source, redim_map): #{{{
     for dimid_old, dim_new in redim_map.iteritems():
         if(dimid_old[-1].shape >=0 and dim_new.shape >= 0):
@@ -115,10 +122,10 @@ class dim_rename(UnaryOpRep):#{{{
                      tuple(nactive_slices))#}}}
 
 @delayable()
-def rarray(source, dim=None):
-    return apply_slice(source, "array", slices.PackArraySlice, dim)
+def rarray(source, dim=None, ndim=1):
+    return apply_slice(source, slices.PackArraySlice, dim, ndim=1)
 
 @delayable()
 def rlist(source, dim=None):
-    return apply_slice(source, "list", slices.PackListSlice, dim)
+    return apply_slice(source, slices.PackListSlice, dim)
 

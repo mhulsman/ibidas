@@ -69,6 +69,7 @@ class fixate(UnaryOpRep):#{{{
     is handled correctly."""
 
     def __init__(self, source):
+        source = normal(source)
         UnaryOpRep.__init__(self, (source,), source._all_slices, 
                      source._active_slices)#}}}
 
@@ -77,13 +78,12 @@ class plusprefix(UnaryOpRep):#{{{
         UnaryOpRep.__init__(self, (source,), source._all_slices, 
              source._active_slices)#}}}
 
-def apply_slice(source, name, slicecls, dim_selector, *params, **kwds):
+def apply_slice(source, slicecls, dim_selector, *params, **kwds):
     """Applies slice class in `slicecls` to every field in source.
 
     Parameters
     ----------
     dim_selector: select dimensions on which to apply the slicecls
-    name: name of the operation (for use in optimization)
     params, kwds: extra params
     """
     if(not dim_selector is None):
@@ -92,9 +92,9 @@ def apply_slice(source, name, slicecls, dim_selector, *params, **kwds):
     nactive_slices = []                       #new active slices
     for slice in source._active_slices:
         if(dim_selector is None):
-            nslice = slicecls(name, slice,*params, **kwds)
+            nslice = slicecls(slice, *params, **kwds)
         elif(dim_helpers.sliceHasDimPath(slice, dim_selector)):
-            nslice = slicecls(name, slice,*params, **kwds)
+            nslice = slicecls(slice, *params, **kwds)
         else:
             nslice = slice
         nactive_slices.append(nslice)
@@ -108,7 +108,12 @@ def apply_slice(source, name, slicecls, dim_selector, *params, **kwds):
         tuple(nactive_slices))
     return self
 
-def freeze(source):
-    return apply_slice(source, "freeze", slices.FreezeSlice, None)
+def frozen(source):
+    return apply_slice(source, slices.ensure_frozen, None)
 
+def normal(source):
+    return apply_slice(source, slices.ensure_normal, None)
+
+def normal_or_frozen(source):
+    return apply_slice(source, slices.ensure_normal_or_frozen, None)
 

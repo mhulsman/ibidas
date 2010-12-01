@@ -11,6 +11,7 @@ from itypes import rtypes
 _delay_import_(globals(),"utils","util","context","cutils")
 _delay_import_(globals(),"itypes","dimensions")
 _delay_import_(globals(),"slices")
+_delay_import_(globals(),"wrappers","wrapper_py")
 
 class RFilter(MultiOpRep):#{{{
     """Filter data based on constraint"""
@@ -28,7 +29,6 @@ class RFilter(MultiOpRep):#{{{
         if it is a representor. If not, it will determine if their is a unique
         dimension branch, and will select the last dimension from it. 
         """
-       
         #create set of constraint dims
         constraint_slices = []
         if(not isinstance(constraint, representor.Representor)):
@@ -163,106 +163,6 @@ class RFilter(MultiOpRep):#{{{
 #}}}
 rfilter = delayable()(RFilter)
 
-class ifilter(MultiOpRep):#{{{
-    """Filter data based on constraint"""
-    def __init__(self, source, constraint, dim=None):
-        """
-        Parameters
-        ----------
-        source: source to be filtered
-        constraint: constraint to be used to determine which 
-                    elements to select. Can be representor of bool type,
-                    index, slice, array of bools, array of ints.
-        dim: (Optional) dim to filter. To override auto determination.
-
-        Filter chooses which dim to filter based on the dimension of constraint
-        if it is a representor. If not, it will determine if their is a unique
-        dimension branch, and will select the last dimension from it. 
-        """
-        
-        
-        #create set of constraint dims
-        constraint_slices = []
-        if(not isinstance(constraint, representor.Representor)):
-            constraint = wrapper_py.rep(constraint)
-            cdimbranch = source._identifyDim(dim)
-            assert not isinstance(cdimbranch, bool), \
-                                "Could not find (unique) dimension to filter"
-            cslice = constraint._active_slices[0]
-        else:
-            assert len(constraint._active_slices) == 1, \
-                "Filter constraint should have only 1 slice."
-            
-            cslice = constraint._active_slices[0]
-            if(not isinstance(cslice.type, rtypes.TypeBool) and cslice.type.has_missing):
-                constraint = ~ismissing(constraint)
-                cslice = constraint._active_slices[0]
-            assert isinstance(cslice.type, rtypes.TypeInteger), \
-                "Filter constraint should be of bool/integer/has_missing type."
-            cdimbranch = cslice.dims
-            
-            dimdict = source._active_dim_id_dict
-            while(cdimbranch and not cdimbranch[-1].id in dimdict):
-                if isinstance(cslice.type, rtypes.TypeBool):
-                    constraint_slices.append(cslice)
-                    cslice = slices.saggregate(cslice, exec_any, check_bool)
-                    cdimbranch = cslice.dims
-                else:
-                    cdimbranch = cdimbranch[:-1]
-
-            if(not cdimbranch):
-                assert len(cslice.dims) <= 1, \
-                                "Could not match nested index to data"
-
-                cdimbranch = source._identifyDim(dim)
-                assert cdimbranch, "Could not find (unique) dimension to filter"
-            elif(not isinstance(cslice.type, rtypes.TypeBool)):
-                if(len(cdimbranch) != len(cslice.dims)):
-                    assert len(cdimbranch) == len(cslice.dims) - 1, \
-                        "Dims of constraint do not match dims of filter source."
-                
-                    active_dim_id_child = source._active_dim_id_child_dict
-                    childdims = active_dim_id_child[cdimbranch[-1].id]
-            
-                    assert len(childdims) <= 1, "Cannot find unique " + \
-                        "dimension to apply filter to: " + str(childdims)
-
-                    assert len(childdims) > 0, "Cannot find dimension " + \
-                                                       "to apply filter to."
-
-                
-                    cdimbranch = cdimbranch + (iter(childdims).next(),)
-
-        constraint_slices.append(cslice)
-                
-
-        oldbranch = cdimbranch
-        newbranch = list(cdimbranch)
-        
-        odim = oldbranch[-1]
-        if(not cslice.dims and isinstance(cslice.type, rtypes.TypeInteger)):
-            newbranch.pop()
-        else:
-            ndim = dimensions.Dim(UNDEFINED, 
-                                  odim.variable, odim.has_missing)
-            newbranch[-1] = ndim
-        newbranch = tuple(newbranch)
-        nall_slices, filter_slices = redimSlices(source._all_slices, 
-                                        oldbranch, newbranch, return_redim=True)
-        for slice in constraint_slices:
-            nall_slices[slice.id] = slice
-        
-        nactive_slices = [nall_slices[slice.id] 
-                                    for slice in source._active_slices]
-
-        self._constraint_slices = [cslice]
-        self._filter_slices = [filter_slices]
-        self._filter_depth = [len(oldbranch)-1]
-        self._filter_branch = oldbranch
-        
-        MultiOpRep.__init__(self, (source, constraint), nall_slices, 
-             tuple(nactive_slices))#}}}
-
 class join_filter(RFilter):
     pass
 
@@ -318,7 +218,6 @@ def _join(lsource, rsource, condition=None, ldim=(), rdim=(),
        we choose that one 
      otherwise: error
     """
-    
     #rule 1-3
     if(not ldim is None):
         ldim = lsource._identifyDim(ldim) 
@@ -492,10 +391,8 @@ def rmap(source, exec_func, otype=rtypes.unknown, dim=None, *params, **kwds):#{{
         otype = rtypes.createType(otype)
     type_func = lambda x, y : otype
     
-    return apply_slice(source, "map", slices.MapSlice, dim, exec_func, type_func)#}}}
+    return apply_slice(source,slices.MapSlice, dim, exec_func, type_func,name="map")#}}}
     
-
-
 def create_mapseq(name, exec_func, type_func=None, otype=None, defslice="*"):#{{{
     if(type_func is None and otype is None):
         type_func = lambda x, y : rtypes.unknown
@@ -507,7 +404,8 @@ def create_mapseq(name, exec_func, type_func=None, otype=None, defslice="*"):#{{
     @delayable(defslice) 
     def apply_func(source, *params, **kwds):
         dim = kwds.get("dim", None)
-        return apply_slice(source, name, slices.MapSeqSlice, dim, exec_func, type_func, *params, **kwds)
+        kwds['name'] = name
+        return apply_slice(source, slices.MapSeqSlice, dim, exec_func, type_func, *params, **kwds)
     
     return apply_func#}}}
 
@@ -554,7 +452,7 @@ def create_aggregate(name, exec_func, type_func=None, otype=None, defslice="*"):
 
     @delayable(defslice)
     def apply_func(source, dim=None):
-        return apply_slice(source, name, slices.AggregateSlice, dim, exec_func, type_func)
+        return apply_slice(source, slices.AggregateSlice, dim, exec_func, type_func,name=name)
     return apply_func#}}}
 
 
@@ -607,12 +505,12 @@ def exec_set(seq):
 def check_set(in_type, dim, exec_func):
     ndim = dimensions.Dim(UNDEFINED, 
                           dim.variable, dim.has_missing)
-    return rtypes.TypeSet(dim.has_missing, (ndim,), (in_type,), need_freeze=False)
+    return rtypes.TypeSet(dim.has_missing, (ndim,), (in_type,), data_state=DATA_FROZEN)
 
 @delayable()
 def rset(source, dim=None):
-    source = freeze(source)
-    return apply_slice(source, "set", slices.AggregateSlice, dim, exec_set, check_set)
+    source = frozen(source)
+    return apply_slice(source,  slices.AggregateSlice, dim, exec_set, check_set,name="set")
 
 def binop(lsource, rsource, op, outtype=None):#{{{
     if(not isinstance(lsource, representor.Representor)):
@@ -679,6 +577,7 @@ def unary_op(source, op, outtype=None): #{{{
 
 class Group(MultiOpRep):
     def __init__(self, source, groupconstraint, keepers={}, name=None):
+        
         groupslices = groupconstraint._active_slices
         if(len(groupslices) > 1):
             sdims = set([slice.dims for slice in groupslices])
@@ -805,4 +704,3 @@ class flat(UnaryOpRep):
         self._flat_depths = startdepths
         self._flat_dim = fdim
 
-from wrappers import wrapper_py

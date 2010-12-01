@@ -3,7 +3,9 @@ from itertools import chain
 from collections import defaultdict
 import numpy
 
+
 import wrapper
+from ..constants import *
 from ..utils.multi_visitor import VisitorFactory, F_CACHE, NF_ERROR, NF_ELSE
 from ..itypes import rtypes
 from ..passes import required
@@ -12,23 +14,20 @@ from .. import engines
 _delay_import_(globals(),"..representor")
 _delay_import_(globals(),"..utils","util","nestutils","cutils")
 _delay_import_(globals(),"..slices")
-_delay_import_(globals(),"..itypes","detector","type_attribute_freeze")
+_delay_import_(globals(),"..itypes","detector","type_attribute_freeze","convertors")
 _delay_import_(globals(),"..repops_slice")
 _delay_import_(globals(),"..repops_dim")
 
-def rep(data=None, dtype=rtypes.unknown, modifiable=False, 
-        type_check=True, unpack=True):#{{{
-    if(isinstance(dtype, str)):
+def rep(data=None, dtype=rtypes.unknown, modifiable=False, unpack=True):#{{{
+    
+    if(not dtype == rtypes.unknown):
         dtype = rtypes.createType(dtype)
-    if(type_check):
-        det = detector.Detector(dtype)
-        det.processObj(data)
+    else:
+        det = detector.Detector()
+        det.process(data)
         dtype = det.getType()
-        if(not dtype.__class__ is rtypes.TypeUnknown):
-            scanner = scanner_protocol.getScanner(dtype)
-            data_convertor.convert(scanner, [data], dtype)[0]
    
-    nslices = (slices.Slice("data", dtype),)
+    nslices = (slices.ensure_normal_or_frozen(slices.Slice("data", dtype)),)
     data = {nslices[0].id: data}
 
     res = PyRepresentor(data, nslices)
@@ -224,27 +223,6 @@ class PySelectExecutor(VisitorFactory(prefixes=("rep", ), flags=F_CACHE),
                     result.data[slice.id] = rdata
         return result
 
-    def opifilter(self, crep):
-        result = self.rep(crep._sources[0]).copy()
-        for source, cslice, filter_slices, fdepth in \
-                             zip(crep._sources[1:], crep._constraint_slices, 
-                                   crep._filter_slices, crep._filter_depth):
-            constraint_res = self.rep(source)
-            cdata, ctype, cdims = self.getSliceById(cslice.id, 
-                                                    crep, constraint_res)
-                     
-            for slice in filter_slices:
-                if(not slice.id in crep._req_ids):
-                    continue
-
-                fdata, ftype, fdims = self.getSliceById(slice.id, crep, result)
-                result.data[slice.id] = nestutils.nest_filter(fdata, cdata, 
-                                         fdepth, fdims, cdims, ftype.toNumpy())
-
-        return result
-     
-     
-     
     def opGroup(self, crep):
         result = self.rep(crep._sources[0]).copy()
         gresult = self.rep(crep._sources[1]) 
@@ -406,9 +384,9 @@ class PySelectExecutor(VisitorFactory(prefixes=("rep", ), flags=F_CACHE),
             "Unpacking array failed: source is not an array but " + str(stype)
 
         subtype = stype.subtypes[0]
-        scanner = scanner_protocol.getScanner(subtype)
+        dconvertor = convertors.getConvertor(subtype)
         ndims = sdims + stype.dims
-        func = lambda data, bcast, dims, pack, rtypes, rdims, args: data_convertor.convert(scanner, data[0], rtypes[0]) 
+        func = lambda data, bcast, dims, pack, rtypes, rdims, args: dconvertor.convert(rtypes[0], data[0]) 
         ndata = nestutils.nest_broadcast([1] * len(sdims), [sdata], [sdims], func, [subtype], ndims)
         return (ndata, subtype, ndims)
     

@@ -32,7 +32,10 @@ def ximport(name, module, args=[]):
             try:
                 res = __import__(name,module,module,args,level)
                 for arg in args:
-                    module[arg] = getattr(res,arg)
+                    try:
+                        module[arg] = getattr(res,arg)
+                    except AttributeError,e:
+                        raise RuntimeError,"importing " + str(arg) + " from " + name + " into " + module['__name__'] + " did not succeed"
             except ValueError:
                 for arg in args:
                     res = __import__(name + "." + arg,module,module,args,level)

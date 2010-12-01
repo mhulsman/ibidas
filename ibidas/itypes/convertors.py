@@ -1,4 +1,13 @@
-_delay_import_(globals(), "..utils","sparse_arrays")
+import numpy
+import collections
+
+_delay_import_(globals(), "..utils","sparse_arrays","cutils","missing")
+
+def getConvertor(rtype):
+    if 'convertor' in rtype.attr:
+        return rtype.attr['convertor']
+    else:
+        return BaseConvertor(set([None.__class__,missing.MissingType]))
 
 class BaseConvertor(object):
     def __init__(self,objectclss):
