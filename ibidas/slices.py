@@ -6,7 +6,7 @@ from itypes import rtypes,dimpaths
 from query_graph import Node
 
 
-_delay_import_(globals(),"itypes","dimensions","typeops","convertors")
+_delay_import_(globals(),"itypes","dimensions","typeops","convertors","casts")
 _delay_import_(globals(),"itypes.type_attribute_freeze","freeze_protocol")
 
 #pylint: disable-msg=E1101
@@ -123,9 +123,12 @@ class ChangeDimPathSlice(UnaryOpSlice):
         UnaryOpSlice.__init__(self, source, dims=new_dims)
 
 class CastSlice(UnaryOpSlice):
-    __slots__ = []
+    __slots__ = ["cast_name"]
     def __init__(self, source, new_type):
-        UnaryOpSlice.__init__(self, source, type=new_type)
+        cast_name = casts.canCast(source.type,new_type)
+        assert not cast_name is False, "Cannot cast " + str(source.type) + " to " + str(new_type)
+        self.cast_name = cast_name
+        UnaryOpSlice.__init__(self, source, rtype=new_type)
         
 
 class DetectTypeSlice(UnaryOpSlice):
@@ -208,6 +211,22 @@ class PackTupleSlice(MultiOpSlice):
         fieldnames = [slice.name for slice in slices]
         subtypes = [slice.type for slice in slices]
         ntype = rtypes.TypeTuple(False, tuple(subtypes), tuple(fieldnames))
+        nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
+        MultiOpSlice.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)
+
+class HArraySlice(MultiOpSlice):
+    __slots__ = []
+
+    def __init__(self, slices, field="data"):
+        cdim = set([slice.dims for slice in slices])
+        assert len(cdim) == 1, "Packing tuple on slices with different dims"
+        
+        subtypes = [slice.type for slice in slices]
+        assert len(set(subtypes)) == 1, "HArray can only be applied if types are equal"
+
+        ndim = dimensions.Dim(len(slices))
+        ntype = rtypes.TypeArray(False, dimpaths.DimPath(ndim), (subtypes[0],))
+
         nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
         MultiOpSlice.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)
 

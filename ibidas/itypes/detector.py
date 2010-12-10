@@ -130,12 +130,12 @@ class Detector(object):
                 for pos in xrange(len(self._scanners) - 1, -1, -1):
                     scanner = self._scanners[pos]
                     while not scanner.scan(seq):
-                        if not any([scanner.parentcls in s.ancestor_classes for s in self._scanners]):
+                        del self._scanners[pos]
+                        if not any([scanner.parentcls in s.ancestor_scanners for s in self._scanners]):
                             scanner = scanner.unregister(create_parent=True)
-                            self._scanners[pos] = scanner
+                            self._scanners.insert(pos,scanner)
                             continue
                         scanner.unregister()
-                        del self._scanners[pos]
                         break
         self.count_elem += elem_count
 

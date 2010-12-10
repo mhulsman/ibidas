@@ -24,21 +24,22 @@ class ArrayConvertor(BaseConvertor):
         """Converts sequence to standard format. Converts None
         to Missing values."""
         numpy_type = elem_type.toNumpy()
-        return self._convert(elem_type.getFullDimPath(),numpy_type,seq)
+        return self._convert(elem_type.getArrayDimPath(),numpy_type,seq)
    
     def _convert(self,dims,numpy_type,seq):
         cur_numpy_type = numpy_type
         
         depth = dims.contigiousFixedNDims()
         if(not depth):# no fixed dims, allow for one non-fixed dim
-            depth = 1
+            if(dims[0].has_missing):
+                depth = 1  #no following dims (has_missing)
+            else:
+                depth = 1 + dims[1:].contigiousFixedNDims()
+
         rest_dims = dims[depth:]
         if(rest_dims):
             cur_numpy_type = object
 
-        if(len(seq.shape) - 1 >= depth):
-           print "HOI"
-      
         res = []
         for elem in seq:
             if(elem is Missing or elem is None):
@@ -59,7 +60,7 @@ class ArrayConvertor(BaseConvertor):
                 assert len(elem.shape) == depth, "Non array values encountered for dims " + str(dims[len(elem.shape):])
             elif(len(elem.shape) > depth):
                 oshape = elem.shape
-                elem = dimpaths.flatFirstDims(elem,depth)
+                elem = dimpaths.flatFirstDims(elem,depth-1)
                 elem = cutils.darray([subelem for subelem in elem],object,1,1)
                 elem.shape = oshape[:depth]
 
@@ -72,7 +73,7 @@ class ArrayConvertor(BaseConvertor):
                 elem = self._convert(rest_dims,numpy_type,elem)
             res.append(elem)
 
-        nseq = cutils.darray(res,object,depth+1,1)
+        nseq = cutils.darray(res,object,depth,1)
         seq = sparse_arrays.FullSparse(nseq)
         return seq
 

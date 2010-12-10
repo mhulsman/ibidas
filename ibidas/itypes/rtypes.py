@@ -164,7 +164,7 @@ class TypeUnknown(object):#{{{
         """Returns copy of this type"""
         return self.__class__()
    
-    def getFullDimPath(self):
+    def getArrayDimPath(self):
         return dimpaths.DimPath()
 
     def redim_var(self, deplen, var_adapt, redim_cache):
@@ -683,8 +683,8 @@ class TypeArray(TypeAny):#{{{
         res.attr.update(newattr)
         return res
 
-    def getFullDimPath(self):
-        return self.dims + self.subtypes[0].getFullDimPath()
+    def getArrayDimPath(self):
+        return self.dims + self.subtypes[0].getArrayDimPath()
     
     def redim_var(self, deplen, var_adapt, redim_cache):
         """Redim nested dimension, in response to change/removal of parent dim(s)
@@ -746,6 +746,9 @@ class TypeSet(TypeArray):#{{{
         subtypes = (type_attribute_freeze.freeze_protocol.freeze(subtypes[0]),)
         TypeArray.__init__(self, has_missing, dims, 
                                     subtypes, **attr)
+    def getArrayDimPath(self):
+        return dimpaths.DimPath()
+
    
     def __repr__(self):
         res = ""
@@ -778,7 +781,7 @@ class TypeString(TypeArray):#{{{
             shape = max(type1.dims[0].shape, type2.dims[0].shape)
         dim = dimensions.Dim(shape)
         res = cls(has_missing=type1.has_missing or type2.has_missing, 
-                    dims=(dim,),)
+                    dims=dimpaths.DimPath(dim),)
 
         res.setCommonAttributes(type1, type2)
         return res
@@ -802,6 +805,9 @@ class TypeString(TypeArray):#{{{
                 hash(self.has_missing) ^ 
                 hash(self.dims))
     
+    def getArrayDimPath(self):
+        return dimpaths.DimPath()
+
     def copy(self, **newattr):
         """Returns copy of this type"""
         res = self.__class__(has_missing=self.has_missing, 
@@ -1282,7 +1288,7 @@ def _createType(name, last_dims=()):#{{{
         if(not all(fieldname is None for fieldname in fieldnames)):
             params['fieldnames'] = fieldnames
     if(not dimlist is None):
-        params['dims'] = tuple(dimlist)
+        params['dims'] = dimpaths.DimPath(*dimlist)
     if(not typecls is TypeUnknown):
         params['has_missing'] = type_has_missing
         if(type_need_freeze is False):
@@ -1312,6 +1318,7 @@ def mostSpecializedTypes(typeobjs):
 
 
 ### sets ###
+TypeAll = set(TypeAny.getDescendantTypes())
 TypeNumbers = set(TypeNumber.getDescendantTypes())
 TypeStrings = set(TypeString.getDescendantTypes())
 TypeArrays = set(TypeArray.getDescendantTypes())

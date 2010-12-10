@@ -5,7 +5,7 @@ import numpy
 
 import wrapper
 from ..constants import *
-from ..utils.multi_visitor import VisitorFactory, F_CACHE, NF_ERROR, NF_ELSE
+from ..utils.multi_visitor import VisitorFactory, DirectVisitorFactory, NF_ERROR, NF_ELSE
 from ..itypes import rtypes, dimpaths
 from ..passes import manager, create_graph, serialize_exec
 from .. import slices
@@ -77,7 +77,8 @@ class ResultSlice(slices.DataSlice):
                 "\n" + str(self.data) 
 
 
-class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), manager.Pass):
+class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), 
+             DirectVisitorFactory(prefixes=("cast",),flags=NF_ERROR), manager.Pass):
 
     after = set([create_graph.CreateGraph, serialize_exec.SerializeExec])
 
@@ -132,16 +133,24 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), manager.Pass):
 
 
     def visitDataSlice(self,node):
-        ndata = nested_array.NestedArray(node.data)
+        ndata = nested_array.NestedArray(node.data,node.type)
         return ResultSlice.from_slice(ndata,node)
 
     def visitConvertSlice(self,node,param0):
         ndata = param0.data.mapseq(node.convertor.convert,
-                                node.type,
-                                dtype=node.type.toNumpy())
+                                node.type,res_type=node.type)
         param0.data = ndata
         return param0
-    
+   
+    def visitCastSlice(self,node,param0):
+        ndata = self.cast(node.cast_name,node,param0)
+        param0.data = ndata
+        param0.type = node.type
+        return param0
+
+    def visitChangeNameSlice(self,node,param0):
+        return param0
+
     def visitDetectTypeSlice(self,node,param0):
         det = detector.Detector()
         det.setParentDimensions(node.dims)
@@ -158,15 +167,15 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), manager.Pass):
         return param0
 
     def visitPackArraySlice(self, node, param0):
-        ndata=param0.data.pack(len(node.type.dims))
+        ndata=param0.data.pack(node.type, len(node.type.dims))
         param0.data = ndata
         param0.type = node.type
         param0.dims = node.dims
         return param0
 
     def visitPackListSlice(self, node, param0):
-        ndata=param0.data.pack(len(node.type.dims))
-        ndata=ndata.map(list,dtype=node.type.toNumpy())
+        ndata=param0.data.pack(node.type, len(node.type.dims))
+        ndata=ndata.map(list,res_type=node.type)
         param0.data = ndata
         param0.type = node.type
         param0.dims = node.dims
@@ -174,15 +183,22 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), manager.Pass):
 
     def visitUnpackTupleSlice(self,node,param0):
         func = operator.itemgetter(node.tuple_idx)
-        ndata = param0.data.map(func,
-                                dtype=node.type.toNumpy())
+        ndata = param0.data.map(func,res_type=node.type)
         param0.data = ndata
         param0.type = node.type
         param0.name = node.name
         return param0
  
     def visitPackTupleSlice(self,node, *params):
-        ndata = nested_array.co_mapseq(speedtuplify,[param.data for param in params],dtype=node.type.toNumpy())
+        ndata = nested_array.co_mapseq(speedtuplify,[param.data for param in params],res_type=node.type)
+        nparam = params[0]
+        nparam.data = ndata
+        nparam.type = node.type
+        nparam.dims = node.dims
+        return nparam
+    
+    def visitHArraySlice(self,node, *params):
+        ndata = nested_array.co_mapseq(speedarrayify,[param.data for param in params],dtype=node.type.subtypes[0].toNumpy(), res_type=node.type)
         nparam = params[0]
         nparam.data = ndata
         nparam.type = node.type
@@ -198,10 +214,19 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), manager.Pass):
             nparam.setSource(cur_slice)
             res.append(nparam)
         return res
+    
+    def castto_any(self,castname,node,param0):
+        return param0.data.mapseq(lambda x:x,res_type=node.type)
 
+    def castnumbers_numbers(self,castname,node,param0):
+        return param0.data.mapseq(lambda x:x,res_type=node.type)
 
 #util funcs
 def speedtuplify(seqs):
     nseq = cutils.darray(zip(*seqs))
+    return nseq
+
+def speedarrayify(seqs,dtype):
+    nseq = numpy.array(seqs,dtype).T
     return nseq
 

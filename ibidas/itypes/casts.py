@@ -8,13 +8,14 @@ cast_exec = defaultdict(dict)
 
 class CheckEnv(object):
     """Object holding attributes to check cast"""
-    __slots__ = ['out_type_cls', 'checktypesfunc', 'simtypefunc']
-    def __init__(self, out_type_cls, checktypesfunc, simtypefunc):
+    __slots__ = ['out_type_cls', 'checktypesfunc', 'simtypefunc', 'name']
+    def __init__(self, out_type_cls, checktypesfunc, simtypefunc, name):
         self.out_type_cls = out_type_cls
         self.checktypesfunc = checktypesfunc
         self.simtypefunc = simtypefunc
+        self.name = name
 
-def addCasts(in_type_cls, out_type_cls, checktypesfunc, simtypefunc):
+def addCasts(in_type_cls, out_type_cls, checktypesfunc, simtypefunc, castname):
     """Add cast
         in_type_cls: in type class, can also be sequence
         out_type_cls: out type class, can also be sequence
@@ -27,24 +28,13 @@ def addCasts(in_type_cls, out_type_cls, checktypesfunc, simtypefunc):
     else:
         out_type_cls = set([out_type_cls])
     
-    checkenv = CheckEnv(out_type_cls, checktypesfunc, simtypefunc) 
+    checkenv = CheckEnv(out_type_cls, checktypesfunc, simtypefunc, castname) 
     
     if(isinstance(in_type_cls, Iterable)):
         for incls in in_type_cls:
             in_type_casts[incls].append(checkenv)
     else:
         in_type_casts[in_type_cls].append(checkenv)
-
-def addCastExecFuncs(checktypesfunc, **execfuncs):
-    """Add execution functions for casts checked with checktypesfunc
-       and for which an execution environment is already available.
-
-       checktypefunc: function to check actual types for compatibility
-       execfuncs: execution functions (e.g. ibi for python env., etc.)
-    """
-    
-    cast_exec[checktypesfunc].update(execfuncs)
-
 
 def findImplicitCastTypes(in_type_cls):
     """Returns type classes that can be casted to without loss of information"""
@@ -62,15 +52,18 @@ def canCast(intype, outtype):
         for pos_cast in pos_casts:
             if(outtype.__class__ in pos_cast.out_type_cls and
                pos_cast.checktypesfunc(intype, outtype)):
-                return cast_exec[pos_cast.checktypesfunc]
+                return pos_cast.name
     else:
         for pos_cast in pos_casts:        
             if(outtype.__class__ in pos_cast.out_type_cls):
                 otype = pos_cast.simtypefunc(intype, outtype)
-                return (otype, cast_exec[pos_cast.checktypesfunc])
+                return (otype, pos_cast.name)
     return False
 
 def castImplicitCommonType(type1, type2):
+    if(type1 == type2):
+        return type1
+
     in1_impli_cls = findImplicitCastTypes(type1.__class__)
     in2_impli_cls = findImplicitCastTypes(type2.__class__)
     out_impli_cls = in1_impli_cls & in2_impli_cls
@@ -86,6 +79,12 @@ def castImplicitCommonType(type1, type2):
         out_impli_cls.discard(out_cls)
     return res
 
+def castMultipleImplicitCommonType(*types):
+    assert types, "No types given to cast function"
+    types = list(types)
+    while(len(types) > 1):
+        types.append(castImplicitCommonType(types.pop(),types.pop()))
+    return types[0]
 
 ############
 # CAST: check type functions
@@ -99,4 +98,5 @@ def simDefault(intype, outtypecls):
     return outtypecls(intype.has_missing)
 
 
-addCasts(rtypes.TypeNumbers, rtypes.TypeNumbers, checkDefault, simDefault)
+addCasts(rtypes.TypeNumbers, rtypes.TypeNumbers, checkDefault, simDefault,"numbers_numbers")
+addCasts(rtypes.TypeAll, rtypes.TypeAny, checkDefault, simDefault,"to_any")

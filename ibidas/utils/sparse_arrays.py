@@ -497,7 +497,7 @@ class FullSparse(numpy.ndarray):
     def hasSparse(self):
         return numpy.equal(self,Missing).any()
 
-    def full(empty_replace=Missing,otype=None):
+    def full(self,empty_replace=Missing,otype=None):
         if(not empty_replace is Missing):
             missing_filter = numpy.equal(self,Missing)
             res = self.copy()

@@ -22,10 +22,9 @@ class UnpackArray(repops.UnaryOpRep):
             #if name param, but does not match
             if(isinstance(slice.type,rtypes.TypeArray)):
                 if(not name is None):
-                    dimindex = stype.dims.getDimIndexByName(name)
+                    dimindex = slice.type.dims.getDimIndexByName(name)
                     if(not dimindex is None):
                         slice = slices.ensure_normal_or_frozen(slices.UnpackArraySlice(slice,ndim=dimindex))
-
                 else:
                     slice = slices.ensure_normal_or_frozen(slices.UnpackArraySlice(slice,ndim=ndim))
             nslices.append(slice)

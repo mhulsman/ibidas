@@ -67,10 +67,14 @@ class Representor(Node):
         return repops_slice.Project(self, name)
 
     def _axisA(self, name):
-        return repops_slice.unpack_tuple(self, name)
+        if(name == ""):
+            name = None
+        return repops_slice.UnpackTuple(self, name)
 
     def _axisE(self, name):
-        return repops_dim.unpack_array(self, name)
+        if(name == ""):
+            name = None
+        return repops_dim.UnpackArray(self, name)
 
     def _axisD(self, name):
         #slices = self._active_dim_slice_dict[name] 
@@ -215,11 +219,11 @@ class Representor(Node):
         if(isinstance(other, context.Context)):
             return other.__rdiv__(self)
         elif(isinstance(other, str)):
-            return repops_slice.slice_rename(self, other)
+            return repops_slice.SliceRename(self, other)
         elif(isinstance(other, tuple)):
-            return repops_slice.slice_rename(self, *other)
+            return repops_slice.SliceRename(self, *other)
         elif(isinstance(other, dict)):
-            return repops_slice.slice_rename(self, **other)
+            return repops_slice.SliceRename(self, **other)
         return repops_rel.binop(self, other, '__div__')
     
     def __rdiv__(self, other):
@@ -312,6 +316,9 @@ class Representor(Node):
     
     def __neg__(self):
         return repops_rel.unary_op(self, "__neg__")
+
+    def cast(self, *newtypes, **kwds):
+        return repops_slice.SliceCast(self, *newtypes, **kwds)
 
     def flat(self, dim_selector=-1):
         return repops_rel.flat(self, dim_selector)

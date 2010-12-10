@@ -7,7 +7,7 @@ import repops
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"slices")
 _delay_import_(globals(),"utils","util","context")
-_delay_import_(globals(),"itypes","rtypes","dimpaths")
+_delay_import_(globals(),"itypes","rtypes","dimpaths","casts")
 
 class ProjectDim(repops.UnaryOpRep):
     def process(self, source, name):
@@ -132,7 +132,30 @@ class SliceRename(repops.UnaryOpRep):
             nslices = []
             for slice in source._slices:
                 if(slice.name in kwds):
-                    nslice = slice.ChangeNameSlice(kdws[slice.name])
+                    nslice = slice.ChangeNameSlice(slice,kdws[slice.name])
+                else:
+                    nslice = slice
+                nslices.append(nslice)
+                
+        return self.initialize(tuple(nslices),source._state)
+        #}}}
+
+class SliceCast(repops.UnaryOpRep):
+    def process(self, source, *newtypes, **kwds): #{{{
+        if not source._state & RS_TYPES_KNOWN:
+            return
+            
+        if(newtypes):
+            assert (len(newtypes) == len(source._slices)), \
+                "Number of new slice types does not match number of slices"
+            nslices = [slices.CastSlice(slice,rtypes.createType(newtype)) 
+                    for slice, newtype in zip(source._slices, newtypes)]
+        else:
+            nslices = []
+            for slice in source._slices:
+                if(slice.name in kwds):
+                    newtype = rtypes.createType(kwds[slice.name])
+                    nslice = slice.CastSlice(slice,newtype)
                 else:
                     nslice = slice
                 nslices.append(nslice)
@@ -168,6 +191,34 @@ class RTuple(repops.UnaryOpRep):
             nslices.append(slice)
     
         nslice = slices.PackTupleSlice(nslices, to_python=to_python)
+
+        #initialize object attributes
+        return self.initialize((nslice,),RS_ALL_KNOWN)
+
+@repops.delayable()
+class HArray(repops.UnaryOpRep):
+    def process(self, source):
+        if not source._state & RS_TYPES_KNOWN:
+            return
+        
+        #commonify dimensions
+        cdimpath = dimpaths.commonDimPath([slice.dims for slice in source._slices])
+        nslices = []
+        for slice in source._slices:
+            oslice = slice
+            if(len(slice.dims) > len(cdimpath)):
+                slice = slices.PackArraySlice(slice, ndim=len(slice.dims) - len(cdimpath))
+            nslices.append(slice)
+
+        #cast to common type
+        ntype = casts.castMultipleImplicitCommonType(*[slice.type for slice in nslices])
+        nnslices = []
+        for slice in nslices:
+            if(ntype != slice.type):
+                slice = slices.CastSlice(slice,ntype)
+            nnslices.append(slice)
+    
+        nslice = slices.HArraySlice(nnslices)
 
         #initialize object attributes
         return self.initialize((nslice,),RS_ALL_KNOWN)
