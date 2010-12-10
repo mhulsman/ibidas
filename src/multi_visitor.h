@@ -29,7 +29,7 @@ extern "C" {
 
 #define Visitor_visit_NUM 5
 #define Visitor_visit_RETURN PyObject *
-#define Visitor_visit_PROTO (PyObject *, PyObject *, PyObject *)
+#define Visitor_visit_PROTO (PyObject *, PyObject *, PyObject *, PyObject *)
 
 
 /* Total number of C API pointers */

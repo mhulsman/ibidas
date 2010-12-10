@@ -51,6 +51,7 @@ from collections import defaultdict
 from ..constants import *
 
 _delay_import_(globals(),"dimensions")
+_delay_import_(globals(),"dimpaths")
 _delay_import_(globals(),"casts")
 _delay_import_(globals(),"type_attribute_freeze")
 
@@ -95,6 +96,7 @@ class TypeUnknown(object):#{{{
     _scalar = numpy.object
     _defval = None
     data_state=DATA_NORMAL
+    has_missing = True
 
     @classmethod
     def commonType(cls, type1, type2):
@@ -162,6 +164,9 @@ class TypeUnknown(object):#{{{
         """Returns copy of this type"""
         return self.__class__()
    
+    def getFullDimPath(self):
+        return dimpaths.DimPath()
+
     def redim_var(self, deplen, var_adapt, redim_cache):
         return self
 
@@ -188,6 +193,7 @@ class TypeAny(TypeUnknown):#{{{
         """
         TypeUnknown.__init__(self)
         self.has_missing = has_missing
+        self.data_state = attr.pop("data_state",DATA_NORMAL)
         self.attr = attr
 
     def __getattr__(self,name):
@@ -280,8 +286,9 @@ class TypeAny(TypeUnknown):#{{{
 
     def copy(self, **newattr):
         """Returns copy of this type"""
-        res = self.__class__(has_missing=self.has_missing)
+        res = self.__class__(has_missing=self.has_missing, data_state=self.data_state)
         res.attr = self.attr.copy()
+        res.attr.update(newattr)
         return res
     
     def __repr__(self):
@@ -451,7 +458,8 @@ class TypeTuple(TypeAny):#{{{
         """Returns copy of this type"""
         res = self.__class__(has_missing=self.has_missing,
                               subtypes=self.subtypes, 
-                              fieldnames=self.fieldnames)
+                              fieldnames=self.fieldnames,
+                              data_state=self.data_state)
         res.attr = self.attr.copy()
         res.attr.update(newattr)
         return res
@@ -518,7 +526,7 @@ class TypeArray(TypeAny):#{{{
         system to determine equality between dimensions. If there are
         no similarities with dimensions in other types, should be left empty.
         """
-        assert isinstance(dims, tuple), \
+        assert isinstance(dims, dimpaths.DimPath), \
                 "Dims of an array should be a tuple"
         assert all([isinstance(dim, dimensions.Dim) for dim in dims]), \
                 "Dims tuple should contain Dim objects"
@@ -670,11 +678,13 @@ class TypeArray(TypeAny):#{{{
     def copy(self, **newattr):
         """Returns copy of this type"""
         res = self.__class__(has_missing=self.has_missing, dims=self.dims, 
-                              subtypes=self.subtypes) 
+                              subtypes=self.subtypes, data_state=self.data_state) 
         res.attr = self.attr.copy()
         res.attr.update(newattr)
         return res
 
+    def getFullDimPath(self):
+        return self.dims + self.subtypes[0].getFullDimPath()
     
     def redim_var(self, deplen, var_adapt, redim_cache):
         """Redim nested dimension, in response to change/removal of parent dim(s)
@@ -727,7 +737,7 @@ class TypeSet(TypeArray):#{{{
     name = "set"
     
     def __init__(self, has_missing=False, dims=(), subtypes=(unknown,), **attr):
-        assert (isinstance(dims, tuple) and len(dims) == 1), \
+        assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
                 "Dimensions of a set should be a tuple of size 1"
         
         assert subtypes and len(subtypes) == 1, \
@@ -754,7 +764,7 @@ class TypeString(TypeArray):#{{{
     _defval = u""
     
     def __init__(self, has_missing=False, dims=(), **attr):
-        assert (isinstance(dims, tuple) and len(dims) == 1), \
+        assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
             "Dimensions of a string should be a tuple of size 1"
         TypeArray.__init__(self, has_missing, dims, 
                                     (TypeChar(),), **attr)
@@ -795,7 +805,7 @@ class TypeString(TypeArray):#{{{
     def copy(self, **newattr):
         """Returns copy of this type"""
         res = self.__class__(has_missing=self.has_missing, 
-                              dims=self.dims)
+                              dims=self.dims, data_state=self.data_state)
         res.attr = self.attr.copy()
         res.attr.update(newattr)
         return res
@@ -843,10 +853,6 @@ class TypeNumber(TypeScalar):#{{{
     def __init__(self, has_missing=False, **attr):
         TypeScalar.__init__(self, has_missing, **attr)
     
-    def copy(self):
-        """Returns copy of this type"""
-        return self.__class__(has_missing=self.has_missing, 
-                               scanner=self.scanner)
 addType(TypeNumber)#}}}
 
 class TypeComplex(TypeNumber):#{{{

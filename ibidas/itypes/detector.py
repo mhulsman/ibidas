@@ -78,6 +78,7 @@ from ..utils import sparse_arrays
 from ..utils.missing import *
 
 _delay_import_(globals(),"dimensions")
+_delay_import_(globals(),"dimpaths")
 _delay_import_(globals(),"..utils","cutils","util")
 
 _scanchildren = defaultdict(list)
@@ -100,6 +101,10 @@ class Detector(object):
         self.dim_eq = dim_eq
         self.parent_scanner = parent_scanner
         return None
+
+    def setParentDimensions(self,dims):
+        assert self.count_elem == 0, "Cannot perform setParentDimensions after process(Seq) has been called"
+        self._scanners = [OuterContainerScanner(self,dims)]
 
     def process(self, obj):
         self.processSeq(sparse_arrays.FullSparse(cutils.darray([obj])))
@@ -283,6 +288,26 @@ class DimRep(object):
     def getParentDimReps(self):
         return self.parent_scanner.getDimReps(self.index)
 
+
+class FixedDimRep(DimRep):
+    def __init__(self, parent_scanner, index, dim):
+        self.parent_scanner = parent_scanner
+        self.index = index
+
+        if(dim.shape == UNDEFINED):
+            self.length_type = LENGTH_VAR
+            self.lengths = [] 
+            #FIXME: implement case where dim.shape is UNDEFINED, but fixed (not dim.variable)
+            #FIXME2: give lengths of variable dimensions from data, will also enable repeat var dimensions
+        else:
+            self.lengths = dim.shape        #stores length data. FIXED: int, VAR: list of lengths, REPEAT: list of lengths
+            self.length_type = LENGTH_FIXED
+
+        self.nparents = dim.variable
+
+        self.has_missing = dim.has_missing
+        self.dim = dim
+        self.dirty = False
 
 
 class DimEqualizer(object):
@@ -573,6 +598,7 @@ registerTypeScanner(DictScanner)
 class ContainerScanner(TypeScanner):
     good_cls = set([set, frozenset, None.__class__, MissingType, list, array.array, numpy.ndarray, sparse_arrays.FullSparse, sparse_arrays.PosSparse])
     bad_cls = set([tuple, str])
+    convertor=convertors.ArrayConvertor
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -581,7 +607,7 @@ class ContainerScanner(TypeScanner):
     def getType(self):
         subtype = self.getSubDetector().getType()
         
-        dims = tuple([self.getDimRep(i).dim for i in xrange(self.min_dim)])
+        dims = dimpaths.DimPath(*[self.getDimRep(i).dim for i in xrange(self.min_dim)])
         cv = self.convertor(self.detector.objectclss.copy()) 
         return rtypes.TypeArray(self.detector.hasMissing(), dims, (subtype,), convertor=cv, data_state=DATA_INPUT)
 
@@ -646,6 +672,26 @@ def getnelem(elem):
 registerTypeScanner(ContainerScanner)
 
 
+class OuterContainerScanner(ContainerScanner):
+    parentcls = None.__class__
+
+    def __init__(self, detector, dims):
+        ContainerScanner.__init__(self,detector)
+        self.dimreps = [FixedDimRep(self,pos,dim) for pos,dim in enumerate(dims)]
+        for dim in dims:
+            d = FixedDimRep(dim)
+            self.dimreps.append(d)
+            self.detector.dim_eq.registerDimRep(d)
+
+    def scan(self,seq):
+        d = self.getSubDetector()
+        d.processSeq()
+        return True
+
+    def getType(self):
+        return self.getSubDetector().getType()
+
+
 class SetScanner(ContainerScanner):
     parentcls = ContainerScanner
     good_cls = set([set, frozenset, None.__class__, MissingType])
@@ -653,7 +699,7 @@ class SetScanner(ContainerScanner):
 
     def getType(self):
         subtype = self.getSubDetector().getType()
-        dims = (self.getDimRep(0).dim,)
+        dims = dimpaths.DimPath(self.getDimRep(0).dim)
         cv = self.convertor(self.detector.objectclss.copy()) 
         return rtypes.TypeSet(self.detector.hasMissing(), dims, (subtype,), convertor=cv, data_state=DATA_INPUT)
 
@@ -700,7 +746,7 @@ class StringScanner(TypeScanner):
         else:
             d = dimensions.Dim(UNDEFINED, len(self.getDimReps(0)), self.detector.hasMissing())
 
-        dims = (d,)
+        dims = dimpaths.DimPath(d)
         cv = self.convertor(self.detector.objectclss.copy()) 
         return ntype(self.detector.hasMissing(), dims, convertor=cv, data_state=DATA_INPUT)
 

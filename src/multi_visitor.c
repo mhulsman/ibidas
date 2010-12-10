@@ -131,7 +131,7 @@ static PyObject * _notfound(PyObject *self, PyObject * prefix, PyObject *visited
 }/*}}}*/
 
 /* Visit helper*/
-static PyObject * _visit_withkey(PyObject *self, PyObject * visited, PyObject * visitkey, PyObject *args, PyObject *closure)/*{{{*/
+static PyObject * _visit_withkey(PyObject *self, PyObject * visited, PyObject * visitkey, PyObject *args, PyObject *kwargs, PyObject *closure)/*{{{*/
 {
     Py_ssize_t arglength;
     PyObject * visit_method, * visit_args;
@@ -248,7 +248,7 @@ static PyObject * _visit_withkey(PyObject *self, PyObject * visited, PyObject * 
         PyTuple_SET_ITEM(visit_args,i + 2,tmp);
     }
 
-    res = PyObject_CallObject(visit_method,visit_args);
+    res = PyObject_Call(visit_method,visit_args,kwargs);
     Py_DECREF(visit_method);
     Py_DECREF(visit_args);
 
@@ -285,7 +285,7 @@ static PyObject * _visit_withkey(PyObject *self, PyObject * visited, PyObject * 
  * Search in cache, if not found, uses findmethod to find method
  * to handle the visit request. Closure object should contain
  * (prefix[PyString],flags[PyInt],visitkeyfunc[PyCobject],findmethodfunc[PyCObject])*/
-static PyObject * visit(PyObject *self, PyObject *args, PyObject *closure)/*{{{*/
+static PyObject * visit(PyObject *self, PyObject *args, PyObject *kwargs, PyObject *closure)/*{{{*/
 {
     Py_ssize_t arglength;
     PyObject * visited, *visitkey;
@@ -314,7 +314,7 @@ static PyObject * visit(PyObject *self, PyObject *args, PyObject *closure)/*{{{*
 
     nargs = PyTuple_GetSlice(args, 1, arglength);
 
-    res = _visit_withkey(self, visited, visitkey, nargs, closure);
+    res = _visit_withkey(self, visited, visitkey, nargs, kwargs, closure);
 
     Py_DECREF(nargs);
     Py_DECREF(visitkey);
@@ -326,7 +326,7 @@ static PyObject * visit(PyObject *self, PyObject *args, PyObject *closure)/*{{{*
 /* Visit key function. Similar to visit, but user can explicity
  * give key to use
 */
-static PyObject * visitKey(PyObject *self, PyObject *args, PyObject *closure)/*{{{*/
+static PyObject * visitKey(PyObject *self, PyObject *args, PyObject *kwargs, PyObject *closure)/*{{{*/
 {
     Py_ssize_t arglength;
     PyObject * visited, *visitkey;
@@ -353,7 +353,7 @@ static PyObject * visitKey(PyObject *self, PyObject *args, PyObject *closure)/*{
 
     nargs = PyTuple_GetSlice(args, 2, arglength);
 
-    res = _visit_withkey(self, visited, visitkey, nargs, closure);
+    res = _visit_withkey(self, visited, visitkey, nargs, kwargs, closure);
 
     Py_DECREF(nargs);
 
@@ -363,8 +363,8 @@ static PyObject * visitKey(PyObject *self, PyObject *args, PyObject *closure)/*{
 
 
 static PyMethodDef object_methods[] = {
-    {"visit",(PyCFunction) visit, METH_VARARGS, "Visitor method"},
-    {"visitKey",(PyCFunction) visitKey, METH_VARARGS, "Visitor key method"},
+    {"visit",(PyCFunction) visit, METH_VARARGS | METH_KEYWORDS, "Visitor method"},
+    {"visitKey",(PyCFunction) visitKey, METH_VARARGS | METH_KEYWORDS, "Visitor key method"},
     {NULL}  /* Sentinel */
 };
 

@@ -6,12 +6,16 @@ class TopologicalSortable(object):
 
 
 class topo_sorted(object):
-    def __init__(self, objiter):
+    def __init__(self, objiter, return_index=False):
         self.objs = list(objiter)
+        self.obj_idxs = range(len(self.objs))
+        self.totalobj = len(self.objs)
+
         self.retcls = set()
         self.availcls = defaultdict(int)
 
         self.before_cls = defaultdict(set)
+        self.return_index = return_index
 
         for obj in self.objs:
             if(self.availcls[obj.__class__] == 0):
@@ -42,10 +46,14 @@ class topo_sorted(object):
     def append(self, obj):
         self._addobj(obj)
         self.objs.append(obj)
+        self.obj_idxs.append(self.totalobj + 1)
+        self.total_obj += 1
 
     def prepend(self, obj):
         self._addobj(obj)
-        self.objs.insert(obj, 0)
+        self.objs.insert(0, obj)
+        self.obj_idxs.insert(0, self.totalobj + 1)
+        self.total_obj += 1
     
     def __iter__(self):
         return self
@@ -60,11 +68,16 @@ class topo_sorted(object):
             if(sum(self.availcls[before] 
                     for before in self.before_cls[objcls])):
                 continue
-            
+            idx = self.obj_idxs[pos]
             del self.objs[pos]
+            del self.obj_idxs[pos]
+
             self.availcls[objcls] -= 1
             self.retcls.add(objcls)
-            return objcls
+            if(self.return_index):
+                return idx
+            else:
+                return objcls
         
         if(not self.objs):
             raise StopIteration

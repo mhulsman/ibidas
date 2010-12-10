@@ -13,8 +13,7 @@ class Executor(manager.Pass):
 
 
 class SourceRepresentor(representor.Representor):
-    def request_ids(self, req_ids, source_ids):
-        self._req_ids = req_ids
+    pass
 
 def open(func, *args, **kwds):
     return func(*args, **kwds)

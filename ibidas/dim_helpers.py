@@ -340,20 +340,6 @@ def equalizeDims(*slices,**kwargs):
         nslices.append(slice) 
     return nslices        
 
-def commonDimPath(source):#{{{
-    """Returns common dimensions shared by all slices"""
-    if(len(source._active_slices) == 0):
-        return ()
-
-    pos = 0
-    minlen = min([len(slice.dims) for slice in source._active_slices])
-    while(pos < minlen):
-        cdim = set([slice.dims[pos] for slice in source._active_slices])
-        pos += 1
-        if(len(cdim) != 1):
-            break
-
-    return source._active_slices[0].dims[:pos]#}}}
 
 def uniqueDimPath(source):#{{{
     """Returns unique dim path, i.e. at each nesting level determines

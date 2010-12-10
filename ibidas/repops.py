@@ -1,5 +1,5 @@
 import copy
-
+from constants import *
 import representor
 _delay_import_(globals(),"slices")
 _delay_import_(globals(),"dim_helpers")
@@ -46,39 +46,67 @@ def delayable(default_slice="*"):
         return delayable_function
     return new
 
-class OpRep(representor.Representor):
-    def __init__(self, sources, all_slices, active_slices):
-        representor.Representor.__init__(self, all_slices, 
-                                               active_slices)
-        self._sources = sources
+class UnaryOpRep(representor.Representor):
+    def __init__(self, source, *args, **kwds):
+        assert isinstance(source,representor.Representor), "Source should be a representor"
+        self._source = source
+        self._params = (args,kwds)
+        self.process(source,*args, **kwds)
 
+    def process(self, source):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+        return self.initialize(source._slices, source._state)
+    
+    def _copyquery(self):
+        res = copy.copy(self)
+        res._source = self._source._copyquery()
+        return res
+
+class MultiOpRep(representor.Representor):
+    def __init__(self, sources):
+        assert isinstance(sources,tuple), "Sources should be a tuple"
+        self._sources = sources
+        self._params = (args,kwds)
+        self.process(sources,*args, **kwds)
+    
+    def process(self, sources):
+        raise RuntimError, "Process function should be overloaded for " + str(type(self))
+    
     def _copyquery(self):
         res = copy.copy(self)
         res._sources = tuple([source._copyquery() for source in res._sources])
         return res
 
-class UnaryOpRep(OpRep):
-    pass
-
-class MultiOpRep(OpRep):
-    pass
-
-class fixate(UnaryOpRep):#{{{
+class Fixate(UnaryOpRep):#{{{
     """Operation used by optimizer to fixate end of tree,
     such that there are no exception situations, and slice retrieval
     is handled correctly."""
+    pass
 
-    def __init__(self, source):
-        source = normal(source)
-        UnaryOpRep.__init__(self, (source,), source._all_slices, 
-                     source._active_slices)#}}}
+    #}}}
 
-class plusprefix(UnaryOpRep):#{{{
-    def __init__(self, source):
-        UnaryOpRep.__init__(self, (source,), source._all_slices, 
-             source._active_slices)#}}}
+class PlusPrefix(UnaryOpRep):#{{{
+    pass
+#}}}
 
-def apply_slice(source, slicecls, dim_selector, *params, **kwds):
+class ApplyFuncRep(UnaryOpRep):
+    """Applies slice class in `slicecls` to every field in source.
+
+    Parameters
+    ----------
+    dim_selector: select dimensions on which to apply the slicecls
+    params, kwds: extra params
+    """
+
+    def process(self,source,func,*params,**kwds):
+        if not source._state & RS_ALL_KNOWN:
+            return
+        nslices = func(source._slices, *params, **kwds)
+        return self.initialize(nslices)
+
+
+def apply_slice(slices, slicecls, dim_selector, *params, **kwds):
     """Applies slice class in `slicecls` to every field in source.
 
     Parameters
@@ -88,32 +116,23 @@ def apply_slice(source, slicecls, dim_selector, *params, **kwds):
     """
     if(not dim_selector is None):
         dim_selector = dim_helpers.identifyDimPath(source, dim_selector)
-    
-    nactive_slices = []                       #new active slices
-    for slice in source._active_slices:
-        if(dim_selector is None):
-            nslice = slicecls(slice, *params, **kwds)
-        elif(dim_helpers.sliceHasDimPath(slice, dim_selector)):
-            nslice = slicecls(slice, *params, **kwds)
-        else:
-            nslice = slice
-        nactive_slices.append(nslice)
+        nslices = []                       #new active slices
+        for slice in slices:
+            if(dim_selector in slice.dims):
+                nslice = slicecls(slice, *params, **kwds)
+            else:
+                nslice = slice
+            nslices.append(nslice)
+    else:
+        nslices = [slicecls(slice,*params,**kwds) for slice in slices]
+    return tuple(nslices)
 
-    all_slices = source._all_slices.copy()
-    for slice in nactive_slices:
-        all_slices[slice.id] = slice
+def frozen(slices):
+    return apply_slice(slices, slices.ensure_frozen, None)
 
-    #initialize object attributes
-    self = UnaryOpRep((source,), all_slices, 
-        tuple(nactive_slices))
-    return self
+def normal(slices):
+    return apply_slice(slices, slices.ensure_normal, None)
 
-def frozen(source):
-    return apply_slice(source, slices.ensure_frozen, None)
-
-def normal(source):
-    return apply_slice(source, slices.ensure_normal, None)
-
-def normal_or_frozen(source):
-    return apply_slice(source, slices.ensure_normal_or_frozen, None)
+def normal_or_frozen(slices):
+    return apply_slice(slices, slices.ensure_normal_or_frozen, None)
 

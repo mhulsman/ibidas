@@ -499,7 +499,7 @@ class FullSparse(numpy.ndarray):
 
     def full(empty_replace=Missing,otype=None):
         if(not empty_replace is Missing):
-            missing_filter = numpy.equal(self.ravel(),Missing)
+            missing_filter = numpy.equal(self,Missing)
             res = self.copy()
             res[missing_filter] = empty_replace
         else:
@@ -528,7 +528,7 @@ class FullSparse(numpy.ndarray):
             return out_empty
 
         if(skip_sparse):
-            filter = ~numpy.equal(self.ravel(),Missing)
+            filter = ~numpy.equal(self,Missing)
             r = self[filter]
             if(len(r) == 0):
                 return out_empty
@@ -540,7 +540,7 @@ class FullSparse(numpy.ndarray):
 
     def all(self,skip_sparse=True):
         if(skip_sparse):
-            filter = ~numpy.equal(self.ravel(),Missing)
+            filter = ~numpy.equal(self,Missing)
             return self[filter].val.all()
         else:
             return self.val.all()

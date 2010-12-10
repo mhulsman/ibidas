@@ -29,8 +29,9 @@ class PassManager(object):
     def __init__(self):
         """Initializes pass manager"""
         self.objs = []
+        self.params = []
 
-    def register(self, objcls):
+    def register(self, objcls, *args, **kwargs):
         """Registers a new pass.
         Passes are ordered according to their topological
         characteristics. If no conflict arises, passes are kept
@@ -39,32 +40,37 @@ class PassManager(object):
         assert issubclass(objcls, Pass), \
             "Only pass classes can be registered"
         self.objs.append(objcls)
+        self.params.append((args,kwargs))
 
     def run(self, query):
         """Performs registered passes on query, by
         performing a stable topological sort."""
 
-        topoiter = topological_sort.topo_sorted(self.objs)
-        pass_results = {}
+        return PassManagerRun(self, query).run()
 
-        for cur_pass in topoiter:
-            res = cur_pass.run(query, pass_results)
-            
-            if(not isinstance(res, tuple)):
+class PassManagerRun(object):
+    def __init__(self,manager, query):
+        self.query = query
+        self.topoiter = topological_sort.topo_sorted(manager.objs,return_index=True)
+        self.pass_results = {}
+        self.objects = list(manager.objs)
+        self.params = list(manager.params)
+
+
+    def invalidate(self, ipass):
+        self.topoiter.invalidate(ipass)
+        self.pass_results.pop(ipass)
+
+    def add_pass(self, ipass):
+        self.topoiter.add_pass(ipass)
+
+    def run(self):
+        for cur_pass_idx in self.topoiter:
+            cur_pass = self.objects[cur_pass_idx]
+            param_args, param_kwds = self.params[cur_pass_idx]
+
+            res = cur_pass.run(self.query, self, *param_args, **param_kwds)
+            if(not res is None):
+                self.pass_results[cur_pass] = res
                 result = res
-                pass_results[cur_pass] = res
-                continue
-            if(len(res) > 0):
-                result = res[0]
-                pass_results[cur_pass] = res[0]
-            if(len(res) > 1):
-                for invalidate in res[1]:
-                    topoiter.invalidate(invalidate)
-                    if invalidate in query.pass_results:
-                        del query.pass_results[invalidate]
-
-            if(len(res) > 2):
-                for add_pass in res[2]:
-                    topoiter.append(add_pass)
-
         return result

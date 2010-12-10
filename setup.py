@@ -35,9 +35,9 @@ setup(name = 'Ibidas',
     #packages = ['container', ],
     ext_modules = [
         Extension(
-		'closure', 
-		['src/closure.c'],
-		extra_compile_args=["-Wall"]
+    		'closure', 
+    		['src/closure.c'],
+    		extra_compile_args=["-Wall"]
 	    ),
         Extension(
 		    'multi_visitor', 
@@ -47,12 +47,6 @@ setup(name = 'Ibidas',
         Extension(
             'base_container', 
             ['src/base_container.c'],
-            include_dirs=[include_dir],
-            extra_compile_args=["-Wall"]
-        ),
-        Extension(
-            'xnumpy', 
-            ['src/xnumpy.c'], 
             include_dirs=[include_dir],
             extra_compile_args=["-Wall"]
         ),

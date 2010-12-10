@@ -3,7 +3,9 @@ import copy
 import itertools
 from collections import defaultdict
 
+from query_graph import Node
 from itypes import rtypes
+from constants import *
 
 _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"itypes", "dimensions")
@@ -16,22 +18,33 @@ _delay_import_(globals(),"repops_dim")
 _delay_import_(globals(),"repops_slice")
 _delay_import_(globals(),"slices")
 
-class Representor(object):
-    def __init__(self, all_slices, active_slices):
-        assert isinstance(all_slices, dict), "all_slices should be a dict"
-        assert isinstance(active_slices, tuple), \
-                                        "active_slices should be a tuple"
-        assert all(slice.id in all_slices for slice in active_slices), \
-                          "all active slices should occur in all_slices"
+class Representor(Node):
+    _state = 0                 #default value
+    _slices = []               #default value
 
-        self._all_slices = all_slices
-        self._active_slices = active_slices
+    def initialize(self, slices, state=RS_ALL_KNOWN):
+        assert isinstance(slices, tuple), "slices should be a tuple"
+        self._slices = slices
+        if(state == RS_CHECK):
+            if(slices):
+                state |= RS_SLICES_KNOWN
+            if(all([slice.type != rtypes.unknown for slice in slices])):
+                state |= RS_TYPES_KNOWN
+            state &= ~RS_CHECK
+        self._state = state
+
+
+    def checkState(self,filter=RS_SLICES_KNOWN):
+        if(not ((self._state & filter) == filter)):
+            slices = self._getResultSlices()
+            self.initialize(slices,state=RS_ALL_KNOWN | RS_INFERRED)
 
     def __str__(self):
+        self.checkState(filter=RS_ALL_KNOWN)
         table = []
         table.append(["Slices:", "Types:", "Dims:"])
         last_dim = ()
-        for slice in self._active_slices:
+        for slice in self._slices:
             dim_str = []
             for pos, dim in enumerate(slice.dims):
                 if len(last_dim) > pos and dim == last_dim[pos]:
@@ -51,7 +64,7 @@ class Representor(object):
     __repr__ = __str__
 
     def _axisF(self, name):
-        return repops_slice.project(self, name)
+        return repops_slice.Project(self, name)
 
     def _axisA(self, name):
         return repops_slice.unpack_tuple(self, name)
@@ -60,9 +73,8 @@ class Representor(object):
         return repops_dim.unpack_array(self, name)
 
     def _axisD(self, name):
-        slices = self._active_dim_slice_dict[name] 
-        sliceids = [slice.id for slice in slices]
-        return repops_slice.ProjectId(self, sliceids)
+        #slices = self._active_dim_slice_dict[name] 
+        return repops_slice.ProjectDim(self, name)
         
 
     def __getattr__(self, name):
@@ -73,12 +85,13 @@ class Representor(object):
             axis_letter = name[0]
             #should be upper case
             if(not axis_letter.upper() == axis_letter or axis_letter == "_"):
+                return repops_slice.Project(self,name)
                 #prevent recursion
-                active_slices = self.__dict__["_active_slices"]
+                slices = self.__dict__["_slices"]
                 
                 #assume default
-                if(len(active_slices) == 1):
-                    if(name == active_slices[0].name):
+                if(len(slices) == 1):
+                    if(name == slices[0].name):
                         return self
                     axis_letter = "A" 
                 else:
@@ -100,27 +113,22 @@ class Representor(object):
         raise AttributeError("No attribute with name: " + name + " found")
 
     def _getAttributeNames(self):
-        return [slice.name for slice in self._active_slices]
+        return [slice.name for slice in self._slices]
 
-    def copy(self, modifiable=False):
-        if(modifiable):
-            ncls = wrapper_py.ModifiablePyRepresentor
-        else:
-            ncls = wrapper_py.PyRepresentor
-        return ncls(self._getResult(), self._active_slices)
+    def copy(self):
+        return wrapper_py.PyRepresentor(self._getResultSlices())
 
    
     def __reduce__(self):
-        ncls = wrapper_py.PyRepresentor
-        return (ncls, (self._getResult(), self._active_slices))
+        return (wrapper_py.PyRepresentor, (self._getResultSlices(),))
 
     def getType(self):
-        if(len(self._active_slices) == 1):
-            return self._active_slices[0].type
+        if(len(self._slices) == 1):
+            return self._slices[0].type
         else:
             return rtypes.TypeTuple(False, 
-                    tuple([slice.type for slice in self._active_slices]), 
-                    tuple([slice.name for slice in self._active_slices]))
+                    tuple([slice.type for slice in self._slices]), 
+                    tuple([slice.name for slice in self._slices]))
 
 
     def __getitem__(self, condition):
@@ -141,7 +149,7 @@ class Representor(object):
             condition = context._apply(condition, self)
         return repops_rel.rfilter(self, condition, dim) 
 
-    def _getResult(self, args={}):
+    def _getResultSlices(self, args={}):
         query = query_context.QueryContext(self, args)
         return engines.select_engine.run(query)
 
@@ -149,13 +157,12 @@ class Representor(object):
         return copy.copy(self)
 
     def __call__(self, **args):
-        res = self._getResult(args)
-        res = tuple([res[slice.id] for slice in self._active_slices])
+        res = self._getResultSlices(args)
 
-        if(len(self._active_slices) == 1):
-            return res[0]
-
-        return res
+        if(len(self._slices) == 1):
+            return res[0].data
+        else:
+            return tuple([slice.data for slice in res])
 
     # Overloaded functions. The r* functions are implemented because you
     # want to the same behaviour no matter no which side the known object
@@ -164,7 +171,7 @@ class Representor(object):
     def __add__(self, other):
         if(isinstance(other, context.Context)):
             return other.__radd__(self)
-        elif(isinstance(other, repops.plusprefix)):
+        elif(isinstance(other, repops.PlusPrefix)):
             pass
         return repops_rel.binop(self, other, '__add__')
     
@@ -174,7 +181,7 @@ class Representor(object):
     def __sub__(self, other):
         if(isinstance(other, context.Context)):
             return other.__radd__(self)
-        elif(isinstance(other, repops.plusprefix)):
+        elif(isinstance(other, repops.PlusPrefix)):
             pass
         return repops_rel.binop(self, other, '__sub__')
     
@@ -185,7 +192,7 @@ class Representor(object):
     def __mul__(self, other):
         if(isinstance(other, context.Context)):
             return other.__rmul__(self)
-        elif(isinstance(other, repops.plusprefix)):
+        elif(isinstance(other, repops.PlusPrefix)):
             pass
         return repops_rel.binop(self, other, '__mul__')
     
@@ -196,7 +203,7 @@ class Representor(object):
     def __mod__(self, other):
         if(isinstance(other, context.Context)):
             return other.__rmul__(self)
-        elif(isinstance(other, repops.plusprefix)):
+        elif(isinstance(other, repops.PlusPrefix)):
             pass
         return repops_rel.binop(self, other, '__mod__')
     
@@ -228,7 +235,7 @@ class Representor(object):
     def __and__(self, other):
         if(isinstance(other, context.Context)):
             return other.__rand__(self)
-        elif(isinstance(other, repops.plusprefix)):
+        elif(isinstance(other, repops.PlusPrefix)):
             pass
         return repops_rel.binop(self, other, '__and__')
     
@@ -239,7 +246,7 @@ class Representor(object):
     def __or__(self, other):
         if(isinstance(other, context.Context)):
             return other.__ror__(self)
-        elif(isinstance(other, repops.plusprefix)):
+        elif(isinstance(other, repops.PlusPrefix)):
             pass
         return repops_rel.binop(self, other, '__or__')
 
@@ -250,7 +257,7 @@ class Representor(object):
     def __xor__(self, other):
         if(isinstance(other, context.Context)):
             return other.__rxor__(self)
-        elif(isinstance(other, repops.plusprefix)):
+        elif(isinstance(other, repops.PlusPrefix)):
             pass
         return repops_rel.binop(self, other, '__xor__')
 
@@ -295,7 +302,7 @@ class Representor(object):
 
     # plus prefix, used for table operators (i.e. ++, &+, etc.)
     def __pos__(self):
-        return repops.plusprefix(self)
+        return repops.PlusPrefix(self)
     
     def __invert__(self):
         return repops_rel.unary_op(self, "__invert__")
@@ -359,13 +366,13 @@ class Representor(object):
         return repops_dim.rlist(self)
     
     def tuple(self, to_python=False):
-        return repops_slice.rtuple(self, to_python)
+        return repops_slice.RTuple(self, to_python)
 
     def to_python(self):
-        if(len(self._active_slices) > 1):
+        if(len(self._slices) > 1):
             self = self.tuple(to_python=True)
 
-        while(self._active_slices[0].dims):
+        while(self._slices[0].dims):
             self = self.list()
 
         return self()
@@ -373,79 +380,13 @@ class Representor(object):
     def sort(self, slice):
         return repops_rel.sort(self, self.get(slice))
 
-    def _getHelperUsedNames(self, nslices, unames):
-        used_names = set()
-        if(not unames is None):
-            used_names |= unames
-        for nslice in nslices:
-            for slice in nslice._active_slices:
-                used_names.add(slice.name)
-        return used_names 
-
     def get(self, *slices, **kwds):
-        nslices = []
-        if("_used_names_" in kwds):
-            unames = kwds["_used_names_"]
-            del kwds["_used_names_"]
-        else:
-            unames = None
-            
-        for elem in slices:
-            if(isinstance(elem, context.Context)):
-                used_names = self._getHelperUsedNames(nslices, unames)
-                elem = context._apply(elem, self, get={'_used_names_':used_names})
-            elif(isinstance(elem, Representor)):
-                pass
-            elif(isinstance(elem, tuple)):
-                elem = repops_slice.rtuple(self.get(*elem))
-            elif(isinstance(elem, list)):
-                if(len(elem) == 1):
-                    elem = self.get(*elem).array()
-                else:
-                    elem = self.get(*elem)
-            elif(elem == "~"):
-                used_names = self._getHelperUsedNames(nslices, unames)
-                sliceids = [slice.id for slice in self._active_slices if slice.name not in used_names]
-                elem = repops_slice.ProjectId(self, sliceids)
-            elif(elem == "#"):
-                common_dims = set([slice.dims for slice in self._active_slices])
-                if len(common_dims) != 1:
-                    raise RuntimeError, "Cannot use # selector as fields do not have a common dimension"
-                if(unames):
-                    elem = repops_slice.project(self, iter(unames).next())                    
-                else:
-                    elem = repops_slice.project(self, 0)
-            else:
-                elem = repops_slice.project(self, elem)
-            nslices.append(elem)
-
-        for name, elem in kwds.iteritems():
-            if(isinstance(elem, context.Context)):
-                used_names = self._getHelperUsedNames(nslices, unames)
-                elem = context._apply(elem, self, _used_names_=used_names)
-            elif(isinstance(elem, Representor)):
-                pass
-            elif(isinstance(elem, tuple)):
-                elem = repops_slice.rtuple(self.get(*elem))
-            elif(isinstance(elem, list)):
-                if(len(elem) == 1):
-                    elem = self.get(*elem).array()
-                else:
-                    elem = self.get(*elem)
-            else:
-                elem = repops_slice.project(self, elem)
-            nslices.append(elem/name)
-       
-        if(len(nslices) > 1):
-           return repops_slice.combine(*nslices)
-        else:
-            assert nslices, "No slice selected with get"
-            return nslices[0]
+        return repops_slice.Project(self,*slices,**kwds)
 
     def _getActiveDimDict(self):
         if(not hasattr(self, '_active_dim_cache')):
             res = defaultdict(set)
-            for slice in self._active_slices:
+            for slice in self._slices:
                 for dim in slice.dims:
                     res[dim.name].add(dim)
             self._active_dim_cache = res
@@ -455,7 +396,7 @@ class Representor(object):
     def _getActiveSliceDict(self):
         if(not hasattr(self, '_active_slice_cache')):
             res = defaultdict(set)
-            for slice in self._active_slices:
+            for slice in self._slices:
                 res[slice.name].add(slice)
             self._active_slice_cache = res
         return self._active_slice_cache
@@ -464,19 +405,18 @@ class Representor(object):
     def _getActiveDimSliceDict(self):
         if(not hasattr(self, '_active_dim_slice_cache')):
             res = defaultdict(set)
-            for slice in self._active_slices:
+            for slice in self._slices:
                 for dim in slice.dims:
                     res[dim.name].add(slice)
             self._active_dim_slice_cache = res
         return self._active_dim_slice_cache
-    
     _active_dim_slice_dict = property(_getActiveDimSliceDict)
 
 
     def _getActiveDimParentDict(self):
         if(not hasattr(self, '_active_dim_parent_cache')):
             res = defaultdict(set)
-            for slice in self._active_slices:
+            for slice in self._slices:
                 for pdim, cdim in zip(slice.dims, slice.dims[1:]):
                     res[cdim.name].add(pdim)
                 if(slice.dims):
@@ -489,7 +429,7 @@ class Representor(object):
     def _getActiveDimChildDict(self):
         if(not hasattr(self, '_active_dim_child_cache')):
             res = defaultdict(set)
-            for slice in self._active_slices:
+            for slice in self._slices:
                 for pdim, cdim in zip(slice.dims, slice.dims[1:]):
                     res[pdim.name].add(cdim)
                 if(slice.dims):
@@ -502,26 +442,17 @@ class Representor(object):
     def _getActiveDimIdDict(self):
         if(not hasattr(self, '_active_dim_id_cache')):
             res = {}
-            for slice in self._active_slices:
+            for slice in self._slices:
                 for dim in slice.dims:
                     res[dim.id] = dim
             self._active_dim_id_cache = res
         return self._active_dim_id_cache
     _active_dim_id_dict = property(_getActiveDimIdDict)
 
-    def _getActiveSliceIdDict(self):
-        if(not hasattr(self, '_active_slice_id_cache')):
-            res = {}
-            for slice in self._active_slices:
-                res[slice.id] = slice
-            self._active_slice_cache = res
-        return self._active_slice_id_cache
-    _active_slice_id_dict = property(_getActiveSliceIdDict)
-
     def _getActiveDimIdSliceDict(self):
         if(not hasattr(self, '_active_dim_id_slice_cache')):
             res = defaultdict(set)
-            for slice in self._active_slices:
+            for slice in self._slices:
                 for dim in slice.dims:
                     res[dim.id].add(slice)
             self._active_dim_id_slice_cache = res
@@ -532,7 +463,7 @@ class Representor(object):
     def _getActiveDimIdParentDict(self):
         if(not hasattr(self, '_active_dim_id_parent_cache')):
             res = defaultdict(set)
-            for slice in self._active_slices:
+            for slice in self._slices:
                 for pdim, cdim in zip(slice.dims, slice.dims[1:]):
                     res[cdim.id].add(pdim)
                 if(slice.dims):
@@ -545,7 +476,7 @@ class Representor(object):
     def _getActiveDimIdChildDict(self):
         if(not hasattr(self, '_active_dim_id_child_cache')):
             res = defaultdict(set)
-            for slice in self._active_slices:
+            for slice in self._slices:
                 for pdim, cdim in zip(slice.dims, slice.dims[1:]):
                     res[pdim.id].add(cdim)
                 if(slice.dims):
@@ -554,202 +485,4 @@ class Representor(object):
             self._active_dim_id_child_cache = res
         return self._active_dim_id_child_cache
     _active_dim_id_child_dict = property(_getActiveDimIdChildDict)       
-
-
-
-    def _identifyDim(self, dim_selector=None):
-        """Identifies a dim, using dim_selector. 
-        Returns dim identifier, which is a tuple of dims.
-            If fixed dim identified:
-                only fixed dim
-            If variable dim, path: 
-                tuple with fixed dim --> --> variable dim
-            However, if a path is specified (tuple of dims,
-               slice dims, unique index path dims), then 
-               path is always contained in tuple
-               even if a fixed dim in it is not at the beginning.
-            multiple matching dims: True
-            no matching dims: False
-
-        
-        Parameters
-        ----------
-        dim_selector: 
-            if None: 
-                return unique common dimension if exists
-            if string:
-                search for dim with name.
-                    if only one fixed dim: return
-                    if variable dim with unique path: return
-                    otherwise returns None
-                search for slice with name 
-                    return identifier for last dim
-            if dim:
-                if only one fixed dim: return
-                if variable dim with unique path: return
-                otherwise returns None
-            if slice
-                return identifier for last dim
-            if tuple of dim (names):
-                if empty: same as None
-                searches for dim name, identified by branch in tuple. 
-                Starts from last dim, find unique path to fixed dim.
-                If exist, returns, otherwise, returns None
-            if int:
-                if there is a unique dim path, use that to index.
-                If positive, dim paths can have variable length as 
-                long as they are equal on the base
-        """
-        if(isinstance(dim_selector, tuple) and len(dim_selector) == 0):
-            dim_selector = None
-
-        if(dim_selector is None):
-            res =  self._commonDims()
-            return res
-        elif(isinstance(dim_selector, int)):
-            fdims = set([slice.dims for slice in self._active_slices 
-                                    if slice.dims])
-            if(len(fdims) == 1):
-                path = fdims.pop()
-            else:
-                path = []
-                for elems in itertools.izip_longest(*list(fdims)):
-                    dimset = set([elem for elem in elems if not elem is None])
-                    if(len(dimset) == 1):
-                        path.append(dimset.pop())
-                    else:
-                        return True
-
-                path = tuple(path)
-            
-            if(not path):
-                return False
-            if(dim_selector == -1):
-                return self._identifyDimPathHelper(path)
-            else:
-                return self._identifyDimPathHelper(path[:(dim_selector + 1)])
-            
-
-        elif(isinstance(dim_selector, str)):
-            if(dim_selector in self._active_dim_dict):
-                nselectors = self._active_dim_dict[dim_selector]
-            elif(dim_selector in self._active_slice_dict):
-                nselectors = self._active_slice_dict[dim_selector]
-            else:
-                return False
-
-            results = []
-            for selector in nselectors:
-                res = self._identifyDim(selector)
-                if(not res is False):
-                    results.append(res)
-            if(len(results) == 1):
-                return results[0]
-            elif(len(results) == 0):
-                return False
-            else:
-                return True
-        elif(isinstance(dim_selector, dimensions.Dim)):
-            return self._identifyDimPathHelper((dim_selector,))
-        elif(isinstance(dim_selector, slices.Slice)):
-            return self._identifyDimPathHelper(dim_selector.dims)
-        elif(isinstance(dim_selector, tuple)):
-            return self._identifyDimPathHelper(dim_selector)
-        else:
-            raise RuntimeError, "Unexpected dim selector: " + str(dim_selector)
-
-    def _identifyDimPathHelper(self, path):
-        """Given a path (tuple of dims or dim names), 
-        Determines if there is a matching dim path in self that uniquely 
-        identifies the dimension last in path. Such a path should have the 
-        same order of dimenmsions as given in 'path', but not necessarily the
-        same dimensions. It however should be unique.
-        
-        Returns an identifier for the last dimension if unique path found.
-        (See _identifyDim for description).
-
-        Note: paths that have a fixed dimension which is not on the beginning
-        will be shortened such that they start from this fixed dimension. The 
-        beginning of the path will not be matched in that case!
-
-        Returns
-        -------
-        True: if multiple paths are possible
-        False: if no path is matching
-        dimension identifier otherwise
-        """
-        if(not path):
-            return False
-        reslist = []
-        active_dim_dict = self._active_dim_dict
-        active_dim_id_dict = self._active_dim_id_dict
-        parent_dim_id_dict = self._active_dim_id_parent_dict
-
-        for pos, dim in enumerate(path[::-1]):
-            if(isinstance(dim, dimensions.Dim)):
-                if not dim.id in active_dim_id_dict:
-                    return False
-            else:
-                dims = active_dim_dict[dim]
-                if(len(dims) > 1): #multiple matches for dim name. Try them all.
-                    sresults = []
-                    for dim in dims:
-                        sres = self._identifyDimPathHelper(path[:(-(pos + 1))] + (dim,))
-                        if(not sres is False):
-                            sresults.append(sres)
-                    if(len(sresults) > 1):
-                        return True
-                    elif(len(sresults) == 0):
-                        return False
-                    reslist.extend(sresults[0][::-1])
-                    break
-                elif(len(dims) == 1):
-                    dim = iter(dims).next()
-                else:
-                    return False
-                   
-            if(not reslist): 
-                reslist.append(dim)
-                match = True
-            else:
-                match = False
-            
-            while(match is False):
-                parentdims = parent_dim_id_dict[reslist[-1].id]
-                if(dim in parentdims):
-                    reslist.append(dim)
-                    break
-                
-                if(len(parentdims) > 1):
-                    sresults = []
-                    for pdim in parentdims:
-                        sres = self._identifyDimPathHelper(
-                                        path[:(-(pos + 1))] + (dim, pdim))
-                        if(not sres is False):
-                            sresults.append(sres)
-                    if(len(sresults) > 1):
-                        return True
-                    elif(len(sresults) == 0):
-                        return False
-                    reslist.extend(sresults[0][::-1])
-                    break
-                elif(len(parentdims) == 1):
-                    reslist.append(iter(parentdims).next())
-                else:
-                    return False
-        else:
-            while(True):
-                parentdims = parent_dim_id_dict[reslist[-1].id]
-                if(len(parentdims) > 1):
-                    return True
-                elif(len(parentdims) == 0):
-                    break
-                else:
-                    nelem = iter(parentdims).next()
-                    if(nelem is None):
-                        break
-                    reslist.append(nelem)
-        
-        return tuple(reslist[::-1])
-
 

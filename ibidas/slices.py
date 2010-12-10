@@ -2,15 +2,16 @@ import copy
 
 from constants import *
 from utils import util
-from itypes import rtypes
+from itypes import rtypes,dimpaths
+from query_graph import Node
 
-_delay_import_(globals(),"itypes","dimensions","typeops")
+
+_delay_import_(globals(),"itypes","dimensions","typeops","convertors")
 _delay_import_(globals(),"itypes.type_attribute_freeze","freeze_protocol")
-
 
 #pylint: disable-msg=E1101
 sliceid = util.seqgen().next
-class Slice(object):
+class Slice(Node):
     """A slice represents a attribute and set of dimensions in the data.
     Each slice has an id for unique identification, an attribute name
     for accessing it, a type describing the contents of the slice,
@@ -22,11 +23,10 @@ class Slice(object):
     but the same id. An id represents similarity of the content 
     on element level, dims the packaging."""
 
-    __slots__ = ['id', 'name', 'type', 'dims', 'last_id']
+    __slots__ = ['name', 'type', 'dims','bookmarks']
 
 
-    def __init__(self, name, rtype = rtypes.unknown, dims=(), 
-                                                sid=None, last_id=None):
+    def __init__(self, name, rtype = rtypes.unknown, dims=dimpaths.DimPath(), bookmarks=set()):
         """Creates a slice object.
 
         Parameters
@@ -34,70 +34,107 @@ class Slice(object):
         name: name of slice (string)
         type: type of slice, optional, default = unknown
         dims: tuple of Dim objects, optional, default = ()
-        id:   id of slice, optional, default = auto-generated
-        last_id: if copied with new `id`, this should refer to `id`
-                   of copied object
         """
-        if(sid is None):
-            self.id = sliceid()
-        else:
-            self.id = sid
-        assert isinstance(name, str), "Name of slice should be a string"
+        assert isinstance(name, (str,unicode)), "Name of slice should be a string"
         assert (name.lower() == name), "Name should be in lowercase"
-        self.name = name
-
         assert isinstance(rtype, rtypes.TypeUnknown), "Invalid type given"
-        self.type = rtype
+        assert isinstance(dims, dimpaths.DimPath), "Dimensions of a slice should be a DimPath"
+        assert isinstance(bookmarks,set), "Bookmarks should be a set"
+        assert all([isinstance(bm,(str,unicode)) for bm in bookmarks]),"Bookmarks should be a string"
+        assert all([bm.lower() == bm for bm in bookmarks]), "Bookmarks should be in lowercase"
 
-        assert isinstance(dims, tuple), \
-                                    "Dimensions of a slice should be a tuple"
-        self.dims = dims
-        self.last_id = last_id
-    
-    def copy(self, realias=False):
-        res =  copy.copy(self)
-        if(realias):
-            res.last_id = res.id
-            res.id = sliceid()
-        return res
-
-    def setName(self, name):
-        assert isinstance(name, str), "Name of slice should be a string"
-        assert (name.lower() == name), "Name should be in lowercase"
         self.name = name
-
-    def __eq__(self, other):
-        return (self.__class__ is other.__class__ and
-                self.id == other.id and self.dims == other.dims)
-
-    def __hash__(self):
-        return hash(self.id) ^ hash(self.dims)
-
-    def __repr__(self, last_dims=()):
+        self.type = rtype
+        self.dims = dims
+        self.bookmarks = bookmarks
+    
+    def __repr__(self):
         res = self.name
         res += "="
         if(self.dims):
             dimstr = []
             for pos, dim in enumerate(self.dims):
-                if(len(last_dims) > pos and dim == last_dims[pos]):
-                    dimstr.append(".")
-                else:
-                    dimstr.append("[" + str(dim) + "]")
+                dimstr.append("[" + str(dim) + "]")
             res += "<".join(dimstr) + "<"
                 
         res += str(self.type)
         return res
 
-class OpSlice(Slice):
+class UnaryOpSlice(Slice):
     __slots__ = ['source']
-    def __init__(self, source_slices, name, rtype=rtypes.unknown, 
-                            dims=(), sid=None, last_id=None):
-        self.source = tuple([slice.id for slice in source_slices])
-        Slice.__init__(self, name, rtype, dims, sid, last_id)
+    def __init__(self, source, name=None, rtype=None, dims=None, bookmarks=None):
+        if(name is None):
+            name = source.name
+        if(rtype is None):
+            rtype = source.type
+        if(dims is None):
+            dims = source.dims
+        if(bookmarks is None):
+            bookmarks = source.bookmarks
+        self.source = source
+        assert isinstance(source,Slice),"Source of UnaryOpSlice should be a slice"
+        Slice.__init__(self, name, rtype, dims, bookmarks)
 
-class UnpackArraySlice(OpSlice):
-    """An slice which is the result of unpacking a source slice."""
+class MultiOpSlice(Slice):
+    __slots__ = ['sources']
+    def __init__(self, source_slices, name, rtype=rtypes.unknown, 
+                            dims=dimpaths.DimPath(), bookmarks=set()):
+        self.sources = tuple(source_slices)
+        Slice.__init__(self, name, rtype, dims, bookmarks)
+
+class LinkSlice(UnaryOpSlice):
+    __slots__ = ['link']
+    def __init__(self, source, link, name, rtype=rtypes.unknown, dims=dimpaths.DimPath(), bookmarks=set()):
+        assert isinstance(link,representor.Representor),"Link of LinkSlice should be a representor"
+        UnaryOpSlice.__init__(self, source, name, rtype, dims, bookmarks)
+
+class DataSlice(Slice):
+    __slots__ = ['data']
+    def __init__(self, data, name=None, rtype=None, dims=dimpaths.DimPath(), bookmarks=set()):
+        self.data = data
+        Slice.__init__(self, name, rtype, dims, bookmarks)
+
+
+class ChangeBookmarkSlice(UnaryOpSlice):
     __slots__ = []
+
+    def __init__(self,source,add_bookmark=None,update_auto_bookmarks=None):
+        nbookmarks = source.bookmarks.copy()
+
+        if(not update_auto_bookmarks is None):
+            for bm in nbookmarks:
+                if(bm.startswith('!')):
+                    nbookmarks.discard(bm)
+                    nbookmarks.add("!" + update_atuo_bookmarks + bm[1:])
+
+        if(not add_bookmark is None):
+            nbookmarks.add(add_bookmark)
+        
+        UnaryOpSlice.__init__(self, source, bookmarks=nbookmarks)
+
+class ChangeNameSlice(UnaryOpSlice):
+    __slots__ = []
+    def __init__(self,source, new_name):
+        UnaryOpSlice.__init__(self, source, name=new_name)
+
+class ChangeDimPathSlice(UnaryOpSlice):
+    __slots__ = []
+    def __init__(self,source, new_dims):
+        UnaryOpSlice.__init__(self, source, dims=new_dims)
+
+class CastSlice(UnaryOpSlice):
+    __slots__ = []
+    def __init__(self, source, new_type):
+        UnaryOpSlice.__init__(self, source, type=new_type)
+        
+
+class DetectTypeSlice(UnaryOpSlice):
+    __slots__ = []
+
+
+class UnpackArraySlice(UnaryOpSlice):
+    """An slice which is the result of unpacking a source slice."""
+    __slots__ = ["unpack_dims"]
 
     def __init__(self,slice,ndim=None):
         """Creates a new slice, and sets attributes.
@@ -116,23 +153,22 @@ class UnpackArraySlice(OpSlice):
 
         if(ndim is None):
             unpack_dims = ndims
-            rest_dims = tuple()
+            rest_dims = dimpaths.DimPath()
         else:
             unpack_dims = ndims[:ndim]
             rest_dims = ndims[ndim:]
+        self.unpack_dims = unpack_dims
 
         if(rest_dims):
-            ntype = rtypes.TypeArray(stype.has_missing, rest_dims, stype.subtypes, data_state=DATA_NORMAL)
-            OpSlice.__init__(self, (slice,), slice.name, 
-                                            ntype, slice.dims + unpack_dims)
+            ntype = rtypes.TypeArray(stype.has_missing, rest_dims, stype.subtypes)
+            UnaryOpSlice.__init__(self, slice, rtype=ntype, dims=slice.dims + unpack_dims)
         else:
-            OpSlice.__init__(self, (slice,), slice.name, 
-                                            stype.subtypes[0], slice.dims + unpack_dims)
+            UnaryOpSlice.__init__(self, slice, rtype=stype.subtypes[0], dims=slice.dims + unpack_dims)
         
 
-class UnpackTupleSlice(OpSlice):#{{{
+class UnpackTupleSlice(UnaryOpSlice):#{{{
     """A slice which is the result of unpacking a tuple slice."""
-    __slots__ = ["slice_idx"]
+    __slots__ = ["tuple_idx"]
     
     def __init__(self, slice, idx):
         """Creates a new slice, using source `slice`, by 
@@ -142,13 +178,14 @@ class UnpackTupleSlice(OpSlice):#{{{
         ----------
         slice: new slice
         idx:   index of tuple attribute to be unpacked"""
-        slice = ensure_normal_or_frozen(slice)
+        
         stype = slice.type
         assert isinstance(stype, rtypes.TypeTuple), "Cannot unpack slice " + \
                                 str(slice.name) + " as it is not a tuple"
         
         assert 0 <= idx < len(slice.type.subtypes), \
             "Tuple index invalid, outside range of available attributes"
+
         ntype = slice.type.subtypes[idx]
         
         if(slice.type.fieldnames):
@@ -156,37 +193,34 @@ class UnpackTupleSlice(OpSlice):#{{{
         else:
             name = "f" + str(idx)
 
-        OpSlice.__init__(self, (slice,), name, 
-                                        ntype, slice.dims)
-        self.slice_idx = idx#}}}
+        UnaryOpSlice.__init__(self, slice, name=name, rtype=ntype)
+        self.tuple_idx = idx#}}}
 
-class PackTupleSlice(OpSlice):
+class PackTupleSlice(MultiOpSlice):
     __slots__ = ["to_python"]
 
     def __init__(self, slices, field="data", to_python=False):
         cdim = set([slice.dims for slice in slices])
-        
         assert len(cdim) == 1, "Packing tuple on slices with different dims"
         
         self.to_python=to_python
+
         fieldnames = [slice.name for slice in slices]
         subtypes = [slice.type for slice in slices]
-        ntype = rtypes.TypeTuple(False, tuple(subtypes), tuple(fieldnames),data_state=DATA_NORMAL)
-        
-        OpSlice.__init__(self, slices, field, ntype, iter(cdim).next())
+        ntype = rtypes.TypeTuple(False, tuple(subtypes), tuple(fieldnames))
+        nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
+        MultiOpSlice.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)
 
-class PackArraySlice(OpSlice):
+class PackArraySlice(UnaryOpSlice):
     __slots__ = []
 
     def __init__(self, pslice, ndim=1):
-        assert pslice.dims, "Cannot pack as array a slice without dimension"
+        assert len(pslice.dims) >= ndim, "Slice does not have enough dimensions to pack as " + str(ndim) + "-dimensional array"
         
         dims = pslice.dims[-ndim:]
-        in_type = pslice.type
         has_missing = any([dim.has_missing for dim in dims])
-        ntype = rtypes.TypeArray(has_missing, dims, (in_type,), data_state=DATA_NORMAL)
-
-        OpSlice.__init__(self, (pslice,), pslice.name, ntype, pslice.dims[:-ndim])
+        ntype = rtypes.TypeArray(has_missing, dims, (pslice.type,))
+        UnaryOpSlice.__init__(self, pslice, rtype=ntype, dims=pslice.dims[:-ndim])
 
 
 class PackListSlice(PackArraySlice):
@@ -194,42 +228,40 @@ class PackListSlice(PackArraySlice):
 
     def __init__(self, pslice, ndim=1):
         assert ndim == 1, "Python lists do not support multi-dimensional data"
-        PackArraySlice.__init__(self,pslice,dim,ndim)
+        PackArraySlice.__init__(self, pslice, ndim)
 
-class RedimSlice(OpSlice):
-    __slots__ = []
-    def __init__(self, slice, ndims,  *params, **kwds):
-        OpSlice.__init__(self,(slice,), slice.name, 
-                                        slice.type, ndims)
 
-class ConvertSlice(OpSlice):
+class ConvertSlice(UnaryOpSlice):
     __slots__ = ["convertor"]
 
-    def __init__(self, pslice):
+    def __init__(self, slice):
         if(slice.type == rtypes.unknown):
-            ntype = rtypes.TypeAny(True,data_state=DATA_NORMAL)
+            ntype = rtypes.TypeAny(True)
         else:
             assert slice.type.data_state == DATA_INPUT, "Slice has not DATA_INPUT as state"
-            ntype = slice.type.copy(data_state=DATA_NORMAL)
+            ntype = slice.type.copy()
+            ntype.data_state = DATA_NORMAL
+            ntype.attr.pop('convertor',None)
+
         self.convertor = convertors.getConvertor(slice.type)
-        OpSlice.__init__(self, (pslice,), pslice.name, ntype, pslice.dims)
+        UnaryOpSlice.__init__(self, slice, rtype=ntype)
 
 
-class FreezeSlice(OpSlice):
-    __slots__ = ["convertor"]
+class FreezeSlice(UnaryOpSlice):
+    __slots__ = []
 
     def __init__(self, pslice):
-        assert slice.type.data_state == DATA_NORMAL, "Slice does not need to frozen"
+        assert freeze_protocol.need_freeze(pslice.type), "Slice does not need to frozen"
         ntype = freeze_protocol.freeze(slice.type)
-        OpSlice.__init__(self, (pslice,), pslice.name, ntype, pslice.dims)
+        UnaryOpSlice.__init__(self, pslice, rtype=ntype)
 
-class UnFreezeSlice(OpSlice):
-    __slots__ = ["convertor"]
+class UnFreezeSlice(UnaryOpSlice):
+    __slots__ = []
 
     def __init__(self, pslice):
         assert freeze_protocol.need_unfreeze(slice.type), "Slice does not need to be unfrozen"
         ntype = freeze_protocol.unfreeze(slice.type)
-        OpSlice.__init__(self, (pslice,), pslice.name, ntype, pslice.dims)
+        UnaryOpSlice.__init__(self, pslice, rtype=ntype)
 
 def ensure_frozen(slice):
     if(slice.type == rtypes.unknown or slice.type.data_state == DATA_INPUT):
@@ -254,11 +286,11 @@ def ensure_normal_or_frozen(slice):
     else:
         return slice
 
-class FuncSlice(OpSlice):
+class FuncSlice(UnaryOpSlice):
     __slots__ = ["exec_func", "type_func", "params", "kwds"]
+    
     def __init__(self,slice, exec_func, type_func, ndims, ntype,  *params, **kwds):
-        assert slice.type.data_state == DATA_NORMAL, "Data should be in normal state"        
-        OpSlice.__init__(self,(slice,), slice.name, ntype, ndims)
+        UnaryOpSlice.__init__(self,slice, rtype=ntype, dims=ndims)
         self.exec_func = exec_func
         self.type_func = type_func
         self.params = params
@@ -312,21 +344,18 @@ class AggregrateSlice(FuncSlice):
         ntype = type_func(slice.type, slice.dims[-ndim:], exec_func)
         FuncSlice.__init__(self, slice,dim,exec_func, type_func, ndims, ntype, *params, **kwds)
 
-class BinOpSlice(OpSlice):
+class BinOpSlice(MultiOpSlice):
     __slots__ = []
-    def __init__(self, slice1, slice2, rtype=rtypes.unknown, dims=(), 
-                                    sid=None, last_id=None, outidx=None):
-        assert slice1.type.data_state == DATA_NORMAL, "Data should be in normal state"        
-        assert slice2.type.data_state == DATA_NORMAL, "Data should be in normal state"        
-
+    def __init__(self, slice1, slice2, rtype=rtypes.unknown, dims=dimpaths.DimPath(), outidx=None):
         if(slice1.name == slice2.name):
             nname = slice1.name
         else:
             nname = "result"
             if(outidx):
                 nname += str(outidx)
-        
-        OpSlice.__init__(self, (slice1, slice2), nname, rtype, dims, sid, last_id)
+
+        nbookmarks = slice1.bookmarks | slice2.bookmarks
+        MultiOpSlice.__init__(self, (slice1, slice2), name=nname, rtype=rtype, dims=dims, bookmarks=nbookmarks)
 
 class BinElemOpSlice(BinOpSlice):
     __slots__ = ['oper', 'op']
@@ -345,8 +374,7 @@ class BinElemOpSlice(BinOpSlice):
         self.oper = oper
         self.op = op
 
-class UnaryElemOpSlice(OpSlice):
-    """An slice which is the result of unpacking a source slice."""
+class UnaryElemOpSlice(UnaryOpSlice):
     __slots__ = ["oper", "op"]
     
     def __init__(self, slice, op, outtype=None):
@@ -358,8 +386,7 @@ class UnaryElemOpSlice(OpSlice):
         op: operator (python name)
         outtype: ibidas out type or None."""
         ntype, oper = typeops.unop_type(slice.type, op, outtype)
-
-        OpSlice.__init__(self, (slice,), slice.name, ntype, slice.dims)
+        UnaryOpSlice.__init__(self, (slice,), rtype=ntype)
         self.oper = oper
         self.op = op
 
