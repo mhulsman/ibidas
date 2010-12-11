@@ -1,7 +1,7 @@
 from constants import *
 import repops
 
-_delay_import_(globals(),"itypes","rtypes")
+_delay_import_(globals(),"itypes","rtypes","dimpaths")
 _delay_import_(globals(),"slices")
 _delay_import_(globals(),"utils","util")
 
@@ -36,16 +36,16 @@ class DimRename(repops.UnaryOpRep):#{{{
         if not source._state & RS_SLICES_KNOWN:
             return
         if(names):
-            unique_dimpath = util.unique(sum([slice.dims for slice in source._slices],DimPath())) 
-            assert (len(names) == len(unique_dimpath)),\
-                    "Number of new dim names does not match number of dims"
+            unique_dimpath = util.unique(sum([slice.dims for slice in source._slices],dimpaths.DimPath())) 
+            assert (len(names) <= len(unique_dimpath)),\
+                    "Number of new dim names larger than number of dims"
             
             name_dict = {}
             for newname,dim  in zip(names,unique_dimpath):
                 name_dict[dim] = newname
             kwds.update(name_dict)
         
-        nslices = [ChangeDimPathSlice(slice, slice.dims.changeNames(kwds))
+        nslices = [slices.ChangeDimPathSlice(slice, slice.dims.changeNames(kwds))
                                                     for slice in source._slices]
         return self.initialize(tuple(nslices),source._state)#}}}
 

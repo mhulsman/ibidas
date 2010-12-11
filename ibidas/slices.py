@@ -105,7 +105,7 @@ class ChangeBookmarkSlice(UnaryOpSlice):
             for bm in nbookmarks:
                 if(bm.startswith('!')):
                     nbookmarks.discard(bm)
-                    nbookmarks.add("!" + update_atuo_bookmarks + bm[1:])
+                    nbookmarks.add("!" + update_auto_bookmarks + bm[1:])
 
         if(not add_bookmark is None):
             nbookmarks.add(add_bookmark)

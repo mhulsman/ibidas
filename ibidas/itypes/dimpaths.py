@@ -11,6 +11,9 @@ class DimPath(tuple):
         return [dim.name for dim in self]
     names = property(fget=_getNames)
 
+    def hasName(self,name):
+        return any([dim.name == name for dim in self])
+
     def getDimIndexByName(self,name):
         dimnames = self.names
         try:
@@ -59,7 +62,7 @@ class DimPath(tuple):
                 dim = dim.copy()
                 dim.name = newname_dict[dim.name]
             newpath.append(dim)
-        return DimPath(newpath)
+        return DimPath(*newpath)
 
     def contigiousFixedNDims(self):
         depth = 0

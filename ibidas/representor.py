@@ -79,7 +79,9 @@ class Representor(Node):
     def _axisD(self, name):
         #slices = self._active_dim_slice_dict[name] 
         return repops_slice.ProjectDim(self, name)
-        
+
+    def _axisB(self, name):
+        return repops_slice.ProjectBookmark(self,name)
 
     def __getattr__(self, name):
         if(not name):
@@ -90,21 +92,9 @@ class Representor(Node):
             #should be upper case
             if(not axis_letter.upper() == axis_letter or axis_letter == "_"):
                 return repops_slice.Project(self,name)
-                #prevent recursion
-                slices = self.__dict__["_slices"]
-                
-                #assume default
-                if(len(slices) == 1):
-                    if(name == slices[0].name):
-                        return self
-                    axis_letter = "A" 
-                else:
-                    axis_letter = "F"
             else:
                 name = name[1:]
-
-            return getattr(self, "_axis" + axis_letter)(name)
-
+                return getattr(self, "_axis" + axis_letter)(name)
 
         except AttributeError, error:
             #reraise attribute error as runtime error, 
@@ -117,7 +107,10 @@ class Representor(Node):
         raise AttributeError("No attribute with name: " + name + " found")
 
     def _getAttributeNames(self):
-        return [slice.name for slice in self._slices]
+        if not source._state & RS_SLICES_KNOWN:
+            return []
+        else:
+            return [slice.name for slice in self._slices]
 
     def copy(self):
         return wrapper_py.PyRepresentor(self._getResultSlices())
@@ -209,6 +202,12 @@ class Representor(Node):
             return other.__rmul__(self)
         elif(isinstance(other, repops.PlusPrefix)):
             pass
+        elif(isinstance(other, str)):
+            return repops_dim.DimRename(self, other)
+        elif(isinstance(other, tuple)):
+            return repops_dim.DimRename(self, *other)
+        elif(isinstance(other, dict)):
+            return repops_dim.DimRename(self, **other)
         return repops_rel.binop(self, other, '__mod__')
     
     def __rmod__(self, other):
@@ -230,11 +229,28 @@ class Representor(Node):
         return repops_rel.binop(self, other, '__rdiv__')
     
     def __floordiv__(self, other):
-        if(isinstance(other, str)):
-            return self.bm(other)
-        else:
-            raise NotImplementedError
-   
+        if(isinstance(other, context.Context)):
+            return other.__rfloordiv__(self)
+        elif(isinstance(other, str)):
+            return repops_slice.Bookmark(self, other)
+        elif(isinstance(other, tuple)):
+            return repops_slice.Bookmark(self, *other)
+        elif(isinstance(other, dict)):
+            return repops_slice.Bookmark(self, **other)
+        return repops_rel.binop(self, other, '__floordiv__')
+    
+    def __rfloordiv__(self,other):
+        return repops_rel.binop(self, other, '__rfloordiv__')
+        
+
+    def __pow__(self,other):
+        if(isinstance(other, context.Context)):
+            return other.__rpow__(self)
+        return repops_rel.binop(self, other, '__pow__')
+    
+    def __rpow__(self, other):
+        return repops_rel.binop(self, other, '__rpow__')
+
     # and operator ( & )
     def __and__(self, other):
         if(isinstance(other, context.Context)):
@@ -344,8 +360,15 @@ class Representor(Node):
         return repops_rel.join(self, other, cond, ldim, rdim)
 
     def rename(self, *names, **kwds):
-        return repops_slice.slice_rename(self, *names, **kwds)
+        return repops_slice.SliceRename(self, *names, **kwds)
     
+    def dim_rename(self, *names, **kwds):
+        return repops_dim.DimRename(self, *names, **kwds)
+  
+    def bookmark(self, *names, **kwds):
+        return repops_slice.Bookmark(self, *names, **kwds)
+        pass
+
     def map(self, func, otype=rtypes.unknown, dim=None, *params, **kwds):
         return repops_rel.rmap(self, func, otype, dim, *params, **kwds)
 

@@ -149,6 +149,15 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return param0
 
     def visitChangeNameSlice(self,node,param0):
+        param0.name = node.name
+        return param0
+
+    def visitChangeDimPathSlice(self,node,param0):
+        param0.dims = node.dims
+        return param0
+
+    def visitChangeBookmarkSlice(self,node,param0):
+        param0.bookmarks = node.bookmarks
         return param0
 
     def visitDetectTypeSlice(self,node,param0):

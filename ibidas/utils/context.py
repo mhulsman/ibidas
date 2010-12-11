@@ -64,13 +64,34 @@ class Context(object):
     def __rmul__(self, other):
         return Context(self,'BINOP','__rmul__',other)
 
-    # devision ( / )
+    # division ( / )
     def __div__(self, other):
         return Context(self,'BINOP','__div__',other)
     
     def __rdiv__(self, other):
         return Context(self,'BINOP','__rdiv__',other)
     
+    # floor division ( // )
+    def __floordiv__(self, other):
+        return Context(self,'BINOP','__floordiv__',other)
+    
+    def __rfloordiv__(self, other):
+        return Context(self,'BINOP','__rfloordiv__',other)
+    
+    # power (**)
+    def __pow__(self, other):
+        return Context(self,'BINOP','__pow__',other)
+    
+    def __rpow__(self, other):
+        return Context(self,'BINOP','__rpow__',other)
+    
+    # modulo (%)
+    def __mod__(self, other):
+        return Context(self,'BINOP','__mod__',other)
+    
+    def __rmod__(self, other):
+        return Context(self,'BINOP','__rmod__',other)
+ 
     # and operator ( & )
     def __and__(self, other):
         return Context(self,'BINOP','__and__',other)
@@ -182,5 +203,5 @@ def _apply(ct, obj, **extra_params):
     return result
 
 
-
-__builtin__.__dict__['_'] = Context(None)
+_=Context(None)
+__builtin__.__dict__['_'] = _

@@ -14,11 +14,18 @@ class ProjectDim(repops.UnaryOpRep):
         if not source._state & RS_SLICES_KNOWN:
             return
         
-        nslices = source._active_dim_slice_dict.get(name,tuple())
-        if(not nslices):
-            raise RuntimeError, "Cannot find matching slices for dim name " + str(name)
+        nslices = [slice for slice in source._slices if slice.dims.hasName(name)]
+        assert nslices,  "Cannot find matching slices for dimension: " + str(name)
+        self.initialize(tuple(nslices),RS_CHECK)
 
-        self.initialize(nslices,RS_CHECK)
+class ProjectBookmark(repops.UnaryOpRep):
+    def process(self, source, name):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+       
+        nslices = [slice for slice in source._slices if name in slice.bookmarks]
+        assert nslices,  "Cannot find matching slices for bookmark: " + str(name)
+        self.initialize(tuple(nslices),RS_CHECK)
 
 class Project(repops.UnaryOpRep):
     def _getUsedSourceSlicesSet(self,nslices):
@@ -27,27 +34,32 @@ class Project(repops.UnaryOpRep):
     def process(self, source, *args, **kwds):
         if not source._state & RS_SLICES_KNOWN:
             return
-        
-        check_one = kwds.copy().pop("_check_one_",False)
+        kwds = kwds.copy()
+        check_one = kwds.pop("_check_one_",False)
 
         cur_slices = self._source._slices
         
         nslices = []
         for name, elem in chain(zip([None] * len(args),args),kwds.iteritems()):
-            if(elem == "~"):
-                used_slices = self._getUsedSourceSlicesSet(nslices)
-                elem = [slice for slice in cur_slices if slice not in used_slices]
-            elif(elem == "#"):
-                common_dims = set([slice.dims for slice in cur_slices])
-                if len(common_dims) != 1:
-                    raise RuntimeError, "Cannot use # selector as fields do not have a common dimension"
-                elem = cur_slices[:1]
-            elif(elem == "*"):
-                elem = cur_slices
-            elif(isinstance(elem,str)):
-                elem = [slice for slice in cur_slices if slice.name == elem]
-            elif(isinstance(elem, context.Context)):
+            if(isinstance(elem, context.Context)):
                 elem = context._apply(elem, self._source)
+            elif(isinstance(elem,str)):
+                if(elem == "~"):
+                    used_slices = self._getUsedSourceSlicesSet(nslices)
+                    nelem = [slice for slice in cur_slices if slice not in used_slices]
+                elif(elem == "#"):
+                    common_dims = set([slice.dims for slice in cur_slices])
+                    if len(common_dims) != 1:
+                        raise RuntimeError, "Cannot use # selector as fields do not have a common dimension"
+                    nelem = cur_slices[:1]
+                elif(elem == "*"):
+                    nelem = cur_slices
+                else:
+                    nelem = [slice for slice in cur_slices if slice.name == elem]
+                    if(not nelem and len(cur_slices) == 1 and isinstance(cur_slices[0].type,rtypes.TypeTuple)):
+                        nelem = unpack_tuple(cur_slices[0],elem)
+                    assert len(nelem) ==1, "Could not find (unique) matching slice for name: " + elem
+                elem = nelem
             elif(isinstance(elem, Representor)):
                 pass
             elif(isinstance(elem, tuple)):
@@ -65,9 +77,8 @@ class Project(repops.UnaryOpRep):
                     return 
                 elem = [slice for slice in elem._slices]
 
-            if(check_one or name):
-                assert len(elem) == 1, "Could not find a (unique) matching slice for " + str(args)
             if(name):
+                assert len(elem) == 1, "Could not find a (unique) matching slice for " + name
                 nslices.append(slices.ChangeNameSlice(elem,name))
             else:
                 nslices.extend(elem)
@@ -90,32 +101,63 @@ class UnpackTuple(repops.UnaryOpRep):
         assert len(source._slices) == 1, \
                 "Unpacking tuples can only be done on single slices"
         slice = source._slices[0]
-        if(not isinstance(slice.type, rtypes.TypeTuple)):
-            if(name):
-                raise RuntimeError, "Asked to unpack tuple attribute " + \
-                    name + " but cannot find a tuple."
-            else:
-                raise RuntimeError, "No tuple to unpack"
-
-        if(not name):
-            nslices = [slices.ensure_normal_or_frozen(slices.UnpackTupleSlice(slice, idx))
-                                                for idx in range(len(slice.type.subtypes))]
-        else: 
-            try:
-                idx = int(name)
-            except ValueError:
-                assert isinstance(name, str), \
-                            "Tuple slice name should be a string"
-                idx = slice.type.fieldnames.index(name)
-            nslices = [slices.ensure_normal_or_frozen(slices.UnpackTupleSlice(slice, idx))]
-        
-        if(unpack):
-            for pos, nslice in enumerate(nslices):
-                while(nslice.type.__class__ is rtypes.TypeArray):
-                    nslice = slices.ensure_normal_or_frozen(slices.UnpackArraySlice(nslice))
-                nslices[pos] = nslice
+        nslices = unpack_tuple(slice,name,unpack)
         return self.initialize(tuple(nslices), RS_CHECK)
+   
+def unpack_tuple(slice,name="",unpack=True):
+    if(not isinstance(slice.type, rtypes.TypeTuple)):
+        if(name):
+            raise RuntimeError, "Asked to unpack tuple attribute " + \
+                name + " but cannot find a tuple."
+        else:
+            raise RuntimeError, "No tuple to unpack"
+
+    if(not name):
+        nslices = [slices.ensure_normal_or_frozen(slices.UnpackTupleSlice(slice, idx))
+                                            for idx in range(len(slice.type.subtypes))]
+    else: 
+        try:
+            idx = int(name)
+        except ValueError:
+            assert isinstance(name, str), \
+                        "Tuple slice name should be a string"
+            idx = slice.type.fieldnames.index(name)
+        nslices = [slices.ensure_normal_or_frozen(slices.UnpackTupleSlice(slice, idx))]
     
+    if(unpack):
+        for pos, nslice in enumerate(nslices):
+            while(nslice.type.__class__ is rtypes.TypeArray):
+                nslice = slices.ensure_normal_or_frozen(slices.UnpackArraySlice(nslice))
+            nslices[pos] = nslice
+    return nslices
+
+class Bookmark(repops.UnaryOpRep):
+    def process(self, source, *names, **kwds): #{{{
+        if not source._state & RS_SLICES_KNOWN:
+            return
+        
+        nslices = source._slices
+        if(len(names) == 1):
+            nslices = [slices.ChangeBookmarkSlice(slice,names[0]) for slice in nslices]
+        elif(len(names) > 1):
+            unique_first_dims = util.unique([slice.dims[0] for slice in source._slices])
+            assert (len(names) == len(unique_first_dims)), \
+                "Number of new slice names does not match number of slices"
+            for name,dim in zip(names,unique_first_dims):
+                kwds[dim.name] = dim
+
+        if(kwds):
+            nnslices = []
+            for slice in source._slices:
+                if(slice.dims[0].name in kwds):
+                    nslice = slice.ChangeBookmarkSlice(slice,kdws[slice.dims[0].name])
+                else:
+                    nslice = slice
+                nnslices.append(nslice)
+            nslices = nnslices
+                
+        return self.initialize(tuple(nslices),source._state)
+        #}}}
 
 
 class SliceRename(repops.UnaryOpRep):
