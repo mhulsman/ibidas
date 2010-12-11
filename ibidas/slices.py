@@ -169,6 +169,18 @@ class UnpackArraySlice(UnaryOpSlice):
             UnaryOpSlice.__init__(self, slice, rtype=stype.subtypes[0], dims=slice.dims + unpack_dims)
         
 
+class InsertDimSlice(UnaryOpSlice):
+    __slots__ = ["matchpoint","newdim"]
+    def __init__(self,slice,matchpoint,ndim):
+        assert len(slice.dims) > matchpoint, "Matchpoint for dim insertion outside dimpath"
+        #FIXME: update va of type 
+        ndims = slice.dims[:matchpoint] + (ndim,) + slice.dims[matchpoint:].updateDimVariable()
+        ntype = slice.type.updateDimVariable(insertpoint=-(len(slice.dims) - matchpoint))
+
+        self.matchpoint = matchpoint
+        self.newdim = ndim
+        UnaryOpSlice.__init__(self,slice,rtype=ntype,dims=ndims)        
+
 class UnpackTupleSlice(UnaryOpSlice):#{{{
     """A slice which is the result of unpacking a tuple slice."""
     __slots__ = ["tuple_idx"]

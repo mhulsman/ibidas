@@ -185,6 +185,27 @@ class NestedArray(object):
         nself.cur_type = restype
         return nself
 
+    def insertDim(self,matchpoint,newdim):
+        nself = self.copy()
+        curidx = nself.idxs[matchpoint]
+        if(isinstance(curidx,int)):
+            newidx = curidx
+        else:
+            newidx = 0
+        nself.idxs.insert(matchpoint,newidx)
+        for pos in range(matchpoint+1,len(nself.idxs)):
+            tidx = nself.idxs[pos]
+            if(isinstance(tidx,int)):
+                nself.idxs[pos] += 1
+            else:
+                tidx.shape = tidx.shape[:newidx] + (1,) + tidx.shape[newidx:]
+                break
+        else:
+            nself.data.shape = nself.data.shape[:newidx] + (1,) + nself.data.shape[newidx:]
+        nself.idx_is_contigious.insert(matchpoint,True)
+        nself.dims = nself.dims[:matchpoint] + (newdim,) + nself.dims[matchpoint:]
+        return nself
+
     def __repr__(self):
         return "NestedArray < \n" + \
                "Idxs: " + str(self.idxs) + "\n" + \

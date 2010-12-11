@@ -1,6 +1,9 @@
+import itertools
+from collections import defaultdict
 import numpy
 
 _delay_import_(globals(),"dimensions","Dim")
+_delay_import_(globals(),"..slices")
 
 class DimPath(tuple):
     def __new__(cls, *dims):
@@ -14,6 +17,8 @@ class DimPath(tuple):
     def hasName(self,name):
         return any([dim.name == name for dim in self])
 
+    def getDimByName(self,name):
+        return self[self.names.index(name)]
     def getDimIndexByName(self,name):
         dimnames = self.names
         try:
@@ -45,7 +50,7 @@ class DimPath(tuple):
             pos = -1
             try:
                 for dim in dim_path:
-                    pos = sdims.index(dim, pos + 1)
+                    pos = self.index(dim, pos + 1)
             except ValueError:
                 return False
             return True
@@ -64,6 +69,23 @@ class DimPath(tuple):
             newpath.append(dim)
         return DimPath(*newpath)
 
+    def updateDimVariable(self,insertsize=1,insertpoint=0):
+        ndims = []
+        found = False
+        for pos in xrange(len(self)):
+            dim = self[pos]
+            if(dim.variable > (pos - insertpoint)):
+                found = True
+                ndim = dim.copy(reid=False)
+                ndim.variable += insertsize
+            else:
+                ndim = dim
+            ndims.append(ndim)     
+        if(not found): 
+            return self
+        else:
+            return DimPath(*ndims)
+
     def contigiousFixedNDims(self):
         depth = 0
         #maximize array size with fixed dims
@@ -72,6 +94,38 @@ class DimPath(tuple):
             depth+=1
         return depth
     
+    def matchDimPath(self, dimpath, return_prev=False):#{{{
+        """Matches dimpath exactly to dim paths in slices.
+        Returns tuple containing a list of matched slices and 
+        a list containing tuples of matched start positions for each slice
+        if return_prev is given, returns as third parameter the header dim paths in
+        a set.
+        """
+        start_depths = []
+        ret_prev = []
+        
+        pos = 0
+        ndims = len(self)
+        nmpath = len(dimpath)
+        startpos = []
+        while(pos < ndims and (ndims - pos) >= nmpath):
+            try:
+                curstart = self.index(dimpath[0], pos)
+            except ValueError:
+                break
+            if(self[(curstart + 1):(curstart + nmpath)] != dimpath[1:]):
+                pos = curstart + 1
+            else:
+                startpos.append(curstart)
+                pos = curstart + nmpath
+                if(return_prev):
+                    ret_prev.append(self[:curstart])
+        
+        if(return_prev):
+            return (startpos, ret_prev)
+        else:
+            return startpos#}}}
+   
 def commonDimPath(dimpaths):#{{{
     """Returns common dimensions shared by all slices"""
     pos = 0
@@ -83,9 +137,233 @@ def commonDimPath(dimpaths):#{{{
             break
     return dimpaths[0][:pos]#}}}
 
+def uniqueDimPath(dimpaths):#{{{
+    """Returns unique dim path, i.e. at each nesting level determines
+    if dim is unique and adds it to path. If dim is not unique, returns False"""
+
+    fdims = set(dimpaths)
+
+    if(len(fdims) <= 1):
+        path = fdims.pop()
+    else:
+        path = []
+        for elems in itertools.izip_longest(*fdims):
+            dimset = set([elem for elem in elems if not elem is None])
+            if(len(dimset) == 1):
+                path.append(dimset.pop())
+            else:
+                return False
+        path = tuple(path)
+     
+    return path#}}}
+
+
 def flatFirstDims(array,ndim):
     oshape = array.shape
     ndim = ndim + 1
     rshape = (int(numpy.multiply.reduce(array.shape[:ndim])),) + array.shape[ndim:]
     return array.reshape(rshape)
 
+def createDimSet(sourcepaths):
+    dimset = set()
+    for dimpath in sourcepaths:
+        dimset.update(dimpath)
+    return dimset
+
+def createDimParentDict(sourcepaths):
+    parents = defaultdict(list)
+    for dimpath in sourcepaths:
+        parents[dimpath[0]].append(None)
+        for pos in xrange(1,len(dimpath)):
+            parents[dimpath[pos]].append(dimpath[pos-1])
+    return parents
+
+
+def identifyDimPath(sourcepaths, dim_selector=None):#{{{
+    """Identifies a dim, using dim_selector. 
+    Returns dim identifier, which is a tuple of dims.
+        If fixed dim identified:
+            only fixed dim
+        If variable dim, path: 
+            tuple with fixed dim --> --> variable dim
+        However, if a path is specified (tuple of dims,
+            slice dims, unique index path dims), then 
+            path is always contained in tuple
+            even if a fixed dim in it is not at the beginning.
+        multiple matching dims: True
+        no matching dims: False
+
+    
+    Parameters
+    ----------
+    dim_selector: 
+        if None: 
+            return unique common dimension if exists
+        if string:
+            search for dim with name, use it as selector
+            search for slice with name: if found, use slice as selector
+        
+        if dim: find path, ending with dim, that has all its dependencies
+        if slice: use its dims as selector
+        if tuple of dim (names):
+            
+        if tuple of dim (names):
+            if empty: return False
+            else, matches dims in tuple:
+            Starts from last dim, find unique path to fixed dim.
+        if int:
+            if there is a unique dim path, use that to find index dim.
+    """
+    if(isinstance(dim_selector, tuple) and len(dim_selector) == 0):
+        dim_selector = None
+
+    if(dim_selector is None):
+        res = commonDimPath(sourcepaths)
+        return identifyDimPathHelper(sourcepaths, res)
+
+    elif(isinstance(dim_selector, int)):
+        path = uniqueDimPath(sourcepaths)
+        if(path is False):
+            return False
+
+        if(dim_selector < 0):
+            dim_selector = len(path) + dim_selector
+            assert dim_selector >= 0, "Unique dim path not long enough"
+
+        return identifyDimPathHelper(sourcepaths, (path[dim_selector],))
+
+    elif(isinstance(dim_selector, str)):
+        nselectors = [dpath.getDimByName(name) for dpath in sourcepaths if dpath.hasName(name)]
+        results = []
+        for selector in set(nselectors):
+            res = identifyDimPath(sourcepaths, selector)
+            if(res is True):
+                return True
+            elif(not res is False):
+                results.append(res)
+
+        if(len(results) == 1):
+            return results[0]
+        elif(len(results) == 0):
+            return False
+        else:
+            results = set(results)
+            if(len(results) == 1):
+                return results.pop()
+            else:
+                return True
+
+    elif(isinstance(dim_selector, Dim)):
+        return identifyDimPathHelper(sourcepaths, (dim_selector,))
+    elif(isinstance(dim_selector, slices.Slice)):
+        return identifyDimPathHelper(sourcepaths, dim_selector.dims)
+    elif(isinstance(dim_selector, tuple)):
+        return identifyDimPathHelper(sourcepaths, dim_selector)
+    else:
+        raise RuntimeError, "Unexpected dim selector: " + str(dim_selector)#}}}
+
+def identifyDimPathHelper(sourcepaths, path):#{{{
+    """Given a path (tuple of dims or dim names), 
+    Determines if there is a matching dim path in source that uniquely 
+    identifies the dimension last in path. Such a path should have the 
+    same order of dimenmsions as given in 'path', but not necessarily the
+    same dimensions. It however should be unique.
+    
+    Returns an dim path (tuple of dims) if unique path found.
+    (See _identifyDim for description).
+
+    Returns
+    -------
+    True: if multiple paths are possible
+    False: if no path is matching
+    dimension identifier otherwise
+    """
+    if(not path):
+        return False
+
+    reslist = []
+
+    #create set and dict of dims
+    dimset = createDimSet(sourcepaths)
+    dimparents = createDimParentDict(sourcepaths)
+
+    done = False
+    for pos, dim in enumerate(path[::-1]):
+        #make certain dim is an (available dim)
+        if(isinstance(dim, Dim)):
+            if not dim in dimset:
+                return False
+        else: #convert str to dim
+            dims = [d for d in dimset if d.name == dim]
+            if(len(dims) > 1): #multiple matches for dim name. Try them all.
+                sresults = []
+                for dim in dims:
+                    sres = identifyDimPathHelper(sourcepaths, path[:(-(pos + 1))] + (dim,))
+                    if(sres is True):
+                        return True
+                    elif(not sres is False):
+                        sresults.append(sres)
+                if(len(sresults) > 1):
+                    return True
+                elif(len(sresults) == 0):
+                    return False
+                reslist.extend(sresults[0][::-1]) #only one result, add dim path to reslist
+                break #all matching was done recursively, we are done here
+            elif(len(dims) == 1):
+                dim = iter(dims).next()
+            else:
+                return False
+                
+        if(not reslist): 
+            reslist.append(dim)
+        else:
+            while(True):
+                pdims = dimparents[reslist[-1]]
+                if(dim in pdims):
+                    reslist.append(dim)
+                    break
+                #if dim not in pdims, we have to add intermediate dims... 
+                if(len(pdims) > 1): #multiple paths possible, do it recursively
+                    sresults = []
+                    for pdim in pdims:
+                        sres = identifyDimPathHelper(source, 
+                                        path[:(-(pos + 1))] + (pdim, dim))
+                        if(sres is True):
+                            return True
+                        elif(not sres is False):
+                            sresults.append(sres)
+                    if(len(sresults) > 1):
+                        return True
+                    elif(len(sresults) == 0):
+                        return False
+                    reslist.extend(sresults[0][::-1])
+                    done = True
+                    break
+                elif(len(pdims) == 1):
+                    reslist.append(iter(pdims).next())
+                else:
+                    return False
+            if(done is True):
+                break
+    
+    #if dims in reslist are variable, we have to make certain their base dimensinos
+    #are available
+    add_remaining = 0
+    for dim in reslist:
+        add_remaining -= 1 
+        add_remaining = max(add_remaining, dim.variable)
+
+    #add remaining dimensions 
+    while(add_remaining):
+        add_remaining -= 1
+        pdims = dimparents[reslist[-1]]
+        if(len(pdims) > 1):
+            return True
+        else:
+            dim = iter(pdims).next()
+            if(dim is None):
+                raise RuntimeError, "Cannot add needed remaining dimensions. Bug?"
+            add_remaining = max(add_remaining, dim.variable)
+            reslist.append(dim)
+    return tuple(reslist[::-1])
+#}}}

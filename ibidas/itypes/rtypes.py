@@ -170,6 +170,9 @@ class TypeUnknown(object):#{{{
     def redim_var(self, deplen, var_adapt, redim_cache):
         return self
 
+    def updateDimVariable(self,insertsize=1,insertpoint=0):
+        return self
+
     def __repr__(self):
         return self.name
 addType(TypeUnknown)#}}}
@@ -472,6 +475,12 @@ class TypeTuple(TypeAny):#{{{
                               self.fieldnames, **self.attr)
         
 
+    def updateDimVariable(self,insertsize=1,insertpoint=0):
+         return self.__class__(self.has_missing, 
+                              tuple([subtype.updateDimVariable(insertsize,insertpoint) 
+                                     for subtype in self.subtypes]), 
+                              self.fieldnames, **self.attr)
+        
     def __repr__(self):
         res = '(' 
         if(len(self.fieldnames) == len(self.subtypes)):
@@ -716,6 +725,17 @@ class TypeArray(TypeAny):#{{{
             self.dims = tuple(ndims)
             return self
         else:
+            return self
+    
+    def updateDimVariable(self, insertsize=1,insertpoint=0):
+        stype = self.subtypes[0].updateDimVariable(insertsize,insertpoint + len(self.dims))
+        ndims = self.dims.updateDimVariable(insertsize,insertpoint)
+        if(ndims is self.dims and stype is self.subtypes[0]):
+            return self
+        else:
+            self = self.copy()
+            self.subtypes = (stype,)
+            self.dims = ndims
             return self
 
     def __repr__(self, unpack_depth=0):

@@ -182,6 +182,12 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         param0.dims = node.dims
         return param0
 
+    def visitInsertDimSlice(self,node,param0):
+        ndata = param0.data.insertDim(node.matchpoint,node.newdim)
+        param0.data = ndata
+        param0.dims = node.dims
+        return param0
+
     def visitPackListSlice(self, node, param0):
         ndata=param0.data.pack(node.type, len(node.type.dims))
         ndata=ndata.map(list,res_type=node.type)
