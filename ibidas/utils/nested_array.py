@@ -15,6 +15,7 @@ class NestedArray(object):
         
     def copy(self):
         res = copy.copy(self)
+        res.data = numpy.array(self.data).view(sparse_arrays.FullSparse)
         res.idxs = list(self.idxs)
         res.idx_is_contigious = list(self.idx_is_contigious)
         return res
@@ -187,7 +188,8 @@ class NestedArray(object):
 
     def insertDim(self,matchpoint,newdim):
         nself = self.copy()
-        curidx = nself.idxs[matchpoint]
+        idxs = nself.idxs + [nself.data]
+        curidx = idxs[matchpoint]
         if(isinstance(curidx,int)):
             newidx = curidx
         else:
@@ -198,7 +200,9 @@ class NestedArray(object):
             if(isinstance(tidx,int)):
                 nself.idxs[pos] += 1
             else:
+                tidx = numpy.array(tidx)
                 tidx.shape = tidx.shape[:newidx] + (1,) + tidx.shape[newidx:]
+                nself.idxs[pos] = tidx
                 break
         else:
             nself.data.shape = nself.data.shape[:newidx] + (1,) + nself.data.shape[newidx:]

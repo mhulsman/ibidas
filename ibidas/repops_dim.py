@@ -50,22 +50,15 @@ class DimRename(repops.UnaryOpRep):#{{{
         return self.initialize(tuple(nslices),source._state)#}}}
 
 class InsertDim(repops.UnaryOpRep):
-    def process(self, source, dim_selector, name=None):
+    def process(self, source, insertpoint, name=None):
         if not source._state & RS_SLICES_KNOWN:
             return
         
-        dimpath = dimpaths.identifyDimPath([s.dims for s in source._slices],dim_selector)
-        if(dimpath is False):
-            raise RuntimeError, "Dim selector " + dim_selector + "cannot find associaed dimpath"
-        if(dimpath is True):
-            raise RuntimeError, "Multiple dimpaths associated with " + dim_selector
-        
+        assert len(dimpaths.uniqueDimPath([s.dims for s in source._slices],only_complete=False)) >= insertpoint, "No unique dimpath covering dim insertion point"
         ndim = dimensions.Dim(1,variable=0,has_missing=False,name=None)
         nslices = []
         for slice in source._slices:
-            matchpoints = slice.dims.matchDimPath(dimpath)
-            for matchpoint in matchpoints:
-                slice = slices.InsertDimSlice(slice,matchpoint,ndim)
+            slice = slices.InsertDimSlice(slice,insertpoint,ndim)
             nslices.append(slice)
         return self.initialize(tuple(nslices),source._state)
 

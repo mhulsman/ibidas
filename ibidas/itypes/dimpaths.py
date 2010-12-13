@@ -94,15 +94,11 @@ class DimPath(tuple):
             depth+=1
         return depth
     
-    def matchDimPath(self, dimpath, return_prev=False):#{{{
+    def matchDimPath(self, dimpath):#{{{
         """Matches dimpath exactly to dim paths in slices.
-        Returns tuple containing a list of matched slices and 
-        a list containing tuples of matched start positions for each slice
-        if return_prev is given, returns as third parameter the header dim paths in
-        a set.
+        Returns a list containing start positions
         """
         start_depths = []
-        ret_prev = []
         
         pos = 0
         ndims = len(self)
@@ -118,13 +114,8 @@ class DimPath(tuple):
             else:
                 startpos.append(curstart)
                 pos = curstart + nmpath
-                if(return_prev):
-                    ret_prev.append(self[:curstart])
         
-        if(return_prev):
-            return (startpos, ret_prev)
-        else:
-            return startpos#}}}
+        return startpos#}}}
    
 def commonDimPath(dimpaths):#{{{
     """Returns common dimensions shared by all slices"""
@@ -137,9 +128,9 @@ def commonDimPath(dimpaths):#{{{
             break
     return dimpaths[0][:pos]#}}}
 
-def uniqueDimPath(dimpaths):#{{{
+def uniqueDimPath(dimpaths,only_complete=True):#{{{
     """Returns unique dim path, i.e. at each nesting level determines
-    if dim is unique and adds it to path. If dim is not unique, returns False"""
+    if dim is unique and adds it to path. """
 
     fdims = set(dimpaths)
 
@@ -152,8 +143,11 @@ def uniqueDimPath(dimpaths):#{{{
             if(len(dimset) == 1):
                 path.append(dimset.pop())
             else:
-                return False
-        path = tuple(path)
+                if(only_complete):
+                    return False
+                else:
+                    break
+        path = DimPath(*path)
      
     return path#}}}
 
@@ -222,13 +216,9 @@ def identifyDimPath(sourcepaths, dim_selector=None):#{{{
         return identifyDimPathHelper(sourcepaths, res)
 
     elif(isinstance(dim_selector, int)):
-        path = uniqueDimPath(sourcepaths)
+        path = uniqueDimPath(sourcepaths,only_complete=(dim_selector < 0))
         if(path is False):
             return False
-
-        if(dim_selector < 0):
-            dim_selector = len(path) + dim_selector
-            assert dim_selector >= 0, "Unique dim path not long enough"
 
         return identifyDimPathHelper(sourcepaths, (path[dim_selector],))
 

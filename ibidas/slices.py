@@ -172,7 +172,7 @@ class UnpackArraySlice(UnaryOpSlice):
 class InsertDimSlice(UnaryOpSlice):
     __slots__ = ["matchpoint","newdim"]
     def __init__(self,slice,matchpoint,ndim):
-        assert len(slice.dims) > matchpoint, "Matchpoint for dim insertion outside dimpath"
+        assert len(slice.dims) >= matchpoint, "Matchpoint for dim insertion outside dimpath"
         #FIXME: update va of type 
         ndims = slice.dims[:matchpoint] + (ndim,) + slice.dims[matchpoint:].updateDimVariable()
         ntype = slice.type.updateDimVariable(insertpoint=-(len(slice.dims) - matchpoint))
