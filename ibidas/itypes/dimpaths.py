@@ -151,6 +151,43 @@ def uniqueDimPath(dimpaths,only_complete=True):#{{{
      
     return path#}}}
 
+def planBroadcastEqual(paths,partial=False):
+    maxlen = max([len(path) for path in paths])
+    plans = [[] * maxlen for path in paths]
+    bcdims = [None] * maxlen
+
+    curpos = -1
+    while(curpos >= -maxlen):
+        xdims = set()
+        l = set()
+        for path in paths:
+            if(len(path) >= -curpos):
+                xdims.add(path[curpos])
+                l.add(path[curpos].shape)
+            else:
+                xdims.add(None)
+        xdims = [path[curpos] for path in paths]
+
+
+        if(len(l) > 1):
+            l.discard(1)
+        if(len(l) > 1):
+            l.discard(UNDEFINED)
+        assert len(l) == 1, "Different shaped dimensions cannot be broadcast to each other"
+        length = l.pop()
+        bcdim = [xdim for xdim in xdims if xdim.shape == length][0]
+        for xdim,plan in zip(xdims,plans):
+            if(xdim is None):
+                plan[curpos] = BCNEW
+            elif(xdim.shape == 1):
+                plan[curpos] = BCEXIST
+            elif(xdim != bcdim):
+                plan[curpos] = BCENSURE
+            else:
+                plan[curpos] = BCCOPY
+        bcdims[curpos] = bcdim 
+        curpos -=1 
+    return (bcdims, plans)        
 
 def flatFirstDims(array,ndim):
     oshape = array.shape

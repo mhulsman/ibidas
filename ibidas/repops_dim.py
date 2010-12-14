@@ -62,6 +62,26 @@ class InsertDim(repops.UnaryOpRep):
             nslices.append(slice)
         return self.initialize(tuple(nslices),source._state)
 
+class Broadcast(repops.MultiOpRep):
+    def process(self,sources, mode="full", partial=False):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+        lengths = set([len(source._slices) for source in sources])
+        lengths.pop(1)
+        assert len(lengths) == 1, "Number of slices in sources to broadcast should be equal (or 1)"
+        length = lengths.pop()
+
+        all_slices = []
+        for source in sources:
+            if(len(source._slices) == 1):
+                all_slices.append(source._slices * length)
+            else:
+                all_slices.append(source._slices)
+
+        nslices = sum([slices.broadcast(bcslices,mode,partial) for bcslices in zip(*all_slices)],[])
+
+        state = reduce(operator.__and__,[source._state for source in sources])
+        return self.initialize(tuple(nslices),state)
 
 @repops.delayable()
 def rarray(source, dim=None, ndim=1):

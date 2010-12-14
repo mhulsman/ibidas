@@ -181,6 +181,63 @@ class InsertDimSlice(UnaryOpSlice):
         self.newdim = ndim
         UnaryOpSlice.__init__(self,slice,rtype=ntype,dims=ndims)        
 
+
+class EnsureCommonDimSlice(MultiOpSlice):
+    __slots__ = ["checkpos"]
+    def __init__(self,slices,checkpos):
+        cslice = slices[0]
+        self.checkpos = checkpos
+        ndim = slices[1].dims[checkpos]
+        ndims = cslice.dims[:checkpos] + dimpaths.DimPath(ndim) + cslice.dims[(checkpos + 1):]
+        
+        MultiOpSlice.__init__(self, slices, name=cslice.name, rtype=cslice.type, dims=ndims, bookmarks=cslice.bookmarks)
+
+
+class BroadcastSlice(MultiOpSlice):
+    __slots__ = ["plan"]
+    
+    def __init__(self,slices,plan):
+        cslice = slices[0]
+        self.plan = plan
+        MultiOpSlice.__init__(self, slices, name=cslice.name, rtype=cslice.type, dims=cslice.dims, bookmarks=cslice.bookmarks)
+    
+
+
+def broadcast(slices,mode="full",partial=False):
+    slicedimpaths = [s.dims for s in slices]
+    if(mode == "full"):
+        bcdims, bcplan = dimpaths.planBroadcastFull(slicedimpaths,partial)
+    elif(mode == "equal"):
+        bcdims, bcplan = dimpaths.planBroadcastEqual(slicedimpaths,partial)
+    else:
+        raise RuntimeError, "Unknown broadcast mode: " + str(mode)
+
+    references = defaultdict(list)
+    for bcdim in bcdims:
+        for slice in slices:
+            if bcdim in slice.dims:
+                references[bcdim].append(slice)
+
+    nplans = []
+    nslices = []
+    for plan,slice in zip(bcplan,slices):
+        dimpos = 0
+        nplan = []
+        for bcdim, planelem in zip(bcdims,plan):
+            if(planelem == BCNEW):
+                slice = InsertDimSlice(slice,dimpos,bcdim)
+                nplan.append(BCEXIST)
+            elif(planelem == BCENSURE):
+                slice = EnsureCommonDimSlice([slice] + references[bcdim],dimpos)
+                dimpos += 1
+                nplan.append(BCCOPY)
+            else:
+                nplan.append(planelem)
+        slice = BroadcastSlice([slice] + references[bcdim],nplan)
+        nslices.append(slice)
+
+    return nslices
+
 class UnpackTupleSlice(UnaryOpSlice):#{{{
     """A slice which is the result of unpacking a tuple slice."""
     __slots__ = ["tuple_idx"]
