@@ -20,28 +20,28 @@ class SerializeExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), manager.
         raise RuntimeError, "Unknown type of node encountered: " + str(type(node))
 
     def visitNode(self,node):
-        source_edges = [edge for edge in self.graph.edge_target[node] if edge.type == "param"]
-        source_edges.sort(key=operator.attrgetter("attr"))
-
-        param_kwds = dict()
-        param_args = []
-        for source_edge in source_edges:
-            source = source_edge.source
+        params = dict()
+        for edge in self.graph.edge_target[node]:
+            source = edge.source
             if(source in self.graph.na['exec_order']):
                 param_idx = self.graph.na['exec_order'][source]
             else:
                 param_idx = self.visit(source)
             self.graph.na['param_usecount'][source] += 1
-            if(isinstance(source_edge.attr,int)):
-                assert source_edge.attr == len(param_args), "Missing argument"
-                param_args.append(param_idx)
-            else:
-                param_kwds[source_edge.attr] = param_idx
+            
+            if edge.type == "param":
+                params[edge.subtype] = param_idx
+            elif(edge.type == "paramlist"):
+                if(not edge.subtype in params):
+                    params[edge.subtype] = [None]
+                while(len(params[edge.subtype]) <= edge.attr):
+                    params.append(None)
+                params[edge.subtype][edge.attr] = param_idx
 
         command_id = len(self.commands)
         self.commands.append(node)
         self.graph.na['exec_order'][node] = command_id
-        self.graph.na['param_idxs'][node] = (param_args,param_kwds)
+        self.graph.na['param_idxs'][node] = params
         self.graph.na['param_usecount'][node] = 0
         return command_id
 

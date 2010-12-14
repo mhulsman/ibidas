@@ -62,15 +62,22 @@ class ResultSlice(slices.DataSlice):
     def from_slice(cls,data,slice):
         return cls(data,slice.name, slice.type,slice.dims,slice.bookmarks)
 
-    def setSource(self,source):
-        self.source = source
-
-    def copy(self, data=None):
+    def modify(self,data=None, name=None, rtype=None, dims=None, bookmarks=None):
+        if(name is None):
+            name = self.name
+        if(rtype is None):
+            rtype = self.type
+        if(dims is None):
+            dims = self.dims
         if(data is None):
             data = self.data
+        if(bookmarks is None):
+            bookmarks = self.bookmarks
 
-        return ResultSlice(data, self.name, self.type, self.dims, self.bookmarks)
-       
+        return ResultSlice(data, name, rtype, dims, bookmarks)
+
+    def setSource(self,source):
+        self.source = source
 
     def __repr__(self):
         return  "\nName: " + str(self.name) + ", Type:   " + str(self.type) + ", Dims: " + str(self.dims) + \
@@ -88,44 +95,26 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         self.graph = run_manager.pass_results[create_graph.CreateGraph]
         commands = run_manager.pass_results[serialize_exec.SerializeExec]
 
-        arguments = []
-        use_counters = []
+        arguments = numpy.zeros((len(commands),),dtype=object)
+        use_counters = numpy.zeros((len(commands),),dtype=int)
         param_idxs = self.graph.na["param_idxs"]
         param_usecount = self.graph.na["param_usecount"]
 
-        for command in commands:
-            command_id = len(arguments)
-            param_args,param_kwds = param_idxs[command]
-           
-            #create kwds/args 
-            if(param_kwds):
-                param_kwds = param_kwds.copy()
-                for param_name,idx in param_kwds.iteritems():
-                    if(use_counters[idx] == 1):
-                        use_counters[idx] = 0
-                        param_kwds[param_name] = arguments[idx]
-                        arguments[idx] = None
-                    else:
-                        param_kwds[param_name] = arguments[idx].copy()
-                        use_counters[idx] -= 1
-            if(param_args):
-                param_args = list(param_args)
-                for pos in xrange(len(param_args)):
-                    idx = param_args[pos]
-                    if(use_counters[idx] == 1):
-                        use_counters[idx] = 0
-                        param_args[pos] = arguments[idx]
-                        arguments[idx] = None
-                    else:
-                        param_args[pos] = arguments[idx].copy()
-                        use_counters[idx] -= 1
-               
-
-            res = self.visit(command, *param_args, **param_kwds)
+        for command_id, command in enumerate(commands):
+            params = param_idxs[command]
+          
+            param_kwds = dict()
+            for name,param_ids in params.iteritems():
+                param_kwds[name] = arguments[param_ids]
+                use_counters[param_ids] -= 1
+                
+            res = self.visit(command, **param_kwds)
             if(debug_mode):
                 self.graph.na["output"][command] = str(res)
-            arguments.append(res)
-            use_counters.append(param_usecount[command])
+
+            arguments[command_id] = res
+            use_counters[command_id] = param_usecount[command]
+            arguments[use_counters == 0] = None
         return res
 
     def visitelse(self,node, *args, **kwargs):
@@ -136,105 +125,74 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         ndata = nested_array.NestedArray(node.data,node.type)
         return ResultSlice.from_slice(ndata,node)
 
-    def visitConvertSlice(self,node,param0):
-        ndata = param0.data.mapseq(node.convertor.convert,
+    def visitConvertSlice(self,node,slice):
+        ndata = slice.data.mapseq(node.convertor.convert,
                                 node.type,res_type=node.type)
-        param0.data = ndata
-        return param0
+        return slice.modify(data=ndata)
    
-    def visitCastSlice(self,node,param0):
-        ndata = self.cast(node.cast_name,node,param0)
-        param0.data = ndata
-        param0.type = node.type
-        return param0
+    def visitCastSlice(self,node,slice):
+        ndata = self.cast(node.cast_name,node,slice)
+        return slice.modify(data=ndata,type=node.type)
 
-    def visitChangeNameSlice(self,node,param0):
-        param0.name = node.name
-        return param0
+    def visitChangeNameSlice(self,node,slice):
+        return slice.modify(name = node.name)
 
-    def visitChangeDimPathSlice(self,node,param0):
-        param0.dims = node.dims
-        return param0
+    def visitChangeDimPathSlice(self,node,slice):
+        return slice.modify(dims=node.dims)
 
-    def visitChangeBookmarkSlice(self,node,param0):
-        param0.bookmarks = node.bookmarks
-        return param0
+    def visitChangeBookmarkSlice(self,node,slice):
+        return slice.modify(bookmarks=node.bookmarks)
 
-    def visitDetectTypeSlice(self,node,param0):
+    def visitDetectTypeSlice(self,node,slice):
         det = detector.Detector()
         det.setParentDimensions(node.dims)
-        det.processSeq(node.param0.data.flat())
-        param0.type = det.getType()
-        return param0
- 
+        det.processSeq(node.slice.data.flat())
+        return slice.modify(rtype=det.getType())
     
-    def visitUnpackArraySlice(self,node,param0):
-        ndata=param0.data.unpack(node.unpack_dims, subtype=node.type)
-        param0.data = ndata
-        param0.type = node.type
-        param0.dims = node.dims
-        return param0
+    def visitUnpackArraySlice(self,node,slice):
+        ndata=slice.data.unpack(node.unpack_dims, subtype=node.type)
+        return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
-    def visitPackArraySlice(self, node, param0):
-        ndata=param0.data.pack(node.type, len(node.type.dims))
-        param0.data = ndata
-        param0.type = node.type
-        param0.dims = node.dims
-        return param0
+    def visitPackArraySlice(self, node, slice):
+        ndata=slice.data.pack(node.type, len(node.type.dims))
+        return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
-    def visitInsertDimSlice(self,node,param0):
-        ndata = param0.data.insertDim(node.matchpoint,node.newdim)
-        param0.data = ndata
-        param0.dims = node.dims
-        return param0
+    def visitInsertDimSlice(self,node,slice):
+        ndata = slice.data.insertDim(node.matchpoint,node.newdim)
+        return slice.modify(data=ndata,dims=node.dims)
 
-    def visitPackListSlice(self, node, param0):
-        ndata=param0.data.pack(node.type, len(node.type.dims))
+    def visitPackListSlice(self, node, slice):
+        ndata=slice.data.pack(node.type, len(node.type.dims))
         ndata=ndata.map(list,res_type=node.type)
-        param0.data = ndata
-        param0.type = node.type
-        param0.dims = node.dims
-        return param0
+        return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
-    def visitUnpackTupleSlice(self,node,param0):
+    def visitUnpackTupleSlice(self,node,slice):
         func = operator.itemgetter(node.tuple_idx)
-        ndata = param0.data.map(func,res_type=node.type)
-        param0.data = ndata
-        param0.type = node.type
-        param0.name = node.name
-        return param0
+        ndata = slice.data.map(func,res_type=node.type)
+        return slice.modify(data=ndata,rtype=node.type,name=node.name)
  
-    def visitPackTupleSlice(self,node, *params):
-        ndata = nested_array.co_mapseq(speedtuplify,[param.data for param in params],res_type=node.type)
-        nparam = params[0]
-        nparam.data = ndata
-        nparam.type = node.type
-        nparam.dims = node.dims
-        return nparam
+    def visitPackTupleSlice(self,node, slices):
+        ndata = nested_array.co_mapseq(speedtuplify,[slice.data for slice in slices],res_type=node.type)
+        return slices[0].modify(data=ndata,rtype=node.type,dims=node.dims)
     
-    def visitHArraySlice(self,node, *params):
-        ndata = nested_array.co_mapseq(speedarrayify,[param.data for param in params],dtype=node.type.subtypes[0].toNumpy(), res_type=node.type)
-        nparam = params[0]
-        nparam.data = ndata
-        nparam.type = node.type
-        nparam.dims = node.dims
-        return nparam
+    def visitHArraySlice(self,node, slices):
+        ndata = nested_array.co_mapseq(speedarrayify,[slice.data for slice in slices],dtype=node.type.subtypes[0].toNumpy(), res_type=node.type)
+        return slices[0].modify(data=ndata,rtype=node.type,dims=node.dims)
 
-    def visitFixate(self,node,*params):
+    def visitFixate(self,node,slices):
         res = []
-        for cur_slice, param in zip(node._slices, params):
-            ndata = param.data.getStructuredData()
-            nparam = param.copy()
-            nparam.data = ndata
-            nparam.setSource(cur_slice)
-            res.append(nparam)
+        for cur_slice, slice in zip(node._slices, slices):
+            ndata = slice.data.getStructuredData()
+            nslice = slice.modify(data=ndata)
+            nslice.setSource(cur_slice)
+            res.append(nslice)
         return res
     
-    def castto_any(self,castname,node,param0):
-        return param0.data.mapseq(lambda x:x,res_type=node.type)
+    def castto_any(self,castname,node,slice):
+        return slice.data.mapseq(lambda x:x,res_type=node.type)
 
-    def castnumbers_numbers(self,castname,node,param0):
-        return param0.data.mapseq(lambda x:x,res_type=node.type)
+    def castnumbers_numbers(self,castname,node,slice):
+        return slice.data.mapseq(lambda x:x,res_type=node.type)
 
 #util funcs
 def speedtuplify(seqs):

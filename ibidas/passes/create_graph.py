@@ -36,7 +36,7 @@ class CreateGraph(VisitorFactory(prefixes=("visit",),
     def visitFixate(self,node):
         for pos, slice in enumerate(node._slices):
             self.graph.addNode(slice)
-            self.graph.addEdge(query_graph.Edge(slice,node,"param",pos))
+            self.graph.addEdge(query_graph.Edge(slice,node,"paramlist","slices",pos))
         self.queue.extend(node._slices)
 
     def visitDataSlice(self,node):
@@ -44,12 +44,12 @@ class CreateGraph(VisitorFactory(prefixes=("visit",),
 
     def visitUnaryOpSlice(self,node):
         self.graph.addNode(node.source)
-        self.graph.addEdge(query_graph.Edge(node.source,node,"param",0))
+        self.graph.addEdge(query_graph.Edge(node.source,node,"param","slice",0))
         self.queue.append(node.source)
     
     def visitMultiOpSlice(self,node):
         for pos, slice in enumerate(node.sources):
             self.graph.addNode(slice)
-            self.graph.addEdge(query_graph.Edge(slice,node,"param",pos))
+            self.graph.addEdge(query_graph.Edge(slice,node,"paramlist","slices",pos))
         self.queue.extend(node.sources)
     

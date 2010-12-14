@@ -26,10 +26,11 @@ class Node(object):
 
 
 class Edge(object):
-    __slots__ = ["source","target","type","attr"]
+    __slots__ = ["source","target","type","subtype","attr"]
 
-    def __init__(self,source,target,type=None,attr=None):
+    def __init__(self,source,target,type=None,subtype=None,attr=None):
         self.source = source
         self.target = target
         self.type = type
+        self.subtype = subtype
         self.attr = attr

@@ -219,31 +219,31 @@ class NestedArray(object):
 
         tilerepeats = []
         prev_repeat = False
-        for pos,(idx,repeat) in enumerate(zip(nself.idxs,repeats)):
+        for pos,idx,repeat in zip(range(len(repeats)),nself.idxs,repeats):
             if(isinstance(idx,int)):
                 if(isinstance(repeat,int)):
                     tilerepeats.append(repeat)
                 else:
                     nextpos,nextobj = nself._get_next_obj(pos)
                     nself._apply_tile_broadcast(tilerepeats,nextpos,prevrepeat)
-                    nextpos,nextobj = nself._get_next_obj(pos) #get updated nextobj
+                    nextobj = nself.idxs[nextpos] #update nextobj
                     
                     #collapse first dims
-                    ntr = len(tlerepeats)
+                    ntr = len(tilerepeats)
                     cshape = nextobj.shape
                     assert cshape[len(tilerepeats)] == 1, "Varbroadcast on full dimension not possible"
                     nshape = (numpy.multiply.reduce(cshape[:(ntr + 1)]),) + cshape[(ntr + 1):]
                     nextobj.shape = nshape
 
                     #replace new idx
-                    assert repeat.shape[:-1] == cshape[:ntr],"Index shapes should match"
+                    assert repeat.shape[:-1] == cshape[:(ntr + 1)],"Index shapes should match"
                     nself.idxs[pos] = repeat
                     
                     temp_repeat = repeat.reshape((numpy.multiply.reduce(cshape[:(ntr + 1)]),2))
-                    varrep = temp_repeat[:,1] - temp_repeat[:,0]
+                    varlength = temp_repeat[:,1] - temp_repeat[:,0]
 
                     #repeat nextobj
-                    nextobj = numpy.repeat(nextobj,varrep)
+                    nextobj = numpy.repeat(nextobj,varlength)
 
                     if(nextpos == len(self.idxs)):
                         nself.data = nextobj
@@ -272,10 +272,16 @@ class NestedArray(object):
         if(not tilerepeats and not prevrepeat):
             return
 
-        while(len(tilerepeats) < (len(pos) - 1)):
+        if(pos == len(self.idxs)):
+            idx = self.data
+        else:
+            idx = self.idxs[pos]
+        
+        assert isinstance(idx,numpy.ndarray), "Tilerepeats should be applied to numpy idx array"
+        while(len(tilerepeats) < len(idx.shape)):
             tilerepeats.append(1)
         
-        assert len(tilerepeats) == (len(pos) - 1), "Number of repeats does not match shape"
+        assert len(tilerepeats) == len(pos), "Number of repeats does not match shape"
 
         shapeok = [col == 1 for tr,col in zip(tilerepeats,idx.shape) if tr > 1]
         if(not shapeok and not prevrepeat):#nothing to broadcast
@@ -286,24 +292,20 @@ class NestedArray(object):
         if(pos == len(self.idxs)): #apply to data
             self.data = numpy.tile(self.data,tilerepeats)
             return
-        
-        
-        tilerepeats.append(1) #add 1 for slice dim
-        idx = self.idxs[pos]
-        
-        assert isinstance(idx,numpy.ndarray), "Tilerepeats should be applied to numpy idx array"
+         
         idx = numpy.tile(idx,tilerepeats)
 
         lastrepeat = 0
-        for pos in xrange(len(tilerepeats)):
-            if(tilerepeats[pos] > 1):
-                lastrepeat = pos
+        for tpos in xrange(len(tilerepeats)):
+            if(tilerepeats[tpos] > 1):
+                lastrepeat = tpos
 
         lastrepeat += 1
         oshape = idx.shape
         nshape = (numpy.multiply.reduce(oshape[:lastrepeat]),numpy.multiply.reduce(oshape[lastrepeat:]))
         idx.shape = nshape
 
+        #make contigious (slices in order), affects nextobj
         nextpos, nextobj = self._get_next_obj(pos)
         curpos = 0
         res = []
