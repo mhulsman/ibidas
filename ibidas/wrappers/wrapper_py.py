@@ -179,6 +179,31 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         ndata = nested_array.co_mapseq(speedarrayify,[slice.data for slice in slices],dtype=node.type.subtypes[0].toNumpy(), res_type=node.type)
         return slices[0].modify(data=ndata,rtype=node.type,dims=node.dims)
 
+    def visitEnsureCommonDimSlice(self,node,slice,compare_slice):
+        checkdim = node.dims[node.checkpos]
+        selfshape = slice.data.getDimShape(node.checkpos)
+
+        otherpos = compare_slice.dims.index(checkdim)
+        othershape = compare_slice.data.getDimShape(otherpos)
+        assert numpy.all(selfshape == othershape), "Dimension mismatch in " + str(checkdim) + ":" + str(selfshape) + " != " + str(othershape)
+        return slice.modify(dims=node.dims)
+
+    def visitBroadcastSlice(self,node,slice,compare_slices):
+        repeat_dict = {}
+        bcpos = 0
+        for pos,planelem in enumerate(node.plan):
+            if(planelem == BCEXIST):
+                repeat_dict[pos] = compare_slices[bcpos].data.getDimShape(pos)
+                bcpos += 1
+            elif(planelem == BCCOPY):
+                pass
+            else:
+                raise RuntimeError, "Unknown broadcast plan element: " + str(planelem)
+        print repeat_dict, slice.data.dims
+        ndata = slice.data.broadcast(repeat_dict)
+        return slice.modify(data=ndata,dims=node.dims)
+
+
     def visitFixate(self,node,slices):
         res = []
         for cur_slice, slice in zip(node._slices, slices):

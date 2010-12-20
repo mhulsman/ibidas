@@ -17,6 +17,8 @@ class Graph(object):
         self.nodes.add(node)
 
     def addEdge(self,edge):
+        assert edge.source in self.nodes, "Unknown edge source"
+        assert edge.target in self.nodes, "Unknown edge target"
         self.edge_source[edge.source].add(edge)
         self.edge_target[edge.target].add(edge)
 

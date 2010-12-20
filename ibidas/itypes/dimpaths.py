@@ -2,8 +2,11 @@ import itertools
 from collections import defaultdict
 import numpy
 
+from ..constants import *
 _delay_import_(globals(),"dimensions","Dim")
 _delay_import_(globals(),"..slices")
+_delay_import_(globals(),"..utils","toposort","util")
+
 
 class DimPath(tuple):
     def __new__(cls, *dims):
@@ -151,23 +154,20 @@ def uniqueDimPath(dimpaths,only_complete=True):#{{{
      
     return path#}}}
 
-def planBroadcastEqual(paths,partial=False):
+def planBroadcastMatchPos(paths,partial=False):
     maxlen = max([len(path) for path in paths])
-    plans = [[] * maxlen for path in paths]
+    plans = [[] for path in paths]
     bcdims = [None] * maxlen
-
-    curpos = -1
-    while(curpos >= -maxlen):
-        xdims = set()
+    curpos = 0
+    while(curpos < maxlen):
+        xdims = []
         l = set()
         for path in paths:
-            if(len(path) >= -curpos):
-                xdims.add(path[curpos])
+            if(len(path) > curpos):
+                xdims.append(path[curpos])
                 l.add(path[curpos].shape)
             else:
-                xdims.add(None)
-        xdims = [path[curpos] for path in paths]
-
+                xdims.append(None)
 
         if(len(l) > 1):
             l.discard(1)
@@ -175,19 +175,118 @@ def planBroadcastEqual(paths,partial=False):
             l.discard(UNDEFINED)
         assert len(l) == 1, "Different shaped dimensions cannot be broadcast to each other"
         length = l.pop()
-        bcdim = [xdim for xdim in xdims if xdim.shape == length][0]
+        bcdim = [xdim for xdim in xdims if not xdim is None and xdim.shape == length][0]
         for xdim,plan in zip(xdims,plans):
             if(xdim is None):
-                plan[curpos] = BCNEW
+                if(not partial):
+                    plan.append(BCNEW)
             elif(xdim.shape == 1):
-                plan[curpos] = BCEXIST
+                plan.append(BCEXIST)
             elif(xdim != bcdim):
-                plan[curpos] = BCENSURE
+                plan.append(BCENSURE)
             else:
-                plan[curpos] = BCCOPY
+                plan.append(BCCOPY)
         bcdims[curpos] = bcdim 
-        curpos -=1 
+        curpos +=1 
     return (bcdims, plans)        
+
+def planBroadcastMatchDim(paths,partial=False):
+    graph = toposort.StableTopoSortGraph()
+
+    #a dim can occur multiple times in dag, to prevent cycles
+    #Therefore, it has to be represented by ids instead of itself
+    #Step 1: assign ids to dims
+    curid = 0
+    translate = {}
+    for dim in itertools.chain(*paths):
+        if not dim in translate:
+            translate[dim] = [curid]
+            curid += 1
+    
+    #broadcast dim mergers
+    wildcard_links = dict()
+    free_wildcards = set()
+    
+    #Step 2: create graph
+    for path in paths:
+        lastid = None
+        for pathpos, dim in enumerate(path):
+            dimid = translate[dim][0]
+            newnode = False
+
+            #new wildcard dim?
+            if(dim.shape == 1 and dim.has_missing is False and not dimid in wildcard_links):
+                try:
+                    odimid = dimid
+                    dimid = graph.elem(0,after=lastid)
+                    wildcard_links[odimid] = dimid
+                except IndexError,e:
+                    graph.addNodeIfNotExist(dimid)
+                    free_wildcards.add(dimid)
+            elif(dimid in wildcard_links): #old wildcarddim, use previous mapping
+                dimid = wildcard_links[dimid]
+            else: #normal dim, ensure it available in the graph
+                newnode = graph.addNodeIfNotExist(dimid)
+
+            if(pathpos > 0):
+                pos = 0
+                #try to add edge, such that we get no cycle
+                #if cycle is found, add new ids for target node
+                while True:
+                    try:
+                        graph.addEdge(lastid,dimid)
+                        break
+                    except toposort.CycleError, e:
+                        pos += 1
+                        if(pos >= len(translate[dim])):
+                            translate[dim].append(curid)
+                            newnode = graph.addNodeIfNotExist(curid)
+                            curid += 1
+                        dimid = translate[dim][pos]
+            
+            if(free_wildcards and newnode):
+                for nodeid in graph:
+                    if(nodeid in free_wildcards and not nodeid == dimid):
+                        try:
+                            graph.mergeNodes(nodeid,dimid)
+                            wildcard_links[nodeid] = dimid
+                            free_wildcards.discard(nodeid)
+                            break
+                        except toposort.CycleError, e:
+                            pass #cannot be merged, let it be
+                    
+            lastid = dimid 
+  
+    #Step 3: get ordered bc dims
+    rev_translate = dict(sum([[(subid,dim) for subid in id] for dim,id in translate.iteritems()],[]))
+    bcdims = list(graph)
+    bcdims = [rev_translate[bcdimid] for bcdimid in bcdims]
+
+    #Step 4: create plans for each path
+    plans = []
+    for path in paths:
+        plan = []
+        pathpos = 0
+        for bcdim in bcdims:
+            if(pathpos < len(path)):
+                if( bcdim == path[pathpos]):
+                    plan.append(BCCOPY)
+                    pathpos += 1
+                else: 
+                    for dimid in translate[path[pathpos]]:
+                        if(dimid in wildcard_links):
+                            bdim = rev_translate[wildcard_links[dimid]]
+                            if(bdim == bcdim):
+                                plan.append(BCEXIST)
+                                pathpos += 1
+                                break
+                    else:
+                        plan.append(BCNEW)
+            elif(not partial):
+                plan.append(BCNEW)
+
+        plans.append(plan)
+    return (bcdims,plans)
 
 def flatFirstDims(array,ndim):
     oshape = array.shape

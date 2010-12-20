@@ -73,7 +73,7 @@ class ArrayConvertor(BaseConvertor):
                 elem = self._convert(rest_dims,numpy_type,elem)
             res.append(elem)
 
-        nseq = cutils.darray(res,object,depth,1)
+        nseq = cutils.darray(res,object,depth+1,1)
         seq = sparse_arrays.FullSparse(nseq)
         return seq
 

@@ -205,14 +205,6 @@ class SliceCast(repops.UnaryOpRep):
         return self.initialize(tuple(nslices),source._state)
         #}}}
 
-class Combine(repops.MultiOpRep):
-    def process(self,*sources, **kwds):
-        state = reduce(operator.__and__,[source._state for source in sources])
-        if not state & RS_SLICES_KNOWN:
-            return
-
-        nslices = sum([source._slices for source in sources],tuple())
-        return self.initialize(nslices,state)
 
 @repops.delayable()
 class RTuple(repops.UnaryOpRep):

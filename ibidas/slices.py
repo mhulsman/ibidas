@@ -1,4 +1,5 @@
 import copy
+from collections import defaultdict
 
 from constants import *
 from utils import util
@@ -173,6 +174,7 @@ class InsertDimSlice(UnaryOpSlice):
     __slots__ = ["matchpoint","newdim"]
     def __init__(self,slice,matchpoint,ndim):
         assert len(slice.dims) >= matchpoint, "Matchpoint for dim insertion outside dimpath"
+        assert ndim.shape == 1, "Length of inserted dim should be equal to 1"
         #FIXME: update va of type 
         ndims = slice.dims[:matchpoint] + (ndim,) + slice.dims[matchpoint:].updateDimVariable()
         ntype = slice.type.updateDimVariable(insertpoint=-(len(slice.dims) - matchpoint))
@@ -182,33 +184,31 @@ class InsertDimSlice(UnaryOpSlice):
         UnaryOpSlice.__init__(self,slice,rtype=ntype,dims=ndims)        
 
 
-class EnsureCommonDimSlice(MultiOpSlice):
-    __slots__ = ["checkpos"]
-    def __init__(self,slices,checkpos):
-        cslice = slices[0]
+class EnsureCommonDimSlice(UnaryOpSlice):
+    __slots__ = ["refslices","checkpos"]
+    def __init__(self,slice,refslices,checkpos,bcdim):
         self.checkpos = checkpos
-        ndim = slices[1].dims[checkpos]
-        ndims = cslice.dims[:checkpos] + dimpaths.DimPath(ndim) + cslice.dims[(checkpos + 1):]
-        
-        MultiOpSlice.__init__(self, slices, name=cslice.name, rtype=cslice.type, dims=ndims, bookmarks=cslice.bookmarks)
+        self.refslices = refslices
+        ndims = slice.dims[:checkpos] + dimpaths.DimPath(bcdim) + slice.dims[(checkpos + 1):]
+        UnaryOpSlice.__init__(self, slice, dims=ndims)
 
 
-class BroadcastSlice(MultiOpSlice):
-    __slots__ = ["plan"]
+class BroadcastSlice(UnaryOpSlice):
+    __slots__ = ["refsliceslist","plan"]
     
-    def __init__(self,slices,plan):
-        cslice = slices[0]
+    def __init__(self,slice,refslices,plan,bcdims):
+        self.refsliceslist = refslices
         self.plan = plan
-        MultiOpSlice.__init__(self, slices, name=cslice.name, rtype=cslice.type, dims=cslice.dims, bookmarks=cslice.bookmarks)
+        UnaryOpSlice.__init__(self, slice,dims=dimpaths.DimPath(*bcdims))
     
 
 
-def broadcast(slices,mode="full",partial=False):
+def broadcast(slices,mode="pos",partial=False):
     slicedimpaths = [s.dims for s in slices]
-    if(mode == "full"):
-        bcdims, bcplan = dimpaths.planBroadcastFull(slicedimpaths,partial)
-    elif(mode == "equal"):
-        bcdims, bcplan = dimpaths.planBroadcastEqual(slicedimpaths,partial)
+    if(mode == "dim"):
+        bcdims, bcplan = dimpaths.planBroadcastMatchDim(slicedimpaths,partial)
+    elif(mode == "pos"):
+        bcdims, bcplan = dimpaths.planBroadcastMatchPos(slicedimpaths,partial)
     else:
         raise RuntimeError, "Unknown broadcast mode: " + str(mode)
 
@@ -220,20 +220,28 @@ def broadcast(slices,mode="full",partial=False):
 
     nplans = []
     nslices = []
+    print bcplan
+    print bcdims
     for plan,slice in zip(bcplan,slices):
-        dimpos = 0
         nplan = []
-        for bcdim, planelem in zip(bcdims,plan):
+        active_bcdims = []
+        for dimpos, bcdim, planelem in zip(range(len(bcdims)),bcdims,plan):
             if(planelem == BCNEW):
-                slice = InsertDimSlice(slice,dimpos,bcdim)
+                ndim = dimensions.Dim(1,variable=0,has_missing=False,name=None)
+                print "IDS",dimpos,ndim
+                slice = InsertDimSlice(slice,dimpos,ndim)
+                active_bcdims.append(bcdim)
                 nplan.append(BCEXIST)
             elif(planelem == BCENSURE):
-                slice = EnsureCommonDimSlice([slice] + references[bcdim],dimpos)
-                dimpos += 1
+                slice = EnsureCommonDimSlice(slice,references[bcdim],dimpos,bcdim)
                 nplan.append(BCCOPY)
+            elif(planelem == BCEXIST):
+                active_bcdims.append(bcdim)
+                nplan.append(planelem)
             else:
                 nplan.append(planelem)
-        slice = BroadcastSlice([slice] + references[bcdim],nplan)
+        if(active_bcdims):                
+            slice = BroadcastSlice(slice,[references[bcdim] for bcdim in active_bcdims],nplan,bcdims)
         nslices.append(slice)
 
     return nslices

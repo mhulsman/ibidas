@@ -35,8 +35,17 @@ class SerializeExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), manager.
                 if(not edge.subtype in params):
                     params[edge.subtype] = [None]
                 while(len(params[edge.subtype]) <= edge.attr):
-                    params.append(None)
+                    params[edge.subtype].append(None)
                 params[edge.subtype][edge.attr] = param_idx
+            elif(edge.type == "paramchoice"):
+                params[edge.subtype] = param_idx
+            elif(edge.type == "paramchoicelist"):
+                if(not edge.subtype in params):
+                    params[edge.subtype] = [None]
+                while(len(params[edge.subtype]) <= edge.attr):
+                    params[edge.subtype].append(None)
+                params[edge.subtype][edge.attr] = param_idx
+                
 
         command_id = len(self.commands)
         self.commands.append(node)

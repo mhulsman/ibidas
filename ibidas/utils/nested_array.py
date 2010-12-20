@@ -3,28 +3,41 @@ import copy
 
 _delay_import_(globals(),"..utils","cutils","sparse_arrays")
 _delay_import_(globals(),"..utils.missing","Missing")
-_delay_import_(globals(),"..itypes","dimpaths","rtypes")
+_delay_import_(globals(),"..itypes","dimpaths","rtypes","dimensions")
 class NestedArray(object):
     def __init__(self,data,cur_type):
         self.data = cutils.darray([data],object).view(sparse_arrays.FullSparse)
         self.cur_type = cur_type
 
-        self.idxs = []
-        self.idx_is_contigious = []
-        self.dims = dimpaths.DimPath()
+        self.idxs = [0]
+        tdim = dimensions.Dim(1,variable=0,has_missing=False)
+        self.dims = dimpaths.DimPath(tdim)
         
     def copy(self):
         res = copy.copy(self)
         res.data = numpy.array(self.data).view(sparse_arrays.FullSparse)
         res.idxs = list(self.idxs)
-        res.idx_is_contigious = list(self.idx_is_contigious)
         return res
-    
-    def _curIdxDepth(self):
-        if(not self.idxs or not isinstance(self.idxs[-1],int)):
-            return 0
+   
+    def getDimShape(self,pos):
+        pos += 1
+        if(isinstance(self.idxs[pos],int)):
+            nextpos,nextobj = self._get_next_obj(pos)
+            print self.idxs
+            print nextobj
+            print nextobj.shape
+            print self.dims
+            print [dim for dim in self.dims]
+            print [dim.shape for dim in self.dims]
+            return nextobj.shape[self.idxs[pos]]
         else:
+            return self.idxs[pos]
+
+    def _curIdxDepth(self):
+        if(isinstance(self.idxs[-1],int)):
             return self.idxs[-1]+1
+        else:
+            return 0
  
     def flat(self):
         data,rshape = self._flatData()
@@ -33,13 +46,11 @@ class NestedArray(object):
 
     def _flatData(self):
         seq = self.data
-        if(self.idxs and isinstance(self.idxs[-1],int)):
-            rshape = seq.shape[:(self.idxs[-1]+2)]
-            seq = dimpaths.flatFirstDims(seq,self.idxs[-1]+1)
+        if(isinstance(self.idxs[-1],int)):
+            rshape = seq.shape[:(self.idxs[-1]+1)]
+            seq = dimpaths.flatFirstDims(seq,self.idxs[-1])
         else:
             rshape = (len(seq),)
-        #else:
-        #    seq = cutils.darray([self.data],object).view(sparse_arrays.FullSparse)
         return (seq,rshape)
 
     def unpack(self, dimpath, subtype):
@@ -47,15 +58,15 @@ class NestedArray(object):
         #init
         data = nself.data
         depth = len(dimpath)
+        odimpath = dimpath
        
         while(depth>0):        
             idxdepth = nself._curIdxDepth()
-            rem_dims = len(data.shape) - idxdepth - 1
+            rem_dims = len(data.shape) - idxdepth
             #does cur data have dimensions left that can be unpacked?
             if(rem_dims):
                 rem_depth = min(rem_dims,depth)
                 nself.idxs.extend(range(idxdepth, idxdepth + rem_depth))
-                nself.idx_is_contigious.extend([True]*rem_depth)
                 dimpath = dimpath[rem_depth:]
                 depth -= rem_depth
                 
@@ -107,13 +118,12 @@ class NestedArray(object):
                 assert (ndata.shape[0] % len(cdata)) == 0, "Leftover elements in joining dimensions"
                 pshape = ndata.shape[0] / len(cdata)
                 ndata.shape = data.shape + (pshape,) + ndata.shape[1:]
-                nself.idxs.append(len(data.shape)-1)
-            nself.idx_is_contigious.append(True)
+                nself.idxs.append(len(data.shape))
             data = ndata    
             depth -= cdepth
         
         nself.cur_type = subtype
-        nself.dims = self.dims + dimpath
+        nself.dims = self.dims + odimpath
         nself.data = data
         return nself
     
@@ -122,10 +132,10 @@ class NestedArray(object):
         nself = self.copy()
       
         while(depth):
-            assert nself.idxs, "Pack operation on nestedarray without index?!"
+            assert len(nself.idxs) > 1, "Pack operation on nestedarray without index?!"
+            assert len(nself.dims) == len(nself.idxs), "Idxs and dims not equal in size"
             idx = nself.idxs.pop()
             nself.dims = nself.dims[:-1]
-            nself.idx_is_contigious.pop()
 
             if(not isinstance(idx,int)): #refers to fixed dim in data
                 res = []
@@ -144,7 +154,7 @@ class NestedArray(object):
         return nself                
  
     def getStructuredData(self):
-        return self.pack(rtypes.unknown, len(self.idxs)).data[0]
+        return self.pack(rtypes.unknown, len(self.idxs)-1).data[0]
 
     def map(self, func, *args, **kwargs):
         restype= kwargs.get("res_type")
@@ -187,11 +197,13 @@ class NestedArray(object):
         return nself
 
     def insertDim(self,matchpoint,newdim):
+        matchpoint += 1
+        print "W1",self.idxs,self.dims
         nself = self.copy()
         idxs = nself.idxs + [nself.data]
-        curidx = idxs[matchpoint]
+        curidx = idxs[matchpoint-1]
         if(isinstance(curidx,int)):
-            newidx = curidx
+            newidx = curidx + 1
         else:
             newidx = 0
         nself.idxs.insert(matchpoint,newidx)
@@ -206,8 +218,8 @@ class NestedArray(object):
                 break
         else:
             nself.data.shape = nself.data.shape[:newidx] + (1,) + nself.data.shape[newidx:]
-        nself.idx_is_contigious.insert(matchpoint,True)
         nself.dims = nself.dims[:matchpoint] + (newdim,) + nself.dims[matchpoint:]
+        print "W2",nself.idxs,nself.dims,matchpoint
         return nself
 
     def broadcast(self, repeat_dict):
@@ -215,8 +227,9 @@ class NestedArray(object):
 
         repeats = [1] * len(self.idxs)
         for pos,repeat  in repeat_dict.iteritems():
-            repeats[pos] = repeat
+            repeats[pos + 1] = repeat
 
+        print repeats
         tilerepeats = []
         prev_repeat = False
         for pos,idx,repeat in zip(range(len(repeats)),nself.idxs,repeats):
@@ -225,21 +238,21 @@ class NestedArray(object):
                     tilerepeats.append(repeat)
                 else:
                     nextpos,nextobj = nself._get_next_obj(pos)
-                    nself._apply_tile_broadcast(tilerepeats,nextpos,prevrepeat)
-                    nextobj = nself.idxs[nextpos] #update nextobj
+                    nself._apply_tile_broadcast(tilerepeats,nextpos,prev_repeat)
+                    nextpos,nextobj = nself._get_next_obj(pos)
                     
                     #collapse first dims
                     ntr = len(tilerepeats)
                     cshape = nextobj.shape
                     assert cshape[len(tilerepeats)] == 1, "Varbroadcast on full dimension not possible"
-                    nshape = (numpy.multiply.reduce(cshape[:(ntr + 1)]),) + cshape[(ntr + 1):]
+                    nshape = (numpy.multiply.reduce(cshape[:ntr]),) + cshape[ntr:]
                     nextobj.shape = nshape
 
                     #replace new idx
-                    assert repeat.shape[:-1] == cshape[:(ntr + 1)],"Index shapes should match"
+                    assert repeat.shape[:-1] == cshape[:ntr],"Index shapes should match"
                     nself.idxs[pos] = repeat
                     
-                    temp_repeat = repeat.reshape((numpy.multiply.reduce(cshape[:(ntr + 1)]),2))
+                    temp_repeat = repeat.reshape((numpy.multiply.reduce(cshape[:ntr]),2))
                     varlength = temp_repeat[:,1] - temp_repeat[:,0]
 
                     #repeat nextobj
@@ -249,44 +262,47 @@ class NestedArray(object):
                         nself.data = nextobj
                     else:
                         nself.idxs[pos] = nextobj
-                    prevrepeat=True
+                    prev_repeat=True
                     tilerepeats = []
             else:
                 assert repeat == 1, "Broadcast of full dimension not possible"
-                nself._apply_tile_broadcast(tilerepeats,pos,prevrepeat)
-                prevrepeat=True
+                nself._apply_tile_broadcast(tilerepeats,pos,prev_repeat)
+                prev_repeat=True
         
         if(tilerepeats):
-            nself._apply_tile_broadcast(tilerepeats,len(self.idxs),prevrepeat)
+            nself._apply_tile_broadcast(tilerepeats,len(self.idxs),prev_repeat)
+        return nself
 
     def _get_next_obj(self,pos):
         pos += 1
-        while(isinstance(self.idxs[pos],int)):
+        while(len(self.idxs) > pos and isinstance(self.idxs[pos],int)):
             pos += 1
-            if(pos == len(self.idxs)):
-                return (pos,self.data)
-        return (pos,self.idxs[pos])
+        if(pos == len(self.idxs)):
+            return (pos,self.data)
+        else:
+            return (pos,self.idxs[pos])
 
             
     def _apply_tile_broadcast(self, tilerepeats, pos, prevrepeat):
         if(not tilerepeats and not prevrepeat):
             return
-
+        print "TR",tilerepeats
         if(pos == len(self.idxs)):
             idx = self.data
         else:
             idx = self.idxs[pos]
-        
+       
         assert isinstance(idx,numpy.ndarray), "Tilerepeats should be applied to numpy idx array"
+        tilerepeats = list(tilerepeats)
         while(len(tilerepeats) < len(idx.shape)):
             tilerepeats.append(1)
         
-        assert len(tilerepeats) == len(pos), "Number of repeats does not match shape"
+        assert len(tilerepeats) == len(idx.shape), "Number of repeats does not match shape"
 
         shapeok = [col == 1 for tr,col in zip(tilerepeats,idx.shape) if tr > 1]
         if(not shapeok and not prevrepeat):#nothing to broadcast
             return
-        
+      
         assert all(shapeok), "Repeat of full dimension: error in  broadcast"
 
         if(pos == len(self.idxs)): #apply to data

@@ -3,7 +3,7 @@ from ..utils.multi_visitor import VisitorFactory, NF_ERROR
 from .. import query_graph
 from ..constants import *
 _delay_import_(globals(),"..repops")
-_delay_import_(globals(),"..repops_slice")
+_delay_import_(globals(),"..repops_multi")
 _delay_import_(globals(),"..slices")
 
 class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"), 
@@ -14,7 +14,7 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
         while(not query_root._state & RS_SLICES_KNOWN):
             self = cls()
             first_known_nodes = self.findFirstKnown(query.root)
-            temp_root = repops_slice.Combine(*first_known_nodes)
+            temp_root = repops_multi.Combine(*first_known_nodes)
             temp_root = repops.ApplyFuncRep(temp_root,apply_slice,slices.DetectTypeSlice,None)
             inferred_slices = root._getResultSlices()
 

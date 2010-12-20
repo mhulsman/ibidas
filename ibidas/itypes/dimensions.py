@@ -7,7 +7,7 @@ from ..constants import *
 #pylint: disable-msg=E1101
 dimid = util.seqgen().next
 def getNewDimid():
-    return "d" + str(dimid())
+    return dimid()
 class Dim(object):
     """Class representing a dimension."""
     __slots__ = ['id', 'name', 'shape', 'variable', 'has_missing']
@@ -27,12 +27,12 @@ class Dim(object):
         else:
             self.id = did
 
-        assert isinstance(self.id, str), "ID should be a string"
-        assert self.id.lower() == self.id, "ID string should be lower case"
+        assert isinstance(self.id, int), "ID should be a integer"
 
         if(name is None):
-            self.name = self.id
+            self.name = "d" + str(self.id)
         else:
+            assert name.lower() == name, "Dimension name should be lower case"
             self.name = name
         
         self.has_missing = has_missing

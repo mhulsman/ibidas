@@ -64,7 +64,7 @@ class UnaryOpRep(representor.Representor):
         return res
 
 class MultiOpRep(representor.Representor):
-    def __init__(self, sources):
+    def __init__(self, sources, *args,**kwds):
         assert isinstance(sources,tuple), "Sources should be a tuple"
         self._sources = sources
         self._params = (args,kwds)

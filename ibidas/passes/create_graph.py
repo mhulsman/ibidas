@@ -53,3 +53,22 @@ class CreateGraph(VisitorFactory(prefixes=("visit",),
             self.graph.addEdge(query_graph.Edge(slice,node,"paramlist","slices",pos))
         self.queue.extend(node.sources)
     
+    def visitEnsureCommonDimSlice(self,node):
+        self.graph.addNode(node.source)
+        self.graph.addEdge(query_graph.Edge(node.source,node,"param","slice",0))
+        for slice in node.refslices:
+            self.graph.addNode(slice)
+            self.graph.addEdge(query_graph.Edge(slice,node,"paramchoice","compare_slice",0))
+        self.queue.extend(node.refslices)
+        self.queue.append(node.source)
+     
+    def visitBroadcastSlice(self,node):
+        self.graph.addNode(node.source)
+        self.graph.addEdge(query_graph.Edge(node.source,node,"param","slice",0))
+        for pos, slicelist in enumerate(node.refsliceslist):
+            for slice in slicelist:
+                self.graph.addNode(slice)
+                self.graph.addEdge(query_graph.Edge(slice,node,"paramchoicelist","compare_slices",pos))
+            self.queue.extend(slicelist)
+        self.queue.append(node.source)
+       
