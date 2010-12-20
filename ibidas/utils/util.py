@@ -106,7 +106,23 @@ def replace_in_tuple(tpl, replace):
 def delete_from_tuple(tpl, remove):
     return tuple([elem for elem in tpl if not elem in remove])
 
+
 def zip_broadcast(*elems):
+    lengths = set([len(elem) for elem in elems])
+    lengths.discard(1)
+    assert len(lengths) <= 1, "Number of elements in zip broadcast should be equal (or 1)"
+    if(lengths):
+        length = lengths.pop()
+    else:
+        length = 1
+  
+    elems = list(elems)
+    for pos, elem in enumerate(elems):
+        if(len(elem) == 1):
+            elems[pos] = elem * length
+    return zip(*elems)
+
+def zip_broadcast_old(*elems):
     iters = []
     firstres = []
     for elem in elems:

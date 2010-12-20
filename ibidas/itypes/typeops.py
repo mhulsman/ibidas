@@ -3,9 +3,11 @@ import operator
 import numpy
 
 import rtypes
+
 _delay_import_(globals(),"dimensions")
 _delay_import_(globals(),"casts")
 _delay_import_(globals(),"..utils","util","cutils","sparse_arrays")
+_delay_import_(globals(),"..utils.missing","Missing")
 
 
 in1_type_ops = defaultdict(set)
@@ -19,12 +21,10 @@ class Operation(object):
         self.check_func = check_func
         self.exec_funcs = exec_funcs
 
-def addOps(in1_type_cls, in2_type_cls, out_type_cls, 
-           ops, operation):
+def addOps(in1_type_cls, in2_type_cls, ops, operation):
     """Add ops
         in1_type_cls: in type class, can also be sequence
         in2_type_cls: in type class, can also be sequence
-        out_type_cls: out type class, can also be sequence
         ops: python string representation of operation (e.g. __add__)
              can also be sequence
         operation: an Operation object
@@ -41,12 +41,6 @@ def addOps(in1_type_cls, in2_type_cls, out_type_cls,
     else:
         in2_type_ops[in2_type_cls].add(operation)
 
-    if(isinstance(out_type_cls, Iterable)):
-        for outcls in out_type_cls:
-            out_type_ops[outcls].add(operation)
-    else:
-        out_type_ops[out_type_cls].add(operation)
-
     if(isinstance(ops, Iterable)
                         and not isinstance(ops, str)):
         for op in ops:
@@ -55,46 +49,30 @@ def addOps(in1_type_cls, in2_type_cls, out_type_cls,
         op_type_ops[ops].add(operation)
 
 
-def unop_type(intype, op, outtype=None):
+def unop_type(intype, op):
     operations = op_type_ops[op] & in1_type_ops[intype.__class__]
 
-    if(outtype):
-        operations &= out_type_ops[outtype.__class__]
-   
     for oper in operations:
-        res = oper.check_func(intype, op, outtype)
+        res = oper.check_func(intype, op)
         if(not res is False):
             return (res, oper) 
-    if(outtype is None):
-        so = "*"
-    else:
-        so = str(outtype)
     raise RuntimeError, "Could not find a valid operation handler for " + \
-            op + " on " + str(intype) + " -> " + so
+            op + " on " + str(intype) 
         
 
 def binop_type(ltype, rtype, op, outtype=None):
     operations = op_type_ops[op] & in1_type_ops[ltype.__class__] & \
                                     in2_type_ops[rtype.__class__]    
-    if(outtype):
-        operations &= out_type_ops[outtype.__class__]
-   
     for oper in operations:
-        res = oper.check_func(ltype, rtype, op, outtype)
+        res = oper.check_func(ltype, rtype, op)
         if(not res is False):
             return (res, oper) 
-    if(outtype is None):
-        so = "*"
-    else:
-        so = str(outtype)
+
     raise RuntimeError, "Could not find a valid operation handler for " + \
-            str(ltype) + " " + op + " " + str(rtype) + \
-            " -> " + so
+            str(ltype) + " " + op + " " + str(rtype)
         
 
-
-
-def check_arith(in1_type, in2_type, op, out_type):#{{{
+def check_arith(in1_type, in2_type, op):#{{{
     in1_impli_cls = casts.findImplicitCastTypes(in1_type.__class__)
     in2_impli_cls = casts.findImplicitCastTypes(in2_type.__class__)
     out_impli_cls = in1_impli_cls & in2_impli_cls
@@ -104,27 +82,12 @@ def check_arith(in1_type, in2_type, op, out_type):#{{{
     if(not out_impli_cls):
         return False
   
-    if(out_type is None):
-        out_impli_cls = rtypes.mostSpecializedTypesCls(out_impli_cls)
-        assert len(out_impli_cls) == 1, "Multiple output types for " + \
-        "arithmetic operation found: " + str(out_impli_cls)
-        out_cls = out_impli_cls[0]
-        
-        out_type = out_cls(in1_type.has_missing or in2_type.has_missing)
-    else:
-        if(isinstance(out_type, rtypes.TypeUnknown)):
-            if not out_type.__class__ in out_impli_cls:
-                return False
-            
-            if(not out_type.has_missing and 
-                (in1_type.has_missing or in2_type.has_missing)):
-                return False
-        else:
-            if not out_type in out_impli_cls:
-                return False
- 
-            out_type = out_type(in1_type.has_missing or in2_type.has_missing)
-
+    out_impli_cls = rtypes.mostSpecializedTypesCls(out_impli_cls)
+    assert len(out_impli_cls) == 1, "Multiple output types for " + \
+                  "arithmetic operation found: " + str(out_impli_cls)
+    out_cls = out_impli_cls[0]
+    
+    out_type = out_cls(in1_type.has_missing or in2_type.has_missing)
     return out_type#}}}
 
 numpy_cmp = {'__eq__':numpy.equal,#{{{
@@ -182,58 +145,37 @@ reverse_op = {'__eq__':'__eq__',
             '__rxor__':'__xor__',
             }#}}}
 
-def exec_arith(data1 , data2, type1, type2, typeo, op):
-    if(data1 is rtypes.Missing or data2 is rtypes.Missing):
-        return rtypes.Missing
+def exec_arith(data, type1, type2, typeo, op):
+    data1,data2 = data
+    if(data1 is Missing or data2 is Missing):
+        return Missing
     return numpy_arith[op](data1, data2, sig=typeo.toNumpy())
 
-
 arith_ops = set(numpy_arith.keys())
-addOps(rtypes.TypeNumbers, rtypes.TypeNumbers, rtypes.TypeNumbers, 
-       arith_ops, Operation(check_arith, py=exec_arith))
+addOps(rtypes.TypeNumbers, rtypes.TypeNumbers, arith_ops, Operation(check_arith, py=exec_arith))
 
 
-def check_cmp(in1_type, in2_type, op, out_type):#{{{
-    if(out_type is None):
-        out_cls = rtypes.TypeBool
-        out_type = out_cls(in1_type.has_missing or in2_type.has_missing)
-    else:
-        out_impli_cls = casts.findImplicitCastTypes(rtypes.TypeBool)
-        out_impli_cls = [ocls for ocls in out_impli_cls \
-                                if issubclass(ocls,rtypes.TypeNumber)]
-        if(isinstance(out_type, rtypes.TypeUnknown)):
-            if not out_type.__class__ in out_impli_cls:
-                return False
-            
-            if(not out_type.has_missing and 
-                (in1_type.has_missing or in2_type.has_missing)):
-                return False
-        else:
-            if not out_type in out_impli_cls:
-                return False
- 
-            out_type = out_type(in1_type.has_missing or in2_type.has_missing)
-
+def check_cmp(in1_type, in2_type, op):#{{{
+    out_cls = rtypes.TypeBool
+    out_type = out_cls(in1_type.has_missing or in2_type.has_missing)
     return out_type#}}}
 
-
-def exec_cmp(data1, data2, type1, type2, typeo, op):
+def exec_cmp(data, type1, type2, typeo, op):
     #a numpy bug gives all true arrays when using
     #bool as outtype in comparison
-    res = numpy_cmp[op](data1, data2)
-    if(typeo):
-        if(isinstance(res, numpy.ndarray)):
-            res = numpy.cast[typeo.toNumpy()](res).view(sparse_arrays.FullSparse)
-        else:
-            res = typeo.toNumpy().type(res)
-    return res
+    assert isinstance(typeo,rtypes.TypeBool),"Comparison should have result type bool"
+    return numpy_cmp[op](data[0], data[1])
 
 
 cmp_ops = set(numpy_cmp.keys())
-addOps(rtypes.TypeNumbers, rtypes.TypeNumbers, rtypes.TypeNumbers, 
-       cmp_ops, Operation(check_cmp, py=exec_cmp))
+addOps(rtypes.TypeNumbers, rtypes.TypeNumbers, cmp_ops, Operation(check_cmp, py=exec_cmp))
+
+#CHECKED UP TO HERE
+
 
 def exec_cmpgeneral(data1, data2, type1, type2, typeo, op):
+    assert isinstance(typeo,rtypes.TypeBool),"Comparison should have result type bool"
+    
     #a numpy bug gives all true arrays when using
     #bool as outtype in comparison
     res = getattr(data1, op)(data2)
@@ -241,18 +183,11 @@ def exec_cmpgeneral(data1, data2, type1, type2, typeo, op):
         res = getattr(data2, reverse_op[op])(data1)
     if(res is NotImplemented):
         raise RuntimeError, "Not implemented error in exec_cmpgeneral"
-    if(typeo):
-        if(isinstance(res, numpy.ndarray)):
-            res = numpy.cast[typeo.toNumpy()](res).view(sparse_arrays.FullSparse)
-        else:
-            res = typeo.toNumpy().type(res)
     return res
 
-addOps(rtypes.TypeStrings, rtypes.TypeStrings, rtypes.TypeNumbers, 
-       cmp_ops, Operation(check_cmp, py=exec_cmpgeneral))
+addOps(rtypes.TypeStrings, rtypes.TypeStrings, cmp_ops, Operation(check_cmp, py=exec_cmpgeneral))
 
-
-def check_cmpset(in1_type, in2_type, op, out_type):#{{{
+def check_cmpset(in1_type, in2_type, op):#{{{
     
     if(isinstance(in1_type, rtypes.TypeSet) and 
                     isinstance(in2_type, rtypes.TypeSet)):
@@ -263,7 +198,7 @@ def check_cmpset(in1_type, in2_type, op, out_type):#{{{
         pass
     else:    
         return False
-    return check_cmp(in1_type, in2_type, op, out_type)#}}}
+    return check_cmp(in1_type, in2_type, op)#}}}
     
 
 set_funcs = {'__or__':"union", "__ror__":"union", "__and__":"intersection", 
@@ -275,12 +210,11 @@ set_funcs = {'__or__':"union", "__ror__":"union", "__and__":"intersection",
 
 def exec_object_func(data1, data2, type1, type2, otype, op):
     funcget = operator.attrgetter(op)
-    missing = rtypes.Missing
     if(isinstance(type1, rtypes.TypeAny) and type1.has_missing or
        isinstance(type2, rtypes.TypeAny) and type2.has_missing):
         def func(x, y):
-            if(x is missing or y is missing):
-                return missing
+            if(x is Missing or y is Missing):
+                return Missing
             else:
                 return funcget(x)(y)
     else:  
@@ -319,7 +253,7 @@ def exec_arrayarray(data1, data2, type1, type2, typeo, op):
     else:
         raise RuntimeError, "Unrecognized operation " + op
 
-def check_arrayarray(in1_type, in2_type, op, out_type):#{{{
+def check_arrayarray(in1_type, in2_type, op):#{{{
     
     if(not (isinstance(in1_type, rtypes.TypeArray) and 
                     isinstance(in2_type, rtypes.TypeArray))):
@@ -338,7 +272,7 @@ def check_arrayarray(in1_type, in2_type, op, out_type):#{{{
                           (ndim,), (subtype,))
     #}}}
 array_ops = set(["__add__", "__radd__"])
-addOps(rtypes.TypeArrays, rtypes.TypeArrays, rtypes.TypeArrays, 
+addOps(rtypes.TypeArrays, rtypes.TypeArrays, 
        array_ops, Operation(check_arrayarray, py=exec_arrayarray))
 
 
@@ -403,13 +337,13 @@ setchange_ops = set(["__or__", "__ror__", "__and__", "__rand__", "__sub__",
                                         "__rsub__", "__xor__", "__rxor__"])
 
 
-addOps(rtypes.TypeArrays, rtypes.TypeArrays, rtypes.TypeBool, 
+addOps(rtypes.TypeArrays, rtypes.TypeArrays, 
        cmp_ops, Operation(check_cmpset, py=exec_cmpset))
-addOps(rtypes.TypeArrays, rtypes.TypeArrays, rtypes.TypeBool, 
+addOps(rtypes.TypeArrays, rtypes.TypeArrays, 
        setchange_ops, Operation(check_setset, py=exec_setset))
 
 
-def check_any(in1_type, in2_type, op, out_type):#{{{
+def check_any(in1_type, in2_type, op):#{{{
     if(in1_type.__class__ is rtypes.TypeUnknown or 
        in2_type.__class__ is rtypes.TypeUnknown):
         return rtypes.unknown
@@ -420,18 +354,17 @@ def check_any(in1_type, in2_type, op, out_type):#{{{
 any_types = set([rtypes.TypeUnknown, rtypes.TypeAny])
 all_ops = set(reverse_op.keys())
 
-addOps(any_types, any_types, any_types, all_ops, 
+addOps(any_types, any_types, all_ops, 
        Operation(check_any, py=exec_object_func))
 
-def check_unary_any(in_type, op, out_type):
+def check_unary_any(in_type, op):
     return in_type
 
 def exec_object_unaryfunc(data1, type1, otype, func):
     funcget = operator.attrgetter(func)
-    missing = rtypes.Missing
     if(isinstance(type1, rtypes.TypeAny) and type1.has_missing):
         def func(x):
-            if(x is missing):
+            if(x is Missing):
                 return x
             else:
                 return funcget(x)()
@@ -454,7 +387,7 @@ unary_ops = set(numpy_unary_arith.keys())
 #addOps(rtypes.TypeNumbers, (), rtypes.TypeNumbers, unary_ops, 
 #       Operation(check_unary_any, py=exec_object_unaryfunc))
 
-def check_unary_arith(in_type, op, out_type):#{{{
+def check_unary_arith(in_type, op):#{{{
     in_impli_cls = casts.findImplicitCastTypes(in_type.__class__)
     out_impli_cls = in_impli_cls
     
@@ -463,34 +396,18 @@ def check_unary_arith(in_type, op, out_type):#{{{
     if(not out_impli_cls):
         return False
   
-    if(out_type is None):
-        out_impli_cls = rtypes.mostSpecializedTypesCls(out_impli_cls)
-        assert len(out_impli_cls) == 1, "Multiple output types for " + \
-        "arithmetic operation found: " + str(out_impli_cls)
-        out_cls = out_impli_cls[0]
-        
-        out_type = out_cls(in_type.has_missing)
-    else:
-        if(isinstance(out_type, rtypes.TypeUnknown)):
-            if not out_type.__class__ in out_impli_cls:
-                return False
-            
-            if(not out_type.has_missing and 
-                in_type.has_missing):
-                return False
-        else:
-            if not out_type in out_impli_cls:
-                return False
- 
-            out_type = out_type(in_type.has_missing)
-
-    return out_type#}}}
+    out_impli_cls = rtypes.mostSpecializedTypesCls(out_impli_cls)
+    assert len(out_impli_cls) == 1, "Multiple output types for " + \
+    "arithmetic operation found: " + str(out_impli_cls)
+    out_cls = out_impli_cls[0]
+    
+    return out_cls(in_type.has_missing)#}}}
 
 
 def exec_unary_arith(data1, intype, outtype, op):
     return numpy_unary_arith[op](data1, sig=outtype.toNumpy())
 
-addOps(rtypes.TypeNumbers, (), rtypes.TypeNumbers, unary_ops, 
+addOps(rtypes.TypeNumbers, (), unary_ops, 
         Operation(check_unary_arith, py=exec_unary_arith))
 
 

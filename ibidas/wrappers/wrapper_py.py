@@ -117,8 +117,8 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             arguments[use_counters == 0] = None
         return res
 
-    def visitelse(self,node, *args, **kwargs):
-        raise RuntimeError, "Unknown node type encountered: " + node.__class__.__name__ + " with " + str(args) + " and " + str(kwargs)
+    def visitelse(self,node, **kwargs):
+        raise RuntimeError, "Unknown node type encountered: " + node.__class__.__name__ + " with  " + str(kwargs)
 
 
     def visitDataSlice(self,node):
@@ -173,11 +173,11 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
  
     def visitPackTupleSlice(self,node, slices):
         ndata = nested_array.co_mapseq(speedtuplify,[slice.data for slice in slices],res_type=node.type)
-        return slices[0].modify(data=ndata,rtype=node.type,dims=node.dims)
+        return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
     
     def visitHArraySlice(self,node, slices):
         ndata = nested_array.co_mapseq(speedarrayify,[slice.data for slice in slices],dtype=node.type.subtypes[0].toNumpy(), res_type=node.type)
-        return slices[0].modify(data=ndata,rtype=node.type,dims=node.dims)
+        return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
     def visitEnsureCommonDimSlice(self,node,slice,compare_slice):
         checkdim = node.dims[node.checkpos]
@@ -186,23 +186,34 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         otherpos = compare_slice.dims.index(checkdim)
         othershape = compare_slice.data.getDimShape(otherpos)
         assert numpy.all(selfshape == othershape), "Dimension mismatch in " + str(checkdim) + ":" + str(selfshape) + " != " + str(othershape)
-        return slice.modify(dims=node.dims)
+
+        ndata = slice.data.replaceDim(node.checkpos,checkdim)
+        return slice.modify(data=ndata,dims=node.dims)
 
     def visitBroadcastSlice(self,node,slice,compare_slices):
         repeat_dict = {}
+        dim_dict = {}
         bcpos = 0
         for pos,planelem in enumerate(node.plan):
             if(planelem == BCEXIST):
                 repeat_dict[pos] = compare_slices[bcpos].data.getDimShape(pos)
+                dim_dict[pos] = compare_slices[bcpos].dims[pos]
                 bcpos += 1
             elif(planelem == BCCOPY):
                 pass
             else:
                 raise RuntimeError, "Unknown broadcast plan element: " + str(planelem)
-        print repeat_dict, slice.data.dims
-        ndata = slice.data.broadcast(repeat_dict)
+        ndata = slice.data.broadcast(repeat_dict,dim_dict)
         return slice.modify(data=ndata,dims=node.dims)
 
+    def visitBinElemOpSlice(self,node, slices):
+        func = node.oper.exec_funcs["py"]
+        ndata = nested_array.co_mapseq(func,[slice.data for slice in slices],
+                                       type1=slices[0].type,type2=slices[1].type,
+                                       typeo=node.type,res_type=node.type,op=node.op,
+                                       bc_allow=True)
+        
+        return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
     def visitFixate(self,node,slices):
         res = []

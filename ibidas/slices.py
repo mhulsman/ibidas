@@ -220,15 +220,12 @@ def broadcast(slices,mode="pos",partial=False):
 
     nplans = []
     nslices = []
-    print bcplan
-    print bcdims
     for plan,slice in zip(bcplan,slices):
         nplan = []
         active_bcdims = []
         for dimpos, bcdim, planelem in zip(range(len(bcdims)),bcdims,plan):
             if(planelem == BCNEW):
                 ndim = dimensions.Dim(1,variable=0,has_missing=False,name=None)
-                print "IDS",dimpos,ndim
                 slice = InsertDimSlice(slice,dimpos,ndim)
                 active_bcdims.append(bcdim)
                 nplan.append(BCEXIST)
@@ -440,29 +437,48 @@ class AggregrateSlice(FuncSlice):
         ntype = type_func(slice.type, slice.dims[-ndim:], exec_func)
         FuncSlice.__init__(self, slice,dim,exec_func, type_func, ndims, ntype, *params, **kwds)
 
+class PackTupleSlice(MultiOpSlice):
+    __slots__ = ["to_python"]
+
+    def __init__(self, slices, field="data", to_python=False):
+        cdim = set([slice.dims for slice in slices])
+        assert len(cdim) == 1, "Packing tuple on slices with different dims"
+        
+        self.to_python=to_python
+
+        fieldnames = [slice.name for slice in slices]
+        subtypes = [slice.type for slice in slices]
+        ntype = rtypes.TypeTuple(False, tuple(subtypes), tuple(fieldnames))
+        nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
+        MultiOpSlice.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)
+
 class BinOpSlice(MultiOpSlice):
     __slots__ = []
-    def __init__(self, slice1, slice2, rtype=rtypes.unknown, dims=dimpaths.DimPath(), outidx=None):
+    def __init__(self, slice1, slice2, outtype=rtypes.unknown, dims=None, outidx=None):
         if(slice1.name == slice2.name):
             nname = slice1.name
         else:
             nname = "result"
             if(outidx):
                 nname += str(outidx)
-
+        
+        if(dims is None):
+            assert slice1.dims == slice2.dims, "Slice dims not equal, and no dim given"
+            dims = slice1.dims
         nbookmarks = slice1.bookmarks | slice2.bookmarks
-        MultiOpSlice.__init__(self, (slice1, slice2), name=nname, rtype=rtype, dims=dims, bookmarks=nbookmarks)
+
+        MultiOpSlice.__init__(self, (slice1, slice2), name=nname, rtype=outtype, dims=dims, bookmarks=nbookmarks)
 
 class BinElemOpSlice(BinOpSlice):
     __slots__ = ['oper', 'op']
 
-    def __init__(self, slice1, slice2, op, outtype=None, outidx=None):
-        ntype, oper = typeops.binop_type(slice1.type, slice2.type, op, outtype)
+    def __init__(self, slice1, slice2, op, outidx=None):
+        ntype, oper = typeops.binop_type(slice1.type, slice2.type, op)
+        
         dim1 = slice1.dims
         dim2 = slice2.dims
         if(len(dim1) < len(dim2)):
             dim2, dim1 = dim1, dim2
-
         assert all([d1 == d2 for d1, d2 in zip(dim1, dim2)]), \
                     "Dimensions of slices do not match"
         
