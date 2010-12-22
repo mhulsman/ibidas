@@ -55,7 +55,7 @@ class InsertDim(repops.UnaryOpRep):
             return
         
         assert len(dimpaths.uniqueDimPath([s.dims for s in source._slices],only_complete=False)) >= insertpoint, "No unique dimpath covering dim insertion point"
-        ndim = dimensions.Dim(1,variable=0,has_missing=False,name=None)
+        ndim = dimensions.Dim(1)
         nslices = []
         for slice in source._slices:
             slice = slices.InsertDimSlice(slice,insertpoint,ndim)

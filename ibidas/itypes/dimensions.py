@@ -1,7 +1,10 @@
 import copy
+import weakref
 
 from ..utils import util
 from ..constants import *
+
+_delay_import_(globals(),"dimpaths")
 
 
 #pylint: disable-msg=E1101
@@ -10,15 +13,15 @@ def getNewDimid():
     return dimid()
 class Dim(object):
     """Class representing a dimension."""
-    __slots__ = ['id', 'name', 'shape', 'variable', 'has_missing']
+    __slots__ = ['id', 'name', 'shape', 'dependent', 'has_missing','redim_cache']
     
-    def __init__(self, shape, variable=0, has_missing=False, did=None, name=None):
+    def __init__(self, shape, dependent=tuple(), has_missing=False, did=None, name=None):
         """Creates dimension class.
 
         Parameters
         ---------
         shape: shape of dimension. Can be integer >= 0 or UNDEFINED
-        variable: indicates the number of parent dimension this dim depends on
+        dependent: tuple of bools, indicating on which parent dimension this dim is dependent
         has_missing: indicates if there are Missing values
         did:   id of dimension, optional
         """
@@ -36,9 +39,69 @@ class Dim(object):
             self.name = name
         
         self.has_missing = has_missing
-        self.variable = variable
+        
+        assert (isinstance(dependent, tuple) and all([isinstance(elem,bool) for elem in dependent])), "Variable should be a tuple of bools"
+        while(dependent and dependent[-1] is False): #remove False at end, as they do not contribute
+            dependent = dependent[:-1]
+
+        self.dependent = dependent
         self.shape = shape
 
+    def isVariable(self):
+        return len(self.dependent) > 0
+
+    def __len__(self):
+        return len(self.dependent)
+    
+    def __iter__(self):
+        return self.dependent.__iter__()
+
+    def _getRedimCache(self):
+        try:
+            return self.redim_cache
+        except AttributeError:
+            self.redim_cache = weakref.WeakValueDictionary()
+            return self.redim_cache
+            
+
+    def removeDepDim(self, pos, elem_specifier):
+        if(pos >= len(self.dependent)):
+            return self
+
+        key = (0, pos, elem_specifier)
+        redim_cache = self._getRedimCache()
+        if(not key in redim_cache):
+            nself = self.copy(reid=self.dependent[pos] and (odim.shape != 1 or odim.isVariable()))
+            ndependent = self.dependent[:pos] + self.dependent[(pos + 1):]
+            while(ndependent[-1] is False):
+                ndependent = ndependent[:-1]
+            nself.dependent = ndependent
+            redim_cache[key] = nself
+
+        return redim_cache[key]
+    
+    def updateDepDim(self, pos, ndim):
+        if(pos >= len(self.dependent)):
+            return self
+        
+        key = (1,pos, ndim.id)
+        redim_cache = self._getRedimCache()
+        if(not key in redim_cache):
+            nself = self.copy(reid=self.dependent[pos])
+            redim_cache[key] = nself
+        return redim_cache[key]
+    
+    def insertDepDim(self, pos, ndim):
+        if(pos >= len(self.dependent)):
+            return self
+
+        redim_cache = self._getRedimCache()
+        key = (2, pos, ndim.id)
+        if(not key in redim_cache):
+            nself = self.copy()
+            nself.dependent = self.dependent[:pos] + (False,) + self.dependent[pos:]
+            redim_cache[self] = nself
+        return redim_cache[self]
 
     def copy(self, reid=False):
         """Returns a copy of this object"""
@@ -48,20 +111,22 @@ class Dim(object):
         return res
 
     def __eq__(self, other):
-        return (self.__class__ is other.__class__ and
-                self.id == other.id and self.variable == other.variable)
+        return (self.__class__ is other.__class__ and  self.id == other.id)
 
     def __hash__(self):
-        return hash(self.id) ^ hash(self.variable)
+        return hash(self.id)
 
     def __repr__(self):
-        if(self.variable and (self.shape > 1 or 
-                                self.shape == UNDEFINED)):
-            return self.name + ":~"
-        elif(self.variable):
-            return self.name + ":?"
+        if(self.dependent):
+            if(self.shape == 1):
+                res = self.name + ":?"
+            else:
+                res = self.name + ":~"
         elif(self.shape == UNDEFINED):
-            return self.name + ":*"
+            res = self.name + ":*"
         else:
-            return self.name + ":" + str(self.shape)
+            res = self.name + ":" + str(self.shape)
+        if(self.has_missing):
+            res += "$"
+        return res
             

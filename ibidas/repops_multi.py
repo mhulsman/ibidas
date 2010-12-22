@@ -56,4 +56,37 @@ class Binop(repops.MultiOpRep):
         
 
 
-        
+class Filter(repops.MultiOpRep):
+    def __init__(self,source,constraint,dim=None):
+        if(not isinstnace(constraint,representor.Representor)):
+            constraint = wrapper_py.rep(lsource)
+        repops.MultiOpRep.__init__(self,(source,constraint),dim=dim)
+
+    def process(self,sources,dim):
+        source,constraint = sources
+        if not source._state & RS_SLICES_KNOWN:
+            return
+        if not constraint._state & RS_TYPES_KNOWN:
+            return
+
+        assert len(constraint._slices) == 1, "Filter constraint should have 1 slice"
+        cslice = constraint._slices[0]
+
+        if(isinstance(cslice.type,rtypes.TypeBool)):
+            assert dim is None, "Cannot use bool or missing data type with specified filter dimension. Constraint dimension already specifies dimension."
+            ndim = dimensions.Dim(UNDEFINED, 
+                                  len(cslice.dims) - 1, False,
+                                  name = cslice.dims[-1].name
+                                  )
+
+            nslices = [slices.BoolFilter(slice,cslice,ndim) for slice in source._slices]
+        else:
+            pass
+                         
+        return self.initialize(tuple(nslices),source._state)
+                    
+
+
+
+
+

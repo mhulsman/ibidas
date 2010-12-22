@@ -150,7 +150,7 @@ class UnpackArraySlice(UnaryOpSlice):
         assert isinstance(stype, rtypes.TypeArray), "Cannot unpack slice " + \
                                 str(slice.name) + " as it is not an array"
         if(not stype.dims):
-            ndims = (dimensions.Dim(UNDEFINED, variable=1, 
+            ndims = (dimensions.Dim(UNDEFINED, variable=slice.dims, 
                                     has_missing=stype.has_missing),)
         else:
             ndims = stype.dims
@@ -176,12 +176,10 @@ class InsertDimSlice(UnaryOpSlice):
         assert len(slice.dims) >= matchpoint, "Matchpoint for dim insertion outside dimpath"
         assert ndim.shape == 1, "Length of inserted dim should be equal to 1"
         #FIXME: update va of type 
-        ndims = slice.dims[:matchpoint] + (ndim,) + slice.dims[matchpoint:].updateDimVariable()
-        ntype = slice.type.updateDimVariable(insertpoint=-(len(slice.dims) - matchpoint))
-
+        ndims = slice.dims.insertDim(matchpoint,ndim,node.type)
         self.matchpoint = matchpoint
         self.newdim = ndim
-        UnaryOpSlice.__init__(self,slice,rtype=ntype,dims=ndims)        
+        UnaryOpSlice.__init__(self,slice,rtype=slice.type,dims=ndims)        
 
 
 class EnsureCommonDimSlice(UnaryOpSlice):
@@ -189,19 +187,48 @@ class EnsureCommonDimSlice(UnaryOpSlice):
     def __init__(self,slice,refslices,checkpos,bcdim):
         self.checkpos = checkpos
         self.refslices = refslices
-        ndims = slice.dims[:checkpos] + dimpaths.DimPath(bcdim) + slice.dims[(checkpos + 1):]
+        ndims = slice.dims.updateDim(checkpos,bcdim,node.type)
         UnaryOpSlice.__init__(self, slice, dims=ndims)
 
 
 class BroadcastSlice(UnaryOpSlice):
-    __slots__ = ["refsliceslist","plan"]
+    __slots__ = ["refsliceslist","plan","bcdims"]
     
     def __init__(self,slice,refslices,plan,bcdims):
         self.refsliceslist = refslices
         self.plan = plan
+        self.bcdims = bcdims
         UnaryOpSlice.__init__(self, slice,dims=dimpaths.DimPath(*bcdims))
     
 
+class FilterSlice(UnaryOpSlice):
+    __slots__ = ["constraint","startpos"]
+
+    def __init__(self,slice,constraint,startpos,ndims):
+        self.constraint = constraint
+        self.startpos = startpos
+        UnaryOpSlice.__init__(self, slice,dims=dimpaths.DimPath(*ndims))
+   
+
+class BoolFilterSlice(UnaryOpSlice):
+    __slots__ = []
+
+    def __init__(self,slice,constraint,ndim):
+        startpos = source.dims.matchDimPath(constraint.dims)
+
+        ndims = list(source.dims)
+        for sp in startpos:
+            ndims[sp + len(constraint.dims) - 1] = ndim
+        FilterSlice.__init__(self, slice,constraint,startpos,dims=dimpaths.DimPath(*ndims))
+
+class SelFilterSlice(UnaryOpSlice):
+    __slots__ = []
+    
+    def __init__(self,slice,constraint,ndim):
+        ndims = list(source.dims)
+        for sp in startpos:
+            ndims[sp + len(constraint.dims) - 1] = ndim
+        FilterSlice.__init__(self, slice,constraint,startpos,dims=dimpaths.DimPath(*ndims))
 
 def broadcast(slices,mode="pos",partial=False):
     slicedimpaths = [s.dims for s in slices]
@@ -225,7 +252,7 @@ def broadcast(slices,mode="pos",partial=False):
         active_bcdims = []
         for dimpos, bcdim, planelem in zip(range(len(bcdims)),bcdims,plan):
             if(planelem == BCNEW):
-                ndim = dimensions.Dim(1,variable=0,has_missing=False,name=None)
+                ndim = dimensions.Dim(1)
                 slice = InsertDimSlice(slice,dimpos,ndim)
                 active_bcdims.append(bcdim)
                 nplan.append(BCEXIST)

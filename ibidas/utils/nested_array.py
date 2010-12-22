@@ -1,7 +1,7 @@
 import numpy
 import copy
 
-_delay_import_(globals(),"..utils","cutils","sparse_arrays")
+_delay_import_(globals(),"..utils","cutils","sparse_arrays","util")
 _delay_import_(globals(),"..utils.missing","Missing")
 _delay_import_(globals(),"..itypes","dimpaths","rtypes","dimensions")
 class NestedArray(object):
@@ -10,7 +10,7 @@ class NestedArray(object):
         self.cur_type = cur_type
 
         self.idxs = [0]
-        tdim = dimensions.Dim(1,variable=0,has_missing=False)
+        tdim = dimensions.Dim(1)
         self.dims = dimpaths.DimPath(tdim)
         
     def copy(self):
@@ -33,9 +33,9 @@ class NestedArray(object):
 
     def _curIdxDepth(self):
         if(isinstance(self.idxs[-1],int)):
-            return self.idxs[-1]+1
+            return self.idxs[-1] + 1
         else:
-            return 0
+            return 1
 
     def replaceDim(self,pos,ndim):
         pos += 1
@@ -208,9 +208,9 @@ class NestedArray(object):
         idxs = nself.idxs + [nself.data]
         curidx = idxs[matchpoint-1]
         if(isinstance(curidx,int)):
-            newidx = curidx + 1
+            newidx = curidx+1
         else:
-            newidx = 0
+            newidx = 1
         nself.idxs.insert(matchpoint,newidx)
         for pos in range(matchpoint+1,len(nself.idxs)):
             tidx = nself.idxs[pos]
@@ -248,33 +248,39 @@ class NestedArray(object):
                     nself._apply_tile_broadcast(tilerepeats,nextpos,prev_repeat)
                     nextpos,nextobj = nself._get_next_obj(pos)
                     
-                    #collapse first dims
+                    #perform some checks
                     ntr = len(tilerepeats)
-                    cshape = nextobj.shape
-                    assert cshape[len(tilerepeats)] == 1, "Varbroadcast on full dimension not possible"
-                    nshape = (numpy.multiply.reduce(cshape[:ntr]),) + cshape[ntr:]
-                    nextobj.shape = nshape
+                    assert nextobj.shape[ntr] == 1, "Varbroadcast on full dimension not possible"
+                    assert repeat.shape[:-1] == nextobj.shape[:ntr],"Index shapes should match"
+
+                    #collapse first dims
+                    nextobj = dimpaths.flatFirstDims(nextobj,ntr)
 
                     #replace new idx
-                    assert repeat.shape[:-1] == cshape[:ntr],"Index shapes should match"
                     nself.idxs[pos] = repeat
-                    
-                    temp_repeat = repeat.reshape((numpy.multiply.reduce(cshape[:ntr]),2))
+                  
+                    #calculate var array lengths
+                    temp_repeat = dimpaths.flatFirstDims(repeat,len(repeat.shape)-2)
                     varlength = temp_repeat[:,1] - temp_repeat[:,0]
 
                     #repeat nextobj
-                    nextobj = numpy.repeat(nextobj,varlength)
+                    nextobj = numpy.repeat(nextobj,varlength,axis=0)
 
                     if(nextpos == len(self.idxs)):
                         nself.data = nextobj
                     else:
                         nself.idxs[pos] = nextobj
+                    #update idxs 
+                    for p in range(pos+1,nextpos):
+                        nself.idxs[p] = p - pos
+
                     prev_repeat=True
-                    tilerepeats = []
+                    tilerepeats = [1]
             else:
                 assert repeat == 1, "Broadcast of full dimension not possible"
                 nself._apply_tile_broadcast(tilerepeats,pos,prev_repeat)
                 prev_repeat=True
+                tilerepeats = [1]
         
         if(tilerepeats):
             nself._apply_tile_broadcast(tilerepeats,len(self.idxs),prev_repeat)
@@ -362,10 +368,8 @@ class NestedArray(object):
 def co_mapseq(func, nested_arrays, *args, **kwargs):
     restype= kwargs.pop("res_type")
     dtype=restype.toNumpy()
-    
     bc_allow=kwargs.pop("bc_allow",False)
     dimpath_set = set([na.dims[1:] for na in nested_arrays])
-    
     data = []
     if not len(dimpath_set) == 1:
         if(not bc_allow is True):

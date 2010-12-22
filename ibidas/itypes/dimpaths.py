@@ -7,6 +7,8 @@ _delay_import_(globals(),"dimensions","Dim")
 _delay_import_(globals(),"..slices")
 _delay_import_(globals(),"..utils","toposort","util")
 
+class PathError(Exception):
+    pass
 
 class DimPath(tuple):
     def __new__(cls, *dims):
@@ -16,12 +18,17 @@ class DimPath(tuple):
     def _getNames(self):
         return [dim.name for dim in self]
     names = property(fget=_getNames)
+    
+    def _getIDs(self):
+        return [dim.id for dim in self]
+    ids = property(fget=_getIDs)
 
     def hasName(self,name):
         return any([dim.name == name for dim in self])
 
     def getDimByName(self,name):
         return self[self.names.index(name)]
+
     def getDimIndexByName(self,name):
         dimnames = self.names
         try:
@@ -48,7 +55,7 @@ class DimPath(tuple):
     def __add__(self, other):
         return DimPath(*tuple.__add__(self,other))
 
-    def __contains__(self,part):
+    def __contains__(self,part):#{{{
         if(isinstance(part,DimPath)):
             pos = -1
             try:
@@ -58,9 +65,9 @@ class DimPath(tuple):
                 return False
             return True
         else:
-            return tuple.__contains__(self,part)
+            return tuple.__contains__(self,part)#}}}
 
-    def changeNames(self,newname_dict):
+    def changeNames(self,newname_dict):#{{{
         newpath = []
         for dim in self:
             if(dim in newname_dict):
@@ -70,34 +77,59 @@ class DimPath(tuple):
                 dim = dim.copy()
                 dim.name = newname_dict[dim.name]
             newpath.append(dim)
-        return DimPath(*newpath)
-
-    def updateDimVariable(self,insertsize=1,insertpoint=0):
+        return DimPath(*newpath)#}}}
+    
+    def removeDim(self, pos, elem_specifier=None, subtype=None):#{{{
         ndims = []
-        found = False
-        for pos in xrange(len(self)):
-            dim = self[pos]
-            if(dim.variable > (pos - insertpoint)):
-                found = True
-                ndim = dim.copy(reid=False)
-                ndim.variable += insertsize
-            else:
-                ndim = dim
-            ndims.append(ndim)     
-        if(not found): 
-            return self
-        else:
-            return DimPath(*ndims)
+        for p in xrange(max(pos + 1,0), len(self)):
+            ndims.append(self[p].removeDepDim(p - pos, elem_specifier))
 
-    def contigiousFixedNDims(self):
+        res = self[:max(pos,0)] + DimPath(*ndims)
+        if(not subtype is None):
+            subtype = subtype.removeDepDim(len(self) - pos, elem_specifier)
+            return (res,subtype)
+        else:
+            return res#}}}
+
+    def updateDim(self, pos, ndim, subtype=None):#{{{
+        if(pos < 0 or self[pos].id != ndim.id):
+            ndims = []
+            for p in xrange(max(pos + 1,0), len(self)):
+                ndims.append(self[p].updateDepDim(p - pos, ndim))
+
+            if(not subtype is None):
+                subtype = subtype.updateDepDim(len(self) - pos, ndim)
+            res = self[:max(pos,0)] + (ndim,) + DimPath(*ndims)
+        else:
+            res = self[:pos] + (ndim,) + self[(pos + 1):]
+        if(not subtype is None):     
+            return (res,subtype)
+        else:
+            return res#}}}
+    
+    def insertDim(self, pos, ndim, subtype=None):#{{{
+        ndims = []
+        for p in xrange(max(pos + 1,0), len(self)):
+            ndims.append(self[p].insertDepDim(p - pos, ndim))
+
+        res = self[:max(pos,0)] + (ndim,) + DimPath(*ndims)
+        if(not subtype is None):
+            subtype = subtype.insertDepDim(len(self) - pos, ndim)
+            return (res,subtype)
+        else:
+            return res#}}}
+
+    def contigiousFixedNDims(self):#{{{
+        """Returns number of contigious non-variable non-missing dims from 
+        start of path"""
         depth = 0
         #maximize array size with fixed dims
-        while(depth < len(self) and not self[depth].variable and not 
+        while(depth < len(self) and not self[depth].isVariable() and not 
                 self[depth].has_missing):
             depth+=1
-        return depth
+        return depth#}}}
     
-    def matchDimPath(self, dimpath):#{{{
+    def matchDimPath(self, dimpath):#{{{#{{{
         """Matches dimpath exactly to dim paths in slices.
         Returns a list containing start positions
         """
@@ -118,8 +150,46 @@ class DimPath(tuple):
                 startpos.append(curstart)
                 pos = curstart + nmpath
         
-        return startpos#}}}
-   
+        return startpos#}}}#}}}
+  
+    #def maxMatchedSuffix(self,other):#{{{
+    #    
+    #    reversed_dimpath = self[::-1]
+    #    selfpos = 0
+    #    for pos in xrange(len(other)):
+    #        try:
+    #            selfpos = reversed_dimpath.index(other[-(pos + 1)],selfpos)
+    #            selfpos += 1
+    #        except ValueError:
+    #            break
+    #    if(pos == 0):
+    #        maxmatch = DimPath()
+    #    else:            
+    #        maxmatch = other[-(pos + 2):]
+    #
+    #    maxmatch.validPath()
+    #    return maxmatch#}}}
+
+    def completePath(self):#{{{
+        for pos in xrange(len(self)):
+            if(len(self[pos]) > pos):
+                return False
+        return True            
+                
+    def splitSuffix(self,minlength=1):#{{{
+        assert minlength <= len(self), "Minlength too large in splitSuffix"
+
+        rev_self = self[::-1]
+        rev_suffix = []
+        curpos = 0
+        while len(rev_suffix) < minlength:
+            assert curpos < len(rev_self), "Cannot find complete suffix"
+            dim = rev_self[curpos]
+            minlength = max(len(dim) + curpos,minlength)
+            rev_suffix.append(dim)
+                
+        return DimPath(*rev_suffix[::-1])                #}}}
+
 def commonDimPath(dimpaths):#{{{
     """Returns common dimensions shared by all slices"""
     pos = 0
@@ -154,7 +224,10 @@ def uniqueDimPath(dimpaths,only_complete=True):#{{{
      
     return path#}}}
 
-def planBroadcastMatchPos(paths,partial=False):
+def planBroadcastMatchPos(paths,partial=False):#{{{
+    """Matches dims in paths based on their position.
+    Returns new set of dims and broadcast plan."""
+
     maxlen = max([len(path) for path in paths])
     plans = [[] for path in paths]
     bcdims = [None] * maxlen
@@ -188,9 +261,12 @@ def planBroadcastMatchPos(paths,partial=False):
                 plan.append(BCCOPY)
         bcdims[curpos] = bcdim 
         curpos +=1 
-    return (bcdims, plans)        
+    return (bcdims, plans)        #}}}
 
-def planBroadcastMatchDim(paths,partial=False):
+def planBroadcastMatchDim(paths,partial=False):#{{{
+    """Matches dims in paths based on their identity, as well
+    as their potential to be used as broadcast dimension (shape == 1).
+    Returns new set of dims and broadcast plan"""
     graph = toposort.StableTopoSortGraph()
 
     #a dim can occur multiple times in dag, to prevent cycles
@@ -286,28 +362,31 @@ def planBroadcastMatchDim(paths,partial=False):
                 plan.append(BCNEW)
 
         plans.append(plan)
-    return (bcdims,plans)
+    return (bcdims,plans)#}}}
 
-def flatFirstDims(array,ndim):
+def flatFirstDims(array,ndim):#{{{
+    """Flattens first ndim dims in numpy array into next dim"""
     oshape = array.shape
     ndim = ndim + 1
     rshape = (int(numpy.multiply.reduce(array.shape[:ndim])),) + array.shape[ndim:]
-    return array.reshape(rshape)
+    return array.reshape(rshape)#}}}
 
-def createDimSet(sourcepaths):
+def createDimSet(sourcepaths):#{{{
+    """Create set of all dims in sourcepaths"""
     dimset = set()
     for dimpath in sourcepaths:
         dimset.update(dimpath)
-    return dimset
+    return dimset#}}}
 
-def createDimParentDict(sourcepaths):
+def createDimParentDict(sourcepaths):#{{{
+    """Create dictionary containing for each dim in sourcepaths 
+    the previous occuring dims  in a  list"""
     parents = defaultdict(list)
     for dimpath in sourcepaths:
         parents[dimpath[0]].append(None)
         for pos in xrange(1,len(dimpath)):
             parents[dimpath[pos]].append(dimpath[pos-1])
-    return parents
-
+    return parents#}}}
 
 def identifyDimPath(sourcepaths, dim_selector=None):#{{{
     """Identifies a dim, using dim_selector. 
@@ -420,7 +499,7 @@ def identifyDimPathHelper(sourcepaths, path):#{{{
             if not dim in dimset:
                 return False
         else: #convert str to dim
-            dims = [d for d in dimset if d.name == dim]
+            dims = set([d for d in dimset if d.name == dim])
             if(len(dims) > 1): #multiple matches for dim name. Try them all.
                 sresults = []
                 for dim in dims:
@@ -436,7 +515,7 @@ def identifyDimPathHelper(sourcepaths, path):#{{{
                 reslist.extend(sresults[0][::-1]) #only one result, add dim path to reslist
                 break #all matching was done recursively, we are done here
             elif(len(dims) == 1):
-                dim = iter(dims).next()
+                dim = dims.pop()
             else:
                 return False
                 
@@ -474,22 +553,18 @@ def identifyDimPathHelper(sourcepaths, path):#{{{
     
     #if dims in reslist are variable, we have to make certain their base dimensinos
     #are available
-    add_remaining = 0
-    for dim in reslist:
-        add_remaining -= 1 
-        add_remaining = max(add_remaining, dim.variable)
-
-    #add remaining dimensions 
-    while(add_remaining):
-        add_remaining -= 1
+    minlength = len(reslist)
+    curpos = 0
+    while len(reslist) < minlength:
         pdims = dimparents[reslist[-1]]
-        if(len(pdims) > 1):
-            return True
-        else:
+        if(len(pdims) == 1):
             dim = iter(pdims).next()
-            if(dim is None):
-                raise RuntimeError, "Cannot add needed remaining dimensions. Bug?"
-            add_remaining = max(add_remaining, dim.variable)
+            assert not dim is None, "Cannot find complete suffix"
             reslist.append(dim)
-    return tuple(reslist[::-1])
+        else:
+            return True
+        minlength = max(len(dim) + curpos,minlength)
+        reslist.append(dim)
+            
+    return DimPath(*reslist[::-1])
 #}}}

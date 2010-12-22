@@ -49,6 +49,7 @@ import operator
 from collections import defaultdict
 
 from ..constants import *
+from ..thirdparty.spark import GenericScanner, GenericParser
 
 _delay_import_(globals(),"dimensions")
 _delay_import_(globals(),"dimpaths")
@@ -82,9 +83,6 @@ def addType(newtypecls):
 _type_attribute_common = {}
 def addTypeAttribute(name, common_visitor):
     _type_attribute_common[name] = common_visitor
-
-
-
 
 class TypeUnknown(object):#{{{
     """Type which represents that no information is known about the values.
@@ -167,10 +165,13 @@ class TypeUnknown(object):#{{{
     def getArrayDimPath(self):
         return dimpaths.DimPath()
 
-    def redim_var(self, deplen, var_adapt, redim_cache):
+    def removeDepDim(self, pos, elem_specifier):
         return self
 
-    def updateDimVariable(self,insertsize=1,insertpoint=0):
+    def updateDepDim(self, pos, ndim):
+        return self
+
+    def insertDepDim(self, pos, ndim):
         return self
 
     def __repr__(self):
@@ -197,6 +198,10 @@ class TypeAny(TypeUnknown):#{{{
         TypeUnknown.__init__(self)
         self.has_missing = has_missing
         self.data_state = attr.pop("data_state",DATA_NORMAL)
+        if "subtypes" in attr:
+            raise RuntimeError, "Subtypes: " + str(attr['subtypes']) + " given for non-subtypeable type " + str(self)
+        if "dims" in attr:
+            raise RuntimeError, "Dims: " + str(attr['dims']) + " given for non-dimensional type " + str(self)
         self.attr = attr
 
     def __getattr__(self,name):
@@ -468,19 +473,36 @@ class TypeTuple(TypeAny):#{{{
         return res
     
 
-    def redim_var(self, deplen, var_adapt, redim_cache):
-        return self.__class__(self.has_missing, 
-                              tuple([subtype.redim_var(deplen, var_adapt, redim_cache) 
-                                     for subtype in self.subtypes]), 
-                              self.fieldnames, **self.attr)
-        
+    def removeDepDim(self, pos, elem_specifier):
+        nsubtypes = [subtype.removeDepDim(pos, elem_specifier) for subtype in self.subtypes]
+        for pos in xrange(len(nsubtypes)):
+            if(not nsubtypes[pos] is self.subtypes[pos]):
+                break
+        else:
+            return self
 
-    def updateDimVariable(self,insertsize=1,insertpoint=0):
-         return self.__class__(self.has_missing, 
-                              tuple([subtype.updateDimVariable(insertsize,insertpoint) 
-                                     for subtype in self.subtypes]), 
-                              self.fieldnames, **self.attr)
-        
+        return self.__class__(self.has_missing, tuple(nsubtypes), self.fieldnames, **self.attr)
+    
+    def updateDepDim(self, pos, ndim):
+        nsubtypes = [subtype.updateDepDim(pos, ndim) for subtype in self.subtypes]
+        for pos in xrange(len(nsubtypes)):
+            if(not nsubtypes[pos] is self.subtypes[pos]):
+                break
+        else:
+            return self
+
+        return self.__class__(self.has_missing, tuple(nsubtypes), self.fieldnames, **self.attr)
+    
+    def insertDepDim(self, pos, ndim):
+        nsubtypes = [subtype.insertDepDim(pos, ndim) for subtype in self.subtypes]
+        for pos in xrange(len(nsubtypes)):
+            if(not nsubtypes[pos] is self.subtypes[pos]):
+                break
+        else:
+            return self
+
+        return self.__class__(self.has_missing, tuple(nsubtypes), self.fieldnames, **self.attr)
+      
     def __repr__(self):
         res = '(' 
         if(len(self.fieldnames) == len(self.subtypes)):
@@ -536,7 +558,7 @@ class TypeArray(TypeAny):#{{{
         no similarities with dimensions in other types, should be left empty.
         """
         assert isinstance(dims, dimpaths.DimPath), \
-                "Dims of an array should be a tuple"
+                "Dims of an array should be a dimpath"
         assert all([isinstance(dim, dimensions.Dim) for dim in dims]), \
                 "Dims tuple should contain Dim objects"
         assert isinstance(subtypes, tuple) and len(subtypes) == 1, \
@@ -694,42 +716,21 @@ class TypeArray(TypeAny):#{{{
 
     def getArrayDimPath(self):
         return self.dims + self.subtypes[0].getArrayDimPath()
-    
-    def redim_var(self, deplen, var_adapt, redim_cache):
-        """Redim nested dimension, in response to change/removal of parent dim(s)
-           deplen: distance from (nearest) parent dim that was changed/removed
-           var_adapt: list with adaptions of dims.variable distances, w.r.t to parent dims.
-                      E.g, nested dim dependent only on last parent dim uses var_adapt[0],
-                      nested dim depnedent on last two, uses var_adapt[1], etc.
-                      Parent dims are indicated by deplen
-           redim_cache: store translation from old dims to new dims
-        """
-        stype = self.subtypes[0].redim_var(deplen + len(self.dims), var_adapt, redim_cache)
-        ndims = []
-        var_found = False
-        for pos, dim in enumerate(self.dims):
-            var_found = True
-            if dim.variable - (deplen + pos) > 0:
-                if(dim in redim_cache):
-                    ndims.append(redim_cache[dim])
-                else:
-                    ndim = dim.copy(reid=True)
-                    ndim.variable = max(ndim.variable + var_adapt[min(dim.variable - (deplen + pos) - 1, len(var_adapt)-1)],0)
-                    ndims.append(ndim)
-                    redim_cache[dim] = ndim
-            else:
-                ndims.append(dim)
-        if(var_found or stype != self.subtypes[0]):
-            self = self.copy()
-            self.subtypes = (stype,)
-            self.dims = tuple(ndims)
+  
+    def removeDepDim(self, pos, elem_specifier):
+        stype = self.subtypes[0].removeDepDim(pos - len(self.dims), elem_specifier)
+        ndims = self.dims.removeDepDim(pos,elem_specifier)
+        if(ndims is self.dims and stype is self.subtypes[0]):
             return self
         else:
+            self = self.copy()
+            self.subtypes = (stype,)
+            self.dims = ndims
             return self
-    
-    def updateDimVariable(self, insertsize=1,insertpoint=0):
-        stype = self.subtypes[0].updateDimVariable(insertsize,insertpoint + len(self.dims))
-        ndims = self.dims.updateDimVariable(insertsize,insertpoint)
+     
+    def updateDepDim(self, pos, ndim):
+        stype = self.subtypes[0].updateDepDim(pos - len(self.dims), ndim)
+        ndims = self.dims.updateDepDim(pos,ndim)
         if(ndims is self.dims and stype is self.subtypes[0]):
             return self
         else:
@@ -738,6 +739,17 @@ class TypeArray(TypeAny):#{{{
             self.dims = ndims
             return self
 
+    def insertDepDim(self, pos, ndim):
+        stype = self.subtypes[0].insertDepDim(pos - len(self.dims), ndim)
+        ndims = self.dims.insertDepDim(pos, ndim)
+        if(ndims is self.dims and stype is self.subtypes[0]):
+            return self
+        else:
+            self = self.copy()
+            self.subtypes = (stype,)
+            self.dims = ndims
+            return self
+         
     def __repr__(self, unpack_depth=0):
         
         res = '[' + ",".join([str(dim) for dim in self.dims]) + ']'
@@ -757,8 +769,9 @@ class TypeSet(TypeArray):#{{{
     name = "set"
     
     def __init__(self, has_missing=False, dims=(), subtypes=(unknown,), **attr):
+
         assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
-                "Dimensions of a set should be a tuple of size 1"
+                "Dimensions of a set should be a dimpath of size 1"
         
         assert subtypes and len(subtypes) == 1, \
                  "Number of subtypes should be 1"
@@ -769,7 +782,6 @@ class TypeSet(TypeArray):#{{{
     def getArrayDimPath(self):
         return dimpaths.DimPath()
 
-   
     def __repr__(self):
         res = ""
         if(self.has_missing):
@@ -788,7 +800,7 @@ class TypeString(TypeArray):#{{{
     
     def __init__(self, has_missing=False, dims=(), **attr):
         assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
-            "Dimensions of a string should be a tuple of size 1"
+            "Dimensions of a string should be a dimpath of size 1"
         TypeArray.__init__(self, has_missing, dims, 
                                     (TypeChar(),), **attr)
 
@@ -1079,6 +1091,12 @@ IN_DIM = 4
 OUT_DIM = 5
 IN_SUBTYPE_DIM = 6
 
+
+
+
+
+
+
 def createType(name):#{{{
     """Creates a type object from string representation.
 
@@ -1112,211 +1130,454 @@ def createType(name):#{{{
         else:
             raise TypeError,"Unknown type description: " + str(name)
 
-    return _createType(name)[0]#}}}
+    return _createType(name)#}}}
 
-def _createType(name, last_dims=()):#{{{
-    begin_pos = 0
-    state = NO_NAME
+
+class Token(object):#{{{
+    def __init__(self, type, attr=None):
+        self.type = type
+        self.attr = attr
+
+    def __cmp__(self,o):
+        return cmp(self.type,o)
     
-    typecls = None
-    type_has_missing = False
-    type_need_freeze = True
+    def __getitem__(self,pos):
+        raise IndexError
 
-    subtypes = None
-    dimlist = None
-    fieldnames = None
+    def __len__(self):
+        return 0
 
-    pos = -1
-    name_len = len(name)
-    fieldname = None
-    while pos < (name_len - 1):
-        pos += 1
-        curchar = name[pos]
-        if(curchar == "="):
-            if(state == NO_NAME):
-                fieldname = name[begin_pos:pos].strip()
-                begin_pos = pos + 1
-                continue
-            assert False, "Encountered unexpected " + \
-                                        curchar + " at: " + str(pos)
-        elif(curchar == "["): #start array type
-            if(state == NO_NAME):
-                if(begin_pos == pos):
-                    typecls = __typenames__["array"]
-                else:
-                    typecls = __typenames__[name[begin_pos:pos].strip()]
-                state = INDIM
-                dim_name = None
-                dimlist = []
-                begin_pos = pos + 1
-                continue
-            assert False, "Encountered unexpected " + \
-                                        curchar + " at: " + str(pos)
-        elif(curchar == "]"):
-            if(state == INDIM):
-                shape = name[begin_pos:pos].strip()
-                if(shape):
-                    dim_variable = 0
-                    if shape == "~" or shape == "?":
-                        dim_variable = 1
-                        if(shape == "?"):
-                            dim_shape = 1
-                        else:
-                            dim_shape = UNDEFINED
-                    elif(shape == "*"):
-                        dim_shape = UNDEFINED
-                    else:
-                        dim_shape = int(shape)
-                        assert dim_shape > 0, "Shape should be larger " + \
-                                        "than 0 (at pos: " + str(pos) + ")"
-                else:
-                    dim_variable = 0
-                    dim_shape = UNDEFINED
-                dimlist.append(dimensions.Dim(dim_shape, 
-                                              dim_variable, did = dim_name))
-                begin_pos = pos + 1
-                state = NAME_FOUND 
-                continue
-            assert False, "Encountered unexpected " + \
-                                        curchar + " at: " + str(pos)
-        elif(curchar == ":"):
-            if(state == INDIM):
-                dim_name = name[begin_pos:pos].strip()
-                begin_pos = pos + 1
-                continue
-            elif(state == NAME_FOUND):
-                assert not name[begin_pos:pos].strip(), \
-                    "Unexpected chars found before : " + "at pos: " + str(pos)
-                subtypes = []
-                begin_pos = pos + 1
-                subtype, npos, fname = _createType(name[begin_pos:])
-                subtypes.append(subtype)
-                begin_pos = pos + npos + 1
-                pos = begin_pos - 1
-                continue
-            assert False, "Encountered unexpected " + \
-                                        curchar + " at: " + str(pos)
-        elif(curchar == ","):
-            if(state == INDIM):
-                shape = name[begin_pos:pos].strip()
-                if(shape):
-                    if shape == "~" or shape == "?":
-                        dim_variable = 1
-                        if(shape == "?"):
-                            dim_shape = 1
-                        else:
-                            dim_shape = UNDEFINED
-                    elif(shape == "*"):
-                        dim_shape = UNDEFINED
-                    else:
-                        dim_shape = int(shape)
-                        assert dim_shape > 0, "Shape should be larger " + \
-                                           "than 0 (at pos: " + str(pos) + ")"
-                else:
-                    dim_variable = 1
-                    dim_shape = UNDEFINED
-                begin_pos = pos + 1
-                dimlist.append(dimensions.Dim(dim_shape, 
-                                              dim_variable, did = dim_name)) 
-                continue
-            elif(state == INSUBTYPES):
-                assert not name[begin_pos:pos].strip(), \
-                    "Unexpected characters before ) at " + str(pos)
-                begin_pos = pos + 1
-                (subtype, npos, fname) = _createType(name[begin_pos:], last_dim)
-                subtypes.append(subtype)
-                fieldnames.append(fname)
-                begin_pos = pos + npos + 1
-                pos = begin_pos - 1
-                continue
-            elif(state == NO_NAME or state == NAME_FOUND):
-                if(state == NO_NAME):
-                    typecls = __typenames__[name[begin_pos:pos].strip()]
-                    state = NAME_FOUND
-                break
-            assert False, "Encountered unexpected " + \
-                                        curchar + " at: " + str(pos)
-        elif(curchar == "$"):
-            if(state == NO_NAME):
-                typecls = __typenames__[name[begin_pos:pos].strip()]
-                state = NAME_FOUND
-            if(state == NAME_FOUND):
-                begin_pos = pos + 1
-                type_has_missing = True
-                continue
-            assert False, "Encountered unexpected " + \
-                                        curchar + " at: " + str(pos)
-        elif(curchar == "!"):
-            if(state == NO_NAME):
-                typecls = __typenames__[name[begin_pos:pos].strip()]
-                state = NAME_FOUND
-            if(state == NAME_FOUND):
-                begin_pos = pos + 1
-                type_need_freeze = False
-                continue
-            assert False, "Encountered unexpected " + \
-                                        curchar + " at: " + str(pos)
-        elif(curchar == "("):
-            if(state == NO_NAME or state == NAME_FOUND):
-                if(state == NO_NAME):
-                    if(begin_pos == pos):
-                        typecls = __typenames__["tuple"]
-                    else:
-                        typecls = __typenames__[name[begin_pos:pos].strip()]
-                state = INSUBTYPES
-                subtypes = []
-                fieldnames = []
-                last_dim = ()
-                begin_pos = pos + 1
-                
-                (subtype, npos, fname) = _createType(name[begin_pos:], last_dim)
-                subtypes.append(subtype)
-                fieldnames.append(fname)
-                begin_pos = pos + npos + 1
-                pos = begin_pos - 1
-                continue
-            assert False, "Encountered unexpected " + \
-                                        curchar + " at: " + str(pos)
-                
-        elif(curchar == ")"):
-            if(state == INSUBTYPES):
-                assert not name[begin_pos:pos].strip(), \
-                    "Unexpected characters before ) at " + str(pos)
-                begin_pos = pos + 1
-                state = NAME_FOUND
-                continue
-            elif(state == NO_NAME or state == NAME_FOUND):
-                if(state == NO_NAME):
-                    typecls = __typenames__[name[begin_pos:pos].strip()]
-                    state = NAME_FOUND
-                break
-        continue
-
-
-
-    if(state == NO_NAME):
-        if(len(name) == 0):
-            return unknown
+    def __repr__(self):
+        if(self.attr is None):
+            return str(self.type)
         else:
-            typecls = __typenames__[name]
+            return str(self.type) + ":" + str(self.attr)#}}}
+
+class AST(object):#{{{
+    def __init__(self, type, kids=tuple()):
+        self.type = type
+        self.kids = kids
+
+    def __getitem__(self,pos):
+        return self.kids[pos]
+
+    def __len__(self):
+        return len(self.kids)
+
+    def __repr__(self):
+        return str(self.type) + str(self.kids)#}}}
+
+class TypeStringScanner(GenericScanner):#{{{
+    def tokenize(self, input):
+        self.rv = []
+        GenericScanner.tokenize(self,input)
+        return self.rv
+
+    def t_whitespace(self,s):
+        r' \s+ '
+        pass
+
+    def t_name(self,s):
+        r' [a-zA-Z_][a-zA-Z_\d]* '
+        t = Token(type='name',attr=s)
+        self.rv.append(t)
+
+    def t_integer(self,s):
+        r' \d+ '
+        t = Token(type="integer",attr=int(s))
+        self.rv.append(t)
+
+    def t_symbol(self,s):
+        r' \= | \? | \. | \{ | \} | \< | \[ | \] | \( | \) | \, | \* | \~ | \$ | \! | \: '
+        t = Token(type=s)
+        self.rv.append(t)#}}}
+    
+class TypeStringParser(GenericParser):#{{{
+    def __init__(self, start="typenest"):
+        GenericParser.__init__(self, start)
+
+    def p_type_1(self,args):
+        ' type ::= name '
+        return AST(type="createtype",kids=args[:1])
+    
+    def p_type_1b(self,args):
+        ' type ::= ? '
+        return AST(type="createtype",kids=args[:1])
+
+    def p_type_2(self,args):
+        ' type ::= type $ '
+        return AST(type="hasmissing", kids=args[:1])
+
+    def p_type_3(self,args):
+        ' type ::= type [ dimlist ] '
+        return AST(type="dims",kids=(args[0], args[2]))
+
+    def p_type_4(self,args):
+        ' type ::= type ( typelist ) '
+        return AST(type="subtypes",kids=(args[0], args[2]))
+    
+    def p_type_6(self,args):
+        ' type ::= [ dimlist ] '
+        return AST(type="dims",kids=(
+            AST(type="createtype", kids=(Token(type="name",attr="array"),)), args[1]))
+    
+    def p_type_7(self,args):
+        ' type ::= { dimlist } '
+        return AST(type="dims",kids=(
+            AST(type="createtype", kids=(Token(type="name",attr="set"),)), args[1]))
+    
+    def p_type_8(self,args):
+        '''
+            type ::= name : type 
+            type ::= name = type 
+        '''
+        return AST(type="namedtype",kids=(args[2], args[0]))
+    
+    def p_type_9(self,args):
+        ' type ::= ( typelist ) '
+        return AST(type="subtypes",kids=(
+            AST(type="createtype", kids=(Token(type="name",attr="tuple"),)), args[1]))
+
+    def p_type_10(self,args):
+        ' type ::= type [ ] '
+        return AST(type="dims",kids=(args[0],))
+    
+    def p_typenest_1(self,args):
+        ' typenest ::= type '
+        return AST(type="typenest",kids=(args[0],))
+        
+
+    def p_typenest_2(self,args):
+        ' typenest ::= typenest < type '
+        return AST(type="typenest",kids=(args[0],args[2]))
+
+    def p_var_1(self,args):
+        ''' 
+            var ::= .
+            var ::= *
+        '''
+        return args[0]
+        
+    def p_varlist_1(self,args):
+        ''' 
+            varlist ::= var
+        '''
+        return AST(type="varlist",kids=args[:1])
+    
+    def p_varlist_2(self,args):
+        ''' 
+            varlist ::= varlist var
+        '''
+        return AST(type="varlist",kids=args)
 
 
-    params = {}
-    if(not subtypes is None):
-        params['subtypes'] = tuple(subtypes)
-    if(not fieldnames is None):
-        if(not all(fieldname is None for fieldname in fieldnames)):
-            params['fieldnames'] = fieldnames
-    if(not dimlist is None):
-        params['dims'] = dimpaths.DimPath(*dimlist)
-    if(not typecls is TypeUnknown):
-        params['has_missing'] = type_has_missing
-        if(type_need_freeze is False):
-            params['need_freeze'] = type_need_freeze
-        return (typecls(**params), pos, fieldname)
-    else:
-        assert (len(params) == 0), "Unknown with extra parameters?"
-        return (unknown, pos, fieldname)#}}}
+    def p_dim_1(self,args):
+        ''' 
+            dim ::= integer 
+            dim ::= ~
+            dim ::= varlist
+        '''
+        return AST(type="createdim",kids=(args[0],))
+
+    def p_dim_2(self,args):
+        ''' nameddim ::= name : dim '''
+        return AST(type="namedim",kids=(args[2], args[0]))
+    
+    def p_dim_3(self,args):
+        ''' nameddim ::= dim '''
+        return args[0]
+    
+    def p_dim_4(self,args):
+        ''' nameddim ::= name '''
+        return AST(type="namedim",kids=(
+            AST(type="createdim", kids=(Token(type="inherit"),)), args[0]))
+   
+    def p_dim_5(self,args):
+        ''' nameddim ::= nameddim  $ '''
+        return AST(type="hasmissing",kids=args[:1])
+
+    def p_dimlist_1(self,args):
+        ''' dimlist ::= nameddim '''
+        return AST(type="dimlist",kids=(args[0],))
+
+    def p_dimlist_2(self,args):
+        ''' dimlist ::= dimlist , nameddim '''
+        return AST(type="dimlist",kids=(args[0], args[2]))
+    
+    def p_typelist_1(self,args):
+        ''' typelist ::= typenest '''
+        return AST(type="typelist",kids=(args[0],))
+    
+    def p_typelist_2(self,args):
+        ''' typelist ::= typelist , typenest '''
+        return AST(type="typelist", kids=(args[0],args[2]))#}}}
+
+class GenericASTRewriter:#{{{
+    def typestring(self, node):
+        return node.type
+
+    def preorder(self, node=None):
+        name = 'n_' + self.typestring(node)
+        if hasattr(self, name):
+            func = getattr(self, name)
+            node = func(node)
+        else:
+            node = self.default(node)
+
+        node.kids = [self.preorder(kid) for kid in node]
+
+        name = name + '_exit'
+        if hasattr(self, name):
+            func = getattr(self, name)
+            node = func(node)
+        return node
+
+    def postorder(self, node=None):
+        node.kids = [self.postorder(kid) for kid in node]
+
+        name = 'n_' + self.typestring(node)
+        if hasattr(self, name):
+            func = getattr(self, name)
+            node = func(node)
+        else:
+            node = self.default(node)
+        return node
+
+    def default(self, node):
+        return node#}}}
+
+class TypeStringASTRewriterPass1(GenericASTRewriter):#{{{
+    def process(self, tree):
+        return self.postorder(tree)
+    def n_typenest(self,node):
+        if(node.kids[0].type == "typenest"):
+            node.kids = tuple(node.kids[0].kids) + (node.kids[1],)
+        else:
+            node.kids = (node.kids[0],)
+        return node#}}}
+
+class TypeStringASTRewriterPass2(GenericASTRewriter):#{{{
+    def process(self, tree):
+        self.dim_annot = {}
+        ntree = self.postorder(tree)
+        return (ntree,self.dim_annot)
+        
+    def n_hasmissing(self, node):
+        if(node.kids[0].type == "createtype"):
+            node.kids[0].has_missing = True
+        elif(node.kids[0].type == "createdim"):
+            node.kids[0].has_missing = True
+        else:
+            raise RuntimeError, "Invalid AST!"
+        return node.kids[0]
+    
+    def n_dims(self, node):
+        assert node.kids[0].type == "createtype", "Invalid AST!"
+        if(len(node.kids) > 1):
+            assert node.kids[1].type == "dimlist", "Invalid AST!"
+            node.kids[0].dims = node.kids[1].kids
+        else:
+            node.kids[0].dims = tuple()
+        return node.kids[0]
+    
+    def n_subtypes(self, node):
+        assert node.kids[0].type == "createtype", "Invalid AST!"
+        assert node.kids[1].type == "typelist", "Invalid AST!"
+        node.kids[0].subtypes = node.kids[1].kids
+        return node.kids[0]
+
+    def n_namedim(self, node):
+        if(node.kids[0].type == "createdim"):
+            node.kids[0].name = node.kids[1].attr
+        else:
+            return node
+        return node.kids[0]
+    
+    def n_namedtype(self, node):
+        if(node.kids[0].type == "createtype"):
+            node.kids[0].name = node.kids[1].attr
+        else:
+            return node
+        return node.kids[0]
+    
+    def n_typenest(self,node):
+        kids = list(node.kids)
+        while(len(kids) > 1):
+            right = kids.pop()
+            assert right.type == "createtype", "Invalid AST!"
+            assert kids[-1].type == "createtype", "Invalid AST!"
+            kids[-1].subtypes = (right,)
+        
+        return kids[0]
+    
+    def n_varlist(self, node):
+        if(node.kids[0].type == "varlist"):
+            node.kids = tuple(node.kids[0].kids) + (self.processVar(node.kids[1]),)
+        else:
+            node.kids = (self.processVar(node.kids[0]),)
+        return node 
+    
+    def n_dimlist(self, node):
+        if(node.kids[0].type == "dimlist"):
+            node.kids = tuple(node.kids[0].kids) + (self.annotateDim(node.kids[1]),)
+        else:
+            node.kids = (self.annotateDim(node.kids[0]),)
+        return node 
+    
+    def n_typelist(self, node):
+        if(node.kids[0].type == "typelist"):
+            node.kids = tuple(node.kids[0].kids) + (node.kids[1],)
+        return node 
+
+    def processVar(self,node):
+        if(node.type == '.'):
+            return True
+        elif(node.type == '*'):
+            return False
+        else:
+            raise RuntimeError, "Unexpected character as dim var"
+
+
+    def annotateDim(self,node):
+        assert node.type == "createdim", "Invalid AST!"
+        
+        name = getattr(node,"name",None)
+        if(name is None):
+            return node
+
+        if(node.kids[0].type == "varlist"):
+            dependent = node.kids[0].kids
+            while(dependent and dependent[-1] is False):
+                dependent = dependent[:-1]
+            shape = UNDEFINED
+        elif(node.kids[0].type == "integer"):
+            dependent = tuple()
+            shape = node.kids[0].attr
+        elif(node.kids[0].type == "~"):
+            dependent = "~"
+            shape = UNDEFINED
+        elif(node.kids[0].type == "inherit"):
+            dependent = None
+            shape = None
+        else:
+            raise RuntimeError, "Invalid AST!"
+
+        has_missing = getattr(node, "has_missing", False)
+
+        if(name in self.dim_annot):
+            ahas_missing, adependent, ashape = self.dim_annot[name]
+            if(not ashape is None):
+                if(not shape is None and shape != ashape):
+                    raise RuntimeError, "Similar named dim: " + name + " with different shape: " + str(shape) + ", " + str(ashape)
+                shape = ashape
+
+            if(not adependent is None):
+                if(not dependent is None and dependent != adependent):
+                    raise RuntimeError, "Similar named dim: " + name + "  with different dependent dims: " + str(dependent) + ", " + str(adependent)
+                dependent = adependent
+
+            if(not ahas_missing is None):
+                if(not has_missing is None and has_missing != ahas_missing):
+                    raise RuntimeError, "Similar named dim: " + name + "  with different has_missing flag: "  + str(has_missing) + ", " + str(ahas_missing)
+                has_missing = ahas_missing
+        
+        self.dim_annot[name] = (has_missing, dependent, shape)
+        return node#}}}
+
+class TypeStringASTInterpreter(object):#{{{
+    def __init__(self, dim_annot):
+        self.dim_annot = dim_annot
+        self.dims = {}
+
+    def processCreateType(self, node, dimpos=0):
+        assert node.type == "createtype", "Invalid AST!"
+       
+        if(node.kids[0].type == '?'):
+            typename = "?"
+        else:
+            typename = node.kids[0].attr
+        if(typename not in __typenames__):
+            raise RuntimeError, "Unknown type name: " + str(typename)
+        typecls = __typenames__[typename]
+        
+        dimnodes = getattr(node, "dims", None)
+        subtypenodes = getattr(node, "subtypes", tuple())
+
+        kwargs = {}
+        has_missing = getattr(node, "has_missing", False)
+        if has_missing:
+            kwargs['has_missing'] = True
+
+        if(not dimnodes is None):
+            dims = dimpaths.DimPath(*[self.processCreateDim(dimnode, dimpos + pos) for pos, dimnode in enumerate(dimnodes)])
+            dimpos += len(dims)
+            kwargs['dims'] = dims
+        
+        subtypes = tuple([self.processCreateType(subtypenode, dimpos) for subtypenode in subtypenodes])
+        fieldnames = tuple([getattr(subtypenode,"name","f" + str(pos)) for pos, subtypenode in enumerate(subtypenodes)])
+        if(subtypes):
+            kwargs['subtypes'] = subtypes
+            kwargs['fieldnames'] = fieldnames
+
+
+        return typecls(**kwargs)
+
+
+
+    def processCreateDim(self, node, dimpos):
+        assert node.type == "createdim", "Invalid AST!"
+        name = getattr(node,"name",None)
+        if(not name is None):
+            assert name in self.dim_annot, "Unannotated named dim found!"
+            if(not name in self.dims):
+                has_missing,dependent,shape = self.dim_annot[name]
+                if(dependent is None):
+                    dependent = tuple()
+                elif(dependent == "~"):
+                    dependent = (True,) * dimpos
+                    
+                if(shape is None):
+                    shape = UNDEFINED
+                self.dims[name] = dimensions.Dim(shape,dependent,has_missing, name=name) 
+                    
+            dim = self.dims[name]
+            if(len(dim.dependent) > dimpos):
+                raise RuntimeError, "Dim: " + name + " has too many dependent dims: " + str(len(dim.dependent)) + " (max: " + str(dimpos) + ")"
+            return dim
+
+        if(node.kids[0].type == "varlist"):
+            dependent = node.kids[0].kids
+            shape = UNDEFINED
+        elif(node.kids[0].type == "integer"):
+            dependent = tuple()
+            shape = node.kids[0].attr
+        elif(node.kids[0].type == "~"):
+            dependent = (True,) * dimpos
+            shape = UNDEFINED
+        else:
+            raise RuntimeError, "Invalid AST!"
+
+        name = getattr(node,"name",None)
+        has_missing = getattr(node, "has_missing", False)
+        
+        return dimensions.Dim(shape,dependent,has_missing, name=name) #}}}
+
+def _createType(name):
+    scanner = TypeStringScanner()
+    tokens = scanner.tokenize(name)
+
+    parser = TypeStringParser()
+
+    tree = parser.parse(tokens)
+    
+    rewriter1 = TypeStringASTRewriterPass1()
+    tree = rewriter1.process(tree)
+
+    rewriter2 = TypeStringASTRewriterPass2()
+    tree,dim_annotation = rewriter2.process(tree)
+
+    return TypeStringASTInterpreter(dim_annotation).processCreateType(tree)
+
 
 #### HELPER functions #########
 

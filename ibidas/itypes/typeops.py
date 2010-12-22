@@ -265,8 +265,10 @@ def check_arrayarray(in1_type, in2_type, op):#{{{
     
     odim1 = in1_type.dims[0]
     odim2 = in2_type.dims[0]
+
+    #FIX variable
     ndim = dimensions.Dim(UNDEFINED, 
-                          odim1.variable or odim2.variable, 
+                          odim1.variable or odim2.variable,  
                           odim1.has_missing or odim2.has_missing)
     return rtypes.TypeArray(in1_type.has_missing or in2_type.has_missing, 
                           (ndim,), (subtype,))

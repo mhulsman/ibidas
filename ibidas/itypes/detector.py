@@ -268,6 +268,7 @@ class DimRep(object):
         self.length_count = len(lengths) / repeat_length
         self.lengths = repeat
         self.nparents = nparents
+        self.length_type = LENGTH_REPEAT
         return True
 
     def getDim(self):
@@ -294,17 +295,15 @@ class FixedDimRep(DimRep):
         self.parent_scanner = parent_scanner
         self.index = index
 
-        if(dim.shape == UNDEFINED):
+        if(dim.isVariable()):
             self.length_type = LENGTH_VAR
             self.lengths = [] 
-            #FIXME: implement case where dim.shape is UNDEFINED, but fixed (not dim.variable)
-            #FIXME2: give lengths of variable dimensions from data, will also enable repeat var dimensions
         else:
-            self.lengths = dim.shape        #stores length data. FIXED: int, VAR: list of lengths, REPEAT: list of lengths
             self.length_type = LENGTH_FIXED
-
-        self.nparents = dim.variable
-
+            self.lengths = dim.shape
+            #FIXME: give lengths of variable dimensions from data, will also enable repeat var dimensions
+        
+        self.nparents = 0
         self.has_missing = dim.has_missing
         self.dim = dim
         self.dirty = False
@@ -339,6 +338,8 @@ class DimEqualizer(object):
             elif parent.length_type == LENGTH_REPEAT:
                 repeat_length *= sum(parent.lengths)
                 pos -= parent.nparents
+            elif parent.lengths == UNDEFINED: # length is UNDEFINED, no further checks possible
+                break
             else:
                 repeat_length *= parent.lengths
 
@@ -352,9 +353,9 @@ class DimEqualizer(object):
 
         if dimrep.length_type != LENGTH_FIXED:
             cur_parents = self._processParents(dimrep)
-            nparents = max(len(cur_parents), 1)
+            parents = cur_parents
         else:
-            nparents = 0
+            parents = []
 
         for dr in self.dimreps:
             if dr.dirty is True:
@@ -368,7 +369,7 @@ class DimEqualizer(object):
             if dimrep.length_type == LENGTH_FIXED:
                 dimrep._setDim(dr.dim)
                 return dr.dim
-            match_parents = dr.getParentDimReps()[-nparents:]
+            match_parents = dr.getParentDimReps()[-len(parents):]
             if len(match_parents) != len(cur_parents):
                 continue
             for mp, cp in zip(match_parents, cur_parents):
@@ -380,9 +381,9 @@ class DimEqualizer(object):
                 dimrep._setDim(dr.dim)
                 return dr.dim
         if dimrep.length_type == LENGTH_FIXED:
-            ndim = dimensions.Dim(dimrep.lengths, nparents, dimrep.has_missing,name="d"+str(self.dimid()))
+            ndim = dimensions.Dim(dimrep.lengths, tuple(), dimrep.has_missing,name="d"+str(self.dimid()))
         else:
-            ndim = dimensions.Dim(UNDEFINED, nparents, dimrep.has_missing,name="d"+str(self.dimid()))
+            ndim = dimensions.Dim(UNDEFINED, (True,) * len(parents), dimrep.has_missing,name="d"+str(self.dimid()))
         dimrep._setDim(ndim)
         return ndim
 
@@ -742,9 +743,9 @@ class StringScanner(TypeScanner):
             ntype = rtypes.TypeString
 
         if self.max_nchars < 32:
-            d = dimensions.Dim(self.max_nchars, 0, self.detector.hasMissing())
+            d = dimensions.Dim(self.max_nchars, tuple(), self.detector.hasMissing())
         else:
-            d = dimensions.Dim(UNDEFINED, len(self.getDimReps(0)), self.detector.hasMissing())
+            d = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
 
         dims = dimpaths.DimPath(d)
         cv = self.convertor(self.detector.objectclss.copy()) 

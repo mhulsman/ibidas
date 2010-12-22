@@ -196,8 +196,9 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         bcpos = 0
         for pos,planelem in enumerate(node.plan):
             if(planelem == BCEXIST):
-                repeat_dict[pos] = compare_slices[bcpos].data.getDimShape(pos)
-                dim_dict[pos] = compare_slices[bcpos].dims[pos]
+                dimpos = compare_slices[bcpos].dims.index(node.bcdims[pos])
+                repeat_dict[pos] = compare_slices[bcpos].data.getDimShape(dimpos)
+                dim_dict[pos] = compare_slices[bcpos].dims[dimpos]
                 bcpos += 1
             elif(planelem == BCCOPY):
                 pass
