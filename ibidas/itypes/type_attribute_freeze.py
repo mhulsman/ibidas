@@ -21,7 +21,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     #Determine if necessary to freeze a type (or its subtypes)    
     def need_freeze(self, rtype):
         return (rtype.data_state != DATA_FROZEN)
-    needFreezeTypeUnknown=need_freeze
+    needFreezeTypeAny=need_freeze
     needFreezeTypeDict=need_freeze
     needFreezeTypeArray=need_freeze
     needFreezeTypeSlice=need_freeze
@@ -38,6 +38,9 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     
     #freeze a type and its subtypes (adapt its representation, not the data!)
     def freezeTypeUnknown(self, rtype):
+        return rtype
+    
+    def freezeTypeAny(self, rtype):
         if self.needFreeze(rtype):
             return rtype.copy(data_state=DATA_FROZEN)
         else:

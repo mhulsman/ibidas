@@ -772,8 +772,10 @@ class TypeSet(TypeArray):#{{{
 
         assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
                 "Dimensions of a set should be a dimpath of size 1"
+
+        assert dims[0].isVariable(), "Dimension of set should be variable!"
         
-        assert subtypes and len(subtypes) == 1, \
+        assert subtypes and len(subtypes) == 1 and isinstance(subtypes,tuple), \
                  "Number of subtypes should be 1"
         
         subtypes = (type_attribute_freeze.freeze_protocol.freeze(subtypes[0]),)
@@ -1511,6 +1513,10 @@ class TypeStringASTInterpreter(object):#{{{
         if(not dimnodes is None):
             dims = dimpaths.DimPath(*[self.processCreateDim(dimnode, dimpos + pos) for pos, dimnode in enumerate(dimnodes)])
             dimpos += len(dims)
+            kwargs['dims'] = dims
+        elif(issubclass(typecls,TypeArray)):
+            dims = dimpaths.DimPath(dimensions.Dim(UNDEFINED,(True,) * dimpos))
+            dimpos += 1
             kwargs['dims'] = dims
         
         subtypes = tuple([self.processCreateType(subtypenode, dimpos) for subtypenode in subtypenodes])
