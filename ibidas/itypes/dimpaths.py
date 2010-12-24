@@ -151,30 +151,12 @@ class DimPath(tuple):
                 pos = curstart + nmpath
         
         return startpos#}}}#}}}
-  
-    #def maxMatchedSuffix(self,other):#{{{
-    #    
-    #    reversed_dimpath = self[::-1]
-    #    selfpos = 0
-    #    for pos in xrange(len(other)):
-    #        try:
-    #            selfpos = reversed_dimpath.index(other[-(pos + 1)],selfpos)
-    #            selfpos += 1
-    #        except ValueError:
-    #            break
-    #    if(pos == 0):
-    #        maxmatch = DimPath()
-    #    else:            
-    #        maxmatch = other[-(pos + 2):]
-    #
-    #    maxmatch.validPath()
-    #    return maxmatch#}}}
 
     def completePath(self):#{{{
         for pos in xrange(len(self)):
             if(len(self[pos]) > pos):
                 return False
-        return True            
+        return True#}}} 
                 
     def splitSuffix(self,minlength=1):#{{{
         assert minlength <= len(self), "Minlength too large in splitSuffix"
@@ -231,12 +213,12 @@ def planBroadcastMatchPos(paths,partial=False):#{{{
     maxlen = max([len(path) for path in paths])
     plans = [[] for path in paths]
     bcdims = [None] * maxlen
-    curpos = 0
-    while(curpos < maxlen):
+    curpos = - 1
+    while(-(curpos + 1) < maxlen):
         xdims = []
         l = set()
         for path in paths:
-            if(len(path) > curpos):
+            if(len(path) > -(curpos+1)):
                 xdims.append(path[curpos])
                 l.add(path[curpos].shape)
             else:
@@ -251,8 +233,7 @@ def planBroadcastMatchPos(paths,partial=False):#{{{
         bcdim = [xdim for xdim in xdims if not xdim is None and xdim.shape == length][0]
         for xdim,plan in zip(xdims,plans):
             if(xdim is None):
-                if(not partial):
-                    plan.append(BCNEW)
+                plan.append(BCNEW)
             elif(xdim.shape == 1):
                 plan.append(BCEXIST)
             elif(xdim != bcdim):
@@ -260,7 +241,10 @@ def planBroadcastMatchPos(paths,partial=False):#{{{
             else:
                 plan.append(BCCOPY)
         bcdims[curpos] = bcdim 
-        curpos +=1 
+        curpos -=1 
+    for pos in xrange(len(plans)):
+        plans[pos] = plans[pos][::-1]
+    print bcdims, plans
     return (bcdims, plans)        #}}}
 
 def planBroadcastMatchDim(paths,partial=False):#{{{
@@ -286,17 +270,18 @@ def planBroadcastMatchDim(paths,partial=False):#{{{
     #Step 2: create graph
     for path in paths:
         lastid = None
-        for pathpos, dim in enumerate(path):
+        for pathpos, dim in enumerate(path[::-1]):
             dimid = translate[dim][0]
             newnode = False
 
             #new wildcard dim?
             if(dim.shape == 1 and dim.has_missing is False and not dimid in wildcard_links):
-                try:
-                    odimid = dimid
-                    dimid = graph.elem(0,after=lastid)
+                odimid = dimid
+                dimids = graph.getParents(lastid)
+                if(dimids):
+                    dimid = min(dimids) #maps to first ordered dim (i.e firstmost path)
                     wildcard_links[odimid] = dimid
-                except IndexError,e:
+                else:
                     graph.addNodeIfNotExist(dimid)
                     free_wildcards.add(dimid)
             elif(dimid in wildcard_links): #old wildcarddim, use previous mapping
@@ -305,23 +290,24 @@ def planBroadcastMatchDim(paths,partial=False):#{{{
                 newnode = graph.addNodeIfNotExist(dimid)
 
             if(pathpos > 0):
-                pos = 0
+                pos = len(translate[dim])
                 #try to add edge, such that we get no cycle
                 #if cycle is found, add new ids for target node
                 while True:
                     try:
-                        graph.addEdge(lastid,dimid)
+                        graph.addEdge(dimid,lastid)
                         break
                     except toposort.CycleError, e:
-                        pos += 1
-                        if(pos >= len(translate[dim])):
+                        pos -= 1
+                        if(pos < 0):
                             translate[dim].append(curid)
                             newnode = graph.addNodeIfNotExist(curid)
                             curid += 1
+                            pos = -1
                         dimid = translate[dim][pos]
             
             if(free_wildcards and newnode):
-                for nodeid in graph:
+                for nodeid in list(graph)[::-1]:
                     if(nodeid in free_wildcards and not nodeid == dimid):
                         try:
                             graph.mergeNodes(nodeid,dimid)
@@ -342,26 +328,28 @@ def planBroadcastMatchDim(paths,partial=False):#{{{
     plans = []
     for path in paths:
         plan = []
-        pathpos = 0
-        for bcdim in bcdims:
-            if(pathpos < len(path)):
+        pathpos = len(path) - 1
+        for bcdim in bcdims[::-1]:
+            if(pathpos >= 0):
                 if( bcdim == path[pathpos]):
                     plan.append(BCCOPY)
-                    pathpos += 1
+                    pathpos -= 1
                 else: 
-                    for dimid in translate[path[pathpos]]:
+                    for dimid in translate[path[pathpos]][::-1]:
                         if(dimid in wildcard_links):
                             bdim = rev_translate[wildcard_links[dimid]]
                             if(bdim == bcdim):
                                 plan.append(BCEXIST)
-                                pathpos += 1
+                                pathpos -= 1
                                 break
                     else:
-                        plan.append(BCNEW)
-            elif(not partial):
+                        if(not partial or plan):
+                            plan.append(BCNEW)
+            else:
                 plan.append(BCNEW)
 
-        plans.append(plan)
+        plans.append(plan[::-1])
+    print bcdims, paths, plans, partial
     return (bcdims,plans)#}}}
 
 def flatFirstDims(array,ndim):#{{{

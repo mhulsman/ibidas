@@ -176,10 +176,10 @@ class InsertDimSlice(UnaryOpSlice):
         assert len(slice.dims) >= matchpoint, "Matchpoint for dim insertion outside dimpath"
         assert ndim.shape == 1, "Length of inserted dim should be equal to 1"
         #FIXME: update va of type 
-        ndims = slice.dims.insertDim(matchpoint,ndim,node.type)
+        ndims,ntype = slice.dims.insertDim(matchpoint,ndim, slice.type)
         self.matchpoint = matchpoint
         self.newdim = ndim
-        UnaryOpSlice.__init__(self,slice,rtype=slice.type,dims=ndims)        
+        UnaryOpSlice.__init__(self,slice,rtype=ntype,dims=ndims)        
 
 
 class EnsureCommonDimSlice(UnaryOpSlice):
@@ -187,8 +187,8 @@ class EnsureCommonDimSlice(UnaryOpSlice):
     def __init__(self,slice,refslices,checkpos,bcdim):
         self.checkpos = checkpos
         self.refslices = refslices
-        ndims = slice.dims.updateDim(checkpos,bcdim,node.type)
-        UnaryOpSlice.__init__(self, slice, dims=ndims)
+        ndims,ntype = slice.dims.updateDim(checkpos, bcdim, slice.type)
+        UnaryOpSlice.__init__(self, slice, rtype=ntype,dims=ndims)
 
 
 class BroadcastSlice(UnaryOpSlice):

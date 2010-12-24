@@ -159,7 +159,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def visitInsertDimSlice(self,node,slice):
         ndata = slice.data.insertDim(node.matchpoint,node.newdim)
-        return slice.modify(data=ndata,dims=node.dims)
+        return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
     def visitPackListSlice(self, node, slice):
         ndata=slice.data.pack(node.type, len(node.type.dims))
@@ -188,7 +188,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         assert numpy.all(selfshape == othershape), "Dimension mismatch in " + str(checkdim) + ":" + str(selfshape) + " != " + str(othershape)
 
         ndata = slice.data.replaceDim(node.checkpos,checkdim)
-        return slice.modify(data=ndata,dims=node.dims)
+        return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
     def visitBroadcastSlice(self,node,slice,compare_slices):
         repeat_dict = {}

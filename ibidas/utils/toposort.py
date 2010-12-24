@@ -46,6 +46,8 @@ class StableTopoSortGraph(object):
         self.ancestors[after].add(before)
         self.ancestors[after].update(self.ancestors[before])
 
+    def getParents(self,node):
+        return self.parents[node]
 
     def getAncestors(self,node):
         return self.ancestors[node]
