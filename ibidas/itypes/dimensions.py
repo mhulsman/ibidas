@@ -13,7 +13,7 @@ def getNewDimid():
     return dimid()
 class Dim(object):
     """Class representing a dimension."""
-    __slots__ = ['id', 'name', 'shape', 'dependent', 'has_missing','redim_cache']
+    __slots__ = ['id', 'name', 'shape', 'dependent', 'has_missing','redim_cache','__weakref__']
     
     def __init__(self, shape, dependent=tuple(), has_missing=False, did=None, name=None):
         """Creates dimension class.
@@ -100,8 +100,21 @@ class Dim(object):
         if(not key in redim_cache):
             nself = self.copy()
             nself.dependent = self.dependent[:pos] + (False,) + self.dependent[pos:]
-            redim_cache[self] = nself
-        return redim_cache[self]
+            redim_cache[key] = nself
+        return redim_cache[key]
+
+    def changeDependent(self, dep, ndims):
+        assert sum(dep) == len(ndims), "Number of true flags should be equal to number of dims when setting dependent dims"
+        
+        redim_cache = self._getRedimCache()
+        key = (3, tuple([ndim.id for ndim in ndims]))
+
+        if(not key in redim_cache):
+            nself = self.copy(reid=True)
+            nself.dependent = dep
+            redim_cache[key] = nself
+        return redim_cache[key]
+       
 
     def copy(self, reid=False):
         """Returns a copy of this object"""

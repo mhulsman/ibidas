@@ -149,7 +149,6 @@ class Detector(object):
         
         restypes = [t for t in restypes if t is not None]
         
-        
         assert not len(restypes) == 0,'BUG: no valid type could be detected'
 
         if len(restypes) > 1:
@@ -760,6 +759,27 @@ class StringScanner(TypeScanner):
         return True
 registerTypeScanner(StringScanner)
 
+class SliceScanner(TypeScanner):
+    __doc__ = 'Slice scanner'
+    typecls = rtypes.TypeSlice
+    good_cls = set((slice, None.__class__, MissingType))
+
+    def __init__(self, detector):
+        TypeScanner.__init__(self, detector)
+
+    def getType(self):
+        if not self.detector.hasMissing():
+            pass
+        has_missing = self.detector.hasMissing()
+        cv = self.convertor(self.detector.objectclss.copy()) 
+
+        return self.typecls(has_missing, convert_type=self.__class__, convertor=cv, data_state=DATA_INPUT)
+
+    def scan(self, seq):
+        if not self.detector.objectclss.issubset(self.good_cls):
+            return False
+        return True
+registerTypeScanner(SliceScanner)
 
 class NumberScanner(TypeScanner):
     __doc__ = 'Number scanner, accepts all number objects.'

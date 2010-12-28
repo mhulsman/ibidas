@@ -56,7 +56,8 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
         self.server.setNodeLabel(self.network, "name", "","default")
         self.server.setDiscreteNodeShapeMapper(self.network, 'default',
                 'type', 'diamond', {'else':'ellipse', 'slice':'octagon', 'rep':'round_rect'}, True)
-        self.server.setEdgeTargetArrowRule(self.network,"type","Arrow",[],[])
+        self.server.setEdgeTargetArrowRule(self.network,"type","Arrow",["paramlist","paramchoicelist"],["T","T"])
+        self.server.setEdgeLineStyleRule(self.network,"type","SOLID",["paramchoice","paramchoicelist"],["DOT","DOT"])
         self.server.performLayout(self.network, "hierarchical")
    
     def createUniqueName(self,name):

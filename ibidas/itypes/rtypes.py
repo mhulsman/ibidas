@@ -741,7 +741,7 @@ class TypeArray(TypeAny):#{{{
 
     def insertDepDim(self, pos, ndim):
         stype = self.subtypes[0].insertDepDim(pos - len(self.dims), ndim)
-        ndims = self.dims.insertDepDim(pos, ndim)
+        ndims = self.dims.insertDim(pos, ndim)
         if(ndims is self.dims and stype is self.subtypes[0]):
             return self
         else:

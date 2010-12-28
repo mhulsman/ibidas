@@ -207,13 +207,19 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         ndata = slice.data.broadcast(repeat_dict,dim_dict)
         return slice.modify(data=ndata,dims=node.dims)
 
+    def visitFilterSlice(self,node, slice, constraint):
+        func = speedfilter
+        ndata = nested_array.co_mapseq(func,[slice.data, constraint.data],
+                                       res_type=node.type, dtype=node.type.toNumpy(), bc_allow=True)
+        return slice.modify(data=ndata,rtype=node.type)
+        
+
     def visitBinElemOpSlice(self,node, slices):
         func = node.oper.exec_funcs["py"]
         ndata = nested_array.co_mapseq(func,[slice.data for slice in slices],
                                        type1=slices[0].type,type2=slices[1].type,
                                        typeo=node.type,res_type=node.type,op=node.op,
                                        bc_allow=True)
-        
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
     def visitFixate(self,node,slices):
@@ -240,3 +246,10 @@ def speedarrayify(seqs,dtype):
     nseq = numpy.array(seqs,dtype).T
     return nseq
 
+
+def speedfilter(seqs,dtype):
+    data,constraint = seqs
+    res = []
+    for pos in xrange(len(data)):
+        res.append(data[pos][constraint[pos]])
+    return cutils.darray(res,dtype)

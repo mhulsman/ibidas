@@ -109,7 +109,7 @@ class DimPath(tuple):
     
     def insertDim(self, pos, ndim, subtype=None):#{{{
         ndims = []
-        for p in xrange(max(pos + 1,0), len(self)):
+        for p in xrange(max(pos,0), len(self)):
             ndims.append(self[p].insertDepDim(p - pos, ndim))
 
         res = self[:max(pos,0)] + (ndim,) + DimPath(*ndims)
@@ -206,7 +206,7 @@ def uniqueDimPath(dimpaths,only_complete=True):#{{{
      
     return path#}}}
 
-def planBroadcastMatchPos(paths,partial=False):#{{{
+def planBroadcastMatchPos(paths):#{{{
     """Matches dims in paths based on their position.
     Returns new set of dims and broadcast plan."""
 
@@ -244,10 +244,9 @@ def planBroadcastMatchPos(paths,partial=False):#{{{
         curpos -=1 
     for pos in xrange(len(plans)):
         plans[pos] = plans[pos][::-1]
-    print bcdims, plans
     return (bcdims, plans)        #}}}
 
-def planBroadcastMatchDim(paths,partial=False):#{{{
+def planBroadcastMatchDim(paths):#{{{
     """Matches dims in paths based on their identity, as well
     as their potential to be used as broadcast dimension (shape == 1).
     Returns new set of dims and broadcast plan"""
@@ -343,13 +342,11 @@ def planBroadcastMatchDim(paths,partial=False):#{{{
                                 pathpos -= 1
                                 break
                     else:
-                        if(not partial or plan):
-                            plan.append(BCNEW)
+                        plan.append(BCNEW)
             else:
                 plan.append(BCNEW)
 
         plans.append(plan[::-1])
-    print bcdims, paths, plans, partial
     return (bcdims,plans)#}}}
 
 def flatFirstDims(array,ndim):#{{{

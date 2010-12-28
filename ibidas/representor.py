@@ -8,7 +8,7 @@ from itypes import rtypes
 from constants import *
 
 _delay_import_(globals(),"utils","util","context")
-_delay_import_(globals(),"itypes", "dimensions")
+_delay_import_(globals(),"itypes", "dimensions","dimpaths")
 _delay_import_(globals(),"wrappers","wrapper_py")
 _delay_import_(globals(),"query_context")
 _delay_import_(globals(),"engines")
@@ -17,6 +17,16 @@ _delay_import_(globals(),"repops_multi")
 _delay_import_(globals(),"repops_dim")
 _delay_import_(globals(),"repops_slice")
 _delay_import_(globals(),"slices")
+
+
+
+class NewDim(object):
+    def __init__(self,name=None):
+        self.name = name
+    def __call__(self,name=None):
+        return NewDim(name)
+newdim = NewDim()
+
 
 class Representor(Node):
     _state = 0                 #default value
@@ -129,22 +139,46 @@ class Representor(Node):
 
 
     def __getitem__(self, condition):
-        if(isinstance(condition, tuple)):
-            ncond = len(condition)
-            for pos, cond in enumerate(condition):
-                if(isinstance(cond, context.Context)):
-                    cond = context._apply(cond, self)
-                self = repops_multi.rfilter(self, cond, pos - ncond)
-            return self
-            
-        elif(isinstance(condition, context.Context)):
-            condition = context._apply(condition, self)
-        return repops_multi.rfilter(self, condition)
+        if(not isinstance(condition, tuple)):
+            condition = (condition,)
+        
+        #add dimensions first
+        ipos = 0
+        for pos, cond in enumerate(condition):
+            if(isinstance(cond,NewDim)):
+                self = repops_dim.InsertDim(self,pos + ipos, cond.name)
+            elif(cond is Ellipsis):
+                ulength = len(dimpaths.uniqueDimPath([s.dims for s in self._slices]))
+                rem_length = len([c for c in condition[(pos + 1):] if not isinstance(cond,NewDim)])
+                newnextpos = ulength - rem_length
+                curnextpos = pos + ipos + 1
+                ipos += newnextpos - curnextpos #skip some dims
+        
+        #next, perform filtering in backwards order
+        if(Ellipsis in condition):
+            ncond = len(dimpaths.uniqueDimPath([s.dims for s in self._slices]))- 1
+        else:
+            ncond = len(condition) - 1
+
+        for pos, cond in enumerate(condition[::-1]):
+            if(isinstance(cond, context.Context)):
+                cond = context._apply(cond, self)
+            if(isinstance(cond,slice) and cond.start is None and 
+                                                cond.stop is None and 
+                                                cond.step is None):
+                pass
+            elif(cond is Ellipsis):
+                ncond = len(condition) - 1
+            elif(isinstance(cond,NewDim)):
+                pass
+            else:
+                self = repops_multi.Filter(self, cond, ncond - pos)
+        return self
            
-    def filter(self, condition, dim=False):
+    def filter(self, condition, dim=None):
         if(isinstance(condition, context.Context)):
             condition = context._apply(condition, self)
-        return repops_multi.rfilter(self, condition, dim) 
+        return repops_multi.Filter(self, condition, dim) 
 
     def _getResultSlices(self, args={}):
         query = query_context.QueryContext(self, args)
