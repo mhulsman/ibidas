@@ -716,10 +716,16 @@ class TypeArray(TypeAny):#{{{
 
     def getArrayDimPath(self):
         return self.dims + self.subtypes[0].getArrayDimPath()
-  
+ 
+    def getNestedArraySubtype(self):
+        if(self.subtypes[0].__class__ == TypeArray):
+            return self.subtypes[0].getNestedArraySubtype()
+        else:
+            return self.subtypes[0]
+
     def removeDepDim(self, pos, elem_specifier):
         stype = self.subtypes[0].removeDepDim(pos - len(self.dims), elem_specifier)
-        ndims = self.dims.removeDepDim(pos,elem_specifier)
+        ndims = self.dims.removeDim(pos,elem_specifier)
         if(ndims is self.dims and stype is self.subtypes[0]):
             return self
         else:
@@ -730,7 +736,7 @@ class TypeArray(TypeAny):#{{{
      
     def updateDepDim(self, pos, ndim):
         stype = self.subtypes[0].updateDepDim(pos - len(self.dims), ndim)
-        ndims = self.dims.updateDepDim(pos,ndim)
+        ndims = self.dims.updateDim(pos,ndim)
         if(ndims is self.dims and stype is self.subtypes[0]):
             return self
         else:

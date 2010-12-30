@@ -71,9 +71,9 @@ class Dim(object):
         key = (0, pos, elem_specifier)
         redim_cache = self._getRedimCache()
         if(not key in redim_cache):
-            nself = self.copy(reid=self.dependent[pos] and (odim.shape != 1 or odim.isVariable()))
+            nself = self.copy(reid=self.dependent[pos])
             ndependent = self.dependent[:pos] + self.dependent[(pos + 1):]
-            while(ndependent[-1] is False):
+            while(ndependent and ndependent[-1] is False):
                 ndependent = ndependent[:-1]
             nself.dependent = ndependent
             redim_cache[key] = nself
@@ -104,16 +104,22 @@ class Dim(object):
         return redim_cache[key]
 
     def changeDependent(self, dep, ndims):
-        assert sum(dep) == len(ndims), "Number of true flags should be equal to number of dims when setting dependent dims"
+        assert len(dep) == len(ndims), "Number of flags should be equal to number of dims when setting dependent dims"
         
         redim_cache = self._getRedimCache()
-        key = (3, tuple([ndim.id for ndim in ndims]))
+        key = (3, tuple([ndim.id for d, ndim in zip(dep,ndims) if d]))
 
         if(not key in redim_cache):
             nself = self.copy(reid=True)
             nself.dependent = dep
             redim_cache[key] = nself
-        return redim_cache[key]
+        nself = redim_cache[key]
+
+        if(not nself.dependent == dep):
+            nself = self.copy(reid=False)
+            nself.dependent = dep
+
+        return nself
        
 
     def copy(self, reid=False):

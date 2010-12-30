@@ -16,6 +16,7 @@ _delay_import_(globals(),"repops")
 _delay_import_(globals(),"repops_multi")
 _delay_import_(globals(),"repops_dim")
 _delay_import_(globals(),"repops_slice")
+_delay_import_(globals(),"repops_funcs")
 _delay_import_(globals(),"slices")
 
 
@@ -155,7 +156,9 @@ class Representor(Node):
                 ipos += newnextpos - curnextpos #skip some dims
         
         #next, perform filtering in backwards order
-        if(Ellipsis in condition):
+        #note: cannot use Ellipsis in condition, will perform Ellipsis == elem,
+        #which wille xecute as query and fail/be slow
+        if(any([elem is Ellipsis for elem in condition])):  
             ncond = len(dimpaths.uniqueDimPath([s.dims for s in self._slices]))- 1
         else:
             ncond = len(condition) - 1
@@ -171,6 +174,8 @@ class Representor(Node):
                 ncond = len(condition) - 1
             elif(isinstance(cond,NewDim)):
                 pass
+            elif(len(condition) == 1):
+                self = repops_multi.Filter(self, cond)
             else:
                 self = repops_multi.Filter(self, cond, ncond - pos)
         return self
@@ -202,42 +207,42 @@ class Representor(Node):
     def __add__(self, other):
         if(isinstance(other, context.Context)):
             return other.__radd__(self)
-        return repops_multi.Binop(self, other, '__add__')
+        return repops_funcs.Add(self, other)
     
     def __radd__(self, other):
-        return repops_multi.Binop(self, other, '__radd__')
+        return repops_funcs.Add(other, self)
     
     def __sub__(self, other):
         if(isinstance(other, context.Context)):
             return other.__radd__(self)
-        return repops_multi.Binop(self, other, '__sub__')
+        return repops_funcs.Subtract(self, other)
     
     def __rsub__(self, other):
-        return repops_multi.Binop(self, other, '__rsub__')
+        return repops_funcs.Subtract(other, self)
 
     # multiplication ( * )
     def __mul__(self, other):
         if(isinstance(other, context.Context)):
             return other.__rmul__(self)
-        return repops_multi.Binop(self, other, '__mul__')
+        return repops_funcs.Multiply(self, other)
     
     def __rmul__(self, other):
-        return repops_multi.Binop(self, other, '__rmul__')
+        return repops_funcs.Multiply(other, self)
     
     # modulo ( % )
     def __mod__(self, other):
         if(isinstance(other, context.Context)):
-            return other.__rmul__(self)
+            return other.__rmod__(self)
         elif(isinstance(other, str)):
             return repops_dim.DimRename(self, other)
         elif(isinstance(other, tuple)):
             return repops_dim.DimRename(self, *other)
         elif(isinstance(other, dict)):
             return repops_dim.DimRename(self, **other)
-        return repops_multi.Binop(self, other, '__mod__')
+        return repops_funcs.Modulo(self, other)
     
     def __rmod__(self, other):
-        return repops_multi.Binop(self, other, '__rmod__')
+        return repops_funcs.Modulo(other, self)
 
     # division ( / )
     def __div__(self, other):
@@ -249,10 +254,10 @@ class Representor(Node):
             return repops_slice.SliceRename(self, *other)
         elif(isinstance(other, dict)):
             return repops_slice.SliceRename(self, **other)
-        return repops_multi.Binop(self, other, '__div__')
+        return repops_funcs.Divide(self, other)
     
     def __rdiv__(self, other):
-        return repops_multi.Binop(self, other, '__rdiv__')
+        return repops_funcs.Divide(other, self)
     
     def __floordiv__(self, other):
         if(isinstance(other, context.Context)):
@@ -263,95 +268,95 @@ class Representor(Node):
             return repops_slice.Bookmark(self, *other)
         elif(isinstance(other, dict)):
             return repops_slice.Bookmark(self, **other)
-        return repops_multi.Binop(self, other, '__floordiv__')
+        return repops_funcs.FloorDivide(self, other)
     
     def __rfloordiv__(self,other):
-        return repops_multi.Binop(self, other, '__rfloordiv__')
+        return repops_funcs.FloorDivide(other, self)
         
 
     def __pow__(self,other):
         if(isinstance(other, context.Context)):
             return other.__rpow__(self)
-        return repops_multi.Binop(self, other, '__pow__')
+        return repops_funcs.Power(self, other)
     
     def __rpow__(self, other):
-        return repops_multi.Binop(self, other, '__rpow__')
+        return repops_funcs.Power(other,self)
 
     # and operator ( & )
     def __and__(self, other):
         if(isinstance(other, context.Context)):
             return other.__rand__(self)
-        return repops_multi.Binop(self, other, '__and__')
+        return repops_funcs.And(self, other)
     
     def __rand__(self, other):
-        return repops_multi.Binop(self, other, '__rand__')
+        return repops_funcs.And(other, self)
     
     # or operator ( | )
     def __or__(self, other):
         if(isinstance(other, context.Context)):
             return other.__ror__(self)
-        return repops_multi.Binop(self, other, '__or__')
+        return repops_funcs.Or(self, other)
 
     def __ror__(self, other):
-        return repops_multi.Binop(self, other, '__ror__')
+        return repops_funcs.Or(other, self)
     
     # exclusive-or operator ( ^ )
     def __xor__(self, other):
         if(isinstance(other, context.Context)):
             return other.__rxor__(self)
-        return repops_multi.Binop(self, other, '__xor__')
+        return repops_funcs.Xor(self, other)
 
     def __rxor__(self, other):
-        return repops_multi.Binop(self, other, '__rxor__')
+        return repops_funcs.Xor(other, self)
 
     # less-than ( < )
     def __lt__(self, other):
         if(isinstance(other, context.Context)):
             return other.__gt__(self)
-        return repops_multi.Binop(self, other, '__lt__')
+        return repops_funcs.Less(self, other)
 
     # less-than-or-equals ( <= )
     def __le__(self, other):
         if(isinstance(other, context.Context)):
             return other.__ge__(self)
-        return repops_multi.Binop(self, other, '__le__')
+        return repops_funcs.LessEqual(self, other)
 
     # equals ( == )
     def __eq__(self, other):
         if(isinstance(other, context.Context)):
             return other.__eq__(self)
-        return repops_multi.Binop(self, other, '__eq__')
+        return repops_funcs.Equal(self, other)
 
     # not-equals ( != )
     def __ne__(self, other):
         if(isinstance(other, context.Context)):
             return other.__ne__(self)
-        return repops_multi.Binop(self, other, '__ne__')
+        return repops_funcs.NotEqual(self, other)
 
     # greater-than ( > )
     def __gt__(self, other):
         if(isinstance(other, context.Context)):
             return other.__lt__(self)
-        return repops_multi.Binop(self, other, '__gt__')
+        return repops_funcs.Greater(self, other)
 
     # greater-than-or-equals ( >= )
     def __ge__(self, other):
         if(isinstance(other, context.Context)):
             return other.__le__(self)
-        return repops_multi.Binop(self, other, '__ge__')
+        return repops_funcs.GreaterEqual(self, other)
 
     # plus prefix, used for table operators (i.e. ++, &+, etc.)
     def __pos__(self):
         return repops.PlusPrefix(self)
     
     def __invert__(self):
-        return repops_multi.unary_op(self, "__invert__")
+        return repops_funcs.Invert(self)
        
     def __abs__(self):
-        return repops_multi.unary_op(self, "__abs__")
+        return repops_funcs.Abs(self)
     
     def __neg__(self):
-        return repops_multi.unary_op(self, "__neg__")
+        return repops_funcs.Negative(self)
 
     def cast(self, *newtypes, **kwds):
         return repops_slice.SliceCast(self, *newtypes, **kwds)
@@ -427,7 +432,7 @@ class Representor(Node):
 
         return self()
 
-    def sort(self, slice):
+    def sort(self, slice="*"):
         return repops_multi.sort(self, self.get(slice))
 
     def get(self, *slices, **kwds):

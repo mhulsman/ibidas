@@ -17,6 +17,7 @@ _delay_import_(globals(),"..utils","util","nestutils","cutils","nested_array")
 _delay_import_(globals(),"..itypes","detector","type_attribute_freeze","convertors")
 _delay_import_(globals(),"..repops_slice")
 _delay_import_(globals(),"..repops_dim")
+_delay_import_(globals(),"..utils.missing","Missing")
 
 
 class PyRepresentor(wrapper.SourceRepresentor):
@@ -108,7 +109,13 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 param_kwds[name] = arguments[param_ids]
                 use_counters[param_ids] -= 1
                 
-            res = self.visit(command, **param_kwds)
+            try:
+                res = self.visit(command, **param_kwds)
+            except:
+                if(debug_mode):
+                    from ..passes.cytoscape_vis import DebugVisualizer
+                    DebugVisualizer.run(query,run_manager)
+                raise
             if(debug_mode):
                 self.graph.na["output"][command] = str(res)
 
@@ -213,12 +220,25 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                                        res_type=node.type, dtype=node.type.toNumpy(), bc_allow=True)
         return slice.modify(data=ndata,rtype=node.type)
         
+    def visitUnaryFuncElemOpSlice(self,node, slice):
+        try:
+            func = getattr(self, node.sig.name + node.funcname)
+        except AttributeError:
+            func = getattr(self, node.sig.name + "General")
 
-    def visitBinElemOpSlice(self,node, slices):
-        func = node.oper.exec_funcs["py"]
+        ndata = slice.data.mapseq(func,type_in=slice.type,type_out=node.type,
+                                  res_type=node.type,op=node.funcname )
+        return slice.modify(data=ndata,rtype=node.type)
+
+    def visitBinFuncElemOpSlice(self,node, slices):
+        try:
+            func = getattr(self, node.sig.name + node.funcname)
+        except AttributeError:
+            func = getattr(self, node.sig.name + "General")
+
         ndata = nested_array.co_mapseq(func,[slice.data for slice in slices],
                                        type1=slices[0].type,type2=slices[1].type,
-                                       typeo=node.type,res_type=node.type,op=node.op,
+                                       typeo=node.type,res_type=node.type,op=node.funcname,
                                        bc_allow=True)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
@@ -236,6 +256,83 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def castnumbers_numbers(self,castname,node,slice):
         return slice.data.mapseq(lambda x:x,res_type=node.type)
+
+
+    def number_numberGeneral(self, data, type1, type2, typeo, op):
+        data1,data2 = data
+        if(data1 is Missing or data2 is Missing):
+            return Missing
+        return numpy_arith[op](data1, data2, sig=typeo.toNumpy())
+
+    def scalar_scalarGeneral(self, data, type1, type2, typeo, op):
+        #a numpy bug gives all true arrays when using
+        #bool as outtype in comparison
+        return numpy_cmp[op](data[0], data[1])
+    
+    def numberGeneral(self, data, type_in, type_out, op):
+        return numpy_unary_arith[op](data, sig=type_out.toNumpy())
+
+    def arrayscalarArgSort(self, data, type_in, type_out, op):
+        if(len(data.shape) < 2):
+            return cutils.darray([numpy.argsort(row,axis=0) for row in data])
+        else:
+            return numpy.argsort(data,axis=1)
+    
+    def arrayanyPos(self, data, type_in, type_out, op):
+        dtype = type_out.toNumpy()
+        if(len(data.shape) < 2):
+            return cutils.darray([numpy.arange(len(row),dtype=dtype) for row in data])
+        else:
+            return numpy.tile(numpy.arange(data.shape[1],dtype=dtype),data.shape[0]).reshape(data.shape[:1])
+
+numpy_cmp = {'Equal':numpy.equal,#{{{
+            'NotEqual':numpy.not_equal,
+            'LessEqual':numpy.less_equal,
+            'GreaterEqual':numpy.greater_equal,
+            'Less':numpy.less,
+            'Greater':numpy.greater}
+
+numpy_arith = { 'Add':numpy.add,
+                'Subtract':numpy.subtract,
+                'Multiply':numpy.multiply,
+                'Modulo':numpy.mod,
+                'Divide':numpy.divide,
+                'FloorDivide':numpy.floor_divide,
+                'And':numpy.bitwise_and,
+                'Or':numpy.bitwise_or,
+                'Xor':numpy.bitwise_xor,
+                'Power':numpy.power
+                }
+
+numpy_unary_arith = {
+    "Invert":numpy.invert,
+    "Negative":numpy.negative,
+    "Abs":numpy.abs
+    }
+
+reverse_op = {'__eq__':'__eq__',
+            '__ne__':'__ne__',
+            '__le__':'__ge__',
+            '__ge__':'__le__',
+            '__lt__':'__gt__',
+            '__gt__':'__lt__',
+            '__add__':'__radd__',
+            '__radd__':'__add__',
+            '__sub__':'__rsub__',
+            '__rsub__':'__sub__',
+            '__mul__':'__rmul__',
+            '__rmul__':'__mul__',
+            '__mod__':'__rmod__',
+            '__rmod__':'__mod__',
+            '__div__':'__rdiv__',
+            '__rdiv__':'__div__',
+            '__and__':'__rand__',
+            '__rand__':'__and__',
+            '__or__':'__ror__',
+            '__ror__':'__or__',
+            '__xor__':'__rxor__',
+            '__rxor__':'__xor__',
+            }#}}}
 
 #util funcs
 def speedtuplify(seqs):

@@ -2,22 +2,21 @@ from collections import defaultdict
 import numpy
 
 class FuncSignature(object):
-    __slots__ = ['types', 'impl']
+    __slots__ = ['types', 'name']
 
-    def __init__(self, types, impl):
+    def __init__(self, types, impl_name):
+        assert isinstance(types, tuple), "Types arguments should be a tuple"
+        assert all(issubclass(t, rtypes.TypeUnknown) for t in types), "Type tuple should contain type classes"
         self.types = types
-        self.impl = impl
+        self.name = name
 
 func_info = defaultdict(list)
-
-
-def add_func(names, types, impl):
-    assert isinstance(types, tuple), "Types arguments should be a tuple"
-    assert all(issubclass(t, rtypes.TypeUnknown) for t in types), "Type tuple should contain type classes"
-    
-    func_sig = FuncSignature(types, impl)
-    for name in names:
-        func_info[name].append(func_sig)
+def add_func(names, func_sig):
+    if(isinstance(names,str)):
+        func_info[names].append(func_sig)
+    else:
+        for name in names:
+            func_info[name].append(func_sig)
 
 
 
@@ -56,7 +55,7 @@ def find_impl(funcname, types, otype=None):
             so = str(otype)
         raise RuntimeError, "Cannot find func " + str(funcname)  + " with signature " + str(types) + " --> " + so
     
-    return (min_sig.impl, min_otype)
+    return (min_sig.name, min_otype)
 
 
 class FuncImpl(object):

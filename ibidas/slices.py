@@ -164,12 +164,13 @@ class UnpackArraySlice(UnaryOpSlice):#{{{
             else: 
                 nudims = stype.dims[:ndim]
                 rest_dims.extend(stype.dims[ndim:])
+            last_type = stype
             stype = stype.subtypes[0]
             ndim -= len(nudims)
             unpack_dims.extend(nudims)
         
         if(rest_dims):
-            ntype = rtypes.TypeArray(stype.has_missing, rest_dims, stype.subtypes)
+            ntype = rtypes.TypeArray(last_type.has_missing, dimpaths.DimPath(*rest_dims), last_type.subtypes)
         else:
             ntype = stype
 
@@ -219,7 +220,6 @@ def broadcast(slices,mode="pos"):#{{{
             if bcdim in slice.dims:
                 references[bcdim].append(slice)
 
-    nplans = []
     nslices = []
     for plan,slice in zip(bcplan,slices):
         nplan = []
@@ -241,8 +241,8 @@ def broadcast(slices,mode="pos"):#{{{
         if(active_bcdims):                
             slice = BroadcastSlice(slice,[references[bcdim] for bcdim in active_bcdims],nplan,bcdims)
         nslices.append(slice)
-
-    return nslices#}}}
+    return (nslices, bcplan)
+    #}}}
 
 class FilterSlice(UnaryOpSlice):#{{{
     __slots__ = ["constraint"]
@@ -255,10 +255,6 @@ class FilterSlice(UnaryOpSlice):#{{{
         if(ndim is None):
             sdims, subtype = sdims.removeDim(0, constraint, stype.subtypes[0])
         else:
-            ndep = [any(dep) for dep in izip_longest(sdims, constraint.dims, fillvalue=False)]
-            ddims = [ddim for dep,ddim in zip(ndep,sdims[::-1]) if dep]
-
-            ndim = ndim.changeDependent(tuple(ndep),tuple(ddims))
             sdims, subtype = sdims.updateDim(0, ndim, stype.subtypes[0])
 
         if(sdims):
@@ -271,19 +267,66 @@ class FilterSlice(UnaryOpSlice):#{{{
 
 
 def filter(slice,constraint,seldim, ndim, mode="dim"):
-        seldimpos = slice.dims.index(seldim)
+    used_dims = [False,] * len(slice.dims)
+    while True:
+        #determine filter dim
+        if(isinstance(seldim, dimensions.Dim)):
+            try:
+                curpos = 0
+                while True:
+                    seldimpos = slice.dims.index(seldim,curpos)
+                    if(not used_dims[seldimpos]):
+                        break
+                    curpos = seldimpos + 1
+            except ValueError:
+                break
+        else:
+            seldimpos = seldim
+        
+        #pack up to and including filter dim
         packdepth = len(slice.dims) - seldimpos
         if(packdepth):
             slice = PackArraySlice(slice,packdepth)
 
-        slice,constraint = broadcast([slice,constraint],mode=mode)
-        slice = FilterSlice(slice,constraint,ndim)
+        #prepare adaptation of ndim.dependent
+        if(ndim):
+            dep = list(ndim.dependent)
+            while(len(dep) < len(slice.dims)):
+                dep.insert(0,False)
+
+        #broadcast to constraint
+        (slice,constraint),(splan,cplan) = broadcast([slice,constraint],mode=mode)
+
+        #adapt ndim to braodcast, apply filter
+        if(ndim):
+            ndep = dimpaths.applyPlan(dep,splan,insertvalue=True)
+            xndim = ndim.changeDependent(tuple(ndep), slice.dims)
+        else:
+            xndim = ndim
+        slice = FilterSlice(slice,constraint,xndim)
+
+        #adapt used_dims
+        used_dims = dimpaths.applyPlan(used_dims,splan,insertvalue=False)
+        for pos,cp in enumerate(cplan):
+            if cp == BCCOPY:
+                used_dims[pos] = True
+        
+        #handle dim removal, filter_dim is used
         if(ndim is None): #dimension removed/collapsed
             packdepth -= 1
+            del used_dims[len(cplan)]
+        else:
+            used_dims[len(cplan)] = True
 
+        #unpack dims
         if(packdepth):
             slice = UnpackArraySlice(slice,packdepth)
-        return slice
+        
+        #if dim position was given, stop, otherwise, search for new pos
+        if(isinstance(seldim,int)):
+            break
+            
+    return slice
 
 
 class UnpackTupleSlice(UnaryOpSlice):#{{{
@@ -475,68 +518,42 @@ class AggregrateSlice(FuncSlice):#{{{
         ntype = type_func(slice.type, slice.dims[-ndim:], exec_func)
         FuncSlice.__init__(self, slice,dim,exec_func, type_func, ndims, ntype, *params, **kwds)#}}}
 
-class PackTupleSlice(MultiOpSlice):#{{{
-    __slots__ = ["to_python"]
+class BinFuncOpSlice(MultiOpSlice):#{{{
+    __slots__ = ["funcname","sig"]
+    def __init__(self, lslice, rslice, funcname, sig, outparam, dims=None):
+        self.funcname = funcname
+        self.sig = sig
 
-    def __init__(self, slices, field="data", to_python=False):
-        cdim = set([slice.dims for slice in slices])
-        assert len(cdim) == 1, "Packing tuple on slices with different dims"
-        
-        self.to_python=to_python
-
-        fieldnames = [slice.name for slice in slices]
-        subtypes = [slice.type for slice in slices]
-        ntype = rtypes.TypeTuple(False, tuple(subtypes), tuple(fieldnames))
-        nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
-        MultiOpSlice.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)#}}}
-
-class BinOpSlice(MultiOpSlice):#{{{
-    __slots__ = []
-    def __init__(self, slice1, slice2, outtype=rtypes.unknown, dims=None, outidx=None):
-        if(slice1.name == slice2.name):
-            nname = slice1.name
-        else:
-            nname = "result"
-            if(outidx):
-                nname += str(outidx)
-        
         if(dims is None):
-            assert slice1.dims == slice2.dims, "Slice dims not equal, and no dim given"
-            dims = slice1.dims
-        nbookmarks = slice1.bookmarks | slice2.bookmarks
+            assert lslice.dims == rslice.dims, "Slice dims not equal, and no dim given"
+            dims = lslice.dims
+        nbookmarks = lslice.bookmarks | rslice.bookmarks
 
-        MultiOpSlice.__init__(self, (slice1, slice2), name=nname, rtype=outtype, dims=dims, bookmarks=nbookmarks)#}}}
+        MultiOpSlice.__init__(self, (lslice, rslice), name=outparam.name, rtype=outparam.type, dims=dims, bookmarks=nbookmarks)#}}}
 
-class BinElemOpSlice(BinOpSlice):#{{{
-    __slots__ = ['oper', 'op']
+class BinFuncElemOpSlice(BinFuncOpSlice):#{{{
+    __slots__ = []
 
-    def __init__(self, slice1, slice2, op, outidx=None):
-        ntype, oper = typeops.binop_type(slice1.type, slice2.type, op)
-        
-        dim1 = slice1.dims
-        dim2 = slice2.dims
-        if(len(dim1) < len(dim2)):
-            dim2, dim1 = dim1, dim2
-        assert all([d1 == d2 for d1, d2 in zip(dim1, dim2)]), \
+    def __init__(self, funcname, sig, outparam, lslice, rslice):
+        dims = lslice.dims
+        assert all([d1 == d2 for d1, d2 in zip(dims, rslice.dims)]), \
                     "Dimensions of slices do not match"
         
-        BinOpSlice.__init__(self, slice1, slice2, ntype, dim1, outidx=outidx)
-        self.oper = oper
-        self.op = op#}}}
+        BinFuncOpSlice.__init__(self, lslice, rslice, funcname, sig, outparam, dims)#}}}
 
-class UnaryElemOpSlice(UnaryOpSlice):#{{{
-    __slots__ = ["oper", "op"]
+class UnaryFuncOpSlice(UnaryOpSlice):#{{{
+    __slots__ = ["funcname","sig"]
+    def __init__(self, slice, funcname, sig, outparam, dims=None):
+        self.funcname = funcname
+        self.sig = sig
+
+        if(dims is None):
+            dims = slice.dims
+        UnaryOpSlice.__init__(self, slice, name=outparam.name, rtype=outparam.type, dims=dims)#}}}
+
+class UnaryFuncElemOpSlice(UnaryFuncOpSlice):#{{{
+    __slots__ = []
     
-    def __init__(self, slice, op, outtype=None):
-        """Creates a new slice, and sets attributes.
-
-        Parameters
-        ----------
-        slice: Source slice func is applied on.
-        op: operator (python name)
-        outtype: ibidas out type or None."""
-        ntype, oper = typeops.unop_type(slice.type, op, outtype)
-        UnaryOpSlice.__init__(self, (slice,), rtype=ntype)
-        self.oper = oper
-        self.op = op#}}}
-
+    def __init__(self, funcname, sig, outparam, slice):
+        UnaryFuncOpSlice.__init__(self, slice, funcname, sig, outparam)
+        #}}}

@@ -86,19 +86,19 @@ class DimPath(tuple):
 
         res = self[:max(pos,0)] + DimPath(*ndims)
         if(not subtype is None):
-            subtype = subtype.removeDepDim(len(self) - pos, elem_specifier)
+            subtype = subtype.removeDepDim(pos - len(self), elem_specifier)
             return (res,subtype)
         else:
             return res#}}}
 
     def updateDim(self, pos, ndim, subtype=None):#{{{
-        if(pos < 0 or self[pos].id != ndim.id):
+        if(pos < 0  or self[pos].id != ndim.id):
             ndims = []
             for p in xrange(max(pos + 1,0), len(self)):
                 ndims.append(self[p].updateDepDim(p - pos, ndim))
 
             if(not subtype is None):
-                subtype = subtype.updateDepDim(len(self) - pos, ndim)
+                subtype = subtype.updateDepDim(pos - len(self), ndim)
             res = self[:max(pos,0)] + (ndim,) + DimPath(*ndims)
         else:
             res = self[:pos] + (ndim,) + self[(pos + 1):]
@@ -111,10 +111,12 @@ class DimPath(tuple):
         ndims = []
         for p in xrange(max(pos,0), len(self)):
             ndims.append(self[p].insertDepDim(p - pos, ndim))
-
-        res = self[:max(pos,0)] + (ndim,) + DimPath(*ndims)
+        if pos >= 0:
+            res = self[:pos] + (ndim,) + DimPath(*ndims)
+        else:
+            res = DimPath(*ndims)
         if(not subtype is None):
-            subtype = subtype.insertDepDim(len(self) - pos, ndim)
+            subtype = subtype.insertDepDim(pos - len(self) -1, ndim)
             return (res,subtype)
         else:
             return res#}}}
@@ -348,6 +350,19 @@ def planBroadcastMatchDim(paths):#{{{
 
         plans.append(plan[::-1])
     return (bcdims,plans)#}}}
+
+
+def applyPlan(seq,plan,insertvalue=None):
+    elempos = 0
+    nseq = []
+    for planelem in plan:
+        if(planelem == BCNEW):
+            nseq.append(insertvalue)
+        else:
+            nseq.append(seq[elempos])
+            elempos += 1
+    nseq.extend(seq[elempos:])
+    return nseq
 
 def flatFirstDims(array,ndim):#{{{
     """Flattens first ndim dims in numpy array into next dim"""

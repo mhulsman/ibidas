@@ -126,7 +126,7 @@ class NestedArray(object):
                 ndata.shape = data.shape + (pshape,) + ndata.shape[1:]
                 nself.idxs.append(len(data.shape))
             data = ndata    
-            depth -= cdepth
+            depth -= 1
         
         nself.cur_type = subtype
         nself.dims = self.dims + odimpath
@@ -186,17 +186,16 @@ class NestedArray(object):
 
     def mapseq(self,func,*args,**kwargs):
         restype= kwargs.pop("res_type")
-        dtype= restype.toNumpy()
         
         seq,rshape = self._flatData()
         seq = func(seq,*args,**kwargs)
-
+        
         seq.shape = rshape + seq.shape[1:]
-            
-        if(not seq.dtype == dtype):
-            seq = numpy.cast[dtype](seq)
-            seq = seq.view(sparse_arrays.FullSparse)
 
+        if restype:
+            #if not seq.dtype == restype.toNumpy():
+            #    seq = numpy.cast[dtype](seq)
+            seq = seq.view(sparse_arrays.FullSparse)
         nself = self.copy()
         nself.data = seq
         nself.cur_type = restype
@@ -359,8 +358,8 @@ class NestedArray(object):
 
     def __repr__(self):
         return "NestedArray < \n" + \
-               "Idxs: " + str(self.idxs) + "\n" + \
-               "Data: " + str(self.data) + "\n" + \
+               "Idxs: " + str(self.idxs) + "  Dims: " + str(self.dims) + " Shape: " + str(self.data.shape) + "\n" + \
+               "Data: " + str(self.data) + "  Dtype: " + str(self.data.dtype) + "\n" + \
                ">\n"
 
 
