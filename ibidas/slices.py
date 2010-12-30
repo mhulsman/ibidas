@@ -265,8 +265,7 @@ class FilterSlice(UnaryOpSlice):#{{{
         self.constraint = constraint
         UnaryOpSlice.__init__(self, slice, rtype=ntype)#}}}
 
-
-def filter(slice,constraint,seldim, ndim, mode="dim"):
+def filter(slice,constraint,seldim, ndim, mode="dim"):#{{{
     used_dims = [False,] * len(slice.dims)
     while True:
         #determine filter dim
@@ -326,8 +325,7 @@ def filter(slice,constraint,seldim, ndim, mode="dim"):
         if(isinstance(seldim,int)):
             break
             
-    return slice
-
+    return slice#}}}
 
 class UnpackTupleSlice(UnaryOpSlice):#{{{
     """A slice which is the result of unpacking a tuple slice."""
@@ -557,3 +555,5 @@ class UnaryFuncElemOpSlice(UnaryFuncOpSlice):#{{{
     def __init__(self, funcname, sig, outparam, slice):
         UnaryFuncOpSlice.__init__(self, slice, funcname, sig, outparam)
         #}}}
+
+

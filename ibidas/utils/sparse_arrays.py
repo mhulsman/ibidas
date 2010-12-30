@@ -290,13 +290,13 @@ class PosSparse(object):
         else:
             return self.val.max()  #missing acts as high value apparently
 
-    def all(self,skip_sparse=True):
-        if(not skip_sparse and self.hasSparse()):
-            return False
-        return self.val.all() 
+    ##def all(self,skip_sparse=True):
+    #    if(not skip_sparse and self.hasSparse()):
+    #        return False
+    #    return self.val.all() 
 
-    def any(self,skip_sparse=True):
-        return self.val.any()
+    #def any(self,skip_sparse=True):
+    #    return self.val.any()
 
     def ravel(self):
         return PosSparse(self.val, self.sorted_pos, (numpy.multiply.reduce(self.shape),))
@@ -538,15 +538,15 @@ class FullSparse(numpy.ndarray):
             return self.val.max() #max always returns Missing if available
 
 
-    def all(self,skip_sparse=True):
-        if(skip_sparse):
-            filter = ~numpy.equal(self,Missing)
-            return self[filter].val.all()
-        else:
-            return self.val.all()
+    #def all(self,skip_sparse=True):
+    #    if(skip_sparse):
+    #        filter = ~numpy.equal(self,Missing)
+    #        return self[filter].val.all()
+    #    else:
+    #        return self.val.all()
 
-    def any(self,skip_sparse=True):
-        return self.val.any()
+    #def any(self,skip_sparse=True):
+    #    return self.val.any()
 
 
 

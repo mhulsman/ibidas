@@ -140,6 +140,21 @@ class UnaryFuncSeqOp(UnaryFuncOp):
             nslices.append(slice)
         return self.initialize(tuple(nslices),source._state)
 
+class UnaryFuncAggregateOp(UnaryFuncOp):
+    def process(self, source, **kwargs):
+        if not source._state & RS_TYPES_KNOWN:
+            return
+
+        nslices = []
+        for pos, slice in enumerate(source._slices):
+            slice = slices.PackArraySlice(slice,1)
+            kwargs["slice"] = slice
+            sig, nkwargs, outparam = self._findSignature(**kwargs)
+            outparam = outparam.withNumber(pos)
+            slice = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
+            nslices.append(slice)
+        return self.initialize(tuple(nslices),source._state)
+
 
 class BinaryFuncOp(repops.MultiOpRep, Func):
     def __init__(self, lsource, rsource, **kwargs):
@@ -204,24 +219,34 @@ class BinArithSignature(FuncSignature):
         return out_type#}}}
 bin_arithsig = BinArithSignature("number_number")
 
+@repops.delayable()
 class Add(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
+@repops.delayable()
 class Subtract(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
+@repops.delayable()
 class Multiply(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
+@repops.delayable()
 class Modulo(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
+@repops.delayable()
 class Divide(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
+@repops.delayable()
 class FloorDivide(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
+@repops.delayable()
 class And(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
+@repops.delayable()
 class Or(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
+@repops.delayable()
 class Xor(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
+@repops.delayable()
 class Power(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
 
@@ -240,18 +265,24 @@ class CompareSignature(FuncSignature):
        
 comparesig = CompareSignature("scalar_scalar")
 
+@repops.delayable()
 class Equal(BinaryFuncElemOp):
     _sigs = [comparesig]
+@repops.delayable()
 class NotEqual(BinaryFuncElemOp):
     _sigs = [comparesig]
 
+@repops.delayable()
 class LessEqual(BinaryFuncElemOp):
     _sigs = [comparesig]
+@repops.delayable()
 class Less(BinaryFuncElemOp):
     _sigs = [comparesig]
     
+@repops.delayable()
 class GreaterEqual(BinaryFuncElemOp):
     _sigs = [comparesig]
+@repops.delayable()
 class Greater(BinaryFuncElemOp):
     _sigs = [comparesig]
 
@@ -266,12 +297,15 @@ class UnaryArithSignature(FuncSignature):
 
 unary_arithsig = UnaryArithSignature("number")
 
+@repops.delayable()
 class Invert(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 
+@repops.delayable()
 class Abs(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 
+@repops.delayable()
 class Negative(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 
@@ -294,11 +328,38 @@ class UnaryArraySubtypeToIntegerSignature(FuncSignature):
         return Param(slice.name, ntype)#}}}
 
 unary_arrayanysig = UnaryArraySubtypeToIntegerSignature("arrayany", rtypes.TypeAny)
-unary_arrayscalarsig = UnaryArraySubtypeToIntegerSignature("arrayscalar", (rtypes.TypeScalar,rtypes.TypeString))
+unary_arrayscalarsig = UnaryArraySubtypeToIntegerSignature("arrayscalar", (rtypes.TypeScalar,rtypes.TypeString, rtypes.TypeTuple))
 
+@repops.delayable()
 class ArgSort(UnaryFuncSeqOp):
     _sigs = [unary_arrayscalarsig]
 
+@repops.delayable()
 class Pos(UnaryFuncSeqOp):
     _sigs = [unary_arrayanysig]
+
+
+class UnaryArrayBoolToBoolSignature(FuncSignature):
+    def check(self, slice):#{{{
+        in_type = slice.type
+        if(not isinstance(in_type, rtypes.TypeArray) or len(in_type.dims) != 1):
+            return False
+
+        if(not isinstance(in_type.subtypes[0], rtypes.TypeBool)):
+            return False
+        
+        #FIXME: make integer type platform dependent
+        ntype = rtypes.TypeBool(in_type.subtypes[0].has_missing)
+        return Param(slice.name, ntype)#}}}
+
+unary_arrayboolsig = UnaryArrayBoolToBoolSignature("arraybool")
+
+
+@repops.delayable()
+class Any(UnaryFuncAggregateOp):
+    _sigs = [unary_arrayboolsig]
+
+@repops.delayable()
+class All(UnaryFuncAggregateOp):
+    _sigs = [unary_arrayboolsig]
 

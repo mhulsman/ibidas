@@ -89,7 +89,19 @@ class Filter(repops.MultiOpRep):
                     
 
 
-def sort(source, sortsource):
+def sort(source, *sortsources):
+    if len(sortsources) > 1:
+        sortsource = Combine(*sortsources)
+    elif len(sortsources) == 0:
+        if len(source._slices) > 1:
+            sortsource = source.tuple()
+        else:
+            sortsource = source
+    else:
+        sortsource = sortsources[0]
+    if len(sortsource._slices) > 1:
+        sortsource = sortsource.tuple()
+
     constraint = repops_funcs.ArgSort(sortsource)
     assert len(constraint._slices) == 1, "Sort field should have 1 slice"
     cslice = constraint._slices[0]

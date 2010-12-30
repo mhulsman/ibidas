@@ -283,7 +283,23 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         if(len(data.shape) < 2):
             return cutils.darray([numpy.arange(len(row),dtype=dtype) for row in data])
         else:
-            return numpy.tile(numpy.arange(data.shape[1],dtype=dtype),data.shape[0]).reshape(data.shape[:1])
+            return numpy.tile(numpy.arange(data.shape[1],dtype=dtype),data.shape[0]).reshape(data.shape[:2])
+
+
+    def arrayboolAny(self, data, type_in, type_out, op):
+        dtype = type_out.toNumpy()
+        if(len(data.shape) < 2):
+            return cutils.darray([numpy.any(row,axis=0) for row in data],dtype)
+        else:
+            return numpy.any(data,axis=1)
+    
+    def arrayboolAll(self, data, type_in, type_out, op):
+        dtype = type_out.toNumpy()
+        if(len(data.shape) < 2):
+            return cutils.darray([numpy.all(row,axis=0) for row in data],dtype)
+        else:
+            return numpy.all(data,axis=1)
+
 
 numpy_cmp = {'Equal':numpy.equal,#{{{
             'NotEqual':numpy.not_equal,

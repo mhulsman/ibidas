@@ -432,8 +432,12 @@ class Representor(Node):
 
         return self()
 
-    def sort(self, slice="*"):
-        return repops_multi.sort(self, self.get(slice))
+    def sort(self, *slices, **kwargs):
+        if(slices or kwargs):
+            sortsource = self.get(*slices,**kwargs)
+            return repops_multi.sort(self, sortsource)
+        else:
+            return repops_multi.sort(self)
 
     def get(self, *slices, **kwds):
         return repops_slice.Project(self,*slices,**kwds)
