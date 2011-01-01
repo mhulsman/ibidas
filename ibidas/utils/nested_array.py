@@ -225,6 +225,47 @@ class NestedArray(object):
         nself.dims = nself.dims[:matchpoint] + (newdim,) + nself.dims[matchpoint:]
         return nself
 
+
+    def mergeDim(self, matchpoint,newdim):
+        matchpoint += 1
+        assert len(self.idxs) > (matchpoint + 1), "Nested array not nested that deep"
+        nself = self.copy()
+        lidx = self.idxs[matchpoint]
+        ridx = self.idxs[matchpoint+1]
+        #Merging dims, 4 possibilities:
+        #fixed-fixed, fixed-var, var-fixed, var-var
+        if(isinstance(ridx,int)):
+            nextpos,nextobj = nself._get_next_obj(matchpoint+1)
+            if(isinstance(lidx,int)):  #fixed-fixed
+                oshape = nextobj.shape
+                nshape = oshape[:lidx] + (oshape[lidx] * oshape[ridx],) + oshape[(ridx+1):]
+            else:  #var-fixed
+                orshape = nextobj.shape[ridx]
+                diff = (lidx[...,-1] - lidx[...,0]) * orshape
+                nlidx = numpy.zeros(lidx.shape,dtype=lidx.dtype)
+                nlidx[...,-1] = numpy.cumsum(diff,axis=-1)
+                nlidx[...,0] = nlidx[...,-1] - diff
+                nself.idxs[matchpoint] = nlidx
+                nshape =  (oshape[0] * oshape[ridx],) + oshape[(ridx+1):]
+            nextobj = nextobj.reshape(nshape)
+            nself._set_obj(nextpos,nextobj)
+        else:
+            if(isinstance(lidx,int)):  #fixed-var
+                oshape = ridx.shape
+                nshape = oshape[:-2] + (2 * oshape[-1],)
+                nridx = ridx.reshape(nshape)[...,[0, -1]]
+                nself.idxs[matchpoint] = nridx
+            else:     #var-var
+                nlidx = numpy.zeros(lidx.shape,dtype=lidx.dtype)
+                nlidx[...,0] = ridx[lidx[...,0],0]
+                nlidx[...,-1] = ridx[lidx[...,-1],-1]
+                nself.idxs[matchpoint] = nlidx
+        del nself.idxs[matchpoint+1]
+
+        nself.dims = nself.dims[:(matchpoint-1)] + (newdim,) + nself.dims[(matchpoint+1):]
+        return nself
+
+
     def broadcast(self, repeat_dict, dim_dict):
         if not repeat_dict:
             return self
@@ -295,6 +336,12 @@ class NestedArray(object):
         else:
             return (pos,self.idxs[pos])
 
+    def _set_obj(self,pos,obj):
+        if(pos == len(self.idxs)):
+            self.data = obj
+        else:
+            self.idxs[pos] = obj
+        
             
     def _apply_tile_broadcast(self, tilerepeats, pos, prevrepeat):
         if(not tilerepeats and not prevrepeat):

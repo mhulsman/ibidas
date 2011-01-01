@@ -54,7 +54,7 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
         if(node._state & RS_SLICES_KNOWN):
             assert node in self.inferred_node_slices, "Cannot find node in inferred nodes map"
             nnode = self.getNodeCopy(node)
-            nnode.initalize(self.inferred_node_slices[node],RS_ALL_KNOWN | RS_INFERRED)
+            nnode._initalize(self.inferred_node_slices[node],RS_ALL_KNOWN | RS_INFERRED)
             return nnode
         else:
             raise RuntimeError, "Cannot find known slices for " + str(type(node))
@@ -65,7 +65,7 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
         else:
             nnode = self.getNodeCopy(node)
             nnode._source = self.processQuery(node._source)
-            nnode.process()
+            nnode._process()
             return nnode
     
     def processQueryMultiOpRep(self,node):
@@ -74,6 +74,6 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
         else:
             nnode = self.getNodeCopy(node)
             nnode._sources = tuple([self.processQuery(source) for source in node._sources])
-            nnode.process()
+            nnode._process()
             return nnode
 

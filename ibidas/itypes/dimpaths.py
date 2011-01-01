@@ -352,15 +352,32 @@ def planBroadcastMatchDim(paths):#{{{
     return (bcdims,plans)#}}}
 
 
-def applyPlan(seq,plan,insertvalue=None):
+def applyPlan(seq,plan,newvalue=None,copyvalue=NOVAL,existvalue=NOVAL,ensurevalue=NOVAL):
     elempos = 0
     nseq = []
     for planelem in plan:
         if(planelem == BCNEW):
             nseq.append(insertvalue)
-        else:
-            nseq.append(seq[elempos])
+        elif(planelem == BCEXIST):
+            if(existvalue is NOVAL):
+                nseq.append(seq[elempos])
+            else:
+                nseq.append(existvalue)
             elempos += 1
+        elif(planelem == BCCOPY):
+            if(copyvalue is NOVAL):
+                nseq.append(seq[elempos])
+            else:
+                nseq.append(copyvalue)
+            elempos += 1
+        elif(planelem == BCENSURE):
+            if(copyvalue is NOVAL):
+                nseq.append(seq[elempos])
+            else:
+                nseq.append(ensurevalue)
+            elempos += 1
+        else:
+            raise RuntimeError, "Unknown plan type"
     nseq.extend(seq[elempos:])
     return nseq
 

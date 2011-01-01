@@ -11,7 +11,7 @@ _delay_import_(globals(),"itypes","rtypes","dimensions","dimpaths")
 _delay_import_(globals(),"repops_funcs")
 
 class Broadcast(repops.MultiOpRep):
-    def process(self,sources, mode="dim"):
+    def _process(self,sources, mode="dim"):
         state = reduce(operator.__and__,[source._state for source in sources])
         if not state & RS_SLICES_KNOWN:
             return
@@ -19,17 +19,53 @@ class Broadcast(repops.MultiOpRep):
         nslices = []
         for bcslices in util.zip_broadcast(*[source._slices for source in sources]):
             nslices.extend(slices.broadcast(bcslices,mode))
-        return self.initialize(tuple(nslices),state)
+        return self._initialize(tuple(nslices),state)
+
+
+class Nest(repops.MultiOpRep):
+    def __init__(self, lsource, rsource, dim=None):
+        repops.MultiOpRep.__init__(self,(lsource,rsource),dim=dim)
+    def _process(self, sources, dim=None):
+        assert len(sources) == 2, "Nest expects two representor objects"
+        state = reduce(operator.__and__,[source._state for source in sources])
+        if not state & RS_SLICES_KNOWN:
+            return
+        lsource,rsource = sources
+        
+        joinpath = dimpaths.identifyDimPath([s.dims for s in lsource._slices], dim)
+
+        idims = []
+        for i in xrange(len(joinpath)):
+            idims.append(dimensions.Dim(1))
+        
+        
+        references = []
+        for ndim in joinpath:
+            nrefs = []
+            for slice in lsource._slices:
+                if ndim in slice.dims:
+                    nrefs.append(slice)
+            references.append(nrefs)
+
+        nslices = []
+        plan = [BCEXIST] * len(idims)
+        for slice in rsource._slices:
+            odims = slice.dims
+            for dimpos in xrange(len(joinpath)):
+                slice = slices.InsertDimSlice(slice,dimpos,idims[dimpos])
+            slice = slices.BroadcastSlice(slice,references,plan,joinpath + odims)
+            nslices.append(slice)
+        return self._initialize(tuple(nslices), state)
 
 
 class Combine(repops.MultiOpRep):
-    def process(self,sources):
+    def _process(self,sources):
         state = reduce(operator.__and__,[source._state for source in sources])
         if not state & RS_SLICES_KNOWN:
             return
 
         nslices = sum([source._slices for source in sources],tuple())
-        return self.initialize(nslices,state)
+        return self._initialize(nslices,state)
 
 
 class Filter(repops.MultiOpRep):
@@ -38,7 +74,7 @@ class Filter(repops.MultiOpRep):
             constraint = repops.PlusPrefix(wrapper_py.rep(constraint,name="filter"))
         repops.MultiOpRep.__init__(self,(source,constraint),dim=dim)
 
-    def process(self,sources,dim):
+    def _process(self,sources,dim):
         source,constraint = sources
         if not source._state & RS_SLICES_KNOWN:
             return
@@ -85,7 +121,7 @@ class Filter(repops.MultiOpRep):
         for slice in source._slices:
             slice = slices.filter(slice, cslice, seldim, ndim, mode)
             nslices.append(slice)
-        return self.initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices),source._state)
                     
 
 

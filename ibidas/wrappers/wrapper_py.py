@@ -2,6 +2,7 @@ import operator
 from itertools import chain
 from collections import defaultdict
 import numpy
+import sys
 
 import wrapper
 from ..constants import *
@@ -42,7 +43,7 @@ def rep(data=None, dtype=None, unpack=True, name=None):#{{{
         data_slice = slices.ensure_normal_or_frozen(slices.UnpackArraySlice(data_slice))
 
     res = wrapper.SourceRepresentor()
-    res.initialize((data_slice,)) 
+    res._initialize((data_slice,)) 
 
     if(unpack and isinstance(res.getType(), rtypes.TypeTuple)):
         res = repops_slice.UnpackTuple(res)
@@ -111,11 +112,15 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 
             try:
                 res = self.visit(command, **param_kwds)
-            except:
+            except Exception, e:
+                exc_info = sys.exc_info()
                 if(debug_mode):
-                    from ..passes.cytoscape_vis import DebugVisualizer
-                    DebugVisualizer.run(query,run_manager)
-                raise
+                    try:
+                        from ..passes.cytoscape_vis import DebugVisualizer
+                        DebugVisualizer.run(query,run_manager)
+                    except Exception:
+                        pass
+                raise exc_info[1], None, exc_info[2]
             if(debug_mode):
                 self.graph.na["output"][command] = str(res)
 

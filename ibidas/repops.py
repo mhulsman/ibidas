@@ -51,12 +51,12 @@ class UnaryOpRep(representor.Representor):
         assert isinstance(source,representor.Representor), "Source should be a representor"
         self._source = source
         self._params = (args,kwds)
-        self.process(source,*args, **kwds)
+        self._process(source,*args, **kwds)
 
-    def process(self, source):
+    def _process(self, source):
         if not source._state & RS_SLICES_KNOWN:
             return
-        return self.initialize(source._slices, source._state)
+        return self._initialize(source._slices, source._state)
     
     def _copyquery(self):
         res = copy.copy(self)
@@ -68,9 +68,9 @@ class MultiOpRep(representor.Representor):
         assert isinstance(sources,tuple), "Sources should be a tuple"
         self._sources = sources
         self._params = (args,kwds)
-        self.process(sources,*args, **kwds)
+        self._process(sources,*args, **kwds)
     
-    def process(self, sources):
+    def _process(self, sources):
         raise RuntimError, "Process function should be overloaded for " + str(type(self))
     
     def _copyquery(self):
@@ -99,11 +99,11 @@ class ApplyFuncRep(UnaryOpRep):
     params, kwds: extra params
     """
 
-    def process(self,source,func,*params,**kwds):
+    def _process(self,source,func,*params,**kwds):
         if not source._state & RS_ALL_KNOWN:
             return
         nslices = func(source._slices, *params, **kwds)
-        return self.initialize(nslices)
+        return self._initialize(nslices)
 
 
 def apply_slice(slices, slicecls, dim_selector, *params, **kwds):

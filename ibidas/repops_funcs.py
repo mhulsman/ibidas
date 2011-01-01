@@ -112,7 +112,7 @@ class UnaryFuncOp(repops.UnaryOpRep, Func):
         repops.UnaryOpRep.__init__(self,source, **kwargs)
 
 class UnaryFuncElemOp(UnaryFuncOp):
-    def process(self, source, **kwargs):
+    def _process(self, source, **kwargs):
         if not source._state & RS_TYPES_KNOWN:
             return
 
@@ -122,10 +122,10 @@ class UnaryFuncElemOp(UnaryFuncOp):
             sig, nkwargs, outparam = self._findSignature(**kwargs)
             outparam = outparam.withNumber(pos)
             nslices.append(slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs))
-        return self.initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices),source._state)
 
 class UnaryFuncSeqOp(UnaryFuncOp):
-    def process(self, source, **kwargs):
+    def _process(self, source, **kwargs):
         if not source._state & RS_TYPES_KNOWN:
             return
 
@@ -138,10 +138,10 @@ class UnaryFuncSeqOp(UnaryFuncOp):
             slice = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
             slice = slices.UnpackArraySlice(slice,1)
             nslices.append(slice)
-        return self.initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices),source._state)
 
 class UnaryFuncAggregateOp(UnaryFuncOp):
-    def process(self, source, **kwargs):
+    def _process(self, source, **kwargs):
         if not source._state & RS_TYPES_KNOWN:
             return
 
@@ -153,7 +153,7 @@ class UnaryFuncAggregateOp(UnaryFuncOp):
             outparam = outparam.withNumber(pos)
             slice = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
             nslices.append(slice)
-        return self.initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices),source._state)
 
 
 class BinaryFuncOp(repops.MultiOpRep, Func):
@@ -166,7 +166,7 @@ class BinaryFuncOp(repops.MultiOpRep, Func):
 
         
 class BinaryFuncElemOp(BinaryFuncOp):
-    def process(self, sources, **kwargs):
+    def _process(self, sources, **kwargs):
         lsource,rsource = sources
         state = lsource._state & rsource._state
         if not state & RS_TYPES_KNOWN:
@@ -190,7 +190,7 @@ class BinaryFuncElemOp(BinaryFuncOp):
 
             outparam = outparam.withNumber(pos)
             nslices.append(slices.BinFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs))
-        return self.initialize(tuple(nslices),state)
+        return self._initialize(tuple(nslices),state)
 
 
 class BinArithSignature(FuncSignature):

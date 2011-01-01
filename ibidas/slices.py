@@ -203,7 +203,19 @@ class BroadcastSlice(UnaryOpSlice):#{{{
         self.refsliceslist = refslices
         self.plan = plan
         self.bcdims = bcdims
-        UnaryOpSlice.__init__(self, slice,dims=dimpaths.DimPath(*bcdims))#}}}
+
+        ndims = slice.dims
+        ntype = slice.type
+        for pos, planelem in enumerate(plan):
+            if(planelem == BCEXIST):
+                ndims, ntype = ndims.updateDim(pos, bcdims[pos], ntype)
+            elif(planelem == BCCOPY):
+                pass
+            else:
+                raise RuntimeError, "Unknown plan element in plan: " + str(plan)
+            
+        #FIXME: update bcdims using updateDim
+        UnaryOpSlice.__init__(self, slice, dims=ndims,rtype=ntype)#}}}
 
 def broadcast(slices,mode="pos"):#{{{
     slicedimpaths = [s.dims for s in slices]
@@ -243,6 +255,36 @@ def broadcast(slices,mode="pos"):#{{{
         nslices.append(slice)
     return (nslices, bcplan)
     #}}}
+
+def apply_broadcast_plan(slices,bcdims, bcplan):
+    references = defaultdict(list)
+    for bcdim in bcdims:
+        for slice in slices:
+            if bcdim in slice.dims:
+                references[bcdim].append(slice)
+   
+    nslices = []
+    for plan,slice in zip(bcplan,slices):
+        nplan = []
+        active_bcdims = []
+        for dimpos, bcdim, planelem in zip(range(len(bcdims)),bcdims,plan):
+            if(planelem == BCNEW):
+                ndim = dimensions.Dim(1)
+                slice = InsertDimSlice(slice,dimpos,ndim)
+                active_bcdims.append(bcdim)
+                nplan.append(BCEXIST)
+            elif(planelem == BCENSURE):
+                slice = EnsureCommonDimSlice(slice,references[bcdim],dimpos,bcdim)
+                nplan.append(BCCOPY)
+            elif(planelem == BCEXIST):
+                active_bcdims.append(bcdim)
+                nplan.append(planelem)
+            else:
+                nplan.append(planelem)
+        if(active_bcdims):                
+            slice = BroadcastSlice(slice,[references[bcdim] for bcdim in active_bcdims],nplan,bcdims)
+        nslices.append(slice)
+
 
 class FilterSlice(UnaryOpSlice):#{{{
     __slots__ = ["constraint"]
@@ -288,24 +330,23 @@ def filter(slice,constraint,seldim, ndim, mode="dim"):#{{{
             slice = PackArraySlice(slice,packdepth)
 
         #prepare adaptation of ndim.dependent
-        if(ndim):
-            dep = list(ndim.dependent)
-            while(len(dep) < len(slice.dims)):
-                dep.insert(0,False)
+        dep = list(ndim.dependent)
+        while(len(dep) < len(slice.dims)):
+            dep.insert(0,False)
 
         #broadcast to constraint
         (slice,constraint),(splan,cplan) = broadcast([slice,constraint],mode=mode)
 
         #adapt ndim to braodcast, apply filter
-        if(ndim):
-            ndep = dimpaths.applyPlan(dep,splan,insertvalue=True)
-            xndim = ndim.changeDependent(tuple(ndep), slice.dims)
-        else:
-            xndim = ndim
+        print "X",ndim
+        print dep, splan, cplan
+        ndep = dimpaths.applyPlan(dep,cplan,newvalue=False,copyvalue=True,ensurevalue=True,existvalue=False)
+        print ndep
+        xndim = ndim.changeDependent(tuple(ndep), slice.dims)
         slice = FilterSlice(slice,constraint,xndim)
 
         #adapt used_dims
-        used_dims = dimpaths.applyPlan(used_dims,splan,insertvalue=False)
+        used_dims = dimpaths.applyPlan(used_dims,cplan,newvalue=False,copyvalue=True,ensurevalue=True)
         for pos,cp in enumerate(cplan):
             if cp == BCCOPY:
                 used_dims[pos] = True

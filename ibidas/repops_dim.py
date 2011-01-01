@@ -6,7 +6,7 @@ _delay_import_(globals(),"slices")
 _delay_import_(globals(),"utils","util")
 
 class UnpackArray(repops.UnaryOpRep):
-    def process(self,source, name = None, ndim=None):
+    def _process(self,source, name = None, ndim=None):
         """Operation to unpack array typed slices
 
         Parameters
@@ -29,10 +29,10 @@ class UnpackArray(repops.UnaryOpRep):
                     slice = slices.ensure_normal_or_frozen(slices.UnpackArraySlice(slice,ndim=ndim))
             nslices.append(slice)
 
-        return self.initialize(tuple(nslices),RS_CHECK)
+        return self._initialize(tuple(nslices),RS_CHECK)
 
 class DimRename(repops.UnaryOpRep):#{{{
-    def process(self, source, *names, **kwds):
+    def _process(self, source, *names, **kwds):
         if not source._state & RS_SLICES_KNOWN:
             return
         if(names):
@@ -47,10 +47,10 @@ class DimRename(repops.UnaryOpRep):#{{{
         
         nslices = [slices.ChangeDimPathSlice(slice, slice.dims.changeNames(kwds))
                                                     for slice in source._slices]
-        return self.initialize(tuple(nslices),source._state)#}}}
+        return self._initialize(tuple(nslices),source._state)#}}}
 
 class InsertDim(repops.UnaryOpRep):
-    def process(self, source, insertpoint, name=None):
+    def _process(self, source, insertpoint, name=None):
         if not source._state & RS_SLICES_KNOWN:
             return
         
@@ -60,7 +60,7 @@ class InsertDim(repops.UnaryOpRep):
         for slice in source._slices:
             slice = slices.InsertDimSlice(slice,insertpoint,ndim)
             nslices.append(slice)
-        return self.initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices),source._state)
 
 
 @repops.delayable()

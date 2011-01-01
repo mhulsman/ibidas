@@ -33,7 +33,7 @@ class Representor(Node):
     _state = 0                 #default value
     _slices = []               #default value
 
-    def initialize(self, slices, state=RS_ALL_KNOWN):
+    def _initialize(self, slices, state=RS_ALL_KNOWN):
         assert isinstance(slices, tuple), "slices should be a tuple"
         self._slices = slices
         if(state == RS_CHECK):
@@ -48,7 +48,7 @@ class Representor(Node):
     def checkState(self,filter=RS_SLICES_KNOWN):
         if(not ((self._state & filter) == filter)):
             slices = self._getResultSlices()
-            self.initialize(slices,state=RS_ALL_KNOWN | RS_INFERRED)
+            self._initialize(slices,state=RS_ALL_KNOWN | RS_INFERRED)
 
     def __str__(self):
         self.checkState(filter=RS_ALL_KNOWN)
