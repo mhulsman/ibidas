@@ -71,3 +71,28 @@ def rarray(source, dim=None, ndim=1):
 def rlist(source, dim=None):
     return repops.ApplyFuncRep(source, repops.apply_slice, slices.PackListSlice, dim)
 
+class FlatAll(repops.UnaryOpRep):
+    def _process(self,source,name=None):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+        nslices = slices.broadcast(source._slices,mode="dim")[0]
+        dims = nslices[0].dims
+        
+        shape = 1
+        for dim in dims:
+            if(dim.shape == UNDEFINED):
+                shape = UNDEFINED
+                break
+            else:
+                shape *= dim.shape
+        if(name is None):
+            name = "_".join([dim.name for dim in dims])
+
+        ndim = dimensions.Dim(shape, name=name)
+        
+        nnslices = []
+        for slice in nslices:
+            nnslices.append(slices.FlatAllSlice(slice, ndim))
+
+        return self._initialize(tuple(nnslices),source._state)
+ 

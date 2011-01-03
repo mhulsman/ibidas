@@ -18,7 +18,7 @@ class Broadcast(repops.MultiOpRep):
 
         nslices = []
         for bcslices in util.zip_broadcast(*[source._slices for source in sources]):
-            nslices.extend(slices.broadcast(bcslices,mode))
+            nslices.extend(slices.broadcast(bcslices,mode)[0])
         return self._initialize(tuple(nslices),state)
 
 
@@ -144,3 +144,5 @@ def sort(source, *sortsources):
     return Filter(source, constraint.array(), dim=cslice.dims[-1])
 
 
+
+       

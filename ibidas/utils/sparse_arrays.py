@@ -459,7 +459,7 @@ class FullSparse(numpy.ndarray):
     def _getClasses(self):
         classes = set()
         if(self.val.dtype == object):
-            classes |= set([value.__class__ for value in self])
+            classes |= set([value.__class__ for value in self.ravel()])
         else:
             classes.add(self.val.dtype.type)
 

@@ -25,10 +25,10 @@ class ArrayConvertor(BaseConvertor):
         """Converts sequence to standard format. Converts None
         to Missing values."""
         return self._convert(elem_type.getArrayDimPath(),elem_type,seq)
-   
+ 
     def _convert(self,dims,elem_type,seq):
         assert isinstance(elem_type,rtypes.TypeArray), "ArrayCOnvertor should be applied to array types"
-        cur_numpy_type = elem_type.toNumpy()
+       
         
         depth = dims.contigiousFixedNDims()
         if(not depth):# no fixed dims, allow for one non-fixed dim
@@ -40,11 +40,12 @@ class ArrayConvertor(BaseConvertor):
         else:
             variable=False
 
-        rest_dims = dims[depth:]
+        rest_dims = elem_type.dims[depth:]
         if(rest_dims):
             elem_numpy_type = object
+            elem_type = rtypes.TypeArray(elem_type.has_missing,dims=rest_dims,subtypes=elem_type.subtypes)
         else:
-            elem_numpy_type = elem_type.getNestedArraySubtype().toNumpy()
+            elem_numpy_type = elem_type.subtypes[0].toNumpy()
 
         if(variable):
             seq_numpy_type = object
@@ -85,7 +86,11 @@ class ArrayConvertor(BaseConvertor):
                 elem = self._convert(rest_dims,elem_type,elem)
             res.append(elem)
 
-        nseq = cutils.darray(res,seq_numpy_type,depth+1,1)
+        if(variable):
+            nseq = cutils.darray(res,seq_numpy_type)
+        else:
+            nseq = cutils.darray(res,seq_numpy_type,depth+1,1)
+
         seq = sparse_arrays.FullSparse(nseq)
         
         return seq

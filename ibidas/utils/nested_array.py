@@ -225,6 +225,14 @@ class NestedArray(object):
         nself.dims = nself.dims[:matchpoint] + (newdim,) + nself.dims[matchpoint:]
         return nself
 
+    def mergeAllDims(self, newdim):
+        nself = self.copy()
+        nself.idxs = [0,1]
+        nself.dims = self.dims[:1] + (newdim,)
+        nself.data = self._flatData()[0]
+        nself.data.shape = (1,) + nself.data.shape
+        return nself
+        
 
     def mergeDim(self, matchpoint,newdim):
         matchpoint += 1

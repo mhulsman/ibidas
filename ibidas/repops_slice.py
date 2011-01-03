@@ -256,3 +256,4 @@ class HArray(repops.UnaryOpRep):
 
         #initialize object attributes
         return self._initialize((nslice,),RS_ALL_KNOWN)
+

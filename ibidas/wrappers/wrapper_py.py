@@ -32,7 +32,9 @@ def rep(data=None, dtype=None, unpack=True, name=None):#{{{
         det = detector.Detector()
         det.process(data)
         dtype = det.getType()
-    
+        if(dtype == rtypes.unknown):
+            dtype = rtypes.TypeAny(True)
+
     if(name is None):
         name = "data"
 
@@ -64,16 +66,16 @@ class ResultSlice(slices.DataSlice):
     def from_slice(cls,data,slice):
         return cls(data,slice.name, slice.type,slice.dims,slice.bookmarks)
 
-    def modify(self,data=None, name=None, rtype=None, dims=None, bookmarks=None):
-        if(name is None):
+    def modify(self,data=NOVAL, name=NOVAL, rtype=NOVAL, dims=NOVAL, bookmarks=NOVAL):
+        if(name is NOVAL):
             name = self.name
-        if(rtype is None):
+        if(rtype is NOVAL):
             rtype = self.type
-        if(dims is None):
+        if(dims is NOVAL):
             dims = self.dims
-        if(data is None):
+        if(data is NOVAL):
             data = self.data
-        if(bookmarks is None):
+        if(bookmarks is NOVAL):
             bookmarks = self.bookmarks
 
         return ResultSlice(data, name, rtype, dims, bookmarks)
@@ -224,7 +226,11 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         ndata = nested_array.co_mapseq(func,[slice.data, constraint.data],
                                        res_type=node.type, dtype=node.type.toNumpy(), bc_allow=True)
         return slice.modify(data=ndata,rtype=node.type)
-        
+
+    def visitFlatAllSlice(self, node, slice):
+        ndata = slice.data.mergeAllDims(slice.dims[0])
+        return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
+
     def visitUnaryFuncElemOpSlice(self,node, slice):
         try:
             func = getattr(self, node.sig.name + node.funcname)

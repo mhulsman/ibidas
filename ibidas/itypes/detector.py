@@ -650,7 +650,7 @@ class ContainerScanner(TypeScanner):
                 else:
                     f = operator.itemgetter(i)
                 nelems = shapes.map(f, otype=object, out_empty=Missing, has_missing=has_missing)
-                dr.processLengths(nelems, has_missing=has_missing)
+                dr.processLengths(nelems.ravel(), has_missing=has_missing)
         
         d = self.getSubDetector()
         for subseq in seq.ravel():

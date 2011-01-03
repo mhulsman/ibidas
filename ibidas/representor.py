@@ -358,11 +358,30 @@ class Representor(Node):
     def __neg__(self):
         return repops_funcs.Negative(self)
 
+    def __nonzero__(self):
+        if(len(self._slices) != 1):
+            raise RuntimeError, "Cannot determine True/False status of a multi-slice representor"
+
+        slice = self._slices[0]
+        if(len(slice.dims) > 1):
+            nself = repops_dim.FlatAll(self)
+        else:
+            nself = self
+
+        if(len(slice.dims) > 0):
+            nself = repops_funcs.All(nself)
+        
+        res = nself()
+        return bool(res)
+
     def cast(self, *newtypes, **kwds):
         return repops_slice.SliceCast(self, *newtypes, **kwds)
 
     def flat(self, dim_selector=-1):
         return repops_multi.flat(self, dim_selector)
+
+    def flatall(self, name=None):
+        return repops_dim.FlatAll(self,name=name)
 
     def group_by(self, *args, **kwargs):
         keep = kwargs.pop("keep", {})

@@ -256,7 +256,7 @@ def broadcast(slices,mode="pos"):#{{{
     return (nslices, bcplan)
     #}}}
 
-def apply_broadcast_plan(slices,bcdims, bcplan):
+def apply_broadcast_plan(slices,bcdims, bcplan):#{{{
     references = defaultdict(list)
     for bcdim in bcdims:
         for slice in slices:
@@ -283,8 +283,7 @@ def apply_broadcast_plan(slices,bcdims, bcplan):
                 nplan.append(planelem)
         if(active_bcdims):                
             slice = BroadcastSlice(slice,[references[bcdim] for bcdim in active_bcdims],nplan,bcdims)
-        nslices.append(slice)
-
+        nslices.append(slice)#}}}
 
 class FilterSlice(UnaryOpSlice):#{{{
     __slots__ = ["constraint"]
@@ -338,10 +337,7 @@ def filter(slice,constraint,seldim, ndim, mode="dim"):#{{{
         (slice,constraint),(splan,cplan) = broadcast([slice,constraint],mode=mode)
 
         #adapt ndim to braodcast, apply filter
-        print "X",ndim
-        print dep, splan, cplan
         ndep = dimpaths.applyPlan(dep,cplan,newvalue=False,copyvalue=True,ensurevalue=True,existvalue=False)
-        print ndep
         xndim = ndim.changeDependent(tuple(ndep), slice.dims)
         slice = FilterSlice(slice,constraint,xndim)
 
@@ -367,6 +363,19 @@ def filter(slice,constraint,seldim, ndim, mode="dim"):#{{{
             break
             
     return slice#}}}
+
+class FlatAllSlice(UnaryOpSlice):#{{{
+    __slots__ = ["constraint"]
+
+    def __init__(self,slice, ndim):
+        stype = slice.type
+        sdims = slice.dims
+        for i in xrange(len(sdims)):
+            stype = stype.removeDepDim(-(i+1), None)
+        stype = stype.insertDepDim(-1,ndim)
+        dims = dimpaths.DimPath(ndim)
+
+        UnaryOpSlice.__init__(self, slice, rtype=stype,dims=dims)#}}}
 
 class UnpackTupleSlice(UnaryOpSlice):#{{{
     """A slice which is the result of unpacking a tuple slice."""
