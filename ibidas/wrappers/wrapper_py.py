@@ -113,6 +113,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 use_counters[param_ids] -= 1
                 
             try:
+                print command, type(command), param_kwds
                 res = self.visit(command, **param_kwds)
             except Exception, e:
                 exc_info = sys.exc_info()
@@ -221,6 +222,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         ndata = slice.data.broadcast(repeat_dict,dim_dict)
         return slice.modify(data=ndata,dims=node.dims)
 
+
     def visitFilterSlice(self,node, slice, constraint):
         func = speedfilter
         ndata = nested_array.co_mapseq(func,[slice.data, constraint.data],
@@ -229,6 +231,10 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def visitFlatAllSlice(self, node, slice):
         ndata = slice.data.mergeAllDims(slice.dims[0])
+        return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
+    
+    def visitFlatDimSlice(self, node, slice):
+        ndata = slice.data.mergeDim(node.flatpos-1, node.dims[node.flatpos-1])
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
     def visitUnaryFuncElemOpSlice(self,node, slice):

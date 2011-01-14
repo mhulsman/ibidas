@@ -32,7 +32,7 @@ class Nest(repops.MultiOpRep):
             return
         lsource,rsource = sources
         
-        joinpath = dimpaths.identifyDimPath([s.dims for s in lsource._slices], dim)
+        joinpath = dimpaths.identifyUniqueDimPathSource(lsource, dim)
 
         idims = []
         for i in xrange(len(joinpath)):
@@ -94,7 +94,7 @@ class Filter(repops.MultiOpRep):
             assert seldim in dimset, "Cannot find last dimension of boolean filter in filter source (" + str(cslice.dims) + ")"
             cslice = slices.PackArraySlice(cslice,1)
         elif(isinstance(cslice.type, rtypes.TypeInteger)):
-            dim_suffix = dimpaths.identifyDimPath([s.dims for s in source._slices], dim)
+            dim_suffix = dimpaths.identifyUniqueDimPathSource(source, dim)
             seldim = dim_suffix[-1]
             ndim = None
         elif(isinstance(cslice.type, rtypes.TypeArray)):
@@ -102,11 +102,11 @@ class Filter(repops.MultiOpRep):
             assert isinstance(cslice.type.subtypes[0], rtypes.TypeInteger) and \
                         not isinstance(cslice.type.subtypes[0], rtypes.TypeBool), \
                         "Multi-dimensional arrays cannot be used as filter. Please unpack the arrays."
-            dim_suffix = dimpaths.identifyDimPath([s.dims for s in source._slices], dim)
+            dim_suffix = dimpaths.identifyUniqueDimPathSource(source, dim)
             seldim = dim_suffix[-1]
             ndim = cslice.type.dims[0]
         elif(isinstance(cslice.type, rtypes.TypeSlice)):
-            dim_suffix = dimpaths.identifyDimPath([s.dims for s in source._slices], dim)
+            dim_suffix = dimpaths.identifyUniqueDimPathSource(source, dim)
             seldim = dim_suffix[-1]
             ndim = dimensions.Dim(UNDEFINED, seldim.dependent, False,name = "f" + cslice.name)
         else:

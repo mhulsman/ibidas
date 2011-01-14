@@ -115,7 +115,7 @@ def apply_slice(slices, slicecls, dim_selector, *params, **kwds):
     params, kwds: extra params
     """
     if(not dim_selector is None):
-        dim_selector = dim_helpers.identifyDimPath(source, dim_selector)
+        dim_selector = dim_helpers.identifyUniqueDimPath(slices, dim_selector)
         nslices = []                       #new active slices
         for slice in slices:
             if(dim_selector in slice.dims):

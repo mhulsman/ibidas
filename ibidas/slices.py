@@ -188,6 +188,9 @@ class InsertDimSlice(UnaryOpSlice):#{{{
         self.newdim = ndim
         UnaryOpSlice.__init__(self,slice,rtype=ntype,dims=ndims)        #}}}
 
+
+
+
 class EnsureCommonDimSlice(UnaryOpSlice):#{{{
     __slots__ = ["refslices","checkpos"]
     def __init__(self,slice,refslices,checkpos,bcdim):
@@ -365,7 +368,7 @@ def filter(slice,constraint,seldim, ndim, mode="dim"):#{{{
     return slice#}}}
 
 class FlatAllSlice(UnaryOpSlice):#{{{
-    __slots__ = ["constraint"]
+    __slots__ = []
 
     def __init__(self,slice, ndim):
         stype = slice.type
@@ -376,6 +379,18 @@ class FlatAllSlice(UnaryOpSlice):#{{{
         dims = dimpaths.DimPath(ndim)
 
         UnaryOpSlice.__init__(self, slice, rtype=stype,dims=dims)#}}}
+
+class FlatDimSlice(UnaryOpSlice):#{{{
+    __slots__ = ["flatpos"]
+
+    def __init__(self,slice,flatpos, ndim):
+        stype = slice.type
+        sdims = slice.dims
+        sdims,stype = sdims.removeDim(flatpos,None,stype)
+        sdims,stype = sdims.updateDim(flatpos-1,ndim,stype)
+
+        self.flatpos = flatpos
+        UnaryOpSlice.__init__(self, slice, rtype=stype,dims=sdims)#}}}
 
 class UnpackTupleSlice(UnaryOpSlice):#{{{
     """A slice which is the result of unpacking a tuple slice."""

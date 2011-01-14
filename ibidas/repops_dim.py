@@ -1,5 +1,6 @@
 from constants import *
 import repops
+from itertools import izip_longest
 
 _delay_import_(globals(),"itypes","rtypes","dimpaths","dimensions")
 _delay_import_(globals(),"slices")
@@ -95,4 +96,52 @@ class FlatAll(repops.UnaryOpRep):
             nnslices.append(slices.FlatAllSlice(slice, ndim))
 
         return self._initialize(tuple(nnslices),source._state)
- 
+
+class Flat(repops.UnaryOpRep):
+    def _process(self,source,name=None,dim=-1):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+        
+        #create new merged dimension
+        selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
+        if(len(selpath) == 1):
+            selpath = dimpaths.extendParentDim(selpath,[s.dims for s in source._slices])
+
+        if(selpath[-1].shape != UNDEFINED and selpath[-2].shape != UNDEFINED):
+            shape = selpath[-2].shape * selpath[-1].shape
+        else:
+            shape = UNDEFINED
+        if(name is None):
+            name = selpath[-2].name + "_" + selpath[-1].name
+        dependent = tuple([left or right for left,right in 
+                        izip_longest(selpath[-2].dependent, selpath[-1].dependent[:-1],fillvalue=False)])
+        ndim = dimensions.Dim(shape, dependent=dependent, has_missing = selpath[-1].has_missing or selpath[-2].has_missing, name=name)
+        
+        bcdim = dimensions.Dim(1)
+
+        #find refslices
+        refslices = [s for s in source._slices if selpath[-1] in s.dims]
+
+        #process slices
+        nslices = []
+        for slice in source._slices:
+            sdims = slice.dims
+            startpos = sdims.matchDimPath(selpath[:-1])
+            while(startpos):
+                spos = startpos[0]
+                flatpos = len(selpath) + spos -1 
+                if(len(sdims) <= flatpos or sdims[flatpos] != selpath[-1]):
+                    slice = slices.InsertDimSlice(slice,flatpos,bcdim)
+                    bcdims = slice.dims[:flatpos] + (selpath[-1],) + slice.dims[flatpos:]
+                    plan = [BCCOPY] * len(slice.dims[:flatpos]) + [BCEXIST] + [BCCOPY] * len(slice.dims[flatpos:])
+                    slice = slices.BroadcastSlice(slice,[refslices],plan,bcdims)
+                slice = slices.FlatDimSlice(slice,flatpos,ndim)
+                if(len(startpos) > 1):
+                    sdims = slice.dims
+                    startpos = sdims.matchDimPath(selpath[::-1])
+                else:
+                    startpos = []
+            nslices.append(slice)
+                
+        return self._initialize(tuple(nslices),source._state)
+       

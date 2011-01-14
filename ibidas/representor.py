@@ -377,8 +377,8 @@ class Representor(Node):
     def cast(self, *newtypes, **kwds):
         return repops_slice.SliceCast(self, *newtypes, **kwds)
 
-    def flat(self, dim_selector=-1):
-        return repops_multi.flat(self, dim_selector)
+    def flat(self, dim=-1,name=None):
+        return repops_dim.Flat(self, name=name,dim=dim)
 
     def flatall(self, name=None):
         return repops_dim.FlatAll(self,name=name)
