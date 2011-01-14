@@ -209,15 +209,17 @@ class BroadcastSlice(UnaryOpSlice):#{{{
 
         ndims = slice.dims
         ntype = slice.type
+        bcpos = 0
         for pos, planelem in enumerate(plan):
             if(planelem == BCEXIST):
+                assert refslices[bcpos],"No refslices for broadcast of dim: " + str(bcdims[pos])
+                bcpos += 1
                 ndims, ntype = ndims.updateDim(pos, bcdims[pos], ntype)
             elif(planelem == BCCOPY):
                 pass
             else:
                 raise RuntimeError, "Unknown plan element in plan: " + str(plan)
             
-        #FIXME: update bcdims using updateDim
         UnaryOpSlice.__init__(self, slice, dims=ndims,rtype=ntype)#}}}
 
 def broadcast(slices,mode="pos"):#{{{

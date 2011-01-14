@@ -401,8 +401,7 @@ def createDimParentDict(sourcepaths):#{{{
             parents[dimpath[pos]].append(dimpath[pos-1])
     return parents#}}}
 
-
-def extendParentDim(path, sourcepaths):
+def extendParentDim(path, sourcepaths):#{{{
     dimparents = createDimParentDict(sourcepaths)
     parents = dimparents[path[0]]
     if(len(parents) > 1):
@@ -411,26 +410,26 @@ def extendParentDim(path, sourcepaths):
     if(parent is None):
         raise RuntimeError, "Dim: " + str(path[0]) + " is first dim, cannot find parent"
 
-    return (parent,) + path
+    return (parent,) + path#}}}
 
 
 class DimPathRoot(Dim):
     pass
-root = DimPathRoot(UNDEFINED)
+root = DimPathRoot(UNDEFINED, name="_root_")
 
 class DimPathEnd(Dim):
     pass
-end = DimPathEnd(UNDEFINED)
+end = DimPathEnd(UNDEFINED, name="_end_")
 
-def identifyUniqueDimPathSource(source,dim_selector):
+def identifyUniqueDimPathSource(source,dim_selector):#{{{
     res = identifyDimPathSource(source,dim_selector)
     if(len(res) > 1):
         raise RuntimeError, "Cannot choose between dim paths: " + str(res)
     elif(len(res) == 0):
         raise RuntimeError, "No matching dimpath found for selector: " + str(dim_selector)
-    return res.pop()
+    return res.pop()#}}}
 
-def identifyDimPathSource(source,dim_selector):
+def identifyDimPathSource(source,dim_selector):#{{{
     if(isinstance(dim_selector, context.Context)):
         dim_selector = context._apply(dim_selector, source)
     elif(isinstance(dim_selector, str)):
@@ -440,17 +439,17 @@ def identifyDimPathSource(source,dim_selector):
     if(isinstance(dim_selector, representor.Representor)):
         return set([s.dims for s in dim_selector._slices])
 
-    return identifyDimPath(set([s.dims for s in source._slices]),dim_selector)
+    return identifyDimPath(set([s.dims for s in source._slices]),dim_selector)#}}}
 
-def identifyUniqueDimPath(source,dim_selector):
+def identifyUniqueDimPath(source,dim_selector):#{{{
     res = identifyDimPath(source,dim_selector)
     if(len(res) > 1):
         raise RuntimeError, "Cannot choose between dim paths: " + str(res)
     elif(len(res) == 0):
         raise RuntimeError, "No matching dimpath found for selector: " + str(dim_selector)
-    return res.pop()
+    return res.pop()#}}}
 
-def identifyDimPath(sourcepaths, dim_selector):
+def identifyDimPath(sourcepaths, dim_selector):#{{{
    
     if(isinstance(dim_selector, int)):
         udpath = uniqueDimPath(sourcepaths)
@@ -469,12 +468,14 @@ def identifyDimPath(sourcepaths, dim_selector):
         return res
     
     if(isinstance(dim_selector, Dim)):
+        #fixme: root/end
         return set([DimPath(dim_selector)])
     elif(dim_selector is None):
         return set([commonDimPath(sourcepaths)])
     elif(isinstance(dim_selector, str)):
         return identifyDimPathParse(sourcepaths, dim_selector)
     elif(isinstance(dim_selector, DimPath)):
+        #fixme: root/end
         return set([dim_selector])
     elif(isinstance(dim_selector, set)):
         res = set()
@@ -482,29 +483,31 @@ def identifyDimPath(sourcepaths, dim_selector):
             res.add(identifyDimPath(sourcepaths, dim_selector))
         return res 
     else:
-        raise RuntimeError, "Unexpected dim selector: " + str(dim_selector)#}}}
-    return res
+        raise RuntimeError, "Unexpected dim selector: " + str(dim_selector)
+    return res#}}}
 
-def identifyDimPathParse(sourcepaths, dim_selector):
+def identifyDimPathParse(sourcepaths, dim_selector):#{{{
     dim_sel = []
     if(dim_selector[0] == "^"):
         dim_selector = dim_selector[1:]
         dim_sel.append(root)
 
-    if(dim_selector[-1] == "$"):
+    if(dim_selector and dim_selector[-1] == "$"):
         dim_selector = dim_selector[:-1]
         fixed_end = True
     else:
         fixed_end=False
+
+    if(dim_selector):
+        dim_sel.extend(dim_selector.split(":"))
     
-    dim_sel.extend(dim_selector.split(":"))
     if(fixed_end):
         dim_sel.append(end)
 
     res = set()
     for spath in sourcepaths:
         res.update(identifyDimPathParseHelper(spath, dim_sel))
-    return res
+    return res#}}}
 
 def identifyDimPathParseHelper(spath, dim_sel, outer=True):
     res = set()
@@ -512,10 +515,13 @@ def identifyDimPathParseHelper(spath, dim_sel, outer=True):
     
     if(ds is root):
         assert outer is True, "Root dim selection after begin"
-        _processRest(spath, dim_sel[1:], res, (root,))
+        if(not dim_sel[1:]):
+            res.add((spath[0],))
+        else:
+            _processRest(spath, dim_sel[1:], res, tuple())
     elif(ds is end):
         assert len(dim_sel) == 1, "Dim selectors found after end selector"
-        res.add(tuple(spath + (end,)))
+        res.add(tuple(spath))
     elif(ds == "?"):
         if outer:
             for pos in xrange(len(spath)-1):
@@ -526,7 +532,7 @@ def identifyDimPathParseHelper(spath, dim_sel, outer=True):
         for pos in xrange(len(spath)):
             _processRest(spath[pos:], dim_sel[1:], res, spath[:pos])
 
-    elif(ds == "*"):
+    elif(ds == "+"):
         for pos in xrange(1,len(spath)):
             _processRest(spath[pos:], dim_sel[1:], res, spath[:pos])
     else:
@@ -542,7 +548,8 @@ def identifyDimPathParseHelper(spath, dim_sel, outer=True):
 
 def _processRest(spath, dim_selector, res, pathprefix):
     if(not dim_selector):
-        res.add(tuple(pathprefix))
+        if(pathprefix):
+            res.add(tuple(pathprefix))
         return
 
     pathsuffixes = identifyDimPathParseHelper(spath, dim_selector,outer=False)

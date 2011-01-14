@@ -113,7 +113,6 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 use_counters[param_ids] -= 1
                 
             try:
-                print command, type(command), param_kwds
                 res = self.visit(command, **param_kwds)
             except Exception, e:
                 exc_info = sys.exc_info()
