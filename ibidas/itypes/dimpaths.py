@@ -88,7 +88,7 @@ class DimPath(tuple):
 
         res = self[:max(pos,0)] + DimPath(*ndims)
         if(not subtype is None):
-            subtype = subtype.removeDepDim(pos - len(self), elem_specifier)
+            subtype = subtype._removeDepDim(dimpos=len(self)-pos, elem_specifier=elem_specifier)
             return (res,subtype)
         else:
             return res#}}}
@@ -100,7 +100,7 @@ class DimPath(tuple):
                 ndims.append(self[p].updateDepDim(p - pos, ndim))
 
             if(not subtype is None):
-                subtype = subtype.updateDepDim(pos - len(self), ndim)
+                subtype = subtype._updateDepDim(dimpos=len(self)-pos, ndim=ndim)
             res = self[:max(pos,0)] + (ndim,) + DimPath(*ndims)
         else:
             res = self[:pos] + (ndim,) + self[(pos + 1):]
@@ -118,7 +118,7 @@ class DimPath(tuple):
         else:
             res = DimPath(*ndims)
         if(not subtype is None):
-            subtype = subtype.insertDepDim(pos - len(self) -1, ndim)
+            subtype = subtype._insertDepDim(dimpos=len(self) - pos + 1, ndim=ndim)
             return (res,subtype)
         else:
             return res#}}}
@@ -417,6 +417,13 @@ def getArrayDimPathFromType(rtype):
         return rtype.dims + getArrayDimPathFromType(rtype.getSubType())
     else:
         return dimpaths.DimPath()
+
+def getNestedArraySubType(rtype):
+    if(rtype.__class__ is rtypes.TypeArray):
+        return getNestedArraySubType(self.getSubType())
+    else:
+        return rtype
+   
 
 class DimPathRoot(Dim):
     pass
