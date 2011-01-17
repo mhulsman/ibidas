@@ -47,12 +47,11 @@ class RequiredSliceIds(VisitorFactory(prefixes=("require", "func"),
     def _funccopy(self, rep, inner_req_ids, source_ids):
         """If the slice performs no real action, required_ids
         can be just copied
-        Parameters (also valid for other require functions)
-        ----------
-        rep : representor object for which required source slices
+        
+        :param rep: representor object for which required source slices
               should be determined
-        required_ids : set of slice ids this representor should deliver
-        source_ids : dictionary from source representors to their
+        :param required_ids: set of slice ids this representor should deliver
+        :param source_ids: dictionary from source representors to their
                      set of required ids. Should be added to. No check
                      necessary if source is in dict, as it is a defaultdict(set).
         """

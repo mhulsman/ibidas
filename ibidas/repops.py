@@ -93,10 +93,7 @@ class PlusPrefix(UnaryOpRep):#{{{
 class ApplyFuncRep(UnaryOpRep):
     """Applies slice class in `slicecls` to every field in source.
 
-    Parameters
-    ----------
-    dim_selector: select dimensions on which to apply the slicecls
-    params, kwds: extra params
+    :param dim_selector: select dimensions on which to apply the slicecls
     """
 
     def _process(self,source,func,*params,**kwds):
@@ -109,10 +106,7 @@ class ApplyFuncRep(UnaryOpRep):
 def apply_slice(slices, slicecls, dim_selector, *params, **kwds):
     """Applies slice class in `slicecls` to every field in source.
 
-    Parameters
-    ----------
-    dim_selector: select dimensions on which to apply the slicecls
-    params, kwds: extra params
+    :param dim_selector: select dimensions on which to apply the slicecls
     """
     if(not dim_selector is None):
         dim_selector = dim_helpers.identifyUniqueDimPath(slices, dim_selector)

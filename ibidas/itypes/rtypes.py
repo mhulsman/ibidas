@@ -11,36 +11,34 @@ Root type is TypeUnknown, with as child TypeAny. Remaining types are divided in
                 described by dimensions
 - TypeFunc:     methods/functions (to do)
 
-Adding new types
-----------------
-Adding a new type is as simple as inheriting from one of the types,
-and calling the function addType(>typeclass<), e.g. 
+.. rubric:: Adding new types
+    Adding a new type is as simple as inheriting from one of the types,
+    and calling the function addType(>typeclass<), e.g. 
 
-TypeDNASequence(TypeString):
-    name = "DNASequence"
-addType(TypeDNASequence)
+    TypeDNASequence(TypeString):
+        name = "DNASequence"
+    addType(TypeDNASequence)
 
-Extra attributes such as _dtype, _scalar can be set to adapt the 
-internal numpy representation. Examples can be found in the source code of 
-this file. 
+    Extra attributes such as _dtype, _scalar can be set to adapt the 
+    internal numpy representation. Examples can be found in the source code of 
+    this file. 
 
-When the type is added, one can add operations (type_ops.py),
-casts (type_casts.py) and automatic object detection (scanners.py).
+    When the type is added, one can add operations (type_ops.py),
+    casts (type_casts.py) and automatic object detection (scanners.py).
 
 
-Hierarchy rules
----------------
-One should only inherit if the child type can only contain a subset 
-of the values of the parent type. 
+.. rubric:: Hierarchy rules
+    One should only inherit if the child type can only contain a subset 
+    of the values of the parent type. 
 
-Operations on the parent type should be applicable on the child type 
-(but one can override them for more type-specific behaviour).
+    Operations on the parent type should be applicable on the child type 
+    (but one can override them for more type-specific behaviour).
 
-Multiple inheritance is allowed, e.g. TypeUInt8(TypeUInt16, TypeInt16)
+    Multiple inheritance is allowed, e.g. TypeUInt8(TypeUInt16, TypeInt16)
 
-It is currently not possible to add types within the hieararchy (e.g.
-a type inbetween TypeUnknown and any of the other types), 
-without modifying the source in this file or some hackish runtime class modification. 
+    It is currently not possible to add types within the hieararchy (e.g.
+    a type inbetween TypeUnknown and any of the other types), 
+    without modifying the source in this file or some hackish runtime class modification. 
 """
 
 
@@ -84,16 +82,16 @@ _type_attribute_common = {}
 def addTypeAttribute(name, common_visitor):
     _type_attribute_common[name] = common_visitor
 
-class TypeUnknown(object):#{{{
-    """Type which represents that no information is known about the values.
-    As this type has only one possible state, 
-    a module singleton is available through rtypes.unknown"""
+class Type(object):#{{{
+    """Base type class. Represents the type of a data structure.
+    """
     
     name = "?"
     _dtype = "object"
     _scalar = numpy.object
     _defval = None
-    data_state=DATA_NORMAL
+    _data_state=DATA_NORMAL
+    _convertor=None
     has_missing = True
 
     @classmethod
@@ -102,14 +100,17 @@ class TypeUnknown(object):#{{{
         return unknown
 
     def toNumpy(self):
-        """Returns dtype of a numpy container which
-        can hold this type efficiently.
+        """Returns numpy dtype compatible with this type
+
+        :rtype: numpy dtype
         """
         return numpy.dtype(self._dtype)
 
     def toScalar(self):
-        """Returns class of a numpy scalar which can
-        hold this type efficiently"""
+        """Returns numpy scalar classs compatible with this type
+        
+        :rtype: numpy scalar class
+        """
         return self._scalar
 
     def toDefval(self):
@@ -118,8 +119,9 @@ class TypeUnknown(object):#{{{
     
     @classmethod
     def getDescendantTypes(cls):
-        """Returns descendant types classes and cls
-        as a list"""
+        """Returns descendant type classes as list
+
+        :rtype: list of descendant type classes"""
         if(not hasattr(cls, "_desc_types")):
             desc_types = [tcls.getDescendantTypes() 
                                 for tcls in __typechildren__[cls]]
@@ -131,8 +133,10 @@ class TypeUnknown(object):#{{{
         return cls._desc_types
 
     def getSubType(self, subtype_id):
-        """Returns subtype. For unknown type, this
-        is always the unknown type"""
+        """Returns subtype if this is a non-scalar type.
+        Otherwise, raises TypeError.
+        
+        :rtype: obj of class :py:class:`Type`"""
         return unknown
 
     def __eq__(self, other):
@@ -162,9 +166,6 @@ class TypeUnknown(object):#{{{
         """Returns copy of this type"""
         return self.__class__()
    
-    def getArrayDimPath(self):
-        return dimpaths.DimPath()
-
     def removeDepDim(self, pos, elem_specifier):
         return self
 
@@ -176,6 +177,15 @@ class TypeUnknown(object):#{{{
 
     def __repr__(self):
         return self.name
+
+class TypeUnknown(Type):
+    """Unknown type represents the lack of information about
+    the actual type. 
+
+    As this type has only one possible state, 
+    a module singleton is available through rtypes.unknown
+    """
+    pass
 addType(TypeUnknown)#}}}
 
 #unknown singleton
@@ -190,10 +200,7 @@ class TypeAny(TypeUnknown):#{{{
         """
         Creates type object.
 
-        Parameters
-        ----------
-        has_missing : bool, optional
-        scanner : scanner  object, optional
+        :param has_missing: bool, optional
         """
         TypeUnknown.__init__(self)
         self.has_missing = has_missing
@@ -316,12 +323,9 @@ class TypeTuple(TypeAny):#{{{
         """
         Creates type object.
 
-        Parameters
-        ----------
-        has_missing : bool, optional
-        subtypes : tuple(type objects, i.e. subclasses of TypeUnknown), optional
-        fieldnames : tuple(strings), optional
-        scanner : scanner object, optional
+        :param has_missing: bool, optional
+        :param subtypes: tuple(type objects, i.e. subclasses of TypeUnknown), optional
+        :param fieldnames: tuple(strings), optional
         """
 
         assert isinstance(subtypes, tuple), \
@@ -363,13 +367,8 @@ class TypeTuple(TypeAny):#{{{
     def getSubType(self, subtype_id):
         """Returns subtype identified by `id`
 
-        Parameters
-        ----------
-        subtype_id : int, number of subtype
-
-        Returns
-        -------
-        subtype, or unknown type if no subtypes given
+        :param subtype_id: int, number of subtype
+        :rtype: subtype, or unknown type if no subtypes given
         """
         if(self.subtypes):
             return self.subtypes[subtype_id]
@@ -546,12 +545,9 @@ class TypeArray(TypeAny):#{{{
         """
         Creates type object.
 
-        Parameters
-        ----------
-        has_missing : bool, optional
-        dims : tuple(Dim's), optional
-        subtypes : tuple(type object, i.e. subclass of TypeUnknown), optional
-        scanner : scanner object, optional
+        :param has_missing: bool, optional
+        :param dims: tuple(Dim's), optional
+        :param subtypes: tuple(type object, i.e. subclass of TypeUnknown), optional
 
         A dimid is a unique identifier for a dimension, helping the
         system to determine equality between dimensions. If there are
@@ -714,9 +710,6 @@ class TypeArray(TypeAny):#{{{
         res.attr.update(newattr)
         return res
 
-    def getArrayDimPath(self):
-        return self.dims + self.subtypes[0].getArrayDimPath()
- 
     def getNestedArraySubtype(self):
         if(self.subtypes[0].__class__ == TypeArray):
             return self.subtypes[0].getNestedArraySubtype()
@@ -787,9 +780,6 @@ class TypeSet(TypeArray):#{{{
         subtypes = (type_attribute_freeze.freeze_protocol.freeze(subtypes[0]),)
         TypeArray.__init__(self, has_missing, dims, 
                                     subtypes, **attr)
-    def getArrayDimPath(self):
-        return dimpaths.DimPath()
-
     def __repr__(self):
         res = ""
         if(self.has_missing):
@@ -845,9 +835,6 @@ class TypeString(TypeArray):#{{{
                 hash(self.has_missing) ^ 
                 hash(self.dims))
     
-    def getArrayDimPath(self):
-        return dimpaths.DimPath()
-
     def copy(self, **newattr):
         """Returns copy of this type"""
         res = self.__class__(has_missing=self.has_missing, 
@@ -1108,15 +1095,12 @@ IN_SUBTYPE_DIM = 6
 def createType(name):#{{{
     """Creates a type object from string representation.
 
-    Parameters
-    ----------
-    name : str
+    :param name: str
 
-    Examples
-    --------
-    createType("unicode")
-    createType("array(int64)[]")
-    createType("tuple(int64,unicode)")
+    .. rubric:: Examples
+        createType("unicode")
+        createType("array(int64)[]")
+        createType("tuple(int64,unicode)")
     """
 
     if(not isinstance(name, str)):

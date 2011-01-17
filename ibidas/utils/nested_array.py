@@ -84,7 +84,7 @@ class NestedArray(object):
             #determine the number of fixed dimensions that can be unpacked
             #finds number of contiguous fixed dims from start of dimpath
             #This allows to unpack a multi-dimensional part of the data
-            tot_dimpath = dimpath + subtype.getArrayDimPath()
+            tot_dimpath = dimpath + dimpaths.getArrayDimPathFromType(subtype)
             cdepth = tot_dimpath.contigiousFixedNDims()
             res = []
             
@@ -251,7 +251,7 @@ class NestedArray(object):
                 orshape = nextobj.shape[ridx]
                 diff = (lidx[...,-1] - lidx[...,0]) * orshape
                 nlidx = numpy.zeros(lidx.shape,dtype=lidx.dtype)
-                nlidx[...,-1] = numpy.cumsum(diff,axis=-1)
+                nlidx[...,-1] = numpy.reshape(numpy.cumsum(diff.ravel()),diff.shape)
                 nlidx[...,0] = nlidx[...,-1] - diff
                 nself.idxs[matchpoint] = nlidx
                 nshape =  (oshape[0] * oshape[ridx],) + oshape[(ridx+1):]
@@ -273,7 +273,96 @@ class NestedArray(object):
         nself.dims = nself.dims[:(matchpoint-1)] + (newdim,) + nself.dims[(matchpoint+1):]
         return nself
 
+    def swapDim(self, matchpoint, nldim, nrdim):
+        matchpoint += 1
+        assert len(self.idxs) > (matchpoint + 1), "Nested array not nested that deep"
+        nself = self.copy()
+        lidx = self.idxs[matchpoint]
+        ridx = self.idxs[matchpoint+1]
+        #Merging dims, 4 possibilities:
+        #fixed-fixed, fixed-var, var-fixed, var-var
+        if(isinstance(ridx,int)):
+            nextpos,nextobj = nself._get_next_obj(matchpoint+1)
+            if(isinstance(lidx,int)):  #fixed-fixed
+                pidx = range(len(nextobj.shape))
+                tmp = pidx[lidx]
+                pidx[lidx] = pidx[ridx]
+                pidx[ridx] = pidx[lidx]
+                res = numpy.permute(nextobj,pidx)
+            else: #fixed-var
+                xshape = ridx.shape[-2]
+                nextobj = numpy.reshape((xshape, nextobj.shape[0] / xshape) + nextojb.shape[1:])
+                pidx = range(len(nextobj.shape))
+                pidx[0] = 1
+                pidx[1] = 0
+                nextobj = numpy.permute(pidx)
+                ridx = ridx[...,0,:]
+                oshape = ridx.shape
+                diff = ridx[...,1] - ridx[...,0]
+                ridx[...,1] = numpy.reshape(numpy.cumsum(diff.ravel()),diff.shape)
+                ridx[...,0] = ridx[...,1] - diff
+                nself.idxs[matchoint] = ridx
+                nself.idxs[matchpoint + 1] = 0 
+                for i in range(matchpoint + 1, nextpos):
+                    nself.idxs[i] = i -(matchpoint + 1)
+            nself._set_obj(nextpos,nextobj)
+            nself._normalize(nextpos)
+        else:
+            if(isinstance(ridx,int)): #var-fixed
+                xshape = lidx.shape[1]
+                pidx = range(len(nextobj.shape))
+                pidx[0] = 1
+                pidx[1] = 0
+                nextobj = dimpaths.flatFirstDims(numpy.permute(pidx),1)
 
+                lidx = lidx[...,numpy.newaxis,:]
+                lidx = numpy.repeat(lidx,xshape,axis=-2)
+                nself.idxs[matchpoint] = len(lidx.shape) - 2
+                nself.idxs[matchpoint+1] = lidx
+
+                for i in range(matchpoint +1, nextpos):
+                    nself.idx[i] = i - (matchpoint + 1)
+                nself._set_obj(nextpos,nextobj)
+                nself._normalize(matchpoint + 1)
+            else:
+                pass
+
+        nself.dims[matchpoint] = nldim
+        nself.dimx[matchpoint+1] = nrdim
+        return nself
+
+    def permuteDims(self, permute, ndims):
+        nself = self.copy()
+
+        return nself
+
+    def _normalize(self, curpos):
+        nself = self.copy()
+
+        curpos,curobj = self._get_next_obj(curpos-1)
+        nextpos,nextobj = self._get_next_obj(curpos)
+        while curpos < len(self.idxs):
+            respos = 0
+            res = []
+            nidx = numpy.zeros(curobj.shape,dtype=curobj.dtype)
+            curobj = dimpaths.flatFirstDims(curobj, len(curobj.shape) - 1)
+            for rowpos in xrange(len(curobj)):
+                start = idx[rowpos,0]
+                stop = idx[rowpos,-1]
+                k = slice(start,stop)
+                res.append(nextobj[k])
+                nidx[rowpos,:] += respos - start
+                respos += stop - start
+            nextobj = numpy.concatenate(res)
+            nidx.shape  = oshape
+            nself._set_obj(curpos, curobj)
+            nself._set_obj(nextpos, nextobj)
+
+            curpos,curobj = self._get_next_obj(curpos)
+            nextpos,nextobj = self._get_next_obj(nextpos)
+        return nself
+
+            
     def broadcast(self, repeat_dict, dim_dict):
         if not repeat_dict:
             return self

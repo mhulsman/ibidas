@@ -1,21 +1,20 @@
 """
-Missing values
---------------
-The MissingType class implements a missing type which is used in the 
-internal representation. Types which allow missing values have to set the flag
-'has_missing' to True. 
+.. rubric:: Missing values
+    The MissingType class implements a missing type which is used in the 
+    internal representation. Types which allow missing values have to set the flag
+    'has_missing' to True. 
 
-The only instance from MissingType that should be used is Missing (similar to None).
-This way one can test for equivalence by using 'variable_name is Missing'. 
+    The only instance from MissingType that should be used is Missing (similar to None).
+    This way one can test for equivalence by using 'variable_name is Missing'. 
 
-MissingType implements most type overloads to implement missing value behaviour. 
-E.g., Missing + 3 = Missing,   Missing & False = False, Missing | True = True,
-Missing == Missing = False, etc., similar to SQL NULL. 
+    MissingType implements most type overloads to implement missing value behaviour. 
+    E.g., Missing + 3 = Missing,   Missing & False = False, Missing | True = True,
+    Missing == Missing = False, etc., similar to SQL NULL. 
 
-!!!To make it possible to have multiple Missing values in the same set, but use the same
-instance, __hash__ returns an incrementing value, and __eq__ returns False. 
-We have to make sure that this keeps working in Python (i.e. that set will not start to 
-use a pointer comparision shortcut). Maybe we can find a better solution in the future. 
+    !!!To make it possible to have multiple Missing values in the same set, but use the same
+    instance, __hash__ returns an incrementing value, and __eq__ returns False. 
+    We have to make sure that this keeps working in Python (i.e. that set will not start to 
+    use a pointer comparision shortcut). Maybe we can find a better solution in the future. 
 """
 
 hash_counter = 0

@@ -24,7 +24,7 @@ class ArrayConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
         """Converts sequence to standard format. Converts None
         to Missing values."""
-        return self._convert(elem_type.getArrayDimPath(),elem_type,seq)
+        return self._convert(dimpaths.getArrayDimPathFromType(elem_type),elem_type,seq)
  
     def _convert(self,dims,elem_type,seq):
         assert isinstance(elem_type,rtypes.TypeArray), "ArrayCOnvertor should be applied to array types"

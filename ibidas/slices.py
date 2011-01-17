@@ -31,11 +31,9 @@ class Slice(Node):#{{{
     def __init__(self, name, rtype = rtypes.unknown, dims=dimpaths.DimPath(), bookmarks=set()):
         """Creates a slice object.
 
-        Parameters
-        ----------
-        name: name of slice (string)
-        type: type of slice, optional, default = unknown
-        dims: tuple of Dim objects, optional, default = ()
+        :param name: name of slice (string)
+        :param type: type of slice, optional, default = unknown
+        :param dims: tuple of Dim objects, optional, default = ()
         """
         assert isinstance(name, (str,unicode)), "Name of slice should be a string"
         assert (name.lower() == name), "Name should be in lowercase"
@@ -141,9 +139,7 @@ class UnpackArraySlice(UnaryOpSlice):#{{{
     def __init__(self,slice,ndim=None):
         """Creates a new slice, and sets attributes.
 
-        Parameters
-        ----------
-        slice: Source slice to be unpacked"""
+        :param slice: Source slice to be unpacked"""
         stype = slice.type
 
         if(ndim is None):
@@ -402,10 +398,8 @@ class UnpackTupleSlice(UnaryOpSlice):#{{{
         """Creates a new slice, using source `slice`, by 
         extracting the `idx` subtype.
         
-        Parameters
-        ----------
-        slice: new slice
-        idx:   index of tuple attribute to be unpacked"""
+        :param slice: new slice
+        :param idx:   index of tuple attribute to be unpacked"""
         
         stype = slice.type
         assert isinstance(stype, rtypes.TypeTuple), "Cannot unpack slice " + \
@@ -542,11 +536,9 @@ class MapSeqSlice(FuncSlice):#{{{
     def __init__(self, slice, exec_func, type_func, *params, **kwds): 
         """Creates a new slice, and sets attributes.
 
-        Parameters
-        ----------
-        slice: Source slice func is applied on.
-        exec_func: function to be applied
-        type_func: function to determine outtype."""
+        :param slice: Source slice func is applied on.
+        :param exec_func: function to be applied
+        :param type_func: function to determine outtype."""
         assert slice.dims, str(exec_func) + " can only be applied on slice " + \
                                     "with at least one dimension"
         
@@ -558,11 +550,9 @@ class MapSlice(FuncSlice):#{{{
     def __init__(self, slice, exec_func, type_func, *params, **kwds): 
         """Creates a new slice, and sets attributes.
 
-        Parameters
-        ----------
-        slice: Source slice func is applied on.
-        exec_func: function to be applied
-        type_func: function to determine outtype."""
+        :param slice: Source slice func is applied on.
+        :param exec_func: function to be applied
+        :param type_func: function to determine outtype."""
         ntype = type_func(slice.type, exec_func)
         FuncSlice.__init__(self,slice,dim,exec_func, type_func, slice.dims, ntype, *params, **kwds)#}}}
 
@@ -571,11 +561,9 @@ class AggregrateSlice(FuncSlice):#{{{
     def __init__(self, slice, exec_func, type_func, *params, **kwds): 
         """Creates a new slice, and sets attributes.
 
-        Parameters
-        ----------
-        slice: Source slice func is applied on.
-        exec_func: function to be applied
-        type_func: function to determine outtype."""
+        :param slice: Source slice func is applied on.
+        :param exec_func: function to be applied
+        :param type_func: function to determine outtype."""
         ndim = kwds.pop("ndim",1)
 
         assert len(slice.dims) >= ndim, "Slice does not have enough dimensions for aggregration"

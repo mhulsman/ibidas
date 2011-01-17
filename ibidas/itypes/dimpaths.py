@@ -412,6 +412,11 @@ def extendParentDim(path, sourcepaths):#{{{
 
     return (parent,) + path#}}}
 
+def getArrayDimPathFromType(rtype):
+    if(rtype.__class__ is rtypes.TypeArray):
+        return rtype.dims + getArrayDimPathFromType(rtype.getSubType())
+    else:
+        return dimpaths.DimPath()
 
 class DimPathRoot(Dim):
     pass

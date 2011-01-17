@@ -8,18 +8,15 @@ class Pass(topological_sort.TopologicalSortable):
     @classmethod
     def run(cls, query, pass_results):
         """Should be reimplemented by child classes. 
-        Parameters
-        ----------
-        query: reference to query context
-        pass_results: dictionary with results from earlier 
+        :param query: reference to query context
+        :param pass_results: dictionary with results from earlier 
                         passes (accessible by using class as key).
 
-        Returns
-        -------
-        - None
-        - Object : stored in pass_results
-        - (Object, invalidate_passes)
-        - (Object, invalidate_passes, add_passes)
+        :rtype: Can return several values:
+            - None
+            - Object : stored in pass_results
+            - (Object, invalidate_passes)
+            - (Object, invalidate_passes, add_passes)
         
         """
 class PassManager(object):

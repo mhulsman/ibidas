@@ -10,10 +10,8 @@ class UnpackArray(repops.UnaryOpRep):
     def _process(self,source, name = None, ndim=None):
         """Operation to unpack array typed slices
 
-        Parameters
-        ----------
-        source: source with active slices which should be unpacked
-        name: (Optional) name of dimension to unpack. If not given,  unpack all.
+        :param source: source with active slices which should be unpacked
+        :param name: (Optional) name of dimension to unpack. If not given,  unpack all.
         """
         if not source._state & RS_TYPES_KNOWN:
             return

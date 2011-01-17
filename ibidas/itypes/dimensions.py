@@ -18,12 +18,10 @@ class Dim(object):
     def __init__(self, shape, dependent=tuple(), has_missing=False, did=None, name=None):
         """Creates dimension class.
 
-        Parameters
-        ---------
-        shape: shape of dimension. Can be integer >= 0 or UNDEFINED
-        dependent: tuple of bools, indicating on which parent dimension this dim is dependent
-        has_missing: indicates if there are Missing values
-        did:   id of dimension, optional
+        :param shape: shape of dimension. Can be integer >= 0 or UNDEFINED
+        :param dependent: tuple of bools, indicating on which parent dimension this dim is dependent
+        :param has_missing: indicates if there are Missing values
+        :param did:   id of dimension, optional
         """
         if(not did):
             self.id = getNewDimid()

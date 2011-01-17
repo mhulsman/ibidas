@@ -17,13 +17,11 @@ class RFilter(MultiOpRep):#{{{
     """Filter data based on constraint"""
     def __init__(self, source, constraint, dim=False):
         """
-        Parameters
-        ----------
-        source: source to be filtered
-        constraint: constraint to be used to determine which 
+        :param source: source to be filtered
+        :param constraint: constraint to be used to determine which 
                     elements to select. Can be representor of bool type,
                     index, slice, array of bools, array of ints.
-        dim: (Optional) dim to filter. To override auto determination.
+        :param dim: (Optional) dim to filter. To override auto determination.
 
         Filter chooses which dim to filter based on the dimension of constraint
         if it is a representor. If not, it will determine if their is a unique
@@ -187,10 +185,9 @@ class Join(MultiOpRep):
 def _join(lsource, rsource, condition=None, ldim=(), rdim=(), 
          type="INNER", group=False):
     """
-    Parameters
-    ----------
-    lsource, rsource: the two sources to be joined
-    condition: condition to determine which dimension-element pairs
+    :param lsource:
+    :param rsource: the two sources to be joined
+    :param condition: condition to determine which dimension-element pairs
                are kept.
     ldim, rdim: override automatical determination on which dims to join.
     type: "INNER", "LEFT", "RIGHT", "OUTER"

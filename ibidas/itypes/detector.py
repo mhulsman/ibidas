@@ -12,59 +12,56 @@ d.process(<your data obj>)
 [d.process(<your data obj>)]
 d.getType()
 
-Helper classes
---------------
-TypeScanner (derivatives): Scan for specific types.
-DimRep:                    Process and store dimension shapes
-DimensionEqualizer:        Find common dimensions
+.. rubric:: Helper classes
+    TypeScanner (derivatives): Scan for specific types.
+    DimRep:                    Process and store dimension shapes
+    DimensionEqualizer:        Find common dimensions
 
 
-Overview
---------------------------
-Scanners follow a hierarchy, starting with the AnyScanner, which has
-children such as CollectionScanner, TupleScanner and NumberScanner. 
-Each child can have children of his own. 
+.. rubric:: Overview
+    Scanners follow a hierarchy, starting with the AnyScanner, which has
+    children such as CollectionScanner, TupleScanner and NumberScanner. 
+    Each child can have children of his own. 
 
-Each detector first performs a depth-first search of allowable scanners,
-and then during data processing goes up in the hiearchy if the more specific
-children-scanners cannot match the data anymore.
+    Each detector first performs a depth-first search of allowable scanners,
+    and then during data processing goes up in the hiearchy if the more specific
+    children-scanners cannot match the data anymore.
 
-Scanners implement a 'scan' method, which gets a sequence of objects, and
-should return False/True if these are objects are acceptable. Detector performs
-a common detection step in that it determines a set of class types available in the
-sequence. 
+    Scanners implement a 'scan' method, which gets a sequence of objects, and
+    should return False/True if these are objects are acceptable. Detector performs
+    a common detection step in that it determines a set of class types available in the
+    sequence. 
 
-Once the user ask for the type, the detector asks every active scanner for a type, and
-next will (try) to determine which type should be returned. For this, the scanner class
-should have a getType method, where it creates an type based on the collected information.
+    Once the user ask for the type, the detector asks every active scanner for a type, and
+    next will (try) to determine which type should be returned. For this, the scanner class
+    should have a getType method, where it creates an type based on the collected information.
 
-During the data scanning, scanners will sometimes not be able to match the data, after
-which their parent scanner is activated. Earlier data is then not scanned again, instead
-the child scanner should transfer its collected information to the parent scanner during
-its own unregistration (the 'unregister' method will be called with create_parent flag set to 
-True). 
+    During the data scanning, scanners will sometimes not be able to match the data, after
+    which their parent scanner is activated. Earlier data is then not scanned again, instead
+    the child scanner should transfer its collected information to the parent scanner during
+    its own unregistration (the 'unregister' method will be called with create_parent flag set to 
+    True). 
 
-If a scanner has to scan subtypes, it should open a subdetector class (for which one 
-can use the getSubDetector method implemented in typescanner). This detector should than be 
-feeded the subobjects. 
+    If a scanner has to scan subtypes, it should open a subdetector class (for which one 
+    can use the getSubDetector method implemented in typescanner). This detector should than be 
+    feeded the subobjects. 
 
-To determine dimensions, one can use the DimensionEqualizer/DimRep classes. Each dimension 
-should have its own DimRep class, which can process dimensions lengths using the processLengths
-method. It will store if this length is fixed/variable/repetitive, and allow for comparison between
-dimensions. One can open a new DimRep class with getDimRep method. If during scanning it becomes clear
-that the number of dimensions has to be reduced, one can do this with the reduceDimReps method. 
+    To determine dimensions, one can use the DimensionEqualizer/DimRep classes. Each dimension 
+    should have its own DimRep class, which can process dimensions lengths using the processLengths
+    method. It will store if this length is fixed/variable/repetitive, and allow for comparison between
+    dimensions. One can open a new DimRep class with getDimRep method. If during scanning it becomes clear
+    that the number of dimensions has to be reduced, one can do this with the reduceDimReps method. 
 
-During the call to getType, DimensionEqualizer will compare DimReps, and assign dimension objects
-to each. These can be obtained from the .dim attributed during type creation. 
+    During the call to getType, DimensionEqualizer will compare DimReps, and assign dimension objects
+    to each. These can be obtained from the .dim attributed during type creation. 
 
 
-Adding a new scanner class
---------------------------
-The scanner hierarchy is separate from the class hierarchy. So one should find the class which has 
-the most common implementation (often just TypeScanner).
-Next, one should implement the scan method. See for examples below.
-The parentcls attribute should be used to determine the parent scanner,
-the registerTypeScanner method to register the scanner. 
+.. rubric:: Adding a new scanner class
+    The scanner hierarchy is separate from the class hierarchy. So one should find the class which has 
+    the most common implementation (often just TypeScanner).
+    Next, one should implement the scan method. See for examples below.
+    The parentcls attribute should be used to determine the parent scanner,
+    the registerTypeScanner method to register the scanner. 
 """
 
 import numpy

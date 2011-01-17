@@ -59,10 +59,8 @@ def select(seq, index):
     """Given list or tuple in `seq`, select using `index`, 
     and returns list or tuple.
 
-    Parameters
-    ----------
-    seq : list or tuple
-    index : int, long, sequence of indexes, sequence of booleans
+    :param seq: list or tuple
+    :param index: int, long, sequence of indexes, sequence of booleans
     """
     if(isinstance(index, slice)):
         return seq[index]
@@ -90,10 +88,8 @@ def index_field(seq, fieldname):
     with name `fieldname` from all
     elements, and creates a dictionary from fieldname value to element.
     
-    Parameters
-    ----------
-    seq: sequence of objects
-    fieldname : attribute available in each object
+    :param seq: sequence of objects
+    :param fieldname: attribute available in each object
     """
     func = operator.attrgetter(fieldname)
     return dict((func(elem), elem) for elem in seq)

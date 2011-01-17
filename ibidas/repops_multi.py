@@ -145,4 +145,61 @@ def sort(source, *sortsources):
 
 
 
+class Match(repops.MultiOpRep):
+    def __init__(self, lsource, rsource, lfield=None, rfield=None):
+        repops.MultiOpRep.__init__(self,(lsource,rsource),lfield=lfield,rfield=rfield)
+
+    def _process(self, sources, lfield, rfield):
+        assert len(sources) == 2, "Match expects two representor objects"
+        state = reduce(operator.__and__,[source._state for source in sources])
+        if not state & RS_SLICES_KNOWN:
+            return
+        lsource,rsource = sources
+        if(lfield is None and rfield is None):
+            rnames = set([slice.name for slice in rsource._slices])
+            r = [slice for slice in lsource._slices if slice.name in rnames and slice.dims]
+            if(len(r) != 1):
+                raise RuntimeError, "Cannot find unique similarly named field to match. Please specify."
+            name = r.pop()
+            lslices = [slice for slice in lsource._slices if slice.name == name]
+            rslices = [slice for slice in rsource._slices if slice.name == name]
+        elif(rfield is None):
+            lslices = [slice for slice in lsource._slices if slice.name == lfield]
+            rslices = [slice for slice in rsource._slices if slice.name == lfield]
+        else:
+            lslices = [slice for slice in lsource._slices if slice.name == lfield]
+            rslices = [slice for slice in rsource._slices if slice.name == rfield]
+            
+        if(len(lslices) > 1 or len(rslices) > 1):
+            raise RuntimeError, "Matching slices in name not unique. Please rename or specify other slices."
+        lslice = lslices[0]
+        rslice = rslices[0]
+
        
+
+
+        joinpath = dimpaths.identifyUniqueDimPathSource(lsource, dim)
+
+        idims = []
+        for i in xrange(len(joinpath)):
+            idims.append(dimensions.Dim(1))
+        
+        
+        references = []
+        for ndim in joinpath:
+            nrefs = []
+            for slice in lsource._slices:
+                if ndim in slice.dims:
+                    nrefs.append(slice)
+            references.append(nrefs)
+
+        nslices = []
+        plan = [BCEXIST] * len(idims)
+        for slice in rsource._slices:
+            odims = slice.dims
+            for dimpos in xrange(len(joinpath)):
+                slice = slices.InsertDimSlice(slice,dimpos,idims[dimpos])
+            slice = slices.BroadcastSlice(slice,references,plan,joinpath + odims)
+            nslices.append(slice)
+        return self._initialize(tuple(nslices), state)
+      

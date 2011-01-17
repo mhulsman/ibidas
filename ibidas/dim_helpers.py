@@ -37,14 +37,8 @@ def planPos(plan, nr):#{{{
     in a plan for source path(s) `nr`. To each 
     position, `startval` is added.
     
-    
-    Parameters
-    ----------
-    nr: (sequence of) nr of source path checked in plan
-
-    Returns
-    -------
-    tuple with position of matches
+    :param nr: (sequence of) nr of source path checked in plan
+    :rtype: tuple with position of matches
     """
     if(operator.isSequenceType(nr)):
         match = 0
@@ -67,13 +61,8 @@ def planPattern(plan, nr, startval=0):#{{{
     To each position,`startval` is added.
     
     
-    Parameters
-    ----------
-    nr: (sequence of) nr of source path checked in plan
-
-    Returns
-    -------
-    tuple with for each match the number of non-matches prepending it
+    :param nr: (sequence of) nr of source path checked in plan
+    :rtype: tuple with for each match the number of non-matches prepending it
     """
     if(operator.isSequenceType(nr)):
         match = 0
@@ -95,13 +84,9 @@ def planBroadcast(*paths):#{{{
     """Matches a set of paths, generating a broadcast plan
     and a combined dimpath.
     
-    Parameter
-    ---------
-    paths: dimension paths
-
-    Returns
-    -------
-    a tuple of a plan and the combined dimpath.
+    :param paths: dimension paths
+    :rtype: a tuple of a plan and the combined dimpath.
+    
     plan: a tuple of actions, equal in length to dimpath.
           each source dimpath has a bit-flag, indicating if it should
           be broadcasted or split in the action. 
@@ -155,14 +140,9 @@ def pathSuffix(dimpath, minlen = 1): #{{{
     """Returns those dimensions of dimpath that can stand alone
     from earlier dimensions in the path (i.e. are not dependent on).
 
-    Parameters
-    ----------
-    dimpath: tuple of dimensions
-    minlen: minimum length of the suffix
-    
-    Returns
-    -------
-    tuple of prefix path and suffix path
+    :param dimpath: tuple of dimensions
+    :param minlen: minimum length of the suffix
+    :param rtuple: tuple of prefix path and suffix path
     """
     need = minlen
     pos = 0
@@ -176,17 +156,12 @@ def broadcastAndMatchDimPath(slices, path_prefix, path_suffix, single_match_suff
     """Matches two sections of a dimpath, of which the first can be 
     broadcasted and the second has to be matched exactly.
 
-    Parameters
-    ----------
-    slices: slices on which to perform the matching
-    path_prefix: part of dim path that can be broadcasted
-    path_suffix: part of dim path that should match exactly
-    single_match_suffix: only the last dim of the suffix should take part in the filter dim path,
+    :param slices: slices on which to perform the matching
+    :param path_prefix: part of dim path that can be broadcasted
+    :param path_suffix: part of dim path that should match exactly
+    :param single_match_suffix: only the last dim of the suffix should take part in the filter dim path,
                          but matched slices should contain whole suffix. 
-    
-    Returns
-    -------
-    Filter path with best (max) match
+    :rtype: Filter path with best (max) match
     """
     #find slices that match dimpath suffix, find prev_paths for these matches
     pos_slices, dummy, prev_paths = matchDimPath(slices, path_suffix, return_prev=True)
@@ -386,9 +361,7 @@ def identifyDimPath(source, dim_selector=None):#{{{
         no matching dims: False
 
     
-    Parameters
-    ----------
-    dim_selector: 
+    :param dim_selector: 
         if None: 
             return unique common dimension if exists
         if string:
@@ -479,11 +452,9 @@ def identifyDimPathHelper(source, path):#{{{
     Returns an dim path (tuple of dims) if unique path found.
     (See _identifyDim for description).
 
-    Returns
-    -------
-    True: if multiple paths are possible
-    False: if no path is matching
-    dimension identifier otherwise
+    :rtype: True: if multiple paths are possible
+            False: if no path is matching
+            dimension identifier otherwise
     """
     if(not path):
         return False

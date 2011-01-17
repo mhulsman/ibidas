@@ -1,3 +1,14 @@
+"""
+The ibidas module contains all main functions for working with ibidas objects.
+"""
+
+__all__ = ["rep","_",
+           "rarray","rlist","rtuple","combine","harray",
+           "pos","argsort",
+           "rany","rall",
+           "bcast","createType",
+           "newdim","Missing"]
+
 from utils import delay_import
 from utils.context import _
 from utils.missing import Missing

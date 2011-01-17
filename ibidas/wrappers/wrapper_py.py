@@ -24,10 +24,29 @@ _delay_import_(globals(),"..utils.missing","Missing")
 class PyRepresentor(wrapper.SourceRepresentor):
     pass
 
-def rep(data=None, dtype=None, unpack=True, name=None):#{{{
+def rep(data=None, dtype=None, unpack=True, name=None):
+    """Packs python data structures into a :py:class:`ibidas.representor.Representor` object.
+        
+       :param data: any python object
+       :param dtype: type of ``data``. See :py:func:`createType` for allowed string formats
+                     (default=autodetect).
+       :type dtype: :py:class:`str` or :py:class:`ibidas.itypes.rtypes.Type`
+       :param unpack: determines if data object is unpacked. 
+                      For example, unpacking an array means that subsequent operations are performed 
+                      on the elements instead of on the array structure
+       :param name: Name of the main slice, representing the data (default='data').
+       :type name: :py:class:`str`, lower case
+      
+       Examples:
+            >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)])
+            
+            >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)],"(string, real64)")
+
+    """
     if(not dtype is None):
         if(isinstance(dtype,str)):
             dtype = rtypes.createType(dtype)
+        dtype = dtype.setDataState
     else:
         det = detector.Detector()
         det.process(data)
@@ -50,7 +69,7 @@ def rep(data=None, dtype=None, unpack=True, name=None):#{{{
     if(unpack and isinstance(res.getType(), rtypes.TypeTuple)):
         res = repops_slice.UnpackTuple(res)
     
-    return res#}}}
+    return res
 
 
 class ResultSlice(slices.DataSlice):

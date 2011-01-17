@@ -9,12 +9,10 @@ _delay_import_(globals(),"missing","Missing")
 def nestmap(data, inner_func, depth, outer_rep=numpy.dtype(object)):
     """Map function on nested data.
 
-    Parameters
-    ----------
-    data: data. Nested layers build using numpy object arrays.
-    inner_func: applied on elements (Missing is filtered)
-    depth: unnesting depth (0: func(data), 1: normal map, ..)
-    outer_rep: numpy type used to package results of `inner_func`
+    :param data: data. Nested layers build using numpy object arrays.
+    :param inner_func: applied on elements (Missing is filtered)
+    :param depth: unnesting depth (0: func(data), 1: normal map, ..)
+    :param outer_rep: numpy type used to package results of `inner_func`
                or function to package these results, res = f(seq)
     """
     inner_func = util.filter_missing(inner_func)
@@ -163,12 +161,10 @@ def nestop(data, func, depths):
 
     Performs function on simultaneously unpacked data
 
-    Parameters
-    ----------
-    data: sequence of (nested) data objects
-    func: func to be applied on unpacked data 
+    :param data: sequence of (nested) data objects
+    :param func: func to be applied on unpacked data 
             (each source as seperate parameter)
-    depth: unnesting depth for each source. If unequal, 
+    :param depth: unnesting depth for each source. If unequal, 
            function from lower depths is broadcasted upward,
            i.e. elements are 'replicated'
     """
@@ -205,10 +201,8 @@ def nest_filter(data, filter_data, filter_depth, fdims, cdims, slice_type):
     Performs filtering on data using filter specified 
     by `filter_data`.
 
-    Parameters
-    ----------
-    data: (nested) data object
-    filter_data: (nested) data object, of which inner objects 
+    :param data: (nested) data object
+    :param filter_data: (nested) data object, of which inner objects 
                     are useable as index in numpy containers
     filter_depth: nest depth at which to apply filter_data
     fdims: new dimensions of `data` after filtering
