@@ -38,30 +38,34 @@ def rep(data=None, dtype=None, unpack=True, name=None):
        :type name: :py:class:`str`, lower case
       
        Examples:
-            Using type autodetection:
+            Let the python data that needs to be represented be a simple table (collection of tuples):
+            
+            >>> data = [('gene1',0.5),('gene2',0.3),('gene100',0.9)]
 
-            >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)])
+            The, to load using type autodetection, use:
+
+            >>> r = rep(data)
             Slices: f0       f1     
             Types:  bytes[7] real64 
             Dims:   d1:3     .   
             
             Specifying type directly:
 
-            >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)],"[genes]<(name:string, value:real64)")
+            >>> r = rep(data,"[genes]<(name:string, value:real64)")
             Slices: name    value
             Types:  string  real64
             Dims:   genes:* .
 
             Effect of setting unpack to False:
 
-            >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)],"[genes]<(name:string, value:real64)", unpack=False)
+            >>> r = rep(data,"[genes]<(name:string, value:real64)", unpack=False)
             Slices: data                                  
             Types:  [genes:*]:(name=string, value=real64) 
             Dims: 
             
             Specifying root slice name:
 
-            >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)],"[genes]<(name:string, value:real64)", unpack=False, name="gene_table")
+            >>> r = rep(data,"[genes]<(name:string, value:real64)", unpack=False, name="gene_table")
             Slices: gene_table                                  
             Types:  [genes:*]:(name=string, value=real64) 
             Dims: 

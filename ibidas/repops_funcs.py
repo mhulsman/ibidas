@@ -120,7 +120,8 @@ class UnaryFuncElemOp(UnaryFuncOp):
         for pos, slice in enumerate(source._slices):
             kwargs["slice"] = slice
             sig, nkwargs, outparam = self._findSignature(**kwargs)
-            outparam = outparam.withNumber(pos)
+            if(len(source._slices) > 0):
+                outparam = outparam.withNumber(pos)
             nslices.append(slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs))
         return self._initialize(tuple(nslices),source._state)
 
@@ -134,7 +135,8 @@ class UnaryFuncSeqOp(UnaryFuncOp):
             slice = slices.PackArraySlice(slice,1)
             kwargs["slice"] = slice
             sig, nkwargs, outparam = self._findSignature(**kwargs)
-            outparam = outparam.withNumber(pos)
+            if(len(source._slices) > 0):
+                outparam = outparam.withNumber(pos)
             slice = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
             slice = slices.UnpackArraySlice(slice,1)
             nslices.append(slice)
@@ -150,7 +152,8 @@ class UnaryFuncAggregateOp(UnaryFuncOp):
             slice = slices.PackArraySlice(slice,1)
             kwargs["slice"] = slice
             sig, nkwargs, outparam = self._findSignature(**kwargs)
-            outparam = outparam.withNumber(pos)
+            if(len(source._slices) > 1):
+                outparam = outparam.withNumber(pos)
             slice = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
             nslices.append(slice)
         return self._initialize(tuple(nslices),source._state)
@@ -178,17 +181,22 @@ class BinaryFuncElemOp(BinaryFuncOp):
             mode = "dim"
 
         nslices = []
+        nslice = max(len(lsource._slices), len(rsource._slices))
         for pos, binslices in enumerate(util.zip_broadcast(lsource._slices, rsource._slices)):
             (kwargs["lslice"],kwargs["rslice"]),plans = slices.broadcast(binslices,mode)
             sig, nkwargs, outparam = self._findSignature(**kwargs)
             if(isinstance(outparam, rtypes.TypeUnknown)):
                 if(binslices[0].name == binslices[1].name):
                     name = binslices[0].name
+                elif(binslices[0].name == "data"):
+                    name = binslices[1].name
+                elif(binslices[1].name == "data"):
+                    name = binslices[0].name
                 else:
                     name = "result"
                 outparam = Param(name, outparam)
-
-            outparam = outparam.withNumber(pos)
+            if(nslice > 1):
+                outparam = outparam.withNumber(pos)
             nslices.append(slices.BinFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs))
         return self._initialize(tuple(nslices),state)
 
