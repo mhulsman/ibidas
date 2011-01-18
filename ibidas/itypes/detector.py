@@ -68,6 +68,7 @@ import numpy
 import array
 from collections import defaultdict
 import operator
+import platform
 
 import rtypes, convertors
 from ..constants import *
@@ -594,7 +595,7 @@ registerTypeScanner(DictScanner)
 
 class ContainerScanner(TypeScanner):
     good_cls = set([set, frozenset, None.__class__, MissingType, list, array.array, numpy.ndarray, sparse_arrays.FullSparse, sparse_arrays.PosSparse])
-    bad_cls = set([tuple, str])
+    bad_cls = set([tuple, str, numpy.string_])
     convertor=convertors.ArrayConvertor
 
     def __init__(self, detector):
@@ -831,16 +832,22 @@ class IntegerScanner(TypeScanner):
 
     def getType(self):
         out_type = rtypes.TypeInteger
-        if self.min_val >= 0:
-            for stepval, rtype in zip(self.ustepvals, self.uinttypes):
-                if self.max_val < stepval:
-                    out_type = rtype
-                    break
+        bits = platform.architecture()[0]
+        if(bits == "32bit" and self.max_val < 2147483648L and self.min_val > -2147483648L):
+            out_type = rtypes.TypeInt32
+        elif(bits == "64bit" and self.max_val < 9223372036854775808L and self.min_val > -9223372036854775808L):
+            out_type = rtypes.TypeInt64
         else:
-            for stepval, rtype in zip(self.istepvals, self.inttypes):
-                if -self.min_val <= stepval and self.max_val < stepval:
-                    out_type = rtype
-                    break
+            if self.min_val >= 0:
+                for stepval, rtype in zip(self.ustepvals, self.uinttypes):
+                    if self.max_val < stepval:
+                        out_type = rtype
+                        break
+            else:
+                for stepval, rtype in zip(self.istepvals, self.inttypes):
+                    if -self.min_val <= stepval and self.max_val < stepval:
+                        out_type = rtype
+                        break
         cv = self.convertor(self.detector.objectclss.copy()) 
         return out_type(self.detector.hasMissing(), need_conversion=True, convertor=cv)
 

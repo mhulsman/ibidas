@@ -49,6 +49,10 @@ class TestNestedMatrix(TestArray):
     def setUp(self):
         self.data = cutils.darray([[[1,2],[2,4],[3,5]],[[1,3],[5,2]],[[1,2]]])
 
+class TestNestedMatrixString(TestArray):
+    def setUp(self):
+        self.data = cutils.darray([[["abc","abcd"],["def","defg"],["abg","fev"]],[["zeK","sdf"],["sdf","sdfff"]],[["sdf","kjl"]]])
+
 class TestNestedNestedArray(TestArray):
     def setUp(self):
         self.data = cutils.darray([[[1,2],[2,3,3,3,4,5],[]],[[1],[2]],[[1,4,5]]])

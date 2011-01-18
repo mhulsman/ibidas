@@ -192,10 +192,6 @@ class NestedArray(object):
         
         seq.shape = rshape + seq.shape[1:]
 
-        if restype:
-            #if not seq.dtype == restype.toNumpy():
-            #    seq = numpy.cast[dtype](seq)
-            seq = seq.view(sparse_arrays.FullSparse)
         nself = self.copy()
         nself.data = seq
         nself.cur_type = restype

@@ -22,7 +22,6 @@ class ArrayConvertor(BaseConvertor):
  
     def _convert(self,dims,elem_type,seq):
         assert isinstance(elem_type,rtypes.TypeArray), "ArrayCOnvertor should be applied to array types"
-       
         
         depth = dims.contigiousFixedNDims()
         if(not depth):# no fixed dims, allow for one non-fixed dim
@@ -56,7 +55,7 @@ class ArrayConvertor(BaseConvertor):
             if(not isinstance(elem, numpy.ndarray)):
                 if(not isinstance(elem, collections.Sequence)):
                     elem = list(elem)
-                elem = cutils.darray(elem,object,depth,1)
+                elem = cutils.darray(elem,elem_numpy_type,depth,1)
             
             #assure correct number of dimensions
             if(len(elem.shape) < depth):
@@ -71,10 +70,13 @@ class ArrayConvertor(BaseConvertor):
                 elem = cutils.darray([subelem for subelem in elem],object,1,1)
                 elem.shape = oshape[:depth]
 
-            if(not isinstance(elem,sparse_arrays.FullSparse)):
-                if not elem.dtype == elem_numpy_type:
+            if not elem.dtype == elem_numpy_type:
+                if(elem_numpy_type.char == 'S' or elem_numpy_type.char == 'U' or elem_numpy_type.char == 'V'):
+                    z = numpy.zeros(elem.shape,elem_numpy_type)
+                    z[:] = elem
+                    elem = z
+                else:
                     elem = numpy.cast[elem_numpy_type](elem)
-                elem = sparse_arrays.FullSparse(elem)
 
             if(rest_dims):
                 elem = self._convert(rest_dims,elem_type,elem)
@@ -85,9 +87,7 @@ class ArrayConvertor(BaseConvertor):
         else:
             nseq = cutils.darray(res,seq_numpy_type,depth+1,1)
 
-        seq = sparse_arrays.FullSparse(nseq)
-        
-        return seq
+        return nseq
 
 class StringConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
@@ -107,8 +107,7 @@ class StringConvertor(BaseConvertor):
                         except KeyError:
                             r[elem] = elem
                         res.append(elem)
-                nseq = cutils.darray(res)
-                seq = sparse_arrays.FullSparse(nseq)
+                seq = cutils.darray(res)
         elif(not seq.dtype == dtype):
             #numpy bug: numpy.cast[<string dtype>] always cast to S1, irrespective 
             #requested length
@@ -129,9 +128,7 @@ class StringFloatConvertor(BaseConvertor):
         else:
             seqres = [float(elem) for elem in seq]
          
-        nseq = cutils.darray(seqres,elem_type.toNumpy())
-        seq = sparse_arrays.FullSparse(nseq)
-        return seq
+        return cutils.darray(seqres,elem_type.toNumpy())
 
 class StringIntegerConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
@@ -145,9 +142,7 @@ class StringIntegerConvertor(BaseConvertor):
         else:
             seqres = [int(elem) for elem in seq]
          
-        nseq = cutils.darray(seqres,elem_type.toNumpy())
-        seq = sparse_arrays.FullSparse(nseq)
-        return seq
+        return cutils.darray(seqres,elem_type.toNumpy())
  
 class SetConvertor(BaseConvertor):
 
@@ -164,9 +159,7 @@ class SetConvertor(BaseConvertor):
                 seqres = [frozenset(elem) for elem in seq]
         else:
             seqres = seq
-        nseq = cutils.darray(seqres,elem_type.toNumpy())
-        seq = sparse_arrays.FullSparse(nseq)
-        return seq
+        return cutils.darray(seqres,elem_type.toNumpy())
 
 
 
@@ -181,9 +174,7 @@ class DictConvertor(BaseConvertor):
             
             subseq = cutils.darray([getname(elem) for elem in seq],subtype.toNumpy())
             columns.append(self.execFreeze(subtype, subseq))
-        nseq = cutils.darray(zip(*columns))
-        seq = sparse_arrays.FullSparse(nseq)
-        return seq
+        return cutils.darray(zip(*columns))
 
 class NamedTupleConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
@@ -195,7 +186,5 @@ class NamedTupleConvertor(BaseConvertor):
                     return Missing
             subseq = cutils.darray([getname(elem) for elem in seq],subtype.toNumpy())
             columns.append(self.execFreeze(subtype, subseq))
-        nseq = cutils.darray(zip(*columns))
-        seq = sparse_arrays.FullSparse(nseq)
-        return seq
+        return cutils.darray(zip(*columns))
 
