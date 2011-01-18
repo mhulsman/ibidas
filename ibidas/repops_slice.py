@@ -113,7 +113,7 @@ def unpack_tuple(slice,name="",unpack=True):
             raise RuntimeError, "No tuple to unpack"
 
     if(not name):
-        nslices = [slices.ensure_normal_or_frozen(slices.UnpackTupleSlice(slice, idx))
+        nslices = [slices.ensure_converted(slices.UnpackTupleSlice(slice, idx))
                                             for idx in range(len(slice.type.subtypes))]
     else: 
         try:
@@ -122,12 +122,12 @@ def unpack_tuple(slice,name="",unpack=True):
             assert isinstance(name, str), \
                         "Tuple slice name should be a string"
             idx = slice.type.fieldnames.index(name)
-        nslices = [slices.ensure_normal_or_frozen(slices.UnpackTupleSlice(slice, idx))]
+        nslices = [slices.ensure_converted(slices.UnpackTupleSlice(slice, idx))]
     
     if(unpack):
         for pos, nslice in enumerate(nslices):
             while(nslice.type.__class__ is rtypes.TypeArray):
-                nslice = slices.ensure_normal_or_frozen(slices.UnpackArraySlice(nslice))
+                nslice = slices.ensure_converted(slices.UnpackArraySlice(nslice))
             nslices[pos] = nslice
     return nslices
 

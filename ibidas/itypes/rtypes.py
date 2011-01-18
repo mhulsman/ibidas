@@ -42,8 +42,10 @@ Root type is TypeUnknown, with as child TypeAny. Remaining types are divided in
 """
 
 
+import copy
 import numpy
 import operator
+import convertors
 from collections import defaultdict
 
 from ..constants import *
@@ -90,7 +92,7 @@ class Type(object):#{{{
     _scalar = numpy.object
     _defval = None
     _need_conversion=False
-    _convertor=None
+    _convertor=convertors.BaseConvertor
     has_missing = True
 
     @classmethod
@@ -120,13 +122,16 @@ class Type(object):#{{{
         """Returns base type name"""
         return self.name
 
-    def _callRecursive(self, methodname, *params, **kwds):
+    def _callRecursive(self, methodname, **kwds):
         """Calls methodname on this type and its subtypes, returning
         new type. 
 
         :param methodname: Name of type method. Should return type object.
-        :param params: Non keyword arguments for ``methodname``
         :param kwds: Keyword arguments for ``methodname``
+                     
+        Special keywords: 
+        - dimdepth: number of dims of parent types are added to value
+        - typedepth: number of parent types are added to value
         """
         return self
     
@@ -135,19 +140,22 @@ class Type(object):#{{{
         return self._need_conversion
 
     def _getConvertor(self):
-        return self._convertor
+        if(isinstance(self._convertor, convertors.BaseConvertor)):
+            return self._convertor
+        else:
+            return self._convertor()
 
     def _setNeedConversion(self,value):
         return self
     
     #dim changes
-    def _removeDepDim(self, dimpos, elem_specifier):
+    def _removeDepDim(self, dimdepth, elem_specifier):
         return self
 
-    def _updateDepDim(self, dimpos, ndim):
+    def _updateDepDim(self, dimdepth, ndim):
         return self
 
-    def _insertDepDim(self, dimpos, ndim):
+    def _insertDepDim(self, dimdepth, ndim):
         return self
 
     #subtypes
@@ -241,7 +249,7 @@ class TypeAny(TypeUnknown):#{{{
         
     @classmethod
     def commonType(cls, type1, type2):
-        return cls(type1.has_missing or type2.has_missing, need_conversion=type1.need_conversion or type2.need_conversion)
+        return cls(type1.has_missing or type2.has_missing, need_conversion=type1._need_conversion or type2._need_conversion)
    
     def toNumpy(self):
         """Returns dtype of a numpy container which
@@ -253,15 +261,18 @@ class TypeAny(TypeUnknown):#{{{
             return numpy.dtype(self._dtype)
     
     
-    def _callRecursive(self, methodname, *params, **kwds):
+    def _callRecursive(self, methodname, **kwds):
         """Calls methodname on this type and its subtypes, returning
         new type. 
 
         :param methodname: Name of type method. Should return type object.
-        :param params: Non keyword arguments for ``methodname``
         :param kwds: Keyword arguments for ``methodname``
+        
+        Special keywords: 
+        - dimdepth: number of dims of parent types are added to value
+        - typedepth: number of parent types are added to value
         """
-        return getattr(self,methodname)(*params,**kwds)
+        return getattr(self,methodname)(**kwds)
     
     #conversion
     def _setNeedConversion(self,value):
@@ -372,12 +383,12 @@ class TypeTuple(TypeAny):#{{{
     def commonType(cls, type1, type2):
         if(not type1.subtypes or not type2.subtypes or
             len(type1.subtypes) != len(type2.subtypes)):
-            return cls(type1.has_missing or type2.has_missing, need_conversion=type1.need_conversion or type2.need_conversion)
+            return cls(type1.has_missing or type2.has_missing, need_conversion=type1._need_conversion or type2._need_conversion)
         else:
             subtypes = [casts.castImplicitCommonType(lstype, rstype)
                       for lstype, rstype in zip(type1.subtypes, type2.subtypes)]
             res = cls(type1.has_missing or type2.has_missing, tuple(subtypes), type1.fieldnames, 
-                      need_conversion=type1.need_conversion or type2.need_conversion)
+                      need_conversion=type1._need_conversion or type2._need_conversion)
         return res
     
     def toDefval(self):
@@ -393,7 +404,7 @@ class TypeTuple(TypeAny):#{{{
         return len(self.subtypes)
 
     def getSubType(self, subtype_id=0):
-         """Returns subtype if this is a non-scalar type.
+        """Returns subtype if this is a non-scalar type.
         Otherwise, raises TypeError. If subtype_id invalid, raised IndexError.
 
         :param subtype_id: id of subtype, default 0. Should be >= 0 and < :py:meth:`getSubTypeNumber`.
@@ -489,21 +500,29 @@ class TypeTuple(TypeAny):#{{{
                 hash(self.subtypes) ^
                 hash(self.fieldnames))
     
-    def _callRecursive(self, methodname, *params, **kwds):
+    def _callRecursive(self, methodname, **kwds):
         """Calls methodname on this type and its subtypes, returning
         new type. 
 
         :param methodname: Name of type method. Should return type object.
-        :param params: Non keyword arguments for ``methodname``
         :param kwds: Keyword arguments for ``methodname``
+        
+        Special keywords: 
+        - dimdepth: number of dims of parent types are added to value
+        - typedepth: number of parent types are added to value
         """
-        nself = getattr(self,methodname)(*params,**kwds)
-        nsubtypes = [subtype._callRecursive(methodname, *params, **kwds) for subtype in self.subtypes]
+        nself = getattr(self,methodname)(**kwds)
+        if("typedepth" in kwds):
+            kwds = kwds.copy()
+            kwds["typedepth"] += 1
+
+        nsubtypes = [subtype._callRecursive(methodname, **kwds) for subtype in self.subtypes]
         for pos in xrange(len(nsubtypes)):
             if(not nsubtypes[pos] is self.subtypes[pos]):
                 break
         else:
             return nself
+
         if(nself is self):
             nself = self.copy()
         nself.subtypes = tuple(nsubtypes)
@@ -525,6 +544,7 @@ addType(TypeTuple)#}}}
 
 class TypeDict(TypeTuple):#{{{
     name = "dict"
+    _convertor = convertors.DictConvertor
 
     def __repr__(self):
         res = '{' 
@@ -546,6 +566,7 @@ class TypeArray(TypeAny):#{{{
     """Type representing a collection of values, 
        possibly in an dimensional structure"""
     name = "array"
+    _convertor = convertors.ArrayConvertor
 
     def __init__(self, has_missing=False, dims=(), \
                        subtypes=(unknown,), need_conversion=False, convertor=None):
@@ -578,13 +599,13 @@ class TypeArray(TypeAny):#{{{
         if(not type1.dims or not type2.dims or
             len(type1.dims) != len(type2.dims)
             or type1.dims != type2.dims):
-            return cls(type1.has_missing or type2.has_missing, need_conversion=type1.need_conversion or type2.need_conversion)
+            return cls(type1.has_missing or type2.has_missing, need_conversion=_type1._need_conversion or type2._need_conversion)
         else:
             subtypes = [casts.castImplicitCommonType(lstype, rstype)
                         for lstype, rstype in zip(type1.subtypes, type2.subtypes)]
             dims = type1.dims 
             res = cls(has_missing=type1.has_missing or type2.has_missing, dims=dims, subtypes=tuple(subtypes), 
-                      need_conversion=type1.need_conversion or type2.need_conversion)
+                      need_conversion=_type1._need_conversion or type2._need_conversion)
         return res
 
     def toDefval(self):
@@ -613,9 +634,15 @@ class TypeArray(TypeAny):#{{{
     
 
     def getSubTypeNumber(self):
+        """Returns number of subtypes of this type"""
         return len(self.subtypes)
 
     def getSubType(self, subtype_id=0):
+        """Returns subtype if this is a non-scalar type.
+        Otherwise, raises TypeError. If subtype_id invalid, raised IndexError.
+
+        :param subtype_id: id of subtype, default 0. Should be >= 0 and < :py:meth:`getSubTypeNumber`.
+        :rtype: obj of class :py:class:`Type`"""
         assert (subtype_id == 0), "Invalid subtype id given"
         if(self.subtypes):
             return self.subtypes[subtype_id]
@@ -711,44 +738,48 @@ class TypeArray(TypeAny):#{{{
                 hash(self.subtypes) ^ 
                 hash(self.dims))
     
-    def _callRecursive(self, methodname, *params, **kwds):
+    def _callRecursive(self, methodname, **kwds):
         """Calls methodname on this type and its subtypes, returning
         new type. 
 
         :param methodname: Name of type method. Should return type object.
-        :param params: Non keyword arguments for ``methodname``
         :param kwds: Keyword arguments for ``methodname``
-        """
-        nself = getattr(self,methodname)(*params,**kwds)
         
-        if("dimpos" in kwds):
-            kwds = kwds.copy()
-            kdws["dimpos"] += len(self.dims)
-       
+        Special keywords: 
+        - dimdepth: number of dims of parent types are added to value
+        - typedepth: number of parent types are added to value
+        """
+        nself = getattr(self,methodname)(**kwds)
         if(self.subtypes):
-            nsubtype = self.subtypes[0]._callRecursive(methodname, *params, **kwds) 
+            if("dimdepth" in kwds):
+                kwds = kwds.copy()
+                kdws["dimdepth"] += len(self.dims)
+            if("typedepth" in kwds):
+                kwds = kwds.copy()
+                kwds["typedepth"] += 1
+            nsubtype = self.subtypes[0]._callRecursive(methodname, **kwds) 
             if(not nsubtype is self.subtypes[0]):
                 if(nself is self):
                     nself = self.copy()
                 nself.subtypes = (nsubtype,)
         return nself
    
-    def _removeDepDim(self, dimpos, elem_specifier):
-        ndims = self.dims.removeDim(-dimpos,elem_specifier)
+    def _removeDepDim(self, dimdepth, elem_specifier):
+        ndims = self.dims.removeDim(-dimdepth,elem_specifier)
         if(not ndims is self.dims):
             self = self.copy()
             self.dims = ndims
         return self
      
-    def _updateDepDim(self, dimpos, ndim):
-        ndims = self.dims.updateDim(-dimpos,ndim)
+    def _updateDepDim(self, dimdepth, ndim):
+        ndims = self.dims.updateDim(-dimdepth,ndim)
         if(not ndims is self.dims):
             self = self.copy()
             self.dims = ndims
         return self
 
-    def _insertDepDim(self, dimpos, ndim):
-        ndims = self.dims.insertDim(-dimpos, ndim)
+    def _insertDepDim(self, dimdepth, ndim):
+        ndims = self.dims.insertDim(-dimdepth, ndim)
         if(not ndims is self.dims):
             self = self.copy()
             self.dims = ndims
@@ -771,8 +802,8 @@ addType(TypeArray)#}}}
 
 class TypeSet(TypeArray):#{{{
     name = "set"
-    
-    def __init__(self, has_missing=False, dims=(), subtypes=(unknown,), **attr):
+    _convertor = convertors.SetConvertor 
+    def __init__(self, has_missing=False, dims=(), subtypes=(unknown,), need_conversion=False, convertor=None):
 
         assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
                 "Dimensions of a set should be a dimpath of size 1"
@@ -784,7 +815,7 @@ class TypeSet(TypeArray):#{{{
         
         subtypes = (type_attribute_freeze.freeze_protocol.freeze(subtypes[0]),)
         TypeArray.__init__(self, has_missing, dims, 
-                                    subtypes, **attr)
+                                 subtypes, need_conversion, convertor)
     def __repr__(self):
         res = ""
         if(self.has_missing):
@@ -800,12 +831,13 @@ class TypeString(TypeArray):#{{{
     name = "string"
     _dtype = "U"
     _defval = u""
+    _convertor=convertors.StringConvertor
     
-    def __init__(self, has_missing=False, dims=(), **attr):
+    def __init__(self, has_missing=False, dims=(), need_conversion=False, convertor=None):
         assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
             "Dimensions of a string should be a dimpath of size 1"
         TypeArray.__init__(self, has_missing, dims, 
-                                    (TypeChar(),), **attr)
+                                    (TypeChar(),), need_conversion, convertor)
 
     @classmethod
     def commonType(cls, type1, type2):
@@ -816,9 +848,7 @@ class TypeString(TypeArray):#{{{
             shape = max(type1.dims[0].shape, type2.dims[0].shape)
         dim = dimensions.Dim(shape)
         res = cls(has_missing=type1.has_missing or type2.has_missing, 
-                    dims=dimpaths.DimPath(dim),)
-
-        res.setCommonAttributes(type1, type2)
+                  dims=dimpaths.DimPath(dim), need_conversion=type1._need_conversion or type2._need_conversion)
         return res
 
     def toNumpy(self):
@@ -840,15 +870,6 @@ class TypeString(TypeArray):#{{{
                 hash(self.has_missing) ^ 
                 hash(self.dims))
     
-    def copy(self, **newattr):
-        """Returns copy of this type"""
-        res = self.__class__(has_missing=self.has_missing, 
-                              dims=self.dims, data_state=self.data_state)
-        res.attr = self.attr.copy()
-        res.attr.update(newattr)
-        return res
-    
-
     def __repr__(self):
         res =  self.name
         if(self.has_missing):
@@ -888,8 +909,8 @@ class TypeNumber(TypeScalar):#{{{
     name = "number"
     _defval = 0
     
-    def __init__(self, has_missing=False, **attr):
-        TypeScalar.__init__(self, has_missing, **attr)
+    def __init__(self, has_missing=False, need_conversion=False, convertor=None):
+        TypeScalar.__init__(self, has_missing, need_conversion, convertor)
     
 addType(TypeNumber)#}}}
 
@@ -1059,8 +1080,6 @@ class TypeBool(TypeUInt8, TypeInt8):#{{{
 addType(TypeBool)#}}}
 
 
-
-
 #maps numpy type to internal type
 __objtype_map__ = {
 numpy.dtype("object"):TypeAny,
@@ -1092,20 +1111,21 @@ OUT_DIM = 5
 IN_SUBTYPE_DIM = 6
 
 
-
-
-
-
-
 def createType(name):#{{{
     """Creates a type object from string representation.
 
     :param name: str
 
-    .. rubric:: Examples
-        createType("unicode")
-        createType("array(int64)[]")
-        createType("tuple(int64,unicode)")
+    Format:
+        Description of type formats
+
+    Examples:
+        >>> createType("unicode")
+
+        >>> createType("array(int64)[]")
+
+        >>> createType("tuple(int64,unicode)")
+
     """
 
     if(not isinstance(name, str)):
@@ -1515,9 +1535,11 @@ class TypeStringASTInterpreter(object):#{{{
             kwargs['dims'] = dims
         
         subtypes = tuple([self.processCreateType(subtypenode, dimpos) for subtypenode in subtypenodes])
-        fieldnames = tuple([getattr(subtypenode,"name","f" + str(pos)) for pos, subtypenode in enumerate(subtypenodes)])
         if(subtypes):
             kwargs['subtypes'] = subtypes
+
+        if(issubclass(typecls,TypeTuple)):
+            fieldnames = tuple([getattr(subtypenode,"name","f" + str(pos)) for pos, subtypenode in enumerate(subtypenodes)])
             kwargs['fieldnames'] = fieldnames
 
 

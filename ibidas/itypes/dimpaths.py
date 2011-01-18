@@ -5,6 +5,7 @@ import numpy
 from ..constants import *
 from dimensions import Dim
 #_delay_import_(globals(),"dimensions","Dim")
+_delay_import_(globals(),"rtypes")
 _delay_import_(globals(),"..representor")
 _delay_import_(globals(),"..slices")
 _delay_import_(globals(),"..utils","toposort","util","context")
@@ -88,7 +89,7 @@ class DimPath(tuple):
 
         res = self[:max(pos,0)] + DimPath(*ndims)
         if(not subtype is None):
-            subtype = subtype._removeDepDim(dimpos=len(self)-pos, elem_specifier=elem_specifier)
+            subtype = subtype._removeDepDim(dimdepth=len(self)-pos, elem_specifier=elem_specifier)
             return (res,subtype)
         else:
             return res#}}}
@@ -100,7 +101,7 @@ class DimPath(tuple):
                 ndims.append(self[p].updateDepDim(p - pos, ndim))
 
             if(not subtype is None):
-                subtype = subtype._updateDepDim(dimpos=len(self)-pos, ndim=ndim)
+                subtype = subtype._updateDepDim(dimdepth=len(self)-pos, ndim=ndim)
             res = self[:max(pos,0)] + (ndim,) + DimPath(*ndims)
         else:
             res = self[:pos] + (ndim,) + self[(pos + 1):]
@@ -118,7 +119,7 @@ class DimPath(tuple):
         else:
             res = DimPath(*ndims)
         if(not subtype is None):
-            subtype = subtype._insertDepDim(dimpos=len(self) - pos + 1, ndim=ndim)
+            subtype = subtype._insertDepDim(dimdepth=len(self) - pos + 1, ndim=ndim)
             return (res,subtype)
         else:
             return res#}}}
@@ -416,7 +417,7 @@ def getArrayDimPathFromType(rtype):
     if(rtype.__class__ is rtypes.TypeArray):
         return rtype.dims + getArrayDimPathFromType(rtype.getSubType())
     else:
-        return dimpaths.DimPath()
+        return DimPath()
 
 def getNestedArraySubType(rtype):
     if(rtype.__class__ is rtypes.TypeArray):

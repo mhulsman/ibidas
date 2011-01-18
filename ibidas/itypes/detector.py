@@ -412,7 +412,7 @@ class TypeScanner(object):
 
     def getType(self):
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return self.typecls(self.detector.hasMissing(), convertor=cv, data_state=DATA_INPUT)
+        return self.typecls(self.detector.hasMissing(), need_conversion=True, convertor=cv)
 
     def getAncestorScanners(self):
         if not hasattr(self.__class__, 'ancest_cls_cache'):
@@ -493,7 +493,7 @@ class TupleScanner(TypeScanner):
         fieldnames = ['f' + str(i) for i in xrange(self.max_len)]
         subtypes = tuple([self.getSubDetector(i).getType() for i in xrange(self.max_len)])
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, convertor=cv, data_state=DATA_INPUT)
+        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, need_conversion=True, convertor=cv)
 
     
     def scan(self, seq):
@@ -531,7 +531,7 @@ class NamedTupleScanner(TypeScanner):
         fieldnames = [name for name in self.names]
         subtypes = tuple([self.getSubDetector(name).getType() for name in self.names])
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, convertor=cv, data_state=DATA_INPUT)
+        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, need_conversion=True, convertor=cv)
 
     def scan(self, seq):
         if self.bad_cls.issubset(self.detector.objectclss):
@@ -568,7 +568,7 @@ class DictScanner(TypeScanner):
         fieldnames = [name for name in self.names]
         subtypes = tuple([self.getSubDetector(name).getType() for name in self.names])
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, convertor=cv, data_state=DATA_INPUT)
+        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, need_conversion=True, convertor=cv)
 
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
@@ -606,7 +606,7 @@ class ContainerScanner(TypeScanner):
         
         dims = dimpaths.DimPath(*[self.getDimRep(i).dim for i in xrange(self.min_dim)])
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeArray(self.detector.hasMissing(), dims, (subtype,), convertor=cv, data_state=DATA_INPUT)
+        return rtypes.TypeArray(self.detector.hasMissing(), dims, (subtype,), need_conversion=True, convertor=cv)
 
     def scan(self, seq):
         has_missing = self.detector.hasMissing()
@@ -698,7 +698,7 @@ class SetScanner(ContainerScanner):
         subtype = self.getSubDetector().getType()
         dims = dimpaths.DimPath(self.getDimRep(0).dim)
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeSet(self.detector.hasMissing(), dims, (subtype,), convertor=cv, data_state=DATA_INPUT)
+        return rtypes.TypeSet(self.detector.hasMissing(), dims, (subtype,), need_conversion=True, convertor=cv)
 
     def unregister(self, create_parent=False):
         parent = ContainerScanner.unregister(self, create_parent)
@@ -745,7 +745,7 @@ class StringScanner(TypeScanner):
 
         dims = dimpaths.DimPath(d)
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return ntype(self.detector.hasMissing(), dims, convertor=cv, data_state=DATA_INPUT)
+        return ntype(self.detector.hasMissing(), dims, need_conversion=True, convertor=cv)
 
     def scan(self, seq):
         has_missing = self.detector.hasMissing()
@@ -770,7 +770,7 @@ class SliceScanner(TypeScanner):
         has_missing = self.detector.hasMissing()
         cv = self.convertor(self.detector.objectclss.copy()) 
 
-        return self.typecls(has_missing, convert_type=self.__class__, convertor=cv, data_state=DATA_INPUT)
+        return self.typecls(has_missing, need_conversion=True, convertor=cv)
 
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
@@ -793,7 +793,7 @@ class NumberScanner(TypeScanner):
         has_missing = self.detector.hasMissing()
         cv = self.convertor(self.detector.objectclss.copy()) 
 
-        return self.typecls(has_missing, convert_type=self.__class__, convertor=cv, data_state=DATA_INPUT)
+        return self.typecls(has_missing, need_conversion=True, convertor=cv)
 
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
@@ -842,7 +842,7 @@ class IntegerScanner(TypeScanner):
                     out_type = rtype
                     break
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return out_type(self.detector.hasMissing(), convertor=cv, data_state=DATA_INPUT)
+        return out_type(self.detector.hasMissing(), need_conversion=True, convertor=cv)
 
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):

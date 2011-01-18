@@ -38,15 +38,39 @@ def rep(data=None, dtype=None, unpack=True, name=None):
        :type name: :py:class:`str`, lower case
       
        Examples:
+            Using type autodetection:
+
             >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)])
+            Slices: f0       f1     
+            Types:  bytes[7] real64 
+            Dims:   d1:3     .   
             
-            >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)],"(string, real64)")
+            Specifying type directly:
+
+            >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)],"[genes]<(name:string, value:real64)")
+            Slices: name    value
+            Types:  string  real64
+            Dims:   genes:* .
+
+            Effect of setting unpack to False:
+
+            >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)],"[genes]<(name:string, value:real64)", unpack=False)
+            Slices: data                                  
+            Types:  [genes:*]:(name=string, value=real64) 
+            Dims: 
+            
+            Specifying root slice name:
+
+            >>> r = rep([('gene1',0.5),('gene2',0.3),('gene100',0.9)],"[genes]<(name:string, value:real64)", unpack=False, name="gene_table")
+            Slices: gene_table                                  
+            Types:  [genes:*]:(name=string, value=real64) 
+            Dims: 
 
     """
     if(not dtype is None):
         if(isinstance(dtype,str)):
             dtype = rtypes.createType(dtype)
-        dtype = dtype.setDataState
+        dtype = dtype._callRecursive("_setNeedConversion",value=True)
     else:
         det = detector.Detector()
         det.process(data)
@@ -58,10 +82,10 @@ def rep(data=None, dtype=None, unpack=True, name=None):
         name = "data"
 
     data_slice = slices.DataSlice(data,name=name,rtype=dtype)
-    data_slice = slices.ensure_normal_or_frozen(data_slice)
+    data_slice = slices.ensure_converted(data_slice)
     
     while(unpack and data_slice.type.__class__ is rtypes.TypeArray):
-        data_slice = slices.ensure_normal_or_frozen(slices.UnpackArraySlice(data_slice))
+        data_slice = slices.ensure_converted(slices.UnpackArraySlice(data_slice))
 
     res = wrapper.SourceRepresentor()
     res._initialize((data_slice,)) 

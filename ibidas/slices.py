@@ -372,8 +372,8 @@ class FlatAllSlice(UnaryOpSlice):#{{{
         stype = slice.type
         sdims = slice.dims
         for i in xrange(len(sdims)):
-            stype = stype.removeDepDim(-(i+1), None)
-        stype = stype.insertDepDim(-1,ndim)
+            stype = stype._removeDepDim((i+1), None)
+        stype = stype._insertDepDim(1,ndim)
         dims = dimpaths.DimPath(ndim)
 
         UnaryOpSlice.__init__(self, slice, rtype=stype,dims=dims)#}}}
@@ -474,12 +474,10 @@ class ConvertSlice(UnaryOpSlice):#{{{
         if(slice.type == rtypes.unknown):
             ntype = rtypes.TypeAny(True)
         else:
-            assert slice.type.data_state == DATA_INPUT, "Slice has not DATA_INPUT as state"
-            ntype = slice.type.copy()
-            ntype.data_state = DATA_NORMAL
-            ntype.attr.pop('convertor',None)
+            assert slice.type._needConversion(), "Slice does not need conversion"
+            ntype = slice.type._setNeedConversion(False)
 
-        self.convertor = convertors.getConvertor(slice.type)
+        self.convertor = slice.type._getConvertor()
         UnaryOpSlice.__init__(self, slice, rtype=ntype)#}}}
 
 class FreezeSlice(UnaryOpSlice):#{{{
@@ -499,24 +497,13 @@ class UnFreezeSlice(UnaryOpSlice):#{{{
         UnaryOpSlice.__init__(self, pslice, rtype=ntype)#}}}
 
 def ensure_frozen(slice):#{{{
-    if(slice.type == rtypes.unknown or slice.type.data_state == DATA_INPUT):
-        slice = ConvertSlice(slice)
-    
     if(freeze_protocol.need_freeze(slice.type)):
         return FreezeSlice(slice)
     else:
         return slice#}}}
 
-def ensure_normal(slice):#{{{
-    if(slice.type == rtypes.unknown or slice.type.data_state == DATA_INPUT):
-        return ConvertSlice(slice)
-    elif(freeze_protocol.need_unfreeze(slice.type)):
-        return UnFreezeSlice(slice)
-    else:
-        return slice#}}}
-
-def ensure_normal_or_frozen(slice):#{{{
-    if(slice.type == rtypes.unknown or slice.type.data_state == DATA_INPUT):
+def ensure_converted(slice):#{{{
+    if(slice.type._needConversion()):
         return ConvertSlice(slice)
     else:
         return slice#}}}

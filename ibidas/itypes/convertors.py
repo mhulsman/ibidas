@@ -7,14 +7,8 @@ _delay_import_(globals(), "..utils.missing","Missing")
 _delay_import_(globals(), "rtypes")
 _delay_import_(globals(), "dimpaths")
 
-def getConvertor(rtype):
-    if 'convertor' in rtype.attr:
-        return rtype.attr['convertor']
-    else:
-        return BaseConvertor(set([None.__class__,missing.MissingType]))
-
 class BaseConvertor(object):
-    def __init__(self,objectclss):
+    def __init__(self,objectclss=set()):
         self.objectclss = objectclss
 
     def convert(self,seq,elem_type):
@@ -158,7 +152,7 @@ class StringIntegerConvertor(BaseConvertor):
 class SetConvertor(BaseConvertor):
 
     def convert(self,seq,elem_type):
-        if(set in self.objectclss): 
+        if(not self.objectclss or set in self.objectclss): 
             if(elem_type.has_missing):
                 seqres = []
                 for elem in seq:

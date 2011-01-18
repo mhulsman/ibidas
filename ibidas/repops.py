@@ -124,9 +124,6 @@ def apply_slice(slices, slicecls, dim_selector, *params, **kwds):
 def frozen(slices):
     return apply_slice(slices, slices.ensure_frozen, None)
 
-def normal(slices):
-    return apply_slice(slices, slices.ensure_normal, None)
-
-def normal_or_frozen(slices):
-    return apply_slice(slices, slices.ensure_normal_or_frozen, None)
+def converted(slices):
+    return apply_slice(slices, slices.ensure_converted, None)
 
