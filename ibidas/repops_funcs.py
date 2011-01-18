@@ -1,3 +1,5 @@
+import platform
+import operator
 import repops
 from constants import *
 from itypes import rtypes
@@ -42,7 +44,7 @@ class Param(object):
             else:
                 return self.default
 
-        if(type is None):
+        if(self.type is None):
             return val
         else:
             if(not isinstance(val, slices.Slice)):
@@ -93,15 +95,17 @@ class Func(object):
                 nkwargs = kwargs.copy()
                 outdescr = res
             return (sig, nkwargs, outdescr)
-        else:
-            res = []
-            for field,slice in kwargs.iteritems():
-                if(isinstance(slice, slices.Slice)):
-                    res.append(str(slice.type) + " " + field)
-                else:
-                    res.append(field + "=" + str(slice))
-
-            raise RuntimeError, "Cannot find func " + str(self.__class__.__name__)  + " with signature (" + ",".join(res) + ")"
+        
+        #cannot find anything
+        res = []
+        for field,slice in kwargs.iteritems():
+            if(isinstance(slice, slices.Slice)):
+                res.append((str(slice.type) + " ",field))
+            else:
+                res.append(("", field + "=" + str(slice)))
+        res.sort(key=operator.itemgetter(1))
+        res = [a + b for a,b in res]
+        raise RuntimeError, "Cannot find func " + str(self.__class__.__name__)  + " with signature (" + ", ".join(res) + ")"
         
        
 
@@ -118,8 +122,7 @@ class UnaryFuncElemOp(UnaryFuncOp):
 
         nslices = []
         for pos, slice in enumerate(source._slices):
-            kwargs["slice"] = slice
-            sig, nkwargs, outparam = self._findSignature(**kwargs)
+            sig, nkwargs, outparam = self._findSignature(slice=slice,**kwargs)
             if(len(source._slices) > 0):
                 outparam = outparam.withNumber(pos)
             nslices.append(slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs))
@@ -133,8 +136,7 @@ class UnaryFuncSeqOp(UnaryFuncOp):
         nslices = []
         for pos, slice in enumerate(source._slices):
             slice = slices.PackArraySlice(slice,1)
-            kwargs["slice"] = slice
-            sig, nkwargs, outparam = self._findSignature(**kwargs)
+            sig, nkwargs, outparam = self._findSignature(slice=slice,**kwargs)
             if(len(source._slices) > 0):
                 outparam = outparam.withNumber(pos)
             slice = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
@@ -150,8 +152,7 @@ class UnaryFuncAggregateOp(UnaryFuncOp):
         nslices = []
         for pos, slice in enumerate(source._slices):
             slice = slices.PackArraySlice(slice,1)
-            kwargs["slice"] = slice
-            sig, nkwargs, outparam = self._findSignature(**kwargs)
+            sig, nkwargs, outparam = self._findSignature(slice=slice, **kwargs)
             if(len(source._slices) > 1):
                 outparam = outparam.withNumber(pos)
             slice = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
@@ -183,8 +184,8 @@ class BinaryFuncElemOp(BinaryFuncOp):
         nslices = []
         nslice = max(len(lsource._slices), len(rsource._slices))
         for pos, binslices in enumerate(util.zip_broadcast(lsource._slices, rsource._slices)):
-            (kwargs["lslice"],kwargs["rslice"]),plans = slices.broadcast(binslices,mode)
-            sig, nkwargs, outparam = self._findSignature(**kwargs)
+            (lslice,rslice),plans = slices.broadcast(binslices,mode)
+            sig, nkwargs, outparam = self._findSignature(left=lslice,right=rslice,**kwargs)
             if(isinstance(outparam, rtypes.TypeUnknown)):
                 if(binslices[0].name == binslices[1].name):
                     name = binslices[0].name
@@ -202,9 +203,9 @@ class BinaryFuncElemOp(BinaryFuncOp):
 
 
 class BinArithSignature(FuncSignature):
-    def check(self, lslice, rslice):
-        in1_type = lslice.type
-        in2_type = rslice.type
+    def check(self, left, right):
+        in1_type = left.type
+        in2_type = right.type
         if(not isinstance(in1_type, rtypes.TypeNumber) or not isinstance(in2_type, rtypes.TypeNumber)):
             return False
 
@@ -260,10 +261,15 @@ class Power(BinaryFuncElemOp):
 
 
 class CompareSignature(FuncSignature):
-    def check(self, lslice, rslice):#{{{
-        in1_type = lslice.type
-        in2_type = rslice.type
-        if(not isinstance(in1_type, rtypes.TypeScalar) or not isinstance(in2_type, rtypes.TypeScalar)):
+    def __init__(self,name,clss):
+        self.comparecls = clss
+        FuncSignature.__init__(self,name)
+
+    def check(self, left, right):#{{{
+        in1_type = left.type
+        in2_type = right.type
+
+        if(not isinstance(in1_type, self.comparecls) or not isinstance(in2_type, self.comparecls)):
             return False
 
         out_cls = rtypes.TypeBool
@@ -271,28 +277,29 @@ class CompareSignature(FuncSignature):
 
         return out_type#}}}
        
-comparesig = CompareSignature("scalar_scalar")
+comparesig = CompareSignature("scalar_scalar",(rtypes.TypeScalar,rtypes.TypeSet))
+comparestringsig = CompareSignature("string_string",(rtypes.TypeString))
 
 @repops.delayable()
 class Equal(BinaryFuncElemOp):
-    _sigs = [comparesig]
+    _sigs = [comparesig,comparestringsig]
 @repops.delayable()
 class NotEqual(BinaryFuncElemOp):
-    _sigs = [comparesig]
+    _sigs = [comparesig,comparestringsig]
 
 @repops.delayable()
 class LessEqual(BinaryFuncElemOp):
-    _sigs = [comparesig]
+    _sigs = [comparesig,comparestringsig]
 @repops.delayable()
 class Less(BinaryFuncElemOp):
-    _sigs = [comparesig]
+    _sigs = [comparesig, comparestringsig]
     
 @repops.delayable()
 class GreaterEqual(BinaryFuncElemOp):
-    _sigs = [comparesig]
+    _sigs = [comparesig, comparestringsig]
 @repops.delayable()
 class Greater(BinaryFuncElemOp):
-    _sigs = [comparesig]
+    _sigs = [comparesig, comparestringsig]
 
 
 class UnaryArithSignature(FuncSignature):
@@ -330,8 +337,10 @@ class UnaryArraySubtypeToIntegerSignature(FuncSignature):
         if(not isinstance(in_type.subtypes[0], self.subtypecls)):
             return False
         
-        #FIXME: make integer type platform dependent
-        nstype = rtypes.TypeInt64(in_type.subtypes[0].has_missing)
+        if(platform.architecture()[0] == "32bit"):
+            nstype = rtypes.TypeInt32(in_type.subtypes[0].has_missing)
+        else:
+            nstype = rtypes.TypeInt64(in_type.subtypes[0].has_missing)
         ntype = rtypes.TypeArray(in_type.has_missing, in_type.dims, (nstype,))
         return Param(slice.name, ntype)#}}}
 
@@ -356,7 +365,6 @@ class UnaryArrayBoolToBoolSignature(FuncSignature):
         if(not isinstance(in_type.subtypes[0], rtypes.TypeBool)):
             return False
         
-        #FIXME: make integer type platform dependent
         ntype = rtypes.TypeBool(in_type.subtypes[0].has_missing)
         return Param(slice.name, ntype)#}}}
 

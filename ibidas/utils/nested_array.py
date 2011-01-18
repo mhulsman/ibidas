@@ -189,7 +189,6 @@ class NestedArray(object):
         
         seq,rshape = self._flatData()
         seq = func(seq,*args,**kwargs)
-        
         seq.shape = rshape + seq.shape[1:]
 
         nself = self.copy()

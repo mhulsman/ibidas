@@ -574,12 +574,12 @@ class BinFuncOpSlice(MultiOpSlice):#{{{
 class BinFuncElemOpSlice(BinFuncOpSlice):#{{{
     __slots__ = []
 
-    def __init__(self, funcname, sig, outparam, lslice, rslice):
-        dims = lslice.dims
-        assert all([d1 == d2 for d1, d2 in zip(dims, rslice.dims)]), \
+    def __init__(self, funcname, sig, outparam, left, right):
+        dims = left.dims
+        assert all([d1 == d2 for d1, d2 in zip(dims, right.dims)]), \
                     "Dimensions of slices do not match"
         
-        BinFuncOpSlice.__init__(self, lslice, rslice, funcname, sig, outparam, dims)#}}}
+        BinFuncOpSlice.__init__(self, left, right, funcname, sig, outparam, dims)#}}}
 
 class UnaryFuncOpSlice(UnaryOpSlice):#{{{
     __slots__ = ["funcname","sig"]

@@ -331,7 +331,19 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         #a numpy bug gives all true arrays when using
         #bool as outtype in comparison
         return numpy_cmp[op](data[0], data[1])
-    
+
+    def string_stringGeneral(self, data, type1, type2, typeo, op):
+        #a numpy bug gives NotImplemented when performing operations,
+        #such as "numpy.equal" on string arrays
+        #so use direct operations ("__eq__")
+        op = python_op[op]
+        res = getattr(data[0], op)(data[1])
+        if(res is NotImplemented):
+            res = getattr(data[1], reverse_op[op])(data[0])
+        assert not res is NotImplemented, "Not implemented error in stringstringGeneral for " \
+                                            + str(op) + " and " + str(type1) + ", " + str(type2)
+        return res
+
     def numberGeneral(self, data, type_in, type_out, op):
         return numpy_unary_arith[op](data, sig=type_out.toNumpy())
 
@@ -351,6 +363,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def arrayboolAny(self, data, type_in, type_out, op):
         dtype = type_out.toNumpy()
+        util.debug_here()
         if(len(data.shape) < 2):
             return cutils.darray([numpy.any(row,axis=0) for row in data],dtype)
         else:
@@ -383,6 +396,23 @@ numpy_arith = { 'Add':numpy.add,
                 'Power':numpy.power
                 }
 
+python_op = {'Equal':'__eq__',
+             'NotEqual':'__ne__',
+             'LessEqual':'__le__',
+             'GreaterEqual':'__ge__',
+             'Less':'__lt__',
+             'Greater':'__gt__',
+             'Add':'__add__',
+             'Subtract':'__sub__',
+             'Multiply':'__mul__',
+             'Modulo':'__mod__',
+             'Divide':'__div__',
+             'FloorDivide':'__floordiv__',
+             'And':'__and__',
+             'Or':'__or__',
+             'Xor':'__xor__',
+             'Power':'__pow__'}
+
 numpy_unary_arith = {
     "Invert":numpy.invert,
     "Negative":numpy.negative,
@@ -405,12 +435,16 @@ reverse_op = {'__eq__':'__eq__',
             '__rmod__':'__mod__',
             '__div__':'__rdiv__',
             '__rdiv__':'__div__',
+            '__floordiv__':'__rfloordiv__',
+            '__rfloordiv__':'__floordiv__',
             '__and__':'__rand__',
             '__rand__':'__and__',
             '__or__':'__ror__',
             '__ror__':'__or__',
             '__xor__':'__rxor__',
             '__rxor__':'__xor__',
+            '__pow__':'__rpow__',
+            '__rpow__':'__pow__'
             }#}}}
 
 #util funcs

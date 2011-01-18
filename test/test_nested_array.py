@@ -52,6 +52,11 @@ class TestNestedMatrix(TestArray):
 class TestNestedMatrixString(TestArray):
     def setUp(self):
         self.data = cutils.darray([[["abc","abcd"],["def","defg"],["abg","fev"]],[["zeK","sdf"],["sdf","sdfff"]],[["sdf","kjl"]]])
+    
+    def test_filter(self):
+        k = rep(self.data)
+        self.assertTrue(k[k == "def"]=="def")
+        self.assertFalse(k[k == "def"] == "defg")
 
 class TestNestedNestedArray(TestArray):
     def setUp(self):
