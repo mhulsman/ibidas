@@ -404,6 +404,34 @@ class Representor(Node):
         return repops_multi.join(self, other, cond, ldim, rdim)
 
     def rename(self, *names, **kwds):
+        """Rename slices.
+
+        :param names: names without keywords. Number of names should match number of slices.
+        :param kwds: names with keywords, e.g.  f0="genes". Number does *not* have to match number of slices.
+
+        Examples::
+            
+            >>> na = a.rename("genes","scores")
+            >>> na = a.rename(f0 = "genes", f1 = "scores")
+        
+        Shortcut:
+            One can use the division operation to rename slices.
+
+            * tuple:
+                Number of names in tuple should match number of slices.
+
+                >>> a/("genes", "scores")
+
+            * dict:
+                Similar to keywords.
+
+                >>> a/{"f0": "genes"}
+
+            * str:
+                Can only be used if representor object consists of single slice.
+
+                >>> a.f0/"genes"
+        """ 
         return repops_slice.SliceRename(self, *names, **kwds)
     
     def dim_rename(self, *names, **kwds):
@@ -433,6 +461,7 @@ class Representor(Node):
 
     def set(self):
         return repops_multi.rset(self)
+
     def array(self):
         return repops_dim.rarray(self)
 
@@ -459,108 +488,69 @@ class Representor(Node):
             return repops_multi.sort(self)
 
     def get(self, *slices, **kwds):
+        """Select slices in a new representor, combine with other slices.
+
+        :param slices: Can be various formats:
+
+             * str:  selects slice with this name.
+                     Special symbols:
+
+                     - "*":  all slices
+
+                     - "~": all slices with names not yet in previous ``get`` parameters are selected.
+
+                     - "#": select first slice if all slices have a common dimension. 
+
+             * int:   selects slice with this index
+
+             * slice: selects slices with these indexes (note: a *Python* slice object, not an Ibidas slice)
+
+             * representor: adds this representor slices
+
+             * context: apply to self, adds resulting slices
+
+             * tuple: applies get to elements in tuple, creates tuple slice from resulting slices (see .tuple() function)
+             
+             * list:  selected slices within list are packed using array function
+
+        :param kwds: Same as slices, but also assigns slice names. 
+        
+        Examples:
+            
+            * str
+
+              >>> a.get("f0","f3")
+
+            * int
+    
+              >>> a.get(0, 3)
+
+            * slice
+
+              >>> a.get(slice(0,3))
+            
+            * representor
+
+              >>> a.get(a.f0 + 3, a.f3 == "gene3",  rep(3))
+
+            * context
+
+              >>> a.perform_some_operation().get(_.f0 + 3, _.f3 == "gene3")
+            
+            * tuple
+
+              >>> a.get((_.f0, _.f1), _.f3)
+
+            * list
+
+              >>> a.get([_.f0])
+
+        """
         return repops_slice.Project(self,*slices,**kwds)
 
-    def _getActiveDimDict(self):
-        if(not hasattr(self, '_active_dim_cache')):
-            res = defaultdict(set)
-            for slice in self._slices:
-                for dim in slice.dims:
-                    res[dim.name].add(dim)
-            self._active_dim_cache = res
-        return self._active_dim_cache
-    _active_dim_dict = property(_getActiveDimDict)
+    def elements(self, name=None):
+        return repops_dim.UnpackArray(self, name)
 
-    def _getActiveSliceDict(self):
-        if(not hasattr(self, '_active_slice_cache')):
-            res = defaultdict(set)
-            for slice in self._slices:
-                res[slice.name].add(slice)
-            self._active_slice_cache = res
-        return self._active_slice_cache
-    _active_slice_dict = property(_getActiveSliceDict)
-
-    def _getActiveDimSliceDict(self):
-        if(not hasattr(self, '_active_dim_slice_cache')):
-            res = defaultdict(set)
-            for slice in self._slices:
-                for dim in slice.dims:
-                    res[dim.name].add(slice)
-            self._active_dim_slice_cache = res
-        return self._active_dim_slice_cache
-    _active_dim_slice_dict = property(_getActiveDimSliceDict)
-
-
-    def _getActiveDimParentDict(self):
-        if(not hasattr(self, '_active_dim_parent_cache')):
-            res = defaultdict(set)
-            for slice in self._slices:
-                for pdim, cdim in zip(slice.dims, slice.dims[1:]):
-                    res[cdim.name].add(pdim)
-                if(slice.dims):
-                    res[slice.dims[0].name].add(None)
-                    res[None].add(slice.dims[-1])
-            self._active_dim_parent_cache = res
-        return self._active_dim_parent_cache
-    _active_dim_parent_dict = property(_getActiveDimParentDict)        
-    
-    def _getActiveDimChildDict(self):
-        if(not hasattr(self, '_active_dim_child_cache')):
-            res = defaultdict(set)
-            for slice in self._slices:
-                for pdim, cdim in zip(slice.dims, slice.dims[1:]):
-                    res[pdim.name].add(cdim)
-                if(slice.dims):
-                    res[slice.dims[-1].name].add(None)
-                    res[None].add(slice.dims[0])
-            self._active_dim_child_cache = res
-        return self._active_dim_child_cache
-    _active_dim_child_dict = property(_getActiveDimChildDict)        
-    
-    def _getActiveDimIdDict(self):
-        if(not hasattr(self, '_active_dim_id_cache')):
-            res = {}
-            for slice in self._slices:
-                for dim in slice.dims:
-                    res[dim.id] = dim
-            self._active_dim_id_cache = res
-        return self._active_dim_id_cache
-    _active_dim_id_dict = property(_getActiveDimIdDict)
-
-    def _getActiveDimIdSliceDict(self):
-        if(not hasattr(self, '_active_dim_id_slice_cache')):
-            res = defaultdict(set)
-            for slice in self._slices:
-                for dim in slice.dims:
-                    res[dim.id].add(slice)
-            self._active_dim_id_slice_cache = res
-        return self._active_dim_id_slice_cache
-    _active_dim_id_slice_dict = property(_getActiveDimIdSliceDict)
-
-
-    def _getActiveDimIdParentDict(self):
-        if(not hasattr(self, '_active_dim_id_parent_cache')):
-            res = defaultdict(set)
-            for slice in self._slices:
-                for pdim, cdim in zip(slice.dims, slice.dims[1:]):
-                    res[cdim.id].add(pdim)
-                if(slice.dims):
-                    res[slice.dims[0].id].add(None)
-                    res[None].add(slice.dims[-1])
-            self._active_dim_id_parent_cache = res
-        return self._active_dim_id_parent_cache
-    _active_dim_id_parent_dict = property(_getActiveDimIdParentDict)        
-    
-    def _getActiveDimIdChildDict(self):
-        if(not hasattr(self, '_active_dim_id_child_cache')):
-            res = defaultdict(set)
-            for slice in self._slices:
-                for pdim, cdim in zip(slice.dims, slice.dims[1:]):
-                    res[pdim.id].add(cdim)
-                if(slice.dims):
-                    res[slice.dims[-1].id].add(None)
-                    res[None].add(slice.dims[0])
-            self._active_dim_id_child_cache = res
-        return self._active_dim_id_child_cache
-    _active_dim_id_child_dict = property(_getActiveDimIdChildDict)       
+    def attributes(self, name=None):
+        return repops_slice.UnpackTuple(self, name)
 

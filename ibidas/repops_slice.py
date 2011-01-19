@@ -34,9 +34,6 @@ class Project(repops.UnaryOpRep):
     def _process(self, source, *args, **kwds):
         if not source._state & RS_SLICES_KNOWN:
             return
-        kwds = kwds.copy()
-        check_one = kwds.pop("_check_one_",False)
-
         cur_slices = self._source._slices
         
         nslices = []
@@ -60,7 +57,7 @@ class Project(repops.UnaryOpRep):
                         nelem = unpack_tuple(cur_slices[0],elem)
                     assert len(nelem) ==1, "Could not find (unique) matching slice for name: " + elem
                 elem = nelem
-            elif(isinstance(elem, Representor)):
+            elif(isinstance(elem, representor.Representor)):
                 pass
             elif(isinstance(elem, tuple)):
                 elem = RTuple(self._source.get(*elem))
@@ -68,7 +65,7 @@ class Project(repops.UnaryOpRep):
                 if(len(elem) == 1):
                     elem = self._source.get(*elem).array()
                 else:
-                    elem = self._source.get(*elem)
+                    elem = self._source.get(*elem).array()
             else:
                 elem = util.select(cur_slices, elem)
 

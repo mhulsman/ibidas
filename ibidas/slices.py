@@ -322,9 +322,8 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
         packdepth = len(slice.dims) - filterpos
         if(packdepth):
             slice = PackArraySlice(slice,packdepth)
-
         #prepare adaptation of ndim.dependent
-        if(ndim):
+        if(not ndim is None):
             dep = list(ndim.dependent)
             while(len(dep) < len(slice.dims)):
                 dep.insert(0,False)
@@ -333,7 +332,7 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
         (slice,constraint),(splan,cplan) = broadcast([slice,constraint],mode=mode)
 
         #adapt ndim to braodcast, apply filter
-        if(ndim):
+        if(not ndim is None):
             ndep = dimpaths.applyPlan(dep,cplan,newvalue=False,copyvalue=True,ensurevalue=True,existvalue=False)
             xndim = ndim.changeDependent(tuple(ndep), slice.dims)
         else:
