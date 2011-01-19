@@ -58,15 +58,44 @@ class DimPath(tuple):
     def __add__(self, other):
         return DimPath(*tuple.__add__(self,other))
 
+    def strip(self):
+        if(self and self[0] is root):
+            if(self[-1] is end):
+                return self[1:-1]
+            else:
+                return self[1:]
+        else:
+            if(self and self[-1] is end):
+                return self[:-1]
+            else:
+                return self
+
     def __contains__(self,part):#{{{
         if(isinstance(part,DimPath)):
-            pos = -1
-            try:
-                for dim in dim_path:
-                    pos = self.index(dim, pos + 1)
-            except ValueError:
+            if(not part):
                 return False
-            return True
+            elif(part[0] is root):
+                if(part[-1] is end):
+                    return self == part[1:-1]
+                else:
+                    return self[:(len(part)-1)] == part[1:]
+            elif(part[-1] is end):
+                return self[-(len(part)-1):] == part[:-1]
+            else:
+                pos = 0
+                ndims = len(self)
+                nmpath = len(part)
+                while(pos < ndims and (ndims - pos) >= nmpath):
+                    try:
+                        curstart = self.index(part[0], pos)
+                    except ValueError:
+                        return False
+
+                    if(self[(curstart + 1):(curstart + nmpath)] == part[1:]):
+                        return True
+                    else:
+                        pos = curstart + 1
+                return False
         else:
             return tuple.__contains__(self,part)#}}}
 
@@ -136,25 +165,35 @@ class DimPath(tuple):
     
     def matchDimPath(self, dimpath):#{{{#{{{
         """Matches dimpath exactly to dim paths in slices.
-        Returns a list containing start positions
+        Returns a list containing positions of last dim
         """
-        start_depths = []
-        pos = 0
-        ndims = len(self)
-        nmpath = len(dimpath)
-        startpos = []
-        while(pos < ndims and (ndims - pos) >= nmpath):
-            try:
-                curstart = self.index(dimpath[0], pos)
-            except ValueError:
-                break
-            if(self[(curstart + 1):(curstart + nmpath)] != dimpath[1:]):
-                pos = curstart + 1
+        lastpos = []
+        nseldims = len(dimpath.strip())
+        if(dimpath and dimpath[0] is root):
+            if(dimpath[-1] is end):
+                if(self == dimpath[1:-1]):
+                    lastpos.append(nseldims - 1)
             else:
-                startpos.append(curstart)
-                pos = curstart + nmpath
+                if(self[:(len(dimpath)-1)] == dimpath[1:]):
+                    lastpos.append(nseldims - 1)
+        elif(dimpath and dimpath[-1] is end):
+            if(self[-(len(dimpath)-1):] == dimpath[:-1]):
+                lastpos.append(len(self) - 1)
+        else:
+            pos = 0
+            ndims = len(self)
+            while(pos < ndims and (ndims - pos) >= nseldims):
+                try:
+                    curstart = self.index(dimpath[0], pos)
+                except ValueError:
+                    break
+                if(self[(curstart + 1):(curstart + nseldims)] != dimpath[1:]):
+                    pos = curstart + 1
+                else:
+                    lastpos.append(curstart + nseldims - 1)
+                    pos = curstart + nseldims
         
-        return startpos#}}}#}}}
+        return lastpos#}}}#}}}
 
     def completePath(self):#{{{
         for pos in xrange(len(self)):
@@ -185,7 +224,7 @@ def commonDimPath(dimpaths):#{{{
         pos += 1
         if(len(cdim) != 1):
             break
-    return dimpaths[0][:pos]#}}}
+    return list(dimpaths)[0][:pos]#}}}
 
 def uniqueDimPath(dimpaths,only_complete=True):#{{{
     """Returns unique dim path, i.e. at each nesting level determines
@@ -354,7 +393,7 @@ def applyPlan(seq,plan,newvalue=None,copyvalue=NOVAL,existvalue=NOVAL,ensurevalu
     nseq = []
     for planelem in plan:
         if(planelem == BCNEW):
-            nseq.append(insertvalue)
+            nseq.append(newvalue)
         elif(planelem == BCEXIST):
             if(existvalue is NOVAL):
                 nseq.append(seq[elempos])
@@ -402,7 +441,7 @@ def createDimParentDict(sourcepaths):#{{{
             parents[dimpath[pos]].append(dimpath[pos-1])
     return parents#}}}
 
-def extendParentDim(path, sourcepaths):#{{{
+def extendParentDim(path, sourcepaths, length=1):#{{{
     dimparents = createDimParentDict(sourcepaths)
     parents = dimparents[path[0]]
     if(len(parents) > 1):
@@ -531,10 +570,10 @@ def identifyDimPathParseHelper(spath, dim_sel, outer=True):
         if(not dim_sel[1:]):
             res.add((spath[0],))
         else:
-            _processRest(spath, dim_sel[1:], res, tuple())
+            _processRest(spath, dim_sel[1:], res, (root,))
     elif(ds is end):
         assert len(dim_sel) == 1, "Dim selectors found after end selector"
-        res.add(tuple(spath))
+        res.add(tuple(spath) + (end,))
     elif(ds == "?"):
         if outer:
             for pos in xrange(len(spath)-1):

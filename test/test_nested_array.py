@@ -18,7 +18,6 @@ class TestData(unittest.TestCase):
         orig = rep(self.data) 
         reload = rep(orig()) 
         self.assertTrue(orig ==+ reload)
-    
 
 class TestScalar(TestData):
     def setUp(self):
@@ -27,6 +26,7 @@ class TestScalar(TestData):
 class TestArray(TestData):
     def setUp(self):
         self.data = numpy.array([1,2,3,4,5])
+        self.fres0 = 1
     
     def test_type(self):
         k = rep(self.data)()
@@ -37,21 +37,30 @@ class TestArray(TestData):
         self.assertTrue(k[k == 3]==3)
         self.assertFalse(k[k == 3] == 4)
 
+    def test_filter2(self):
+        k = rep(self.data)
+        self.assertTrue(k[0] == self.fres0)
+
+
 class TestMatrix(TestArray):
     def setUp(self):
         self.data = numpy.array([[1,2,3,4,5],[1,2,3,4,5]])
+        self.fres0 = numpy.array([1,1])
 
 class TestNestedArray(TestArray):
     def setUp(self):
         self.data = cutils.darray([[1,2,3],[1,2],[1]])
+        self.fres0 = cutils.darray([1,1,1])
 
 class TestNestedMatrix(TestArray):
     def setUp(self):
         self.data = cutils.darray([[[1,2],[2,4],[3,5]],[[1,3],[5,2]],[[1,2]]])
+        self.fres0 = cutils.darray([[1,2,3],[1,5],[1]])
 
 class TestNestedMatrixString(TestArray):
     def setUp(self):
         self.data = cutils.darray([[["abc","abcd"],["def","defg"],["abg","fev"]],[["zeK","sdf"],["sdf","sdfff"]],[["sdf","kjl"]]])
+        self.fres0 = cutils.darray([["abc","def","abg"],["zeK","sdf"],["sdf"]])
     
     def test_filter(self):
         k = rep(self.data)
@@ -61,15 +70,26 @@ class TestNestedMatrixString(TestArray):
 class TestNestedNestedArray(TestArray):
     def setUp(self):
         self.data = cutils.darray([[[1,2],[2,3,3,3,4,5],[]],[[1],[2]],[[1,4,5]]])
+        self.fres0 = cutils.darray([[1,2,[]],[1,2],[1]])
+
+    def test_filter2(self):
+        k = rep(self.data)
+        self.assertRaises(Exception,k[0])
 
 class TestNestedNestedMatrix(TestArray):
     def setUp(self):
         self.data = cutils.darray([[[[1,2],[3,4]],[[5,6],[7,9],[9,8]],[[]]],[[[1,4]],[[2,5]]],[[[1,5],[4,7],[8,5]]]])
+    def test_filter2(self):
+        k = rep(self.data)
+        self.assertRaises(Exception,k[0])
 
 class TestArrayNestedNestedMatrix(TestArray):
     def setUp(self):
         nnmatrix = cutils.darray([[[[1,2],[3,4]],[[5,6],[7,9],[9,8]],[[]]],[[[1,4]],[[2,5]]],[[[1,5],[4,7],[8,5]]]])
         self.data = cutils.darray([nnmatrix, nnmatrix, nnmatrix])
+    def test_filter2(self):
+        k = rep(self.data)
+        self.assertRaises(Exception,k[0])
 
         
 if __name__ == "__main__":

@@ -102,8 +102,7 @@ class Flat(repops.UnaryOpRep):
         
         #create new merged dimension
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
-        if(len(selpath) == 1):
-            selpath = dimpaths.extendParentDim(selpath,[s.dims for s in source._slices])
+        selpath = dimpaths.extendParentDim(selpath,[s.dims for s in source._slices],2)
 
         if(selpath[-1].shape != UNDEFINED and selpath[-2].shape != UNDEFINED):
             shape = selpath[-2].shape * selpath[-1].shape
@@ -124,10 +123,9 @@ class Flat(repops.UnaryOpRep):
         nslices = []
         for slice in source._slices:
             sdims = slice.dims
-            startpos = sdims.matchDimPath(selpath[:-1])
-            while(startpos):
-                spos = startpos[0]
-                flatpos = len(selpath) + spos -1 
+            lastpos = sdims.matchDimPath(selpath[:-1])
+            while(lastpos):
+                flatpos = lastpos[0]
                 if(len(sdims) <= flatpos or sdims[flatpos] != selpath[-1]):
                     slice = slices.InsertDimSlice(slice,flatpos,bcdim)
                     bcdims = slice.dims[:flatpos] + (selpath[-1],) + slice.dims[flatpos:]
@@ -136,9 +134,9 @@ class Flat(repops.UnaryOpRep):
                 slice = slices.FlatDimSlice(slice,flatpos,ndim)
                 if(len(startpos) > 1):
                     sdims = slice.dims
-                    startpos = sdims.matchDimPath(selpath[::-1])
+                    lastpos = sdims.matchDimPath(selpath[::-1])
                 else:
-                    startpos = []
+                    lastpos = []
             nslices.append(slice)
                 
         return self._initialize(tuple(nslices),source._state)

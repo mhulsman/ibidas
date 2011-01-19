@@ -33,6 +33,7 @@ class Nest(repops.MultiOpRep):
         lsource,rsource = sources
         
         joinpath = dimpaths.identifyUniqueDimPathSource(lsource, dim)
+        joinpath = dimpaths.extendParentDim(joinpath,[s.dims for s in source._slices], ALL)
 
         idims = []
         for i in xrange(len(joinpath)):
@@ -90,27 +91,28 @@ class Filter(repops.MultiOpRep):
             assert dim is None, "Cannot use bool or missing data type with specified filter dimension. Constraint dimension already specifies dimension."
             assert cslice.dims, "Constraint should have at least one dimension"
             ndim = dimensions.Dim(UNDEFINED,tuple(),  False, name = "f" + cslice.dims[-1].name)
-            seldim = cslice.dims[-1]
-            assert seldim in dimset, "Cannot find last dimension of boolean filter in filter source (" + str(cslice.dims) + ")"
+            dim_suffix = None
+            seldimpath = cslice.dims[-1:]
+            assert seldimpath[0] in dimset, "Cannot find last dimension of boolean filter in filter source (" + str(cslice.dims) + ")"
             cslice = slices.PackArraySlice(cslice,1)
-        elif(isinstance(cslice.type, rtypes.TypeInteger)):
-            dim_suffix = dimpaths.identifyUniqueDimPathSource(source, dim)
-            seldim = dim_suffix[-1]
-            ndim = None
-        elif(isinstance(cslice.type, rtypes.TypeArray)):
-            assert len(cslice.type.dims) == 1, "Filter array should be 1-dimensional"
-            assert isinstance(cslice.type.subtypes[0], rtypes.TypeInteger) and \
-                        not isinstance(cslice.type.subtypes[0], rtypes.TypeBool), \
-                        "Multi-dimensional arrays cannot be used as filter. Please unpack the arrays."
-            dim_suffix = dimpaths.identifyUniqueDimPathSource(source, dim)
-            seldim = dim_suffix[-1]
-            ndim = cslice.type.dims[0]
-        elif(isinstance(cslice.type, rtypes.TypeSlice)):
-            dim_suffix = dimpaths.identifyUniqueDimPathSource(source, dim)
-            seldim = dim_suffix[-1]
-            ndim = dimensions.Dim(UNDEFINED, seldim.dependent, False,name = "f" + cslice.name)
         else:
-            raise RuntimeError, "Unknown constraint type in filter: " + str(cslice.type)
+            seldimpath = dimpaths.identifyUniqueDimPathSource(source, dim)
+            if(not seldimpath):
+                raise RuntimeError, "Attempting to perform filter on non-existing dimension"
+
+            if(isinstance(cslice.type, rtypes.TypeInteger)):
+                ndim = None
+            elif(isinstance(cslice.type, rtypes.TypeArray)):
+                assert len(cslice.type.dims) == 1, "Filter array should be 1-dimensional"
+                assert isinstance(cslice.type.subtypes[0], rtypes.TypeInteger) and \
+                            not isinstance(cslice.type.subtypes[0], rtypes.TypeBool), \
+                            "Multi-dimensional arrays cannot be used as filter. Please unpack the arrays."
+                ndim = cslice.type.dims[0]
+            elif(isinstance(cslice.type, rtypes.TypeSlice)):
+                ndim = dimensions.Dim(UNDEFINED, seldimpath[-1].dependent, False,name = "f" + cslice.name)
+            else:
+                raise RuntimeError, "Unknown constraint type in filter: " + str(cslice.type)
+
 
         if(isinstance(constraint, repops.PlusPrefix)):
             mode = "pos"
@@ -119,7 +121,7 @@ class Filter(repops.MultiOpRep):
 
         nslices = []
         for slice in source._slices:
-            slice = slices.filter(slice, cslice, seldim, ndim, mode)
+            slice = slices.filter(slice, cslice, seldimpath, ndim, mode)
             nslices.append(slice)
         return self._initialize(tuple(nslices),source._state)
                     

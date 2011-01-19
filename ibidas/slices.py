@@ -307,39 +307,37 @@ class FilterSlice(UnaryOpSlice):#{{{
         self.constraint = constraint
         UnaryOpSlice.__init__(self, slice, rtype=ntype)#}}}
 
-def filter(slice,constraint,seldim, ndim, mode="dim"):#{{{
+def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
     used_dims = [False,] * len(slice.dims)
     while True:
         #determine filter dim
-        if(isinstance(seldim, dimensions.Dim)):
-            try:
-                curpos = 0
-                while True:
-                    seldimpos = slice.dims.index(seldim,curpos)
-                    if(not used_dims[seldimpos]):
-                        break
-                    curpos = seldimpos + 1
-            except ValueError:
+        lastpos = slice.dims.matchDimPath(seldimpath)
+        for filterpos in lastpos[::-1]:
+             if(not used_dims[filterpos]):
                 break
         else:
-            seldimpos = seldim
-        
+            break
+
         #pack up to and including filter dim
-        packdepth = len(slice.dims) - seldimpos
+        packdepth = len(slice.dims) - filterpos
         if(packdepth):
             slice = PackArraySlice(slice,packdepth)
 
         #prepare adaptation of ndim.dependent
-        dep = list(ndim.dependent)
-        while(len(dep) < len(slice.dims)):
-            dep.insert(0,False)
+        if(ndim):
+            dep = list(ndim.dependent)
+            while(len(dep) < len(slice.dims)):
+                dep.insert(0,False)
 
         #broadcast to constraint
         (slice,constraint),(splan,cplan) = broadcast([slice,constraint],mode=mode)
 
         #adapt ndim to braodcast, apply filter
-        ndep = dimpaths.applyPlan(dep,cplan,newvalue=False,copyvalue=True,ensurevalue=True,existvalue=False)
-        xndim = ndim.changeDependent(tuple(ndep), slice.dims)
+        if(ndim):
+            ndep = dimpaths.applyPlan(dep,cplan,newvalue=False,copyvalue=True,ensurevalue=True,existvalue=False)
+            xndim = ndim.changeDependent(tuple(ndep), slice.dims)
+        else:
+            xndim = ndim
         slice = FilterSlice(slice,constraint,xndim)
 
         #adapt used_dims
@@ -358,10 +356,6 @@ def filter(slice,constraint,seldim, ndim, mode="dim"):#{{{
         #unpack dims
         if(packdepth):
             slice = UnpackArraySlice(slice,packdepth)
-        
-        #if dim position was given, stop, otherwise, search for new pos
-        if(isinstance(seldim,int)):
-            break
             
     return slice#}}}
 

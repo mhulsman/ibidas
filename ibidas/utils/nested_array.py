@@ -6,7 +6,7 @@ _delay_import_(globals(),"..utils.missing","Missing")
 _delay_import_(globals(),"..itypes","dimpaths","rtypes","dimensions")
 class NestedArray(object):
     def __init__(self,data,cur_type):
-        self.data = cutils.darray([data],object).view(sparse_arrays.FullSparse)
+        self.data = cutils.darray([data],object)
         self.cur_type = cur_type
 
         self.idxs = [0]
@@ -15,7 +15,7 @@ class NestedArray(object):
         
     def copy(self):
         res = copy.copy(self)
-        res.data = numpy.array(self.data).view(sparse_arrays.FullSparse)
+        res.data = numpy.array(self.data)
         res.idxs = list(self.idxs)
         return res
   
@@ -116,7 +116,7 @@ class NestedArray(object):
             
             dimpath = dimpath[cdepth:]
 
-            ndata = numpy.concatenate(res).view(sparse_arrays.FullSparse)
+            ndata = numpy.concatenate(res)
             if(variable):
                 idxres.shape =  data.shape + (2,)
                 nself.idxs.append(idxres)
@@ -153,7 +153,7 @@ class NestedArray(object):
                         res.append(Missing)
                      else:
                         res.append(data[i])
-                nself.data = cutils.darray(res,object).view(sparse_arrays.FullSparse)
+                nself.data = cutils.darray(res,object)
                 nself.data.shape = idx.shape[:-1]
             depth -= 1
         nself.cur_type = subtype
@@ -550,10 +550,6 @@ def co_mapseq(func, nested_arrays, *args, **kwargs):
 
     seq = func(data,*args, **kwargs)
     seq.shape = flatshape + seq.shape[1:]
-
-    if(not seq.dtype == dtype):
-        seq = numpy.cast[dtype](seq)
-        seq = seq.view(sparse_arrays.FullSparse)
 
     nself = na_ref.copy()
     nself.data = seq
