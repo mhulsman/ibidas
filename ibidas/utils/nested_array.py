@@ -148,11 +148,12 @@ class NestedArray(object):
                 data = nself.data
                 fidx = dimpaths.flatFirstDims(idx,len(idx.shape)-2)
                 for pos in xrange(len(fidx)):
-                     i = slice(fidx[pos,0],fidx[pos,1])
-                     if(i.start == -1):
+                     start = fidx[pos,0]
+                     stop = fidx[pos,1]
+                     if(start == -1):
                         res.append(Missing)
                      else:
-                        res.append(data[i])
+                        res.append(data[start:stop])
                 nself.data = cutils.darray(res,object)
                 nself.data.shape = idx.shape[:-1]
             depth -= 1
@@ -228,6 +229,29 @@ class NestedArray(object):
         nself.data.shape = (1,) + nself.data.shape
         return nself
         
+    def mergeLastDims(self, ndims, newdim):
+        nself = self.copy()
+        nself.dims = self.dims[:-ndims] + (newdim,)
+        nself.data = self._flatData()[0]
+        nself.idxs = self.idxs[:-ndims]
+        lastidx = nself.idxs[-1]
+        if(isinstance(lastidx,int)):
+            nself.idxs.append(nself.idxs[-1] + 1)
+            nextpos, nextobj = self._get_next_obj(len(nself.idxs))
+            nelem = numpy.multiply.reduce(nextobj.shape[:(lastidx + 1)])
+            assert (nself.data.shape[0] % nelem) == 0, "Leftover elements in merging"
+            nself.data.shape = nextobj.shape[:(lastidx + 1)] + (nself.data.shape[0] / nelem) + nself.data.shape[1:]
+        else:
+            nself.idxs.append(0)
+            lastidx = lastidx.ravel()
+            nelem = lastidx[-1] - lastidx[0]
+            assert (nself.data.shape[0] % nelem) == 0, "Leftover elements in merging"
+            nself.data.shape = (nelem, nself.data.shape[0] / nelem) + nself.data.shape[1:]
+        return nself
+
+    def splitLastDim(self, idxs, newdims):
+        pass
+        
 
     def mergeDim(self, matchpoint,newdim):
         matchpoint += 1
@@ -271,86 +295,173 @@ class NestedArray(object):
     def swapDim(self, matchpoint, nldim, nrdim):
         matchpoint += 1
         assert len(self.idxs) > (matchpoint + 1), "Nested array not nested that deep"
+        dep = self.dims[matchpoint+1].dependent 
+        assert not dep or dep[-1] is False, "Switching dimensions that are dependent not possible"
         nself = self.copy()
+        nself._swapDim(matchpoint)
+        nself.dims[matchpoint] = nldim
+        nself.dims[matchpoint+1] = nrdim
+        return nself
+
+    def _swapDim(self, matchpoint):#{{{
+        nself = self
         lidx = self.idxs[matchpoint]
         ridx = self.idxs[matchpoint+1]
         #Merging dims, 4 possibilities:
         #fixed-fixed, fixed-var, var-fixed, var-var
-        if(isinstance(ridx,int)):
+        if(isinstance(lidx,int)):
             nextpos,nextobj = nself._get_next_obj(matchpoint+1)
-            if(isinstance(lidx,int)):  #fixed-fixed
+            if(isinstance(ridx,int)):  #fixed-fixed
                 pidx = range(len(nextobj.shape))
                 tmp = pidx[lidx]
                 pidx[lidx] = pidx[ridx]
-                pidx[ridx] = pidx[lidx]
-                res = numpy.permute(nextobj,pidx)
-            else: #fixed-var
-                xshape = ridx.shape[-2]
-                nextobj = numpy.reshape((xshape, nextobj.shape[0] / xshape) + nextojb.shape[1:])
-                pidx = range(len(nextobj.shape))
-                pidx[0] = 1
-                pidx[1] = 0
-                nextobj = numpy.permute(pidx)
+                pidx[ridx] = tmp
+                nextobj = numpy.transpose(nextobj,axes=pidx)
+            else: #fixed-var --> var-fixed
+                fixshape = ridx.shape[-2]
+                nnextobj = numpy.zeros(nextobj.shape,dtype=nextobj.dtype)
+                nnextobj = numpy.reshape(nnextobj, (nextobj.shape[0] / fixshape,fixshape) + nextobj.shape[1:])
+
+                source_ridx = dimpaths.flatFirstDims(ridx,len(ridx.shape) -2).copy()
+                
                 ridx = ridx[...,0,:]
                 oshape = ridx.shape
                 diff = ridx[...,1] - ridx[...,0]
                 ridx[...,1] = numpy.reshape(numpy.cumsum(diff.ravel()),diff.shape)
                 ridx[...,0] = ridx[...,1] - diff
-                nself.idxs[matchoint] = ridx
+
+                dest_ridx = dimpaths.flatFirstDims(ridx,len(ridx.shape)-2)
+                range_fixshape = range(fixshape)
+                for i in range(0,len(dest_ridx)):
+                    dest = slice(dest_ridx[i,0],dest_ridx[i,1])
+                    for j in range_fixshape:
+                        xj = j + i * fixshape
+                        nnextobj[dest,j] = nextobj[source_ridx[xj,0]:source_ridx[xj,1]]
+                nextobj = nnextobj
+
+                nself.idxs[matchpoint] = ridx
                 nself.idxs[matchpoint + 1] = 0 
                 for i in range(matchpoint + 1, nextpos):
                     nself.idxs[i] = i -(matchpoint + 1)
             nself._set_obj(nextpos,nextobj)
-            nself._normalize(nextpos)
+            nself = nself._normalize(nextpos)
         else:
-            if(isinstance(ridx,int)): #var-fixed
-                xshape = lidx.shape[1]
-                pidx = range(len(nextobj.shape))
+            nextpos,nextobj = nself._get_next_obj(matchpoint+1)
+            if(isinstance(ridx,int)): #var-fixed --> fixed-var
+                fixshape = nextobj.shape[1]
+                
+                nnextobj = numpy.zeros(nextobj.shape,dtype=nextobj.dtype)
+                nnextobj = dimpaths.flatFirstDims(nnextobj,1)
+
+                source_lidx = dimpaths.flatFirstDims(lidx,len(lidx.shape)-2)
+                
+                diff = source_lidx[:,1] - source_lidx[:,0]
+                diff = numpy.repeat(diff,fixshape)
+                nlidx = numpy.zeros((len(diff),2),dtype=int)
+                nlidx[:,1] = numpy.cumsum(diff)
+                nlidx[:,0] = nlidx[:,1] -diff
+                nlidx.shape = lidx.shape[:-1] + (fixshape,2)
+
+                dest_lidx = dimpaths.flatFirstDims(nlidx,len(nlidx.shape)-2)
+                range_fixshape = range(fixshape)
+                for i in range(0,len(source_lidx)):
+                    src = slice(source_lidx[i,0],source_lidx[i,1])
+                    for j in range_fixshape:
+                        xj = j + i * fixshape
+                        nnextobj[dest_lidx[xj,0]:dest_lidx[xj,1]] = nextobj[src,j]
+                nextobj=nnextobj
+                
+                nself.idxs[matchpoint] = len(nlidx.shape) - 2
+                nself.idxs[matchpoint+1] = nlidx
+
+                for i in range(matchpoint +2, nextpos):
+                    nself.idxs[i] = i - (matchpoint + 1)
+            else: #var-var --> var-var
+                nnextobj = numpy.zeros(nextobj.shape,dtype=nextobj.dtype)
+                source_lidx = dimpaths.flatFirstDims(lidx,len(lidx.shape)-2)
+                source_ridx = dimpaths.flatFirstDims(ridx,len(ridx.shape)-2)
+
+                ldiff = source_lidx[:,1] - source_lidx[:,0]
+                rdiff = source_ridx[source_lidx[:,0],1] - source_ridx[source_lidx[:,0],0]
+                repeat = rdiff.copy()
+                ldiff[repeat==0] = 0
+                repeat[repeat==0] =1
+                ldiff = numpy.repeat(ldiff,repeat)
+
+                nlidx = numpy.zeros((len(ldiff),2),dtype=int)
+                nlidx[:,1] = numpy.cumsum(ldiff)
+                nlidx[:,0] = nlidx[:,1] -ldiff
+
+                nridx = numpy.zeros((len(rdiff),2),dtype=int)
+                nridx[:,1] = numpy.cumsum(rdiff)
+                nridx[:,0] = nridx[:,1] -rdiff
+                nridx.shape = lidx.shape
+              
+                pidx = range(len(nextobj.shape)+1)
                 pidx[0] = 1
                 pidx[1] = 0
-                nextobj = dimpaths.flatFirstDims(numpy.permute(pidx),1)
+                for i in range(0,len(source_lidx)):
+                    lsrc = slice(source_lidx[i,0],source_lidx[i,1])
+                    rsrc = slice(source_ridx[lsrc.start,0],source_ridx[lsrc.stop-1,1])
+                    leftlen = lsrc.stop - lsrc.start
+                    if(leftlen == 0):
+                        rightlen= (rsrc.stop - rsrc.start)
+                    else:
+                        rightlen= (rsrc.stop - rsrc.start) / leftlen
 
-                lidx = lidx[...,numpy.newaxis,:]
-                lidx = numpy.repeat(lidx,xshape,axis=-2)
-                nself.idxs[matchpoint] = len(lidx.shape) - 2
-                nself.idxs[matchpoint+1] = lidx
+                    d = numpy.reshape(nextobj[rsrc],(leftlen,rightlen) +  nextobj.shape[1:])
+                    d = numpy.transpose(d,pidx)
+                    nnextobj[rsrc] = d.ravel()
+                nextobj = nnextobj
 
-                for i in range(matchpoint +1, nextpos):
-                    nself.idx[i] = i - (matchpoint + 1)
-                nself._set_obj(nextpos,nextobj)
-                nself._normalize(matchpoint + 1)
-            else:
-                pass
+                nself.idxs[matchpoint] = nridx
+                nself.idxs[matchpoint+1] = nlidx
+            nself._set_obj(nextpos,nextobj)
+            nself = nself._normalize(matchpoint + 2)#}}}
 
-        nself.dims[matchpoint] = nldim
-        nself.dimx[matchpoint+1] = nrdim
-        return nself
-
-    def permuteDims(self, permute, ndims):
+    def permuteDims(self, permute_idxs, ndims):
         nself = self.copy()
+        assert len(permute_idxs) == (len(self.idxs) - 1), "Permute idxs do not cover all dimensions"
+      
+        #determine new dim positions
+        dim_permute = [0] * len(permute_idxs)
+        for pos, pi in enumerate(permute_idxs):
+            dim_permute[pi] = pos
+        permute_idxs = dim_permute
 
+        for i in range(len(permute_idxs)):
+            for j in range(len(permute_idxs) - i - 1):
+                if permute_idxs[j] > permute_idxs[j+1]:
+                    dep = self.dims[j+2].dependent 
+                    nself._swapDim(j+1) #correct for first idx
+                    permute_idxs[j],permute_idxs[j+1] = permute_idxs[j+1],permute_idxs[j]
+
+        nself.dims = nself.dims[:1] + ndims
         return nself
 
     def _normalize(self, curpos):
-        nself = self.copy()
+        if(curpos >= len(self.idxs)):
+            return self
 
+        nself = self
         curpos,curobj = self._get_next_obj(curpos-1)
         nextpos,nextobj = self._get_next_obj(curpos)
         while curpos < len(self.idxs):
             respos = 0
             res = []
+            oshape = curobj.shape 
+            curobj = dimpaths.flatFirstDims(curobj, len(curobj.shape) - 2)
             nidx = numpy.zeros(curobj.shape,dtype=curobj.dtype)
-            curobj = dimpaths.flatFirstDims(curobj, len(curobj.shape) - 1)
             for rowpos in xrange(len(curobj)):
-                start = idx[rowpos,0]
-                stop = idx[rowpos,-1]
-                k = slice(start,stop)
-                res.append(nextobj[k])
-                nidx[rowpos,:] += respos - start
+                start = curobj[rowpos,0]
+                stop = curobj[rowpos,-1]
+                res.append(nextobj[start:stop])
+                nidx[rowpos,0] = respos
                 respos += stop - start
+                nidx[rowpos,1] = respos
             nextobj = numpy.concatenate(res)
             nidx.shape  = oshape
-            nself._set_obj(curpos, curobj)
+            nself._set_obj(curpos, nidx)
             nself._set_obj(nextpos, nextobj)
 
             curpos,curobj = self._get_next_obj(curpos)
@@ -423,7 +534,7 @@ class NestedArray(object):
         pos += 1
         while(len(self.idxs) > pos and isinstance(self.idxs[pos],int)):
             pos += 1
-        if(pos == len(self.idxs)):
+        if(pos >= len(self.idxs)):
             return (pos,self.data)
         else:
             return (pos,self.idxs[pos])
@@ -480,8 +591,7 @@ class NestedArray(object):
         for rowpos in xrange(len(idx)):
             start = idx[rowpos,0]
             stop = idx[rowpos,-1]
-            k = slice(start,stop)
-            res.append(nextobj[k])
+            res.append(nextobj[start:stop])
             nidx[rowpos,:] += curpos - start
             curpos += stop - start
         nextobj = numpy.concatenate(res)

@@ -74,7 +74,7 @@ def rep(data=None, dtype=None, unpack=True, name=None):
     if(not dtype is None):
         if(isinstance(dtype,str)):
             dtype = rtypes.createType(dtype)
-        dtype = dtype._callRecursive("_setNeedConversion",value=True)
+        dtype = dtype._setNeedConversionRecursive(True)
     else:
         det = detector.Detector()
         det.process(data)
@@ -221,6 +221,10 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def visitInsertDimSlice(self,node,slice):
         ndata = slice.data.insertDim(node.matchpoint,node.newdim)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
+
+    def visitPermuteDimsSlice(self, node, slice):
+        ndata=slice.data.permuteDims(node.permute_idxs,node.dims)
+        return slice.modify(data=ndata,dims=node.dims,rtype=node.type)
 
     def visitPackListSlice(self, node, slice):
         ndata=slice.data.pack(node.type, len(node.type.dims))

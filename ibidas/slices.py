@@ -184,9 +184,6 @@ class InsertDimSlice(UnaryOpSlice):#{{{
         self.newdim = ndim
         UnaryOpSlice.__init__(self,slice,rtype=ntype,dims=ndims)        #}}}
 
-
-
-
 class EnsureCommonDimSlice(UnaryOpSlice):#{{{
     __slots__ = ["refslices","checkpos"]
     def __init__(self,slice,refslices,checkpos,bcdim):
@@ -285,6 +282,17 @@ def apply_broadcast_plan(slices,bcdims, bcplan):#{{{
         if(active_bcdims):                
             slice = BroadcastSlice(slice,[references[bcdim] for bcdim in active_bcdims],nplan,bcdims)
         nslices.append(slice)#}}}
+
+class PermuteDimsSlice(UnaryOpSlice):
+    __slots__ = ["permute_idxs"]
+    
+    def __init__(self,slice,permute_idxs):
+        assert len(permute_idxs) == len(slice.dims), "Number of permute indexes not equal to number of dimensions"
+        
+        ndims,ntype = slice.dims.permuteDims(permute_idxs,slice.type)
+        self.permute_idxs = permute_idxs
+        UnaryOpSlice.__init__(self,slice, dims=ndims,rtype=ntype)
+
 
 class FilterSlice(UnaryOpSlice):#{{{
     __slots__ = ["constraint"]

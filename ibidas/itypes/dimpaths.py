@@ -114,7 +114,8 @@ class DimPath(tuple):
     def removeDim(self, pos, elem_specifier=None, subtype=None):#{{{
         ndims = []
         for p in xrange(max(pos + 1,0), len(self)):
-            ndims.append(self[p].removeDepDim(p - pos, elem_specifier))
+            r = self[p].removeDepDim(p - pos - 1, elem_specifier)
+            ndims.append(r)
 
         res = self[:max(pos,0)] + DimPath(*ndims)
         if(not subtype is None):
@@ -153,6 +154,45 @@ class DimPath(tuple):
         else:
             return res#}}}
 
+
+    def permuteDims(self,permute_idxs, subtype=None, prevdims=tuple()):
+        ndims = []
+        if(prevdims):
+            permute_start = len(permute_idxs) - len(prevdims)
+            for pos, dim in enumerate(self.dims):
+                dep = dim.dependent
+                if(len(dep) > pos - permute_start):
+                    deppos = util.select(range(-len(prevdims),pos)[::-1],dep)
+                    ndep = [False] * (len(prevdims) + pos)
+                    redim=False
+                    for dp in deppos:
+                        if dp < permute_start:
+                            ndep[permute_idx.index(dp + len(prevdims))] = True
+                            redim=True
+                        else:
+                            ndep[dp + len(prevdims)] = True
+                    if(redim):
+                        dim = dim.changeDependent(ndep[::-1],(prevdims + tuple(ndims))[::-1])
+                ndims.append(dim)
+        else:
+            for pos, permute_idx in enumerate(permute_idxs):
+                dim = self[permute_idx]
+                dep = dim.dependent
+                if(dep):
+                    deppos = util.select(range(0,permute_idx)[::-1],dep)
+                    ndep = [False] * pos
+                    for dp in deppos:
+                        assert dp in permute_idxs[:pos], "Dependent dim " + str(self[dp]) + " of dim " + str(dim) + " cannot be placed after it"
+                        ndep[permute_idxs.index(dp)]=True
+                    dim = dim.changeDependent(ndep[::-1],ndims[::-1])
+                ndims.append(dim)
+        res = DimPath(*ndims)
+        if(not subtype is None):
+            subtype = subtype._permuteDepDim(prevdims=res, permute_idxs=permute_idxs)
+            return (res,subtype)
+        else:
+            return res
+
     def contigiousFixedNDims(self):#{{{
         """Returns number of contigious non-variable non-missing dims from 
         start of path"""
@@ -164,7 +204,7 @@ class DimPath(tuple):
         return depth#}}}
     
     def matchDimPath(self, dimpath):#{{{#{{{
-        """Matches dimpath exactly to dim paths in slices.
+        """Matches dimpath exactly to dim paths in self.
         Returns a list containing positions of last dim
         """
         lastpos = []
@@ -295,10 +335,15 @@ def planBroadcastMatchDim(paths):#{{{
     #Step 1: assign ids to dims
     curid = 0
     translate = {}
+
+    dimnames = dict()
     for dim in itertools.chain(*paths):
         if not dim in translate:
             translate[dim] = [curid]
             curid += 1
+            if(dim.name in dimnames and dimnames[dim.name] != dim):
+                raise RuntimeError, "Cannot broadcast, there are different dimensions with same name: " + str(dim.name) + ". Please rename (dim_rename) or state their equivalence."
+            dimnames[dim.name] = dim
     
     #broadcast dim mergers
     wildcard_links = dict()

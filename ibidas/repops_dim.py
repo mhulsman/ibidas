@@ -61,6 +61,25 @@ class InsertDim(repops.UnaryOpRep):
             nslices.append(slice)
         return self._initialize(tuple(nslices),source._state)
 
+class PermuteDims(repops.UnaryOpRep):
+    def _process(self, source, permute_idxs):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+        
+        cpath = dimpaths.commonDimPath([s.dims for s in source._slices])
+        if len(permute_idxs) > len(cpath):
+            raise RuntimeError, "Permute index length longer than common dimensions"
+        assert len(permute_idxs) == len(set(permute_idxs)), "Permute indices not unique"
+        assert min(permute_idxs) == 0, "Lowest permute index should be 0"
+        assert max(permute_idxs) == len(permute_idxs) - 1, "Highest permute index should be equal to: " + str(len(permute_idxs)-1)
+
+        nslices = []
+        for slice in source._slices:
+            pidx = list(permute_idxs) + range(max(permute_idxs) + 1, len(slice.dims))
+            slice = slices.PermuteDimsSlice(slice,pidx)
+            nslices.append(slice)
+        return self._initialize(tuple(nslices),source._state)
+
 
 @repops.delayable()
 def rarray(source, dim=None, ndim=1):

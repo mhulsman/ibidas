@@ -122,19 +122,15 @@ class Type(object):#{{{
         """Returns base type name"""
         return self.name
 
-    def _callRecursive(self, methodname, **kwds):
-        """Calls methodname on this type and its subtypes, returning
-        new type. 
+    def _callSubtypes(self, methodname, *params, **kwds):
+        """If has subtype, calls subtype with methodname and params
 
-        :param methodname: Name of type method. Should return type object.
+        :param methodname: Name of type method. Should return type object
+        :param params: arguments for ``methodname``.
         :param kwds: Keyword arguments for ``methodname``
-                     
-        Special keywords: 
-        - dimdepth: number of dims of parent types are added to value
-        - typedepth: number of parent types are added to value
         """
         return self
-    
+
     #conversion
     def _needConversion(self):
         return self._need_conversion
@@ -148,15 +144,21 @@ class Type(object):#{{{
     def _setNeedConversion(self,value):
         return self
     
+    def _setNeedConversionRecursive(self,value):
+        return self
+   
     #dim changes
     def _removeDepDim(self, dimdepth, elem_specifier):
-        return self
+        return self._callSubtypes("_removeDepDim",dimdepth, elem_specifier)
 
     def _updateDepDim(self, dimdepth, ndim):
-        return self
+        return self._callSubtypes("_updateDepDim",dimdepth, ndim)
 
     def _insertDepDim(self, dimdepth, ndim):
-        return self
+        return self._callSubtypes("_insertDepDim",dimdepth, ndim)
+
+    def _permuteDepDim(self, prevdims, permute_idxs):
+        return self._callSubtypes("_permuteDepDim",prevdims, permute_idxs)
 
     #subtypes
     def getSubTypeNumber(self):
@@ -260,19 +262,13 @@ class TypeAny(TypeUnknown):#{{{
         else:
             return numpy.dtype(self._dtype)
     
-    
-    def _callRecursive(self, methodname, **kwds):
-        """Calls methodname on this type and its subtypes, returning
-        new type. 
-
-        :param methodname: Name of type method. Should return type object.
-        :param kwds: Keyword arguments for ``methodname``
-        
-        Special keywords: 
-        - dimdepth: number of dims of parent types are added to value
-        - typedepth: number of parent types are added to value
-        """
-        return getattr(self,methodname)(**kwds)
+    #conversion
+    def _setNeedConversionRecursive(self,value):
+        nself = self._callSubtypes("_setNeedConversionRecursive",value)
+        if(nself is self):
+            nself = self.copy()
+        nself._need_conversion = value
+        return nself
     
     #conversion
     def _setNeedConversion(self,value):
@@ -500,32 +496,14 @@ class TypeTuple(TypeAny):#{{{
                 hash(self.subtypes) ^
                 hash(self.fieldnames))
     
-    def _callRecursive(self, methodname, **kwds):
-        """Calls methodname on this type and its subtypes, returning
-        new type. 
+    def _callSubtypes(self, methodname, *params, **kwds):
+        nsubtypes = tuple([getattr(subtype,methodname)(*params,**kwds) for subtype in self.subtypes])
 
-        :param methodname: Name of type method. Should return type object.
-        :param kwds: Keyword arguments for ``methodname``
-        
-        Special keywords: 
-        - dimdepth: number of dims of parent types are added to value
-        - typedepth: number of parent types are added to value
-        """
-        nself = getattr(self,methodname)(**kwds)
-        if("typedepth" in kwds):
-            kwds = kwds.copy()
-            kwds["typedepth"] += 1
-
-        nsubtypes = [subtype._callRecursive(methodname, **kwds) for subtype in self.subtypes]
-        for pos in xrange(len(nsubtypes)):
-            if(not nsubtypes[pos] is self.subtypes[pos]):
-                break
+        if(all([nsubtype is subtype for nsubtype,subtype in zip(nsubtypes,self.subtypes)])):
+            nself = self
         else:
-            return nself
-
-        if(nself is self):
             nself = self.copy()
-        nself.subtypes = tuple(nsubtypes)
+            nself.subtypes = nsubtypes
         return nself
 
     def __repr__(self):
@@ -738,53 +716,52 @@ class TypeArray(TypeAny):#{{{
                 hash(self.subtypes) ^ 
                 hash(self.dims))
     
-    def _callRecursive(self, methodname, **kwds):
-        """Calls methodname on this type and its subtypes, returning
-        new type. 
+    def _callSubtypes(self, methodname, *params, **kwds):
+        nsubtypes = tuple([getattr(subtype,methodname)(*params,**kwds) for subtype in self.subtypes])
 
-        :param methodname: Name of type method. Should return type object.
-        :param kwds: Keyword arguments for ``methodname``
-        
-        Special keywords: 
-        - dimdepth: number of dims of parent types are added to value
-        - typedepth: number of parent types are added to value
-        """
-        nself = getattr(self,methodname)(**kwds)
-        if(self.subtypes):
-            if("dimdepth" in kwds):
-                kwds = kwds.copy()
-                kdws["dimdepth"] += len(self.dims)
-            if("typedepth" in kwds):
-                kwds = kwds.copy()
-                kwds["typedepth"] += 1
-            nsubtype = self.subtypes[0]._callRecursive(methodname, **kwds) 
-            if(not nsubtype is self.subtypes[0]):
-                if(nself is self):
-                    nself = self.copy()
-                nself.subtypes = (nsubtype,)
+        if(all([nsubtype is subtype for nsubtype,subtype in zip(nsubtypes,self.subtypes)])):
+            nself = self
+        else:
+            nself = self.copy()
+            nself.subtypes = nsubtypes
         return nself
    
     def _removeDepDim(self, dimdepth, elem_specifier):
+        nself = self._callSubtypes("_removeDepDim", dimdepth + len(self.dims), elem_specifier)
         ndims = self.dims.removeDim(-dimdepth,elem_specifier)
         if(not ndims is self.dims):
-            self = self.copy()
-            self.dims = ndims
-        return self
+            if(self is nself):
+                nself = self.copy()
+            nself.dims = ndims
+        return nself
      
     def _updateDepDim(self, dimdepth, ndim):
+        nself = self._callSubtypes("_updateDepDim", dimdepth + len(self.dims), ndim)
         ndims = self.dims.updateDim(-dimdepth,ndim)
         if(not ndims is self.dims):
-            self = self.copy()
-            self.dims = ndims
+            if(self is nself):
+                nself = self.copy()
+            nself.dims = ndims
         return self
 
     def _insertDepDim(self, dimdepth, ndim):
+        nself = self._callSubtypes("_insertDepDim",dimdepth + len(self.dims), ndim)
         ndims = self.dims.insertDim(-dimdepth, ndim)
         if(not ndims is self.dims):
-            self = self.copy()
-            self.dims = ndims
+            if(self is nself):
+                nself = self.copy()
+            nself.dims = ndims
         return self
-         
+
+    def _permuteDepDim(self, prevdims, permute_idxs):
+        nself = self._callSubtypes("_permuteDepDim", prevdims + self.dims, permute_idxs, ndims + self.dims)
+        ndims = self.dims.permuteDim(permute_idxs, prevdims=prevdims)
+        if(not ndims is self.dims):
+            if(self is nself):
+                nself = self.copy()
+            nself.dims = ndims
+        return self
+
     def __repr__(self, unpack_depth=0):
         
         res = '[' + ",".join([str(dim) for dim in self.dims]) + ']'

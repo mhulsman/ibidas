@@ -43,6 +43,14 @@ class Representor(Node):
                 state |= RS_TYPES_KNOWN
             state &= ~RS_CHECK
         self._state = state
+        
+        #name checking
+        slicenames = set()
+        for slice in slices:
+            if slice.name in slicenames:
+                raise RuntimeError, "More than one slice with name: " + slice.name
+            slicenames.add(slice.name)
+            
 
 
     def checkState(self,filter=RS_SLICES_KNOWN):
@@ -376,6 +384,9 @@ class Representor(Node):
 
     def cast(self, *newtypes, **kwds):
         return repops_slice.SliceCast(self, *newtypes, **kwds)
+
+    def transpose(self,permute_idxs=(1,0)):
+        return repops_dim.PermuteDims(self,permute_idxs)
 
     def flat(self, dim=-1,name=None):
         return repops_dim.Flat(self, name=name,dim=dim)

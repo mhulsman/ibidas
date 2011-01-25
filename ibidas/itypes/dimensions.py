@@ -103,7 +103,9 @@ class Dim(object):
 
     def changeDependent(self, dep, ndims):
         assert len(dep) == len(ndims), "Number of flags should be equal to number of dims when setting dependent dims"
-        
+        while(dep and dep[-1] is False):
+            dep = dep[:-1]
+
         redim_cache = self._getRedimCache()
         key = (3, tuple([ndim.id for d, ndim in zip(dep,ndims) if d]))
 
