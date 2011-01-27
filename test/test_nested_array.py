@@ -18,6 +18,17 @@ class TestData(unittest.TestCase):
         orig = rep(self.data) 
         reload = rep(orig()) 
         self.assertTrue(orig ==+ reload)
+    
+    def getRep(self):
+        if(hasattr(self,'dtype')):
+            return rep(self.data,dtype=self.dtype[0])
+        else:
+            return rep(self.data)
+    
+    def test_type(self):
+        if(hasattr(self,'dtype')):
+            for elem in self.dtype:
+                self.assertTrue(rep(self.data,dtype=elem) ==+ rep(self.data))
 
 class TestScalar(TestData):
     def setUp(self):
@@ -46,28 +57,42 @@ class TestMatrix(TestArray):
     def setUp(self):
         self.data = numpy.array([[1,2,3,4,5],[1,2,3,4,5]])
         self.fres0 = numpy.array([1,1])
+        self.transpose_couples = [((1,0),(1,0))]
 
-class TestNestedArray(TestArray):
+    def test_tranpose(self):
+        r = self.getRep()
+        pidx = range(r.Rdepth)
+        self.assertTrue(r.transpose(pidx) ==+ r)
+       
+        if(hasattr(self,'transpose_couples')):
+           for i in range(len(self.transpose_couples)):
+               t1,t2 = self.transpose_couples[i]
+               self.assertTrue(r.transpose(t1).transpose(t2) ==+ r)
+        
+
+class TestNestedArray(TestMatrix):
     def setUp(self):
         self.data = cutils.darray([[1,2,3],[1,2],[1]])
         self.fres0 = cutils.darray([1,1,1])
 
-class TestNestedMatrix(TestArray):
+class TestNestedMatrix(TestMatrix):
     def setUp(self):
         self.data = cutils.darray([[[1,2],[2,4],[3,5]],[[1,3],[5,2]],[[1,2]]])
         self.fres0 = cutils.darray([[1,2,3],[1,5],[1]])
+        self.transpose_couples = [((0,2,1),(0,2,1)),((2,0,1),(1,2,0))]
 
-class TestNestedMatrixString(TestArray):
+class TestNestedMatrixString(TestMatrix):
     def setUp(self):
         self.data = cutils.darray([[["abc","abcd"],["def","defg"],["abg","fev"]],[["zeK","sdf"],["sdf","sdfff"]],[["sdf","kjl"]]])
         self.fres0 = cutils.darray([["abc","def","abg"],["zeK","sdf"],["sdf"]])
+        self.transpose_couples = [((0,2,1),(0,2,1)),((2,0,1),(1,2,0))]
     
     def test_filter(self):
         k = rep(self.data)
         self.assertTrue(k[k == "def"]=="def")
         self.assertFalse(k[k == "def"] == "defg")
 
-class TestNestedNestedArray(TestArray):
+class TestNestedNestedArray(TestMatrix):
     def setUp(self):
         self.data = cutils.darray([[[1,2],[2,3,3,3,4,5],[]],[[1],[2]],[[1,4,5]]])
         self.fres0 = cutils.darray([[1,2,[]],[1,2],[1]])
@@ -76,21 +101,31 @@ class TestNestedNestedArray(TestArray):
         k = rep(self.data)
         self.assertRaises(Exception,k[0])
 
-class TestNestedNestedMatrix(TestArray):
+class TestNestedNestedMatrix(TestMatrix):
     def setUp(self):
-        self.data = cutils.darray([[[[1,2],[3,4]],[[5,6],[7,9],[9,8]],[[]]],[[[1,4]],[[2,5]]],[[[1,5],[4,7],[8,5]]]])
+        self.data = cutils.darray([[[[1,2],[3,4]],[[5,6],[7,9],[9,8]],[[4,9]]],[[[1,4]],[[2,5]]],[[[1,5],[4,7],[8,5]]]])
+        self.transpose_couples = [((0,1,3,2),(0,1,3,2)),((0,3,1,2),(0,2,3,1)),((3,0,1,2),(1,2,3,0))]
+
     def test_filter2(self):
         k = rep(self.data)
-        self.assertRaises(Exception,k[0])
+        self.assertRaises(Exception,k[3])
 
-class TestArrayNestedNestedMatrix(TestArray):
+class TestArrayNestedNestedMatrix(TestMatrix):
     def setUp(self):
-        nnmatrix = cutils.darray([[[[1,2],[3,4]],[[5,6],[7,9],[9,8]],[[]]],[[[1,4]],[[2,5]]],[[[1,5],[4,7],[8,5]]]])
+        nnmatrix = cutils.darray([[[[1,2],[3,4]],[[5,6],[7,9],[9,8]],[[8,9]]],[[[1,4]],[[2,5]]],[[[1,5],[4,7],[8,5]]]])
         self.data = cutils.darray([nnmatrix, nnmatrix, nnmatrix])
+        self.transpose_couples = [((1,2,3,4,0),(4,0,1,2,3)),((1,0,2,3,4),(1,0,2,3,4)),((1,2,0,3,4),(2,0,1,3,4)),((1,2,3,0,4),(3,0,1,2,4))]
+
     def test_filter2(self):
         k = rep(self.data)
-        self.assertRaises(Exception,k[0])
+        self.assertRaises(Exception,k[3])
 
+class TestNestedVarMatrix(TestMatrix):
+    def setUp(self):
+        self.data = cutils.darray([[[1,2],[3,4],[5,6]],[[4,5,6],[7,8,9]]])
+        self.dtype=["[arr]<[var1:.]<[var2:*.]<int64"]
+        self.fres0 = cutils.darray([[1,3,5],[4,7]])
+        self.transpose_couples = [((0,2,1),(0,2,1))]
         
 if __name__ == "__main__":
     unittest.main()

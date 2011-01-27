@@ -145,7 +145,12 @@ class Representor(Node):
             return rtypes.TypeTuple(False, 
                     tuple([slice.type for slice in self._slices]), 
                     tuple([slice.name for slice in self._slices]))
+    Rtype=property(fget=getType)
 
+    def getDepth(self):
+        return max([len(slice.dims) for slice in self._slices])
+    Rdepth=property(fget=getDepth)
+    
 
     def __getitem__(self, condition):
         if(not isinstance(condition, tuple)):

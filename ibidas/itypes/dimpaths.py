@@ -159,7 +159,7 @@ class DimPath(tuple):
         ndims = []
         if(prevdims):
             permute_start = len(permute_idxs) - len(prevdims)
-            for pos, dim in enumerate(self.dims):
+            for pos, dim in enumerate(self):
                 dep = dim.dependent
                 if(len(dep) > pos - permute_start):
                     deppos = util.select(range(-len(prevdims),pos)[::-1],dep)

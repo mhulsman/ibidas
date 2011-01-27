@@ -754,8 +754,8 @@ class TypeArray(TypeAny):#{{{
         return self
 
     def _permuteDepDim(self, prevdims, permute_idxs):
-        nself = self._callSubtypes("_permuteDepDim", prevdims + self.dims, permute_idxs, ndims + self.dims)
-        ndims = self.dims.permuteDim(permute_idxs, prevdims=prevdims)
+        nself = self._callSubtypes("_permuteDepDim", prevdims + self.dims, permute_idxs)
+        ndims = self.dims.permuteDims(permute_idxs, prevdims=prevdims)
         if(not ndims is self.dims):
             if(self is nself):
                 nself = self.copy()

@@ -340,9 +340,8 @@ class NestedArray(object):
                 nextobj = nnextobj
 
                 nself.idxs[matchpoint] = ridx
-                nself.idxs[matchpoint + 1] = 0 
                 for i in range(matchpoint + 1, nextpos):
-                    nself.idxs[i] = i -(matchpoint + 1)
+                    nself.idxs[i] = i -(matchpoint + 1) + 1
             nself._set_obj(nextpos,nextobj)
             nself = nself._normalize(nextpos)
         else:
