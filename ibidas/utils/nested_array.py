@@ -251,7 +251,75 @@ class NestedArray(object):
 
     def splitLastDim(self, idxs, newdims):
         pass
-        
+    
+    def _diffToIdx(self,diff):
+        nlidx = numpy.zeros(diff.shape + (2,),dtype=diff.dtype)
+        nlidx[...,-1] = numpy.reshape(numpy.cumsum(diff.ravel()),shape[:-1])
+        nlidx[...,0] = nlidx[...,-1] - diff
+        return nlidx
+
+
+    def splitDim(self,matchpoint,lshape,rshape,ldim,rdim):
+        matchpoint += 1
+        assert len(self.idxs) > matchpoint, "Nested array not nested that deep"
+        nself = self.copy()
+        cidx = self.idxs[matchpoint]
+        nextpos,nextobj = nself._get_next_obj(matchpoint)
+        if(isinstance(cidx,int)):
+            if(isinstance(lshape,int) and isinstance(rshape,int)):
+                xshape = list(nextobj.shape)
+                assert lshape * rshape == xshape[cidx], "Splitted dimensions do not match size original dimension"
+                xshape[cidx] = rshape
+                xshape.insert(cidx,lshape)
+                nextobj = numpy.reshape(nextobj,xshape)
+                nself.idxs.insert(matchpoint,cidx)
+                for i in range(matchpoint+1,nextpos+1):
+                    nself.idxs[i] += 1
+                nself._set_obj(nextpos+1,nextobj)
+            else:
+                raise RuntimeError,"Splitting fixed to variable dimension not yet supported"
+        else:
+            if(isinstance(lshape,int)):
+                if(isinstance(rshape,int)):
+                    assert (lshape * rshape == nextobj.shape[0]), "Splitted dimensions do not match size original dimensions"
+                    nextobj = nextobj.reshape(cidx.shape[:-1] + (lshape,rshape) + nextobj.shape[1:])
+                    if(isinstance(nself.idxs[matchpoint-1],int)):
+                        spos = nself.idxs[matchpoint-1] + 1
+                    else:
+                        spos = 0
+                    nself.idxs[matchpoint] = spos+1
+                    nself.idxs.insert(matchpoint,spos)
+                    for i in range(matchpoint + 2, nextpos + 1):
+                        nself.idxs[i] += spos + 1
+                    nself._set_obj(nextpos+1,nextobj)
+                else:
+                    assert nextobj.shape[0] == numpy.sum(rshape), "Splitted dimensions do not match size original dimension"
+                    rshape = numpy.reshape(rshape,cidx.shape[:-1] + (lshape,))
+                    rshape = self._diffToIdx(rshape)
+                    nself.idxs[matchpoint] = rshape 
+                    nself.idxs.insert(matchpoint,len(rshape.shape) - 2)
+            else:
+                if(isinstance(rshape,int)):
+                    assert nextobj.shape[0] == numpy.sum(lshape) * rshape, "Splitted dimensions do not match size original dimension"
+                    lshape = numpy.reshape(lshape,cidx.shape[:-1])
+                    lshape = self._diffToIdx(lshape)
+                    nextobj = nextobj.reshape((nextobj.shape[0] / rshape,rshape) + nextobj.shape[1:])
+                    nself.idxs[matchpoint] = 0
+                    nself.idxs.insert(matchpoint,lshape)
+                    for i in range(matchpoint+2,nextpos+1):
+                        nself.idxs[i] += 1
+                    nself._set_obj(nextpos+1,nextobj)
+                else:
+                    rshape = rshape.ravel()
+                    assert numpy.sum(lshape) == rshape.shape[0],"Splitted dimensions do not match size original dimension"
+                    assert nextobj.shape[0] == numpy.sum(rshape), "Splitted dimensions do not match size original dimension"
+                    lshape = numpy.reshape(lshape,cidx.shape[:-1])
+                    lshape = self._diffToIdx(lshape)
+                    rshape = self._diffToIdx(rshape)
+                    nself.idxs[matchpoint] = rshape
+                    nself.idxs.insert(matchpoint,lshape)
+        nself.dims = nself.dims[:matchpoint] + (ldim,rdim) + nself.dims[(matchpoint+1):]            
+        return nself
 
     def mergeDim(self, matchpoint,newdim):
         matchpoint += 1
@@ -534,7 +602,7 @@ class NestedArray(object):
         while(len(self.idxs) > pos and isinstance(self.idxs[pos],int)):
             pos += 1
         if(pos >= len(self.idxs)):
-            return (pos,self.data)
+            return (pos,self.data.copy())
         else:
             return (pos,self.idxs[pos])
 

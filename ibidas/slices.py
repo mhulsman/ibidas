@@ -293,6 +293,14 @@ class PermuteDimsSlice(UnaryOpSlice):
         self.permute_idxs = permute_idxs
         UnaryOpSlice.__init__(self,slice, dims=ndims,rtype=ntype)
 
+class SplitDimSlice(UnaryOpSlice):
+    __slots__ = ["pos","lshape","rshape","ldim","rdim"]
+
+    def __init__(self,slice, pos,lshape,rshape,ldim,rdim):
+        npath = slice.dims.removeDim(pos, (ldim,rdim))
+
+        pass
+
 
 class FilterSlice(UnaryOpSlice):#{{{
     __slots__ = ["constraint"]

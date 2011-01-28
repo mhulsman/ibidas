@@ -61,6 +61,33 @@ class InsertDim(repops.UnaryOpRep):
             nslices.append(slice)
         return self._initialize(tuple(nslices),source._state)
 
+class SplitDim(repops.UnaryOpRep):
+    def _process(self,source,dimsel,lshape,rshape,lname=None,rname=None):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+
+        selpath = dimpaths.identifyUniqueDimPathSource(source,dimsel)
+        nslices = []
+
+        if(isinstance(lshape,int)):
+            ldim = dimensions.Dim(lshape,name=lname)
+        else:
+            ldim = dimensions.Dim(UNDEFINED,dependent=(True,) * len(selpath.strip()), name=lname)
+
+        if(isinstance(rshape,int)):
+            rdim = dimensions.Dim(rshape,name=rname)
+        else:
+            rdim = dimensions.Dim(UNDEFINED,dependent=(True,) * (len(selpath.strip()) + 1), name=rname)
+        
+        for slice in source._slices:
+            lastposs = slice.dims.matchDimPath(selpath)
+            for lastpos in lastposs:
+                slice = slice.SplitDimSlice(slice,lastpos,lshape,rshape,ldim,rdim)
+            nslices.append(slice)
+            
+        return self._initialize(tuple(nslices),source._state)
+
+
 class PermuteDims(repops.UnaryOpRep):
     def _process(self, source, permute_idxs):
         if not source._state & RS_SLICES_KNOWN:
