@@ -125,19 +125,15 @@ class DimPath(tuple):
             return res#}}}
 
     def updateDim(self, pos, ndim, subtype=None):#{{{
-        if(pos < 0  or self[pos].id != ndim.id):
-            ndims = []
-            for p in xrange(max(pos + 1,0), len(self)):
-                ndims.append(self[p].updateDepDim(p - pos, ndim))
+        if(not isinstance(ndim,tuple)):
+            ndim = (ndim,)
+        
+        ndims = []
+        for p in xrange(max(pos + 1,0), len(self)):
+            ndims.append(self[p].updateDepDim(p - pos, ndim))
+       
+        res = self[:max(pos,0)] + ndim + DimPath(*ndims)
 
-            if(not subtype is None):
-                subtype = subtype._updateDepDim(dimdepth=len(self)-pos, ndim=ndim)
-            res = self[:max(pos,0)] + (ndim,) + DimPath(*ndims)
-        else:
-            if(isinstance(ndim,tuple)):
-                res = self[:pos] + ndim + self[(pos + 1):]
-            else:
-                res = self[:pos] + (ndim,) + self[(pos + 1):]
         if(not subtype is None):     
             subtype = subtype._updateDepDim(dimdepth=len(self)-pos, ndim=ndim)
             return (res,subtype)
@@ -491,15 +487,26 @@ def createDimParentDict(sourcepaths):#{{{
     return parents#}}}
 
 def extendParentDim(path, sourcepaths, length=1):#{{{
-    dimparents = createDimParentDict(sourcepaths)
-    parents = dimparents[path[0]]
-    if(len(parents) > 1):
-        raise RuntimeError, "Cannot find unique parent for dim: " + str(path[0])
-    parent = parents[0]
-    if(parent is None):
-        raise RuntimeError, "Dim: " + str(path[0]) + " is first dim, cannot find parent"
+    if(length <= len(path.strip())):
+        return path
 
-    return (parent,) + path#}}}
+    if path[0] is root:
+        raise RuntimeError, "Could not get long enough dim path"
+    
+    dimparents = createDimParentDict(sourcepaths)
+
+    while(len(path.strip()) < length):
+        parents = dimparents[path[0]]
+
+        if(len(parents) > 1):
+            raise RuntimeError, "Cannot find unique parent for dim: " + str(path[0])
+
+        parent = parents[0]
+        if(parent is None):
+            raise RuntimeError, "Dim: " + str(path[0]) + " is first dim, cannot find parent"
+        path = DimPath(*((parent,) + path))
+    return path
+    #}}}
 
 def getArrayDimPathFromType(rtype):
     if(rtype.__class__ is rtypes.TypeArray):
@@ -650,12 +657,12 @@ def identifyDimPathParseHelper(spath, dim_sel, outer=True):
 def _processRest(spath, dim_selector, res, pathprefix):
     if(not dim_selector):
         if(pathprefix):
-            res.add(tuple(pathprefix))
+            res.add(DimPath(*pathprefix))
         return
 
     pathsuffixes = identifyDimPathParseHelper(spath, dim_selector,outer=False)
     for s in pathsuffixes:
-        res.add(tuple(pathprefix + s))
+        res.add(DimPath(*(pathprefix + s)))
         return
 
 

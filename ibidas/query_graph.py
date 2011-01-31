@@ -24,7 +24,7 @@ class Graph(object):
 
 
 class Node(object):
-    __slots__ = []
+    pass
 
 
 class Edge(object):

@@ -58,11 +58,6 @@ class UnaryOpRep(representor.Representor):
             return
         return self._initialize(source._slices, source._state)
     
-    def _copyquery(self):
-        res = copy.copy(self)
-        res._source = self._source._copyquery()
-        return res
-
 class MultiOpRep(representor.Representor):
     def __init__(self, sources, *args,**kwds):
         assert isinstance(sources,tuple), "Sources should be a tuple"
@@ -73,10 +68,6 @@ class MultiOpRep(representor.Representor):
     def _process(self, sources):
         raise RuntimError, "Process function should be overloaded for " + str(type(self))
     
-    def _copyquery(self):
-        res = copy.copy(self)
-        res._sources = tuple([source._copyquery() for source in res._sources])
-        return res
 
 class Fixate(UnaryOpRep):#{{{
     """Operation used by optimizer to fixate end of tree,

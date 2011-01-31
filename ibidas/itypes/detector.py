@@ -683,7 +683,7 @@ class OuterContainerScanner(ContainerScanner):
 
     def scan(self,seq):
         d = self.getSubDetector()
-        d.processSeq()
+        d.processSeq(seq)
         return True
 
     def getType(self):

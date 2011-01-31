@@ -48,6 +48,24 @@ class DimRename(repops.UnaryOpRep):#{{{
                                                     for slice in source._slices]
         return self._initialize(tuple(nslices),source._state)#}}}
 
+
+class Shape(repops.UnaryOpRep):
+    def _process(self,source):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+
+        dimnames = set()
+        nslices = []
+        for slice in source._slices:
+            for pos, dim in enumerate(slice.dims):
+                if dim.name in dimnames:
+                    continue
+                nslice = slices.ShapeSlice(slice,pos)
+                nslices.append(nslice)
+                dimnames.add(dim.name)
+        return self._initialize(tuple(nslices),RS_SLICES_KNOWN)
+       
+
 class InsertDim(repops.UnaryOpRep):
     def _process(self, source, insertpoint, name=None):
         if not source._state & RS_SLICES_KNOWN:
@@ -62,7 +80,7 @@ class InsertDim(repops.UnaryOpRep):
         return self._initialize(tuple(nslices),source._state)
 
 class SplitDim(repops.UnaryOpRep):
-    def _process(self,source,dimsel,lshape,rshape,lname=None,rname=None):
+    def _process(self,source,lshape,rshape,lname=None,rname=None,dimsel=None):
         if not source._state & RS_SLICES_KNOWN:
             return
 
@@ -82,7 +100,7 @@ class SplitDim(repops.UnaryOpRep):
         for slice in source._slices:
             lastposs = slice.dims.matchDimPath(selpath)
             for lastpos in lastposs:
-                slice = slice.SplitDimSlice(slice,lastpos,lshape,rshape,ldim,rdim)
+                slice = slices.SplitDimSlice(slice,lastpos,lshape,rshape,ldim,rdim)
             nslices.append(slice)
             
         return self._initialize(tuple(nslices),source._state)
@@ -149,15 +167,19 @@ class Flat(repops.UnaryOpRep):
         #create new merged dimension
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
         selpath = dimpaths.extendParentDim(selpath,[s.dims for s in source._slices],2)
-
+        
+        #determine new dim
         if(selpath[-1].shape != UNDEFINED and selpath[-2].shape != UNDEFINED):
             shape = selpath[-2].shape * selpath[-1].shape
         else:
             shape = UNDEFINED
+
         if(name is None):
             name = selpath[-2].name + "_" + selpath[-1].name
+
         dependent = tuple([left or right for left,right in 
-                        izip_longest(selpath[-2].dependent, selpath[-1].dependent[:-1],fillvalue=False)])
+                        izip_longest(selpath[-2].dependent, selpath[-1].dependent[1:],fillvalue=False)])
+
         ndim = dimensions.Dim(shape, dependent=dependent, has_missing = selpath[-1].has_missing or selpath[-2].has_missing, name=name)
         
         bcdim = dimensions.Dim(1)
@@ -171,14 +193,14 @@ class Flat(repops.UnaryOpRep):
             sdims = slice.dims
             lastpos = sdims.matchDimPath(selpath[:-1])
             while(lastpos):
-                flatpos = lastpos[0]
+                flatpos = lastpos[0] + 1
                 if(len(sdims) <= flatpos or sdims[flatpos] != selpath[-1]):
                     slice = slices.InsertDimSlice(slice,flatpos,bcdim)
                     bcdims = slice.dims[:flatpos] + (selpath[-1],) + slice.dims[flatpos:]
                     plan = [BCCOPY] * len(slice.dims[:flatpos]) + [BCEXIST] + [BCCOPY] * len(slice.dims[flatpos:])
                     slice = slices.BroadcastSlice(slice,[refslices],plan,bcdims)
                 slice = slices.FlatDimSlice(slice,flatpos,ndim)
-                if(len(startpos) > 1):
+                if(len(lastpos) > 1):
                     sdims = slice.dims
                     lastpos = sdims.matchDimPath(selpath[::-1])
                 else:

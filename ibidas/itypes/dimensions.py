@@ -85,14 +85,12 @@ class Dim(object):
         if(not isinstance(ndim,tuple)):
             ndim = (ndim,)
         assert ndim, "No new dimensions specified"
+
         key = (1,pos, tuple([nd.id for nd in ndim]))
         redim_cache = self._getRedimCache()
         if(not key in redim_cache):
-            if(len(ndim) > 1):
-                nself = self.copy(reid=self.dependent[pos])
-                nself.dependent = nself.dependent[:pos] + (nself.dependent[pos],) + nself.dependent[pos:]
-            else:
-                nself = self.copy(reid=self.dependent[pos])
+            nself = self.copy(reid=self.dependent[pos])
+            nself.dependent = nself.dependent[:pos] + (nself.dependent[pos],) * len(ndim) + nself.dependent[(pos+1):]
             redim_cache[key] = nself
         return redim_cache[key]
     

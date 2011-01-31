@@ -205,10 +205,13 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(bookmarks=node.bookmarks)
 
     def visitDetectTypeSlice(self,node,slice):
-        det = detector.Detector()
-        det.setParentDimensions(node.dims)
-        det.processSeq(node.slice.data.flat())
-        return slice.modify(rtype=det.getType())
+        if(slice.type == rtypes.unknown):
+            det = detector.Detector()
+            det.setParentDimensions(node.dims)
+            det.processSeq(slice.data.flat())
+            return slice.modify(rtype=det.getType())
+        else:
+            return slice
     
     def visitUnpackArraySlice(self,node,slice):
         ndata=slice.data.unpack(node.unpack_dims, subtype=node.type)
@@ -219,11 +222,15 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
     def visitInsertDimSlice(self,node,slice):
-        ndata = slice.data.insertDim(node.matchpoint,node.newdim)
+        ndata = slice.data.insertDim(node.matchpoint)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
     def visitPermuteDimsSlice(self, node, slice):
-        ndata=slice.data.permuteDims(node.permute_idxs,node.dims)
+        ndata=slice.data.permuteDims(node.permute_idxs)
+        return slice.modify(data=ndata,dims=node.dims,rtype=node.type)
+
+    def visitSplitDimSlice(self, node, slice):
+        ndata=slice.data.splitDim(node.pos,node.lshape,node.rshape)
         return slice.modify(data=ndata,dims=node.dims,rtype=node.type)
 
     def visitPackListSlice(self, node, slice):
@@ -252,24 +259,29 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         othershape = compare_slice.data.getDimShape(otherpos)
         assert numpy.all(selfshape == othershape), "Dimension mismatch in " + str(checkdim) + ":" + str(selfshape) + " != " + str(othershape)
 
-        ndata = slice.data.replaceDim(node.checkpos,checkdim)
-        return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
+        return slice.modify(rtype=node.type,dims=node.dims)
+
+    def visitShapeSlice(self, node, slice):
+        d = slice.data.getDimShape(node.pos)
+        if(not isinstance(d,int)):
+            d = d[...,1] - d[...,0]
+            
+        ndata = nested_array.NestedArray(d,node.type)
+        return slice.modify(ndata,rtype=node.type,dims=node.dims,name=node.name)
 
     def visitBroadcastSlice(self,node,slice,compare_slices):
         repeat_dict = {}
-        dim_dict = {}
         bcpos = 0
         for pos,planelem in enumerate(node.plan):
             if(planelem == BCEXIST):
                 dimpos = compare_slices[bcpos].dims.index(node.bcdims[pos])
                 repeat_dict[pos] = compare_slices[bcpos].data.getDimShape(dimpos)
-                dim_dict[pos] = compare_slices[bcpos].dims[dimpos]
                 bcpos += 1
             elif(planelem == BCCOPY):
                 pass
             else:
                 raise RuntimeError, "Unknown broadcast plan element: " + str(planelem)
-        ndata = slice.data.broadcast(repeat_dict,dim_dict)
+        ndata = slice.data.broadcast(repeat_dict)
         return slice.modify(data=ndata,dims=node.dims)
 
 
@@ -280,11 +292,11 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(data=ndata,rtype=node.type)
 
     def visitFlatAllSlice(self, node, slice):
-        ndata = slice.data.mergeAllDims(slice.dims[0])
+        ndata = slice.data.mergeAllDims()
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
     
     def visitFlatDimSlice(self, node, slice):
-        ndata = slice.data.mergeDim(node.flatpos-1, node.dims[node.flatpos-1])
+        ndata = slice.data.mergeDim(node.flatpos-1)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
     def visitUnaryFuncElemOpSlice(self,node, slice):
@@ -323,7 +335,6 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def castnumbers_numbers(self,castname,node,slice):
         return slice.data.mapseq(lambda x:x,res_type=node.type)
-
 
     def number_numberGeneral(self, data, type1, type2, typeo, op):
         data1,data2 = data

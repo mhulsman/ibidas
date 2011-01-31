@@ -10,8 +10,6 @@ class NestedArray(object):
         self.cur_type = cur_type
 
         self.idxs = [0]
-        tdim = dimensions.Dim(1)
-        self.dims = dimpaths.DimPath(tdim)
         
     def copy(self):
         res = copy.copy(self)
@@ -19,10 +17,6 @@ class NestedArray(object):
         res.idxs = list(self.idxs)
         return res
   
-    def getDim(self,pos):
-        pos += 1
-        return self.dims[pos]
-
     def getDimShape(self,pos):
         pos += 1
         if(isinstance(self.idxs[pos],int)):
@@ -36,14 +30,6 @@ class NestedArray(object):
             return self.idxs[-1] + 1
         else:
             return 1
-
-    def replaceDim(self,pos,ndim):
-        pos += 1
-        nself = self.copy()
-        dims = list(self.dims)
-        dims[pos] = ndim
-        nself.dims = dimpaths.DimPath(*dims)
-        return nself
 
     def flat(self):
         data,rshape = self._flatData()
@@ -129,7 +115,6 @@ class NestedArray(object):
             depth -= 1
         
         nself.cur_type = subtype
-        nself.dims = self.dims + odimpath
         nself.data = data
         return nself
     
@@ -139,9 +124,7 @@ class NestedArray(object):
       
         while(depth):
             assert len(nself.idxs) > 1, "Pack operation on nestedarray without index?!"
-            assert len(nself.dims) == len(nself.idxs), "Idxs and dims not equal in size"
             idx = nself.idxs.pop()
-            nself.dims = nself.dims[:-1]
 
             if(not isinstance(idx,int)): #refers to fixed dim in data
                 res = []
@@ -197,7 +180,7 @@ class NestedArray(object):
         nself.cur_type = restype
         return nself
 
-    def insertDim(self,matchpoint,newdim):
+    def insertDim(self,matchpoint):
         matchpoint += 1
         nself = self.copy()
         idxs = nself.idxs + [nself.data]
@@ -218,48 +201,23 @@ class NestedArray(object):
                 break
         else:
             nself.data.shape = nself.data.shape[:newidx] + (1,) + nself.data.shape[newidx:]
-        nself.dims = nself.dims[:matchpoint] + (newdim,) + nself.dims[matchpoint:]
         return nself
 
-    def mergeAllDims(self, newdim):
+    def mergeAllDims(self):
         nself = self.copy()
         nself.idxs = [0,1]
-        nself.dims = self.dims[:1] + (newdim,)
         nself.data = self._flatData()[0]
         nself.data.shape = (1,) + nself.data.shape
         return nself
         
-    def mergeLastDims(self, ndims, newdim):
-        nself = self.copy()
-        nself.dims = self.dims[:-ndims] + (newdim,)
-        nself.data = self._flatData()[0]
-        nself.idxs = self.idxs[:-ndims]
-        lastidx = nself.idxs[-1]
-        if(isinstance(lastidx,int)):
-            nself.idxs.append(nself.idxs[-1] + 1)
-            nextpos, nextobj = self._get_next_obj(len(nself.idxs))
-            nelem = numpy.multiply.reduce(nextobj.shape[:(lastidx + 1)])
-            assert (nself.data.shape[0] % nelem) == 0, "Leftover elements in merging"
-            nself.data.shape = nextobj.shape[:(lastidx + 1)] + (nself.data.shape[0] / nelem) + nself.data.shape[1:]
-        else:
-            nself.idxs.append(0)
-            lastidx = lastidx.ravel()
-            nelem = lastidx[-1] - lastidx[0]
-            assert (nself.data.shape[0] % nelem) == 0, "Leftover elements in merging"
-            nself.data.shape = (nelem, nself.data.shape[0] / nelem) + nself.data.shape[1:]
-        return nself
-
-    def splitLastDim(self, idxs, newdims):
-        pass
-    
     def _diffToIdx(self,diff):
         nlidx = numpy.zeros(diff.shape + (2,),dtype=diff.dtype)
-        nlidx[...,-1] = numpy.reshape(numpy.cumsum(diff.ravel()),shape[:-1])
+        nlidx[...,-1] = numpy.reshape(numpy.cumsum(diff.ravel()),diff.shape)
         nlidx[...,0] = nlidx[...,-1] - diff
         return nlidx
 
 
-    def splitDim(self,matchpoint,lshape,rshape,ldim,rdim):
+    def splitDim(self,matchpoint,lshape,rshape):
         matchpoint += 1
         assert len(self.idxs) > matchpoint, "Nested array not nested that deep"
         nself = self.copy()
@@ -318,10 +276,9 @@ class NestedArray(object):
                     rshape = self._diffToIdx(rshape)
                     nself.idxs[matchpoint] = rshape
                     nself.idxs.insert(matchpoint,lshape)
-        nself.dims = nself.dims[:matchpoint] + (ldim,rdim) + nself.dims[(matchpoint+1):]            
         return nself
 
-    def mergeDim(self, matchpoint,newdim):
+    def mergeDim(self, matchpoint):
         matchpoint += 1
         assert len(self.idxs) > (matchpoint + 1), "Nested array not nested that deep"
         nself = self.copy()
@@ -356,19 +313,13 @@ class NestedArray(object):
                 nlidx[...,-1] = ridx[lidx[...,-1],-1]
                 nself.idxs[matchpoint] = nlidx
         del nself.idxs[matchpoint+1]
-
-        nself.dims = nself.dims[:(matchpoint-1)] + (newdim,) + nself.dims[(matchpoint+1):]
         return nself
 
-    def swapDim(self, matchpoint, nldim, nrdim):
+    def swapDim(self, matchpoint):
         matchpoint += 1
         assert len(self.idxs) > (matchpoint + 1), "Nested array not nested that deep"
-        dep = self.dims[matchpoint+1].dependent 
-        assert not dep or dep[-1] is False, "Switching dimensions that are dependent not possible"
         nself = self.copy()
         nself._swapDim(matchpoint)
-        nself.dims[matchpoint] = nldim
-        nself.dims[matchpoint+1] = nrdim
         return nself
 
     def _swapDim(self, matchpoint):#{{{
@@ -486,7 +437,7 @@ class NestedArray(object):
             nself._set_obj(nextpos,nextobj)
             nself = nself._normalize(matchpoint + 2)#}}}
 
-    def permuteDims(self, permute_idxs, ndims):
+    def permuteDims(self, permute_idxs):
         nself = self.copy()
         assert len(permute_idxs) == (len(self.idxs) - 1), "Permute idxs do not cover all dimensions"
       
@@ -499,11 +450,9 @@ class NestedArray(object):
         for i in range(len(permute_idxs)):
             for j in range(len(permute_idxs) - i - 1):
                 if permute_idxs[j] > permute_idxs[j+1]:
-                    dep = self.dims[j+2].dependent 
                     nself._swapDim(j+1) #correct for first idx
                     permute_idxs[j],permute_idxs[j+1] = permute_idxs[j+1],permute_idxs[j]
 
-        nself.dims = nself.dims[:1] + ndims
         return nself
 
     def _normalize(self, curpos):
@@ -536,16 +485,14 @@ class NestedArray(object):
         return nself
 
             
-    def broadcast(self, repeat_dict, dim_dict):
+    def broadcast(self, repeat_dict):
         if not repeat_dict:
             return self
         nself = self.copy()
 
         repeats = [1] * len(self.idxs)
-        ndims = list(nself.dims)
         for pos,repeat  in repeat_dict.iteritems():
             repeats[pos + 1] = repeat
-            ndims[pos + 1] = dim_dict[pos]
 
         tilerepeats = []
         prev_repeat = False
@@ -594,7 +541,6 @@ class NestedArray(object):
         
         if(tilerepeats):
             nself._apply_tile_broadcast(tilerepeats,len(self.idxs),prev_repeat)
-        nself.dims = dimpaths.DimPath(*ndims)
         return nself
 
     def _get_next_obj(self,pos):
@@ -674,7 +620,7 @@ class NestedArray(object):
 
     def __repr__(self):
         return "NestedArray < \n" + \
-               "Idxs: " + str(self.idxs) + "  Dims: " + str(self.dims) + " Shape: " + str(self.data.shape) + "\n" + \
+               "Idxs: " + str(self.idxs) + " Shape: " + str(self.data.shape) + "\n" + \
                "Data: " + str(self.data) + "  Dtype: " + str(self.data.dtype) + "\n" + \
                ">\n"
 
@@ -684,39 +630,32 @@ def co_mapseq(func, nested_arrays, *args, **kwargs):
     restype= kwargs.pop("res_type")
     dtype=restype.toNumpy()
     bc_allow=kwargs.pop("bc_allow",False)
-    dimpath_set = set([na.dims[1:] for na in nested_arrays])
+    idxlen = set([len(na.idxs) for na in nested_arrays])
     data = []
-    if not len(dimpath_set) == 1:
+    if not len(idxlen) == 1:
         if(not bc_allow is True):
             raise RuntimeError, "Nested arrays should have same dimensions!"
-        
-        udimpath = dimpaths.uniqueDimPath(dimpath_set)
-        if(udimpath is False):
-            raise RuntimeError, "Nested arrays should have same dimensions on same positions!"
-        ndims = len(udimpath) + 1
-        
+       
+        ndims = max(idxlen)
         minlen = ndims
         for na in nested_arrays:
-            if(len(na.dims) == ndims):
+            if(len(na.idxs) == ndims):
                 na_ref = na
-            minlen = min(len(na.dims),minlen)
+            minlen = min(len(na.idxs),minlen)
         while(minlen < ndims and not isinstance(na_ref.getDimShape(minlen-1),int)):
             minlen += 1
 
         for pos,na in enumerate(nested_arrays):
             rep_dict = dict()
-            dim_dict = dict()
-            while(len(na.dims) < ndims):
-                extpos = len(na.dims) - 1
-                ndim = dimensions.Dim(1)
-                na = na.insertDim(extpos,ndim)
+            while(len(na.idxs) < ndims):
+                extpos = len(na.idxs) - 1
+                na = na.insertDim(extpos)
                 idx = na_ref.getDimShape(extpos)
                 if(not isinstance(idx,int)):
                     rep_dict[extpos] = idx
-                    dim_dict[extpos] = udimpath[extpos]
-            na = na.broadcast(rep_dict,dim_dict)
-            if(len(na.dims) > minlen):
-                na = na.pack(rtypes.unknown,len(na.dims) - minlen)
+            na = na.broadcast(rep_dict)
+            if(len(na.idxs) > minlen):
+                na = na.pack(rtypes.unknown,len(na.idxs) - minlen)
             seq, flatshape = na._flatData()
             data.append(seq)
     else:

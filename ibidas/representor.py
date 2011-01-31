@@ -44,15 +44,6 @@ class Representor(Node):
             state &= ~RS_CHECK
         self._state = state
         
-        #name checking
-        slicenames = set()
-        for slice in slices:
-            if slice.name in slicenames:
-                raise RuntimeError, "More than one slice with name: " + slice.name
-            slicenames.add(slice.name)
-            
-
-
     def checkState(self,filter=RS_SLICES_KNOWN):
         if(not ((self._state & filter) == filter)):
             slices = self._getResultSlices()
@@ -138,6 +129,12 @@ class Representor(Node):
     def __reduce__(self):
         return (wrapper_py.PyRepresentor, (self._getResultSlices(),))
 
+    def __copy__(self):
+        nself = Representor()
+        nself.__class__ = self.__class__
+        nself.__dict__ = self.__dict__.copy()
+        return nself
+
     def getType(self):
         if(len(self._slices) == 1):
             return self._slices[0].type
@@ -200,10 +197,7 @@ class Representor(Node):
 
     def _getResultSlices(self, args={}):
         query = query_context.QueryContext(self, args)
-        return engines.select_engine.run(query)
-
-    def _copyquery(self):
-        return copy.copy(self)
+        return tuple(engines.select_engine.run(query))
 
     def __call__(self, **args):
         res = self._getResultSlices(args)
@@ -398,6 +392,12 @@ class Representor(Node):
 
     def flatall(self, name=None):
         return repops_dim.FlatAll(self,name=name)
+
+    def splitDim(self,lshape,rshape,lname=None,rname=None,dimsel=None):
+        return repops_dim.SplitDim(self,lshape,rshape,lname,rname,dimsel)
+
+    def getShape(self):
+        return repops_dim.Shape(self)
 
     def group_by(self, *args, **kwargs):
         keep = kwargs.pop("keep", {})
