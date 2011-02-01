@@ -193,7 +193,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
    
     def visitCastSlice(self,node,slice):
         ndata = self.cast(node.cast_name,node,slice)
-        return slice.modify(data=ndata,type=node.type)
+        return slice.modify(data=ndata,rtype=node.type)
 
     def visitChangeNameSlice(self,node,slice):
         return slice.modify(name = node.name)

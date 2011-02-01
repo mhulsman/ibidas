@@ -360,17 +360,14 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
 
         #adapt ndim to braodcast, apply filter
         if(not ndim is None):
-            ndep = dimpaths.applyPlan(dep,cplan,newvalue=False,copyvalue=True,ensurevalue=True,existvalue=False)
+            ndep = dimpaths.applyPlan(dep,splan,newvalue=True, copyvalue=True, ensurevalue=True)
             xndim = ndim.changeDependent(tuple(ndep), slice.dims)
         else:
             xndim = ndim
         slice = FilterSlice(slice,constraint,xndim)
 
         #adapt used_dims
-        used_dims = dimpaths.applyPlan(used_dims,cplan,newvalue=False,copyvalue=True,ensurevalue=True)
-        for pos,cp in enumerate(cplan):
-            if cp == BCCOPY:
-                used_dims[pos] = True
+        used_dims = dimpaths.applyPlan(used_dims,splan,newvalue=True,copyvalue=True,ensurevalue=True)
         
         #handle dim removal, filter_dim is used
         if(ndim is None): #dimension removed/collapsed
