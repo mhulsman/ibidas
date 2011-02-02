@@ -548,6 +548,13 @@ class Representor(Node):
 
     def map(self, func, otype=rtypes.unknown, dim=None, *params, **kwds):
         return repops_multi.rmap(self, func, otype, dim, *params, **kwds)
+    
+    
+    def pos(self, dim=None):
+        return repops_funcs.Pos(self, dim)
+    
+    def argsort(self, dim=None):
+        return repops_funcs.ArgSort(self, dim)
 
     def sum(self, dim=None):
         return repops_funcs.Sum(self, dim)

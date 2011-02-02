@@ -699,9 +699,10 @@ class SetScanner(ContainerScanner):
 
     def getType(self):
         subtype = self.getSubDetector().getType()
-        dims = dimpaths.DimPath(self.getDimRep(0).dim)
+        dim = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
+        dims = dimpaths.DimPath(dim)
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeSet(self.detector.hasMissing(), dims, (subtype,), need_conversion=True, convertor=cv)
+        return rtypes.TypeSet(self.detector.hasMissing(), dims, (subtype,), need_conversion=False, convertor=cv)
 
     def unregister(self, create_parent=False):
         parent = ContainerScanner.unregister(self, create_parent)
@@ -715,9 +716,6 @@ class SetScanner(ContainerScanner):
         if not self.detector.objectclss.issubset(self.good_cls):
             return False
         
-        dr = self.getDimRep(0)
-        nelems = seq.map(len, otype=object, out_empty=Missing, has_missing=has_missing)
-        dr.processLengths(nelems, has_missing=has_missing)
         d = self.getSubDetector()
         for subseq in seq.ravel():
             if not (subseq is Missing or subseq is None):

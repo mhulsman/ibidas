@@ -20,21 +20,20 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
 
     #Determine if necessary to freeze a type (or its subtypes)    
     def need_freeze(self, rtype):
-        return (rtype.data_state != DATA_FROZEN)
+        return True
     needFreezeTypeAny=need_freeze
     needFreezeTypeDict=need_freeze
     needFreezeTypeArray=need_freeze
     needFreezeTypeSlice=need_freeze
+    needFreezeTypeSet=need_freeze
 
     def noneed_freeze(self, rtype):
         return False
     needFreezeTypeString=noneed_freeze
     needFreezeTypeScalar=noneed_freeze
-    needFreezeTypeSet=noneed_freeze
     
     def needFreezeTypeTuple(self,rtype):
         return any([self.needFreeze(subtype)for subtype in rtype.subtypes])
-
     
     #freeze standard python objects
     def ftypeobject(self, obj):
@@ -81,6 +80,8 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
                     seqres.append(func(elem))
         else:
             seqres = [func(elem) for elem in seq]
+        
+        seqres = cutils.darray(seqres,seq.dtype)
         return seqres 
     
 

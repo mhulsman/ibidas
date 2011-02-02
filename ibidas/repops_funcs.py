@@ -135,29 +135,35 @@ class UnaryFuncSeqOp(UnaryFuncOp):
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
 
         nslices = []
+        found = False
         for pos, slice in enumerate(source._slices):
             lastposs = slice.dims.matchDimPath(selpath)
             for lastpos in lastposs:
+                found = True
                 packdepth = len(slice.dims) - lastpos
                 sig, nkwargs, outparam = self._findSignature(slice=slice, packdepth=packdepth, **kwargs)
                 if(len(source._slices) > 0):
                     outparam = outparam.withNumber(pos)
                 slice = slices.UnaryFuncSeqOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
             nslices.append(slice)
+        if(not found):
+            raise RuntimeError, "No slice with dims to apply " + self.__class__.__name__
         return self._initialize(tuple(nslices),source._state)
 
 class UnaryFuncAggregateOp(UnaryFuncOp):
     def _process(self, source, dim=None, **kwargs):
         if not source._state & RS_TYPES_KNOWN:
             return
-        
+
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
 
         nslices = []
+        found = False
         for pos, slice in enumerate(source._slices):
             lastposs = slice.dims.matchDimPath(selpath)
             if(lastposs):
                 slice = self.prepareSlice(slice)
+                found = True
             for lastpos in lastposs:
                 packdepth = len(slice.dims) - lastpos
                 sig, nkwargs, outparam = self._findSignature(slice=slice, packdepth=packdepth, **kwargs)
@@ -165,6 +171,8 @@ class UnaryFuncAggregateOp(UnaryFuncOp):
                     outparam = outparam.withNumber(pos)
                 slice = slices.UnaryFuncAggregateOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
             nslices.append(slice)
+        if(not found):
+            raise RuntimeError, "No slice with dims to apply " + self.__class__.__name__
         return self._initialize(tuple(nslices),source._state)
 
     def prepareSlice(self,slice):
@@ -236,14 +244,32 @@ class BinArithSignature(FuncSignature):
         out_type = out_cls(in1_type.has_missing or in2_type.has_missing)
 
         return out_type#}}}
-bin_arithsig = BinArithSignature("number_number")
+bin_arithsig = BinArithSignature("simple_arith")
+
+class SetSetSignature(FuncSignature):
+    def check(self, left, right):
+        in1_type = left.type
+        in2_type = right.type
+        if(not isinstance(left.type, rtypes.TypeSet) or not isinstance(right.type, rtypes.TypeSet)):
+            return False
+        
+        subout_type = casts.castImplicitCommonType(left.type.subtypes[0],right.type.subtypes[0])
+        
+        ldim = left.type.dims[0]
+        rdim = right.type.dims[0]
+        dim = dimensions.Dim(UNDEFINED,(True,) * len(left.dims),ldim.has_missing or rdim.has_missing, name=ldim.name + "_" + rdim.name)
+        dims = dimpaths.DimPath(dim)
+
+        out_type = rtypes.TypeSet(has_missing=left.type.has_missing or right.type.has_missing, subtypes=(subout_type,), dims=dims)
+        return out_type#}}}
+setset_sig = SetSetSignature("simple_arith")
 
 @repops.delayable()
 class Add(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
 @repops.delayable()
 class Subtract(BinaryFuncElemOp):
-   _sigs = [bin_arithsig]
+   _sigs = [bin_arithsig, setset_sig]
 @repops.delayable()
 class Multiply(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
@@ -258,13 +284,13 @@ class FloorDivide(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
 @repops.delayable()
 class And(BinaryFuncElemOp):
-   _sigs = [bin_arithsig]
+   _sigs = [bin_arithsig, setset_sig]
 @repops.delayable()
 class Or(BinaryFuncElemOp):
-   _sigs = [bin_arithsig]
+   _sigs = [bin_arithsig, setset_sig]
 @repops.delayable()
 class Xor(BinaryFuncElemOp):
-   _sigs = [bin_arithsig]
+   _sigs = [bin_arithsig, setset_sig]
 @repops.delayable()
 class Power(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
@@ -287,29 +313,30 @@ class CompareSignature(FuncSignature):
 
         return out_type#}}}
        
-comparesig = CompareSignature("scalar_scalar",(rtypes.TypeScalar,rtypes.TypeSet))
-comparestringsig = CompareSignature("string_string",(rtypes.TypeString))
+compareanysig = CompareSignature("simple_cmp",rtypes.TypeAny)
+comparesetsig = CompareSignature("simple_cmp",rtypes.TypeSet)
+comparestringsig = CompareSignature("string_cmp",rtypes.TypeString)
 
 @repops.delayable()
 class Equal(BinaryFuncElemOp):
-    _sigs = [comparesig,comparestringsig]
+    _sigs = [comparestringsig,comparesetsig,compareanysig]
 @repops.delayable()
 class NotEqual(BinaryFuncElemOp):
-    _sigs = [comparesig,comparestringsig]
+    _sigs = [comparestringsig,comparesetsig,compareanysig]
 
 @repops.delayable()
 class LessEqual(BinaryFuncElemOp):
-    _sigs = [comparesig,comparestringsig]
+    _sigs = [comparestringsig,comparesetsig,compareanysig]
 @repops.delayable()
 class Less(BinaryFuncElemOp):
-    _sigs = [comparesig, comparestringsig]
+    _sigs = [comparestringsig,comparesetsig,compareanysig]
     
 @repops.delayable()
 class GreaterEqual(BinaryFuncElemOp):
-    _sigs = [comparesig, comparestringsig]
+    _sigs = [comparestringsig,comparesetsig,compareanysig]
 @repops.delayable()
 class Greater(BinaryFuncElemOp):
-    _sigs = [comparesig, comparestringsig]
+    _sigs = [comparestringsig,comparesetsig,compareanysig]
 
 
 class UnaryArithSignature(FuncSignature):

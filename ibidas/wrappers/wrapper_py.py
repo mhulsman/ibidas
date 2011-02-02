@@ -267,7 +267,9 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(ndata,rtype=node.type,dims=node.dims,name=node.name)
 
     def visitFreezeSlice(self, node, slice):
-        type_attribute_freeze.freeze_protocol.execFreeze
+        func = lambda x: type_attribute_freeze.freeze_protocol.execFreeze(slice.type,x)
+        ndata = slice.data.mapseq(func,res_type=node.type)
+        return slice.modify(data=ndata)
 
     def visitBroadcastSlice(self,node,slice,compare_slices):
         repeat_dict = {}
@@ -389,18 +391,18 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def castnumbers_numbers(self,castname,node,slice):
         return slice.data.mapseq(lambda x:x,res_type=node.type)
 
-    def number_numberGeneral(self, data, type1, type2, typeo, op):
+    def simple_arithGeneral(self, data, type1, type2, typeo, op):
         data1,data2 = data
         if(data1 is Missing or data2 is Missing):
             return Missing
         return numpy_arith[op](data1, data2, sig=typeo.toNumpy())
 
-    def scalar_scalarGeneral(self, data, type1, type2, typeo, op):
+    def simple_cmpGeneral(self, data, type1, type2, typeo, op):
         #a numpy bug gives all true arrays when using
         #bool as outtype in comparison
         return numpy_cmp[op](data[0], data[1])
 
-    def string_stringGeneral(self, data, type1, type2, typeo, op):
+    def string_cmpGeneral(self, data, type1, type2, typeo, op):
         #a numpy bug gives NotImplemented when performing operations,
         #such as "numpy.equal" on string arrays
         #so use direct operations ("__eq__")

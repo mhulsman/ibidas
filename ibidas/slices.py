@@ -499,13 +499,10 @@ class ConvertSlice(UnaryOpSlice):#{{{
 
 class FreezeSlice(UnaryOpSlice):#{{{
     __slots__ = []
-
-    def __init__(self, pslice):
-        assert freeze_protocol.need_freeze(pslice.type), "Slice does not need to frozen"
-        UnaryOpSlice.__init__(self, pslice, rtype=slice.type)#}}}
+#}}}
 
 def ensure_frozen(slice):#{{{
-    if(freeze_protocol.need_freeze(slice.type)):
+    if(freeze_protocol.needFreeze(slice.type)):
         return FreezeSlice(slice)
     else:
         return slice#}}}

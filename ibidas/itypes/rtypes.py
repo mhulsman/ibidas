@@ -786,12 +786,9 @@ class TypeSet(TypeArray):#{{{
         assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
                 "Dimensions of a set should be a dimpath of size 1"
 
-        assert dims[0].isVariable(), "Dimension of set should be variable!"
-        
         assert subtypes and len(subtypes) == 1 and isinstance(subtypes,tuple), \
                  "Number of subtypes should be 1"
         
-        subtypes = (type_attribute_freeze.freeze_protocol.freeze(subtypes[0]),)
         TypeArray.__init__(self, has_missing, dims, 
                                  subtypes, need_conversion, convertor)
     def __repr__(self):
