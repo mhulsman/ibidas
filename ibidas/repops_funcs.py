@@ -1,4 +1,3 @@
-import platform
 import operator
 import repops
 from constants import *
@@ -7,7 +6,7 @@ _delay_import_(globals(),"utils","util")
 _delay_import_(globals(),"slices")
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","wrapper_py")
-_delay_import_(globals(),"itypes", "casts")
+_delay_import_(globals(),"itypes", "casts","dimpaths","dimensions")
 
 class FuncSignature(object):
     def __init__(self, signame):
@@ -110,10 +109,10 @@ class Func(object):
        
 
 class UnaryFuncOp(repops.UnaryOpRep, Func):
-    def __init__(self, source, **kwargs):
+    def __init__(self, source, *params, **kwargs):
         if(not isinstance(source, representor.Representor)):
             source = wrapper_py.rep(source)
-        repops.UnaryOpRep.__init__(self,source, **kwargs)
+        repops.UnaryOpRep.__init__(self,source, *params,**kwargs)
 
 class UnaryFuncElemOp(UnaryFuncOp):
     def _process(self, source, **kwargs):
@@ -129,33 +128,40 @@ class UnaryFuncElemOp(UnaryFuncOp):
         return self._initialize(tuple(nslices),source._state)
 
 class UnaryFuncSeqOp(UnaryFuncOp):
-    def _process(self, source, **kwargs):
+    def _process(self, source, dim=None, **kwargs):
         if not source._state & RS_TYPES_KNOWN:
             return
 
+        selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
+
         nslices = []
         for pos, slice in enumerate(source._slices):
-            slice = slices.PackArraySlice(slice,1)
-            sig, nkwargs, outparam = self._findSignature(slice=slice,**kwargs)
-            if(len(source._slices) > 0):
-                outparam = outparam.withNumber(pos)
-            slice = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
-            slice = slices.UnpackArraySlice(slice,1)
+            lastposs = slice.dims.matchDimPath(selpath)
+            for lastpos in lastposs:
+                packdepth = len(slice.dims) - lastpos
+                sig, nkwargs, outparam = self._findSignature(slice=slice, packdepth=packdepth, **kwargs)
+                if(len(source._slices) > 0):
+                    outparam = outparam.withNumber(pos)
+                slice = slices.UnaryFuncSeqOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
             nslices.append(slice)
         return self._initialize(tuple(nslices),source._state)
 
 class UnaryFuncAggregateOp(UnaryFuncOp):
-    def _process(self, source, **kwargs):
+    def _process(self, source, dim=None, **kwargs):
         if not source._state & RS_TYPES_KNOWN:
             return
+        
+        selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
 
         nslices = []
         for pos, slice in enumerate(source._slices):
-            slice = slices.PackArraySlice(slice,1)
-            sig, nkwargs, outparam = self._findSignature(slice=slice, **kwargs)
-            if(len(source._slices) > 1):
-                outparam = outparam.withNumber(pos)
-            slice = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
+            lastposs = slice.dims.matchDimPath(selpath)
+            for lastpos in lastposs:
+                packdepth = len(slice.dims) - lastpos
+                sig, nkwargs, outparam = self._findSignature(slice=slice, packdepth=packdepth, **kwargs)
+                if(len(source._slices) > 1):
+                    outparam = outparam.withNumber(pos)
+                slice = slices.UnaryFuncAggregateOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
             nslices.append(slice)
         return self._initialize(tuple(nslices),source._state)
 
@@ -324,58 +330,120 @@ class Abs(UnaryFuncElemOp):
 class Negative(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 
-class UnaryArraySubtypeToIntegerSignature(FuncSignature):
-    def __init__(self, name, subtypecls):
-        self.subtypecls = subtypecls
-        FuncSignature.__init__(self, name)
+class UnaryFixShapeSignature(FuncSignature):
+    def __init__(self,name,check_dependent=True):
+        self.check_dependent = check_dependent
+        FuncSignature.__init__(self,name)
 
-    def check(self, slice):#{{{
+    def check(self,slice,packdepth):
+        if(self.check_dependent):
+            for pos,i in enumerate(range(len(slice.dims) - packdepth + 1, len(slice.dims))):
+                d = slice.dims[i]
+                if len(d.dependent) > pos and d.dependent[pos] == True:
+                    return False
+        return True
+
+class UnaryTypeToTypeSignature(UnaryFixShapeSignature):
+    def __init__(self, name, itypecls, otypecls=None, check_dependent=True):
+        self.itypecls = itypecls
+        self.otypecls = otypecls
+        UnaryFixShapeSignature.__init__(self, name, check_dependent)
+
+    def check(self, slice, packdepth):#{{{
+        if not UnaryFixShapeSignature.check(self,slice,packdepth):
+            return False
+
         in_type = slice.type
-        if(not isinstance(in_type, rtypes.TypeArray) or len(in_type.dims) != 1):
+        if(not isinstance(in_type, self.itypecls)):
             return False
 
-        if(not isinstance(in_type.subtypes[0], self.subtypecls)):
-            return False
-        
-        if(platform.architecture()[0] == "32bit"):
-            nstype = rtypes.TypeInt32(in_type.subtypes[0].has_missing)
+        if(self.otypecls is None):
+            nstype = in_type
         else:
-            nstype = rtypes.TypeInt64(in_type.subtypes[0].has_missing)
-        ntype = rtypes.TypeArray(in_type.has_missing, in_type.dims, (nstype,))
-        return Param(slice.name, ntype)#}}}
+            nstype = self.otypecls(in_type.has_missing)
+        return Param(slice.name, nstype)#}}}
 
-unary_arrayanysig = UnaryArraySubtypeToIntegerSignature("arrayany", rtypes.TypeAny)
-unary_arrayscalarsig = UnaryArraySubtypeToIntegerSignature("arrayscalar", (rtypes.TypeScalar,rtypes.TypeString, rtypes.TypeTuple))
+any_nodepsig = UnaryTypeToTypeSignature("any_nodep", rtypes.TypeAny, rtypes.TypePlatformInt, check_dependent=False)
+sortablesig = UnaryTypeToTypeSignature("sortable", (rtypes.TypeScalar, rtypes.TypeString, rtypes.TypeTuple), rtypes.TypePlatformInt)
+
+boolsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeBool, rtypes.TypeBool)
+numbersig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber)
+int_tointsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeInteger,rtypes.TypePlatformInt)
+float_tofloatsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeInteger,rtypes.TypeReal64)
+number_tofloatsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber,rtypes.TypeReal64)
+number_tointsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber,rtypes.TypePlatformInt)
 
 @repops.delayable()
 class ArgSort(UnaryFuncSeqOp):
-    _sigs = [unary_arrayscalarsig]
+    _sigs = [sortablesig]
 
 @repops.delayable()
 class Pos(UnaryFuncSeqOp):
-    _sigs = [unary_arrayanysig]
-
-
-class UnaryArrayBoolToBoolSignature(FuncSignature):
-    def check(self, slice):#{{{
-        in_type = slice.type
-        if(not isinstance(in_type, rtypes.TypeArray) or len(in_type.dims) != 1):
-            return False
-
-        if(not isinstance(in_type.subtypes[0], rtypes.TypeBool)):
-            return False
-        
-        ntype = rtypes.TypeBool(in_type.subtypes[0].has_missing)
-        return Param(slice.name, ntype)#}}}
-
-unary_arrayboolsig = UnaryArrayBoolToBoolSignature("arraybool")
+    _sigs = [any_nodepsig]
 
 
 @repops.delayable()
 class Any(UnaryFuncAggregateOp):
-    _sigs = [unary_arrayboolsig]
+    _sigs = [boolsig]
 
 @repops.delayable()
 class All(UnaryFuncAggregateOp):
-    _sigs = [unary_arrayboolsig]
+    _sigs = [boolsig]
+
+@repops.delayable()
+class Max(UnaryFuncAggregateOp):
+    _sigs = [numbersig]
+
+@repops.delayable()
+class Min(UnaryFuncAggregateOp):
+    _sigs = [numbersig]
+
+@repops.delayable()
+class Sum(UnaryFuncAggregateOp):
+    _sigs = [int_tointsig, float_tofloatsig]
+
+@repops.delayable()
+class Mean(UnaryFuncAggregateOp):
+    _sigs = [number_tofloatsig]
+
+@repops.delayable()
+class ArgMax(UnaryFuncAggregateOp):
+    _sigs = [number_tointsig]
+
+@repops.delayable()
+class ArgMin(UnaryFuncAggregateOp):
+    _sigs = [number_tointsig]
+
+@repops.delayable()
+class Median(UnaryFuncAggregateOp):
+    _sigs = [number_tofloatsig]
+
+
+class CountSignature(FuncSignature):
+    def check(self, slice, packdepth):#{{{
+        if(packdepth > 1):
+            return False
+        
+        nstype = rtypes.TypePlatformInt(len(slice.dims) > 1 and slice.dims[-2].has_missing)
+        return Param(slice.name, nstype)#}}}
+countsig = CountSignature("count")
+
+@repops.delayable()
+class Count(UnaryFuncAggregateOp):
+    _sigs = [countsig]
+
+class SetSignature(UnaryFixShapeSignature):
+    def check(self, slice, packdepth):#{{{
+        if not UnaryFixShapeSignature.check(self,slice,packdepth):
+            return False
+        
+        has_missing = len(slice.dims) > 1 and slice.dims[-2].has_missing
+        subtypes = (slice.type,)
+        dim = dimensions.Dim(UNDEFINED,(True,) * len(slice.dims), slice.type.has_missing, name="s" + slice.dims[-packdepth].name)
+        nstype = rtypes.TypeSet(has_missing,dimpaths.DimPath(dim),subtypes)
+        return Param(slice.name, nstype)#}}}
+setsig = SetSignature("set")
+
+class Set(UnaryFuncAggregateOp):
+    _sigs = [setsig]
 

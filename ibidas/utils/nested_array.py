@@ -23,7 +23,9 @@ class NestedArray(object):
             nextpos,nextobj = self._get_next_obj(pos)
             return nextobj.shape[self.idxs[pos]]
         else:
-            return self.idxs[pos]
+            d = self.idxs[pos]
+            d = d[...,1] - d[...,0]
+            return d
 
     def _curIdxDepth(self):
         if(isinstance(self.idxs[-1],int)):
@@ -51,7 +53,8 @@ class NestedArray(object):
         data = nself.data
         depth = len(dimpath)
         odimpath = dimpath
-       
+        dtype=subtype.toNumpy()
+
         while(depth>0):        
             idxdepth = nself._curIdxDepth()
             rem_dims = len(data.shape) - idxdepth
@@ -97,7 +100,10 @@ class NestedArray(object):
                     idxres[pos,1] = curpos
                
                 #check that elem shape is not smaller or larger than expected 
-                assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
+                if(not isinstance(elem,numpy.ndarray)):
+                    elem = cutils.darray(list(elem),dtype,cdepth,cdepth)
+                else:
+                    assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
                 res.append(elem)
             
             dimpath = dimpath[cdepth:]
@@ -217,24 +223,51 @@ class NestedArray(object):
         return nlidx
 
 
-    def splitDim(self,matchpoint,lshape,rshape):
+    def splitDim(self,matchpoint,lshape,rshape=None):
+        
+        #info on current dim
+        cshape = self.getDimShape(matchpoint)
         matchpoint += 1
-        assert len(self.idxs) > matchpoint, "Nested array not nested that deep"
-        nself = self.copy()
         cidx = self.idxs[matchpoint]
+        
+        nself = self.copy()
         nextpos,nextobj = nself._get_next_obj(matchpoint)
-        if(isinstance(cidx,int)):
-            if(isinstance(lshape,int) and isinstance(rshape,int)):
-                xshape = list(nextobj.shape)
-                assert lshape * rshape == xshape[cidx], "Splitted dimensions do not match size original dimension"
-                xshape[cidx] = rshape
-                xshape.insert(cidx,lshape)
-                nextobj = numpy.reshape(nextobj,xshape)
-                nself.idxs.insert(matchpoint,cidx)
-                for i in range(matchpoint+1,nextpos+1):
-                    nself.idxs[i] += 1
-                nself._set_obj(nextpos+1,nextobj)
+
+        if(rshape is None):
+            if(isinstance(lshape,int)):
+                if isinstance(cshape,int):
+                    assert cshape % lshape == 0, "Cannot find matching right shape"
+                    rshape = cshape / lshape
+                else:
+                    assert (cshape % lshape == 0).all(), "Cannot find matching right shape"
+                    rshape = cshape / lshape
             else:
+                raise RuntimeError, "Cannot determine right shape"
+
+        if(isinstance(cidx,int)):
+            if(isinstance(lshape,int)):
+                if(isinstance(rshape,int)):
+                    xshape = list(nextobj.shape)
+                    assert lshape * rshape == xshape[cidx], "Splitted dimensions do not match size original dimension"
+                    xshape[cidx] = rshape
+                    xshape.insert(cidx,lshape)
+                    nextobj = numpy.reshape(nextobj,xshape)
+                    nself.idxs.insert(matchpoint,cidx)
+                    for i in range(matchpoint+1,nextpos+1):
+                        nself.idxs[i] += 1
+                    nself._set_obj(nextpos+1,nextobj)
+                else:
+                    rshape = numpy.reshape(rshape,nextobj.shape[:cidx] + (lshape,))
+                    assert (numpy.sum(rshape,axis=-1) == nextobj.shape[cidx]).all(), "Variable dimension lengths of rshape unequal to current shape"
+                    rshape = self._diffToIdx(rshape)
+                    nself.idxs[matchpoint] = rshape 
+                    nself.idxs.insert(matchpoint,len(rshape.shape) - 2)
+                    nextobj = dimpaths.flatFirstDims(nextobj,cidx)
+                    for pos,i in enumerate(range(matchpoint+2,nextpos+1)):
+                        nself.idxs[i] += pos
+                    nself._set_obj(nextpos+1,nextobj)
+            else:           
+                #FIXME
                 raise RuntimeError,"Splitting fixed to variable dimension not yet supported"
         else:
             if(isinstance(lshape,int)):
@@ -247,7 +280,7 @@ class NestedArray(object):
                         spos = 0
                     nself.idxs[matchpoint] = spos+1
                     nself.idxs.insert(matchpoint,spos)
-                    for i in range(matchpoint + 2, nextpos + 1):
+                    for i in range(matchpoint + 2, nextpos+1):
                         nself.idxs[i] += spos + 1
                     nself._set_obj(nextpos+1,nextobj)
                 else:
@@ -313,6 +346,25 @@ class NestedArray(object):
                 nlidx[...,-1] = ridx[lidx[...,-1],-1]
                 nself.idxs[matchpoint] = nlidx
         del nself.idxs[matchpoint+1]
+        return nself
+
+    def mergeLastDims(self,depth):
+        curdepth = len(self.idxs) - 1
+        assert depth < curdepth, "Attempted merge to deep"
+        
+        nself = self
+        nshapes = []
+        for d in range(curdepth - depth, curdepth)[::-1]:
+            s1 = nself.getDimShape(d-1)
+            s2 = nself.getDimShape(d)
+            nshapes.append((s1,s2))
+            nself = nself.mergeDim(d-1)
+        return nself, nshapes[::-1]
+
+    def splitLastDim(self, shapes):
+        nself = self
+        for shapeleft, shaperight in shapes:
+            nself = nself.splitDim(len(nself.idxs) - 2, shapeleft,shaperight)
         return nself
 
     def swapDim(self, matchpoint):
@@ -508,7 +560,7 @@ class NestedArray(object):
                     #perform some checks
                     ntr = len(tilerepeats)
                     assert nextobj.shape[ntr] == 1, "Varbroadcast on full dimension not possible"
-                    assert repeat.shape[:-1] == nextobj.shape[:ntr],"Index shapes should match"
+                    assert repeat.shape == nextobj.shape[:ntr],"Index shapes should match"
 
                     #collapse first dims
                     nextobj = dimpaths.flatFirstDims(nextobj,ntr)
@@ -517,8 +569,7 @@ class NestedArray(object):
                     nself.idxs[pos] = repeat
                   
                     #calculate var array lengths
-                    temp_repeat = dimpaths.flatFirstDims(repeat,len(repeat.shape)-2)
-                    varlength = temp_repeat[:,1] - temp_repeat[:,0]
+                    varlength = dimpaths.flatFirstDims(repeat,len(repeat.shape)-1)
 
                     #repeat nextobj
                     nextobj = numpy.repeat(nextobj,varlength,axis=0)
@@ -682,3 +733,33 @@ def co_map(func, nested_arrays, *args, **kwargs):
         nseq = cutils.darray(res,dtype)
         return nseq
     return self.co_mapseq(wrapfunc, *nested_arrays, **kwargs)
+
+def drop_prev_shapes_dim(ndata,shapes):
+    cidx = ndata.idxs[-1]
+    if(not isinstance(cidx,int)):
+        cidx = 0
+    sel = 0
+
+    nshapes = []
+    for lshape,rshape in shapes:
+        if(isinstance(lshape,int)):
+            if(not isinstance(rshape,int)):
+                s = [slice(None,None)] * (cidx + 1)
+                s[-1] = sel
+                rshape = rshape[s]
+                cidx = 0
+                sel = slice(0,numpy.sum(rshape))
+        else:
+            s = [slice(None,None)] * (cidx + 1)
+            s[-1] = sel
+            lshape = lshape[s]
+            cidx = 0
+            sel = slice(0,numpy.sum(lshape))
+            if(not isinstance(rshape,int)):
+                s = [slice(None,None)] * (cidx + 1)
+                s[-1] = sel
+                rshape = rshape[s]
+                cidx = 0
+                sel = slice(0,numpy.sum(rshape))
+        nshapes.append((lshape,rshape))
+    return nshapes

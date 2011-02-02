@@ -42,6 +42,7 @@ Root type is TypeUnknown, with as child TypeAny. Remaining types are divided in
 """
 
 
+import platform
 import copy
 import numpy
 import operator
@@ -1605,4 +1606,8 @@ TypeStrings = set(TypeString.getDescendantTypes())
 TypeArrays = set(TypeArray.getDescendantTypes())
 
 
-
+if(platform.architecture()[0] == "32bit"):
+    TypePlatformInt = TypeInt32
+else:
+    TypePlatformInt = TypeInt64
+    

@@ -15,7 +15,7 @@ from ..utils.multi_visitor import VisitorFactory, DirectVisitorFactory, NF_ELSE
 
 _delay_import_(globals(),"..representor")
 _delay_import_(globals(),"..utils","util","nestutils","cutils","nested_array")
-_delay_import_(globals(),"..itypes","detector","type_attribute_freeze","convertors")
+_delay_import_(globals(),"..itypes","detector","type_attribute_freeze","convertors","dimensions")
 _delay_import_(globals(),"..repops_slice")
 _delay_import_(globals(),"..repops_dim")
 _delay_import_(globals(),"..utils.missing","Missing")
@@ -263,9 +263,6 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def visitShapeSlice(self, node, slice):
         d = slice.data.getDimShape(node.pos)
-        if(not isinstance(d,int)):
-            d = d[...,1] - d[...,0]
-            
         ndata = nested_array.NestedArray(d,node.type)
         return slice.modify(ndata,rtype=node.type,dims=node.dims,name=node.name)
 
@@ -304,10 +301,63 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             func = getattr(self, node.sig.name + node.funcname)
         except AttributeError:
             func = getattr(self, node.sig.name + "General")
+        
 
         ndata = slice.data.mapseq(func,type_in=slice.type,type_out=node.type,
                                   res_type=node.type,op=node.funcname )
         return slice.modify(data=ndata,rtype=node.type)
+
+    def visitUnaryFuncSeqOpSlice(self,node, slice):
+        try:
+            func = getattr(self, node.sig.name + node.funcname)
+        except AttributeError:
+            func = getattr(self, node.sig.name + "General")
+       
+        ndata = slice.data
+        if(node.packdepth > 2):
+            ndata,nshapes = ndata.mergeLastDims(node.packdepth-2)
+            dim = dimensions.Dim(UNDEFINED,(True,))
+            ldims = dimpaths.DimPath(slice.dims[-node.packdepth],dim)
+        else:
+            ldims = slice.dims[-node.packdepth:]
+        
+        ndata = ndata.pack(slice.type, min(node.packdepth,2))
+        ndata = ndata.mapseq(func,type_in=slice.type,type_out=node.type,
+                                  res_type=node.type,op=node.funcname, packdepth=node.packdepth)
+        ndata = ndata.unpack(ldims, subtype=node.type)
+        if(node.packdepth > 2):
+            ndata = ndata.splitLastDim(nshapes)
+
+        return slice.modify(data=ndata,rtype=node.type)
+
+       
+    def visitUnaryFuncAggregateOpSlice(self,node, slice):
+        try:
+            func = getattr(self, node.sig.name + node.funcname)
+        except AttributeError:
+            func = getattr(self, node.sig.name + "General")
+        
+        ndata = slice.data
+        if(node.packdepth > 1):
+            if(node.packdepth > 2):
+                ndata,nshapes = ndata.mergeLastDims(node.packdepth-2)
+            ndata = ndata.pack(slice.type, 2)
+        else:
+            ndata = ndata.pack(slice.type)
+
+        ndata = ndata.mapseq(func,type_in=slice.type,type_out=node.type,
+                                  res_type=node.type,op=node.funcname,packdepth=node.packdepth )
+        
+        if(node.packdepth > 1):
+            dim = dimensions.Dim(UNDEFINED,(True,))
+            ndata = ndata.unpack(dimpaths.DimPath(dim), subtype=node.type)
+            if(node.packdepth > 2):
+                nshapes = nested_array.drop_prev_shapes_dim(ndata,nshapes)
+                ndata = ndata.splitLastDim(nshapes)
+            
+        return slice.modify(data=ndata,rtype=node.type)
+
+
 
     def visitBinFuncElemOpSlice(self,node, slices):
         try:
@@ -362,36 +412,71 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def numberGeneral(self, data, type_in, type_out, op):
         return numpy_unary_arith[op](data, sig=type_out.toNumpy())
 
-    def arrayscalarArgSort(self, data, type_in, type_out, op):
+    def sortableArgSort(self, data, type_in, type_out, op, packdepth):
+        data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(len(data.shape) < 2):
-            return cutils.darray([numpy.argsort(row,axis=0) for row in data])
+            return cutils.darray([numpy.argsort(row,axis=0) for row in data],object)
         else:
             return numpy.argsort(data,axis=1)
+   
+    def any_nodepPos(self, data, type_in, type_out, op, packdepth):
+        dtype = type_out.toNumpy()
+        if(len(data.shape) == 1):
+            if(packdepth == 1):
+                xres = [numpy.arange(len(row),dtype=dtype) for row in data]
+            else:
+                xres = []
+                for row in data:
+                    res = numpy.arange(len(row),dtype=dtype)
+                    if(len(row.shape) > 1):
+                        res = numpy.repeat(res,row.shape[1]).reshape(row.shape)
+                    else:
+                        subres = []
+                        for r,d in zip(res.ravel(),row.ravel()):
+                            subres.append(cutils.darray([r] * len(d),dtype))
+                        res = cutils.darray(subres,object)
+                    xres.append(res)
+            xres = cutils.darray(xres)
+        elif(len(data.shape) == 2):
+            xres = numpy.tile(numpy.arange(data.shape[1],dtype=dtype),data.shape[0]).reshape(data.shape[:2])
+            if(packdepth > 1):
+                res = []
+                for r,d in zip(xres.ravel(),data.ravel()):
+                    res.append(cutils.darray([r] * len(d),dtype))
+                xres = cutils.darray(res,object,1,1).reshape(data.shape)
+        else:
+            assert len(data.shape) == 3, "Unexpected data shape"
+            r =  numpy.tile(numpy.arange(data.shape[1],dtype=dtype),data.shape[0]).reshape(data.shape[:2])
+            xres = numpy.repeat(r,data.shape[2]).reshape(data.shape)
+           
+        return xres
+
+    def countCount(self, data, type_in, type_out, op, packdepth):
+        dtype = type_out.toNumpy()
+        if(len(data.shape) == 1):
+            return cutils.darray([len(row) for row in data],dtype)
+        else:
+            return cutils.darray([data.shape[1]] * len(data.shape[0]),dtype)
     
-    def arrayanyPos(self, data, type_in, type_out, op):
+    def setSet(self, data, type_in, type_out, op, packdepth):
+        data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
+        dtype = type_out.toNumpy()
+        if(packdepth > 1):
+           return cutils.darray([[set(subrow) for subrow in row.transpose()] for row in data],dtype,2,2)
+        else:
+           return cutils.darray([set(row) for row in data],dtype)
+  
+    def fixdimGeneral(self, data, type_in, type_out, op, packdepth):
+        data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
+        func = numpy_dimfuncs[op]
         dtype = type_out.toNumpy()
         if(len(data.shape) < 2):
-            return cutils.darray([numpy.arange(len(row),dtype=dtype) for row in data])
+            if(packdepth > 1):
+                dtype = object
+            return cutils.darray([func(row,axis=0) for row in data],dtype)
         else:
-            return numpy.tile(numpy.arange(data.shape[1],dtype=dtype),data.shape[0]).reshape(data.shape[:2])
-
-
-    def arrayboolAny(self, data, type_in, type_out, op):
-        dtype = type_out.toNumpy()
-        util.debug_here()
-        if(len(data.shape) < 2):
-            return cutils.darray([numpy.any(row,axis=0) for row in data],dtype)
-        else:
-            return numpy.any(data,axis=1)
-    
-    def arrayboolAll(self, data, type_in, type_out, op):
-        dtype = type_out.toNumpy()
-        if(len(data.shape) < 2):
-            return cutils.darray([numpy.all(row,axis=0) for row in data],dtype)
-        else:
-            return numpy.all(data,axis=1)
-
-
+            return func(data,axis=1)
+      
 numpy_cmp = {'Equal':numpy.equal,#{{{
             'NotEqual':numpy.not_equal,
             'LessEqual':numpy.less_equal,
@@ -410,6 +495,17 @@ numpy_arith = { 'Add':numpy.add,
                 'Xor':numpy.bitwise_xor,
                 'Power':numpy.power
                 }
+numpy_dimfuncs = {
+    'Max':numpy.max,
+    'Min':numpy.min,
+    'Mean':numpy.mean,
+    'Any':numpy.any,
+    'All':numpy.all,
+    'Sum':numpy.sum,
+    'Median':numpy.median,
+    'ArgMin':numpy.argmin,
+    'ArgMax':numpy.argmax
+    }
 
 python_op = {'Equal':'__eq__',
              'NotEqual':'__ne__',
@@ -478,3 +574,22 @@ def speedfilter(seqs,dtype):
     for pos in xrange(len(data)):
         res.append(data[pos][constraint[pos]])
     return cutils.darray(res,dtype)
+
+def ensure_fixeddims(seqs,packdepth,dtype):
+    if(packdepth > 1):
+        if(len(seqs.shape) == 1):
+            res = []
+            for seq in seqs:
+                if(len(seq.shape) >= 2):
+                    res.append(seq)
+                else:
+                    res.append(cutils.darray(seq,dtype,100000,2))
+            res = cutils.darray(res,object)
+        elif(len(seqs.shape) == 2):
+            res = cutils.darray(seqs.tolist(),dtype,1000,3)
+        else:
+            res = seqs
+    else:
+        res = seqs
+    return res
+            

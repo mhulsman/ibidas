@@ -200,6 +200,7 @@ class Representor(Node):
         """Performs filtering on this dataset using ``condition``.
            
            :param condition: condition to filter on
+
                 * Non-representor values are converted using ``ibidas.rep`` function
 
                 * Representor should have single slice.
@@ -207,6 +208,7 @@ class Representor(Node):
                 * Can be of type bool, integer, array or slice. 
 
                 Various data types can be used:
+
                 * Bool: last dim should be equal to dim in this representor. Is applied to that dim by default.
 
                 * Integer: collapses dim it is applied on. 
@@ -216,6 +218,7 @@ class Representor(Node):
                 * Slice: selects slice from array.
 
            :param dim: Dim to apply the filtering on. 
+
                 * If no dim given, applied to last common dimension of slices (except for bool types).
         """
         if(isinstance(condition, context.Context)):
@@ -412,6 +415,7 @@ class Representor(Node):
         """Cast data to new type. 
 
         Allowed formats:
+
         * single type for all slices
 
           >>> x.cast("int32")
@@ -545,23 +549,38 @@ class Representor(Node):
     def map(self, func, otype=rtypes.unknown, dim=None, *params, **kwds):
         return repops_multi.rmap(self, func, otype, dim, *params, **kwds)
 
-    def sum(self):
-        return repops_multi.rsum(self)
-    def max(self):
-        return repops_multi.rmax(self)
-    def min(self):
-        return repops_multi.rmin(self)
-    def mean(self):
-        return repops_multi.mean(self)
-    def any(self):
-        return repops_multi.rany(self)
-    def all(self):
-        return repops_multi.rall(self)
-    def count(self):
-        return repops_multi.count(self)
+    def sum(self, dim=None):
+        return repops_funcs.Sum(self, dim)
 
-    def set(self):
-        return repops_multi.rset(self)
+    def max(self, dim=None):
+        return repops_funcs.Max(self, dim)
+
+    def min(self, dim=None):
+        return repops_funcs.Min(self, dim)
+    
+    def argmax(self, dim=None):
+        return repops_funcs.ArgMax(self, dim)
+
+    def argmin(self, dim=None):
+        return repops_funcs.ArgMin(self, dim)
+
+    def mean(self, dim=None):
+        return repops_funcs.Mean(self, dim)
+    
+    def median(self, dim=None):
+        return repops_funcs.Median(self, dim)
+      
+    def any(self,dim=None):
+        return repops_funcs.Any(self,dim)
+
+    def all(self,dim=None):
+        return repops_funcs.All(self,dim)
+
+    def count(self):
+        return repops_funcs.Count(self)
+
+    def set(self, dim=None):
+        return repops_funcs.Set(self,dim)
 
     def array(self):
         """Packages dimension into array type"""
@@ -589,6 +608,7 @@ class Representor(Node):
         """Performs sort on data.
         
         Example:
+
         *  Sort slices in x on all slices. If multiple slices, combines into tuple, then sort it.
 
            >>> x.sort()
