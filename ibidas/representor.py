@@ -201,13 +201,18 @@ class Representor(Node):
            
            :param condition: condition to filter on
                 * Non-representor values are converted using ``ibidas.rep`` function
+
                 * Representor should have single slice.
+
                 * Can be of type bool, integer, array or slice. 
 
                 Various data types can be used:
                 * Bool: last dim should be equal to dim in this representor. Is applied to that dim by default.
+
                 * Integer: collapses dim it is applied on. 
+
                 * Array (of integers): selects positions indicated by integers in array.
+
                 * Slice: selects slice from array.
 
            :param dim: Dim to apply the filtering on. 
