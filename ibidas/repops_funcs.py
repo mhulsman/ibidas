@@ -156,6 +156,8 @@ class UnaryFuncAggregateOp(UnaryFuncOp):
         nslices = []
         for pos, slice in enumerate(source._slices):
             lastposs = slice.dims.matchDimPath(selpath)
+            if(lastposs):
+                slice = self.prepareSlice(slice)
             for lastpos in lastposs:
                 packdepth = len(slice.dims) - lastpos
                 sig, nkwargs, outparam = self._findSignature(slice=slice, packdepth=packdepth, **kwargs)
@@ -165,6 +167,8 @@ class UnaryFuncAggregateOp(UnaryFuncOp):
             nslices.append(slice)
         return self._initialize(tuple(nslices),source._state)
 
+    def prepareSlice(self,slice):
+        return slice
 
 class BinaryFuncOp(repops.MultiOpRep, Func):
     def __init__(self, lsource, rsource, **kwargs):
@@ -447,3 +451,6 @@ setsig = SetSignature("set")
 class Set(UnaryFuncAggregateOp):
     _sigs = [setsig]
 
+    def prepareSlice(self,slice):
+        return slices.ensure_frozen(slice)
+            

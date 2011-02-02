@@ -266,6 +266,9 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         ndata = nested_array.NestedArray(d,node.type)
         return slice.modify(ndata,rtype=node.type,dims=node.dims,name=node.name)
 
+    def visitFreezeSlice(self, node, slice):
+        type_attribute_freeze.freeze_protocol.execFreeze
+
     def visitBroadcastSlice(self,node,slice,compare_slices):
         repeat_dict = {}
         bcpos = 0

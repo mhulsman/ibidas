@@ -484,6 +484,7 @@ TypeScanner.parentcls = AnyScanner
 
 class TupleScanner(TypeScanner):
     good_cls = set([tuple, None.__class__, MissingType])
+    convertor=convertors.TupleConvertor
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -494,7 +495,8 @@ class TupleScanner(TypeScanner):
         fieldnames = ['f' + str(i) for i in xrange(self.max_len)]
         subtypes = tuple([self.getSubDetector(i).getType() for i in xrange(self.max_len)])
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, need_conversion=True, convertor=cv)
+        need_conversion = self.min_len < self.max_len
+        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, need_conversion=need_conversion, convertor=cv)
 
     
     def scan(self, seq):

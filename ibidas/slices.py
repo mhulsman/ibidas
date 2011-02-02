@@ -502,16 +502,7 @@ class FreezeSlice(UnaryOpSlice):#{{{
 
     def __init__(self, pslice):
         assert freeze_protocol.need_freeze(pslice.type), "Slice does not need to frozen"
-        ntype = freeze_protocol.freeze(slice.type)
-        UnaryOpSlice.__init__(self, pslice, rtype=ntype)#}}}
-
-class UnFreezeSlice(UnaryOpSlice):#{{{
-    __slots__ = []
-
-    def __init__(self, pslice):
-        assert freeze_protocol.need_unfreeze(slice.type), "Slice does not need to be unfrozen"
-        ntype = freeze_protocol.unfreeze(slice.type)
-        UnaryOpSlice.__init__(self, pslice, rtype=ntype)#}}}
+        UnaryOpSlice.__init__(self, pslice, rtype=slice.type)#}}}
 
 def ensure_frozen(slice):#{{{
     if(freeze_protocol.need_freeze(slice.type)):

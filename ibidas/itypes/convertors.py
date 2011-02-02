@@ -1,4 +1,5 @@
 import numpy
+import operator
 import collections
 from ..constants import *
 
@@ -165,7 +166,8 @@ class SetConvertor(BaseConvertor):
 
 class DictConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
-        for fieldname, subtype in zip(rtype.fieldnames, rtype.subtypes):
+        columns = []
+        for fieldname, subtype in zip(elem_type.fieldnames, elem_type.subtypes):
             def getname(elem):
                 try:
                     return elem[fieldname]
@@ -173,18 +175,33 @@ class DictConvertor(BaseConvertor):
                     return Missing
             
             subseq = cutils.darray([getname(elem) for elem in seq],subtype.toNumpy())
-            columns.append(self.execFreeze(subtype, subseq))
+            columns.append(subseq)
         return cutils.darray(zip(*columns))
 
 class NamedTupleConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
-        for fieldname, subtype in zip(rtype.fieldnames, rtype.subtypes):
+        columns = []
+        for fieldname, subtype in zip(elem_type.fieldnames, elem_type.subtypes):
             def getname(elem):
                 try:
                     return getattr(elem,fieldname)
                 except (KeyError, TypeError):
                     return Missing
             subseq = cutils.darray([getname(elem) for elem in seq],subtype.toNumpy())
-            columns.append(self.execFreeze(subtype, subseq))
+            columns.append(subseq)
+        return cutils.darray(zip(*columns))
+
+class TupleConvertor(BaseConvertor):
+    def convert(self,seq,elem_type):
+        columns = []
+        for pos, subtype in enumerate(elem_type.subtypes):
+            itemfunc =  operator.itemgetter(pos)
+            def getitem(elem):
+                try:
+                    return itemfunc(elem)
+                except IndexError:
+                    return Missing
+            subseq = cutils.darray([getitem(elem) for elem in seq],subtype.toNumpy())
+            columns.append(subseq)
         return cutils.darray(zip(*columns))
 

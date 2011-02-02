@@ -36,40 +36,6 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
         return any([self.needFreeze(subtype)for subtype in rtype.subtypes])
 
     
-    #freeze a type and its subtypes (adapt its representation, not the data!)
-    def freezeTypeUnknown(self, rtype):
-        return rtype
-    
-    def freezeTypeAny(self, rtype):
-        if self.needFreeze(rtype):
-            return rtype.copy(data_state=DATA_FROZEN)
-        else:
-            return rtype
-
-    def freezeTypeTuple(self, rtype):
-        if(self.needFreeze(rtype)):
-            res = rtype.copy()
-            res.subtypes = [self.freezeType(subtype) for subtype in rtype.subtypes]
-        else:
-            res = rtype
-        return res
-    
-    def freezeTypeDict(self, rtype):
-        if(self.needFreeze(rtype)):
-            res = rtype.copy(data_state=DATA_FROZEN)
-            res.subtypes = [self.freezeType(subtype) for subtype in rtype.subtypes]
-        else:
-            res = rtype
-        return res
-
-    def freezeTypeArray(self,rtype):
-        if(self.needFreeze(rtype)):
-            res = rtype.copy(data_state=DATA_FROZEN)
-            res.subtypes = [self.freezeType(subtype) for subtype in rtype.subtypes]
-        else:
-            res = rtype
-        return res
-    
     #freeze standard python objects
     def ftypeobject(self, obj):
         if(hasattr(obj, "__freeze__")):
@@ -105,7 +71,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     def ftypeslice(self, obj):
         return slicetuple(obj)
 
-    def map(self, func, seq, parent_type):
+    def map(self, func, parent_type, seq):
         if(parent_type.has_missing):
             seqres = []
             for elem in seq:
@@ -118,26 +84,27 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
         return seqres 
     
 
-    def execFreezeTypeUnknown(self, rtype, seq):
-        seq = seq.map(self.ftype,has_missing=rtype.has_missing)
+    def execFreezeTypeUnknown(self, ptype, seq):
+        seq = self.map(self.ftype, ptype, seq)
         return seq
    
-    def execFreezeTypeScalar(self,rtype,seq):
+    def execFreezeTypeScalar(self, ptype, seq):
         return seq
 
 
-    def execFreezeTypeSlice(self,rtype,seq):
-        seq = seq.map(self.ftypeslice,has_missing=rtype.has_missing)
-        return seq
+    def execFreezeTypeSlice(self, ptype, seq):
+        return self.map(self.ftypeslice, ptype, seq)
         
 
-    def execFreezeTypeTuple(self,rtype,seq):
+    def execFreezeTypeTuple(self, ptype, seq):
         if(not rtype.subtypes):
-            return self.execFreezeTypeUnknown(rtype,seq)
+            return self.execFreezeTypeUnknown(ptype, seq)
+        else:
+            return self.map(self.ftypetuple, ptype, seq)
         
         columns = []
         if(len(rtype.subtypes) > rtype.min_len):
-            l = seq.map(len, otype=int, out_empty = 0, has_missing=self.detector.hasMissing())
+            l = self.map(len, otype=int, out_empty = 0, has_missing=self.detector.hasMissing())
 
         for pos, subtype in enumerate(rtype.subtypes):
             f = operator.itemgetter(pos)
@@ -198,99 +165,26 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     #        seq = sparse_arrays.FullSparse(nseq)
     #    return seq
 
-    def execFreezeTypeArray(self,rtype,seq):
-        subtype = rtype.subtypes[0]
-        if(subtype.needFreeze(rtype)):
+    def execFreezeTypeArray(self, ptype, seq):
+        subtype = ptype.subtypes[0]
+        if(subtype.needFreeze(subtype)):
             def subfreeze(elem):
-                elem = self.execFreeze(subtype,elem)
+                elem = self.execFreeze(subtype, elem)
                 elem = elem.view(util.farray)
                 return elem
         else:
             def subfreeze(elem):
-                ele = elem.view(util.farray)
+                elem = elem.view(util.farray)
                 return elem
-        seq = seq.map(subfreeze,out_empty=Missing,otype=object,has_missing=rtype.has_missing)
+        seq = self.map(subfreeze, ptype, seq)
         return seq
      
-    def execFreezeTypeString(self,rtype,seq):
+    def execFreezeTypeString(self,ptype,seq):
         return seq
     
-    def execFreezeTypeSet(self, rtype, seq):
+    def execFreezeTypeSet(self, ptype, seq):
+        seq = self.map(frozenset, ptype, seq)
         return seq
     
-    
-    
-    #Determine if necessary to freeze a type (or its subtypes)    
-    def need_unfreeze(self, rtype):
-        return (rtype.data_state == DATA_FROZEN)
-    needUnfreezeTypeUnknown=need_unfreeze
-    needUnfreezeTypeDict=need_unfreeze
-    needUnfreezeTypeSlice=need_unfreeze
-
-    def noneed_unfreeze(self, rtype):
-        return False
-    needUnreezeTypeString=noneed_unfreeze
-    needUnfreezeTypeScalar=noneed_unfreeze
-    needUnfreezeTypeSet=noneed_unfreeze
-    needUnfreezeTypeTuple=noneed_unfreeze
-   
-    #freeze a type and its subtypes (adapt its representation, not the data!)
-    def unfreezeTypeUnknown(self, rtype):
-        if self.needUnfreeze(rtype):
-            return rtype.copy(data_state=DATA_NORMAL)
-        else:
-            return rtype
-    
-    #freeze standard python objects
-    def uftypeobject(self, obj):
-        if(hasattr(obj, "__unfreeze__")):
-            return obj.__unfreeze__()
-        else:
-            return obj
-
-    def _uftypenofreeze(self,obj):
-        return obj
-    uftypeint=_uftypenofreeze
-    uftypefloat=_uftypenofreeze
-    uftypestr=_uftypenofreeze
-    uftypeunicode=_uftypenofreeze
-    uftypetuple=_uftypenofreeze
-
-    def uftypefarray(self, obj):
-        return sparse_arrays.FullSparse(obj)
-
-    def uftypeslicetuple(self, obj):
-        return obj.getSlice()
-
-    def execUnfreezeTypeUnknown(self, rtype, seq):
-        seq = seq.map(self.uftype,has_missing=rtype.has_missing)
-        return seq
-   
-    def execUnfreezeTypeScalar(self,rtype,seq):
-        return seq
-
-
-    def execUnfreezeTypeSlice(self,rtype,seq):
-        seq = seq.map(self.uftypeslice,has_missing=rtype.has_missing)
-        return seq
-        
-    def execUnfreezeTypeTuple(self,rtype,seq):
-        return seq
-
-
-    def execUnfreezeTypeArray(self,rtype,seq):
-        def subunfreeze(elem):
-            seq = sparse_arrays.FullSparse(elem)
-            return seq
-        seq = seq.map(subunfreeze,out_empty=Missing,otype=object,has_missing=rtype.has_missing)
-        return seq
-     
-    def execUnfreezeTypeString(self,rtype,seq):
-        return seq
-    
-    def execUnfreezeTypeSet(self, rtype, seq):
-        return seq
-    
-   
 freeze_protocol = RTypeFreezeProtocol()
 
