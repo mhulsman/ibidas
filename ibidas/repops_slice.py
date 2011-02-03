@@ -28,47 +28,59 @@ class ProjectBookmark(repops.UnaryOpRep):
         self._initialize(tuple(nslices),RS_CHECK)
 
 class Project(repops.UnaryOpRep):
+    def __init__(self,source,*args, **kwds):
+        self._project_sources = []
+        repops.UnaryOpRep.__init__(self,source,*args, **kwds)
+
     def _getUsedSourceSlicesSet(self,nslices):
         return nslices
 
     def _process(self, source, *args, **kwds):
         if not source._state & RS_SLICES_KNOWN:
             return
+
         cur_slices = self._source._slices
         
         nslices = []
-        for name, elem in chain(zip([None] * len(args),args),kwds.iteritems()):
-            if(isinstance(elem, context.Context)):
-                elem = context._apply(elem, self._source)
-            elif(isinstance(elem,str)):
-                if(elem == "~"):
-                    used_slices = self._getUsedSourceSlicesSet(nslices)
-                    nelem = [slice for slice in cur_slices if slice not in used_slices]
-                elif(elem == "#"):
-                    common_dims = set([slice.dims for slice in cur_slices])
-                    if len(common_dims) != 1:
-                        raise RuntimeError, "Cannot use # selector as fields do not have a common dimension"
-                    nelem = cur_slices[:1]
-                elif(elem == "*"):
-                    nelem = cur_slices
+        if(not self._project_sources):
+            project_sources = []
+            for name, elem in chain(zip([None] * len(args),args),kwds.iteritems()):
+                if(isinstance(elem, context.Context)):
+                    elem = context._apply(elem, self._source)
+                elif(isinstance(elem,str)):
+                    if(elem == "~"):
+                        used_slices = self._getUsedSourceSlicesSet(nslices)
+                        nelem = [slice for slice in cur_slices if slice not in used_slices]
+                    elif(elem == "#"):
+                        common_dims = set([slice.dims for slice in cur_slices])
+                        if len(common_dims) != 1:
+                            raise RuntimeError, "Cannot use # selector as fields do not have a common dimension"
+                        nelem = cur_slices[:1]
+                    elif(elem == "*"):
+                        nelem = cur_slices
+                    else:
+                        nelem = [slice for slice in cur_slices if slice.name == elem]
+                        if(not nelem and len(cur_slices) == 1 and isinstance(cur_slices[0].type,rtypes.TypeTuple)):
+                            nelem = unpack_tuple(cur_slices[0],elem)
+                        assert len(nelem) ==1, "Could not find (unique) matching slice for name: " + elem
+                    elem = nelem
+                elif(isinstance(elem, representor.Representor)):
+                    pass
+                elif(isinstance(elem, tuple)):
+                    elem = RTuple(self._source.get(*elem))
+                elif(isinstance(elem, list)):
+                    if(len(elem) == 1):
+                        elem = self._source.get(*elem).array()
+                    else:
+                        elem = self._source.get(*elem).array()
                 else:
-                    nelem = [slice for slice in cur_slices if slice.name == elem]
-                    if(not nelem and len(cur_slices) == 1 and isinstance(cur_slices[0].type,rtypes.TypeTuple)):
-                        nelem = unpack_tuple(cur_slices[0],elem)
-                    assert len(nelem) ==1, "Could not find (unique) matching slice for name: " + elem
-                elem = nelem
-            elif(isinstance(elem, representor.Representor)):
-                pass
-            elif(isinstance(elem, tuple)):
-                elem = RTuple(self._source.get(*elem))
-            elif(isinstance(elem, list)):
-                if(len(elem) == 1):
-                    elem = self._source.get(*elem).array()
-                else:
-                    elem = self._source.get(*elem).array()
-            else:
-                elem = util.select(cur_slices, elem)
+                    elem = util.select(cur_slices, elem)
 
+                project_sources.append((name,elem))
+            self._project_sources = project_sources
+     
+        
+        for name,elem in self._project_sources:
             if(isinstance(elem, representor.Representor)):
                 if not elem._state & RS_SLICES_KNOWN:
                     return 
@@ -79,9 +91,13 @@ class Project(repops.UnaryOpRep):
                 nslices.append(slices.ChangeNameSlice(elem[0],name))
             else:
                 nslices.extend(elem)
-        
         assert nslices, "No slices found with: " + str(args) + " and " + str(kwds)
-        return self._initialize(tuple(nslices),self._source._state) 
+        
+        if(any([s.type == rtypes.unknown for s in nslices])):
+            state = RS_SLICES_KNOWN
+        else:
+            state = RS_ALL_KNOWN
+        return self._initialize(tuple(nslices),state) 
     
 
 class UnpackTuple(repops.UnaryOpRep):

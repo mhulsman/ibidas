@@ -65,13 +65,18 @@ class Representor(Node):
             dim_str = "<".join(dim_str)
             table.append([slice.name, str(slice.type), dim_str])
 
-        res = util.create_strtable(table) + "\n"
+        res = util.create_strtable(table)
         if(print_data):
-            res += "Data: " + str(self())
+            res += "\nData: " + str(self())
         return res
 
     def _getInfo(self):
-        print self.__str__(False)
+        class Info(object):
+            def __repr__(self):
+                return self.info
+        k = Info()
+        k.info = self.__str__(False)
+        return k
     I=property(fget=_getInfo)
 
     #def __repr__(self):

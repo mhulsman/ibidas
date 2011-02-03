@@ -502,7 +502,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         if(len(data.shape) == 1):
             return cutils.darray([len(row) for row in data],dtype)
         else:
-            return cutils.darray([data.shape[1]] * len(data.shape[0]),dtype)
+            return cutils.darray([data.shape[1]] * data.shape[0],dtype)
     
     def setSet(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
