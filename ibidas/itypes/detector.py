@@ -678,10 +678,6 @@ class OuterContainerScanner(ContainerScanner):
     def __init__(self, detector, dims):
         ContainerScanner.__init__(self,detector)
         self.dimreps = [FixedDimRep(self,pos,dim) for pos,dim in enumerate(dims)]
-        for dim in dims:
-            d = FixedDimRep(dim)
-            self.dimreps.append(d)
-            self.detector.dim_eq.registerDimRep(d)
 
     def scan(self,seq):
         d = self.getSubDetector()

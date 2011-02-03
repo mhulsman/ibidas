@@ -77,6 +77,12 @@ class Fixate(UnaryOpRep):#{{{
 
     #}}}
 
+class Gather(Fixate):#{{{
+    """Operation used by optimizer to fixate end of tree,
+    such that there are no exception situations, and slice retrieval
+    is handled correctly."""
+    pass
+
 class PlusPrefix(UnaryOpRep):#{{{
     pass
 #}}}

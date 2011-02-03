@@ -24,6 +24,13 @@ class Param(object):
         self.type = type
         self.default = default
 
+    def getStateMask(self):
+        if(self.type == rtypes.unknown):
+            return RS_SLICES_KNOWN
+        else:
+            return RS_ALL_KNOWN
+    state_mask = property(fget=getStateMask)
+
     def __str__(self):
        if(self.type is None):
            res = self.name
@@ -116,20 +123,23 @@ class UnaryFuncOp(repops.UnaryOpRep, Func):
 
 class UnaryFuncElemOp(UnaryFuncOp):
     def _process(self, source, **kwargs):
-        if not source._state & RS_TYPES_KNOWN:
+        state = source._state
+        if not state & RS_TYPES_KNOWN:
             return
 
         nslices = []
         for pos, slice in enumerate(source._slices):
             sig, nkwargs, outparam = self._findSignature(slice=slice,**kwargs)
+            state &= outparam.state_mask
             if(len(source._slices) > 0):
                 outparam = outparam.withNumber(pos)
             nslices.append(slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs))
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices),state)
 
 class UnaryFuncSeqOp(UnaryFuncOp):
     def _process(self, source, dim=None, **kwargs):
-        if not source._state & RS_TYPES_KNOWN:
+        state = source._state
+        if not state & RS_TYPES_KNOWN:
             return
 
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
@@ -142,17 +152,19 @@ class UnaryFuncSeqOp(UnaryFuncOp):
                 found = True
                 packdepth = len(slice.dims) - lastpos
                 sig, nkwargs, outparam = self._findSignature(slice=slice, packdepth=packdepth, **kwargs)
+                state &= outparam.state_mask
                 if(len(source._slices) > 0):
                     outparam = outparam.withNumber(pos)
                 slice = slices.UnaryFuncSeqOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
             nslices.append(slice)
         if(not found):
             raise RuntimeError, "No slice with dims to apply " + self.__class__.__name__
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices),state)
 
 class UnaryFuncAggregateOp(UnaryFuncOp):
     def _process(self, source, dim=None, **kwargs):
-        if not source._state & RS_TYPES_KNOWN:
+        state = source._state
+        if not state & RS_TYPES_KNOWN:
             return
 
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
@@ -167,13 +179,14 @@ class UnaryFuncAggregateOp(UnaryFuncOp):
             for lastpos in lastposs:
                 packdepth = len(slice.dims) - lastpos
                 sig, nkwargs, outparam = self._findSignature(slice=slice, packdepth=packdepth, **kwargs)
+                state &= outparam.state_mask
                 if(len(source._slices) > 1):
                     outparam = outparam.withNumber(pos)
                 slice = slices.UnaryFuncAggregateOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
             nslices.append(slice)
         if(not found):
             raise RuntimeError, "No slice with dims to apply " + self.__class__.__name__
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices),state)
 
     def _prepareSlice(self,slice):
         return slice
@@ -216,6 +229,7 @@ class BinaryFuncElemOp(BinaryFuncOp):
                 else:
                     name = "result"
                 outparam = Param(name, outparam)
+            state &= outparam.state_mask
             if(nslice > 1):
                 outparam = outparam.withNumber(pos)
             nslices.append(slices.BinFuncElemOpSlice(self.__class__.__name__, sig,\
@@ -361,6 +375,17 @@ class GreaterEqual(BinaryFuncElemOp):
 class Greater(BinaryFuncElemOp):
     _sigs = [comparestringsig,comparesetsig,compareanysig]
 
+
+class EachSignature(FuncSignature):
+    def check(self, slice, eachfunc, dtype=rtypes.unknown):#{{{
+        if(not isinstance(dtype,rtypes.TypeUnknown)):
+            dtype = rtypes.createType(dtype) 
+        nkwargs = {'eachfunc': eachfunc, 'slice':slice}
+        return (nkwargs, Param(slice.name, dtype))#}}}
+eachsig = EachSignature("each")
+
+class Each(UnaryFuncElemOp):
+    _sigs = [eachsig]
 
 class UnaryArithSignature(FuncSignature):
     def check(self, slice):#{{{

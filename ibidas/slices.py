@@ -601,8 +601,8 @@ class UnaryFuncOpSlice(UnaryOpSlice):#{{{
 class UnaryFuncElemOpSlice(UnaryFuncOpSlice):#{{{
     __slots__ = []
     
-    def __init__(self, funcname, sig, outparam, slice):
-        UnaryFuncOpSlice.__init__(self, slice, funcname, sig, outparam)
+    def __init__(self, funcname, sig, outparam, slice, **kwargs):
+        UnaryFuncOpSlice.__init__(self, slice, funcname, sig, outparam, **kwargs)
         #}}}
 
 class UnaryFuncSeqOpSlice(UnaryFuncOpSlice):#{{{
@@ -618,11 +618,11 @@ class UnaryFuncSeqOpSlice(UnaryFuncOpSlice):#{{{
 class UnaryFuncAggregateOpSlice(UnaryFuncOpSlice):#{{{
     __slots__ = ["packdepth"]
     
-    def __init__(self, funcname, sig, outparam, packdepth, slice):
+    def __init__(self, funcname, sig, outparam, packdepth, slice, **kwargs):
         self.packdepth = packdepth
         sdims, ntype = slice.dims.removeDim(len(slice.dims) - packdepth, (funcname,outparam), outparam.type)
 
-        UnaryFuncOpSlice.__init__(self, slice, funcname, sig, outparam, dims=sdims)
+        UnaryFuncOpSlice.__init__(self, slice, funcname, sig, outparam, dims=sdims, **kwargs)
         self.type = ntype
         #}}}
 

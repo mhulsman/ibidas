@@ -14,7 +14,7 @@ from .. import slices
 from ..utils.multi_visitor import VisitorFactory, DirectVisitorFactory, NF_ELSE
 
 _delay_import_(globals(),"..representor")
-_delay_import_(globals(),"..utils","util","nestutils","cutils","nested_array")
+_delay_import_(globals(),"..utils","util","nestutils","cutils","nested_array","context")
 _delay_import_(globals(),"..itypes","detector","type_attribute_freeze","convertors","dimensions")
 _delay_import_(globals(),"..repops_slice")
 _delay_import_(globals(),"..repops_dim")
@@ -183,7 +183,10 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
 
     def visitDataSlice(self,node):
-        ndata = nested_array.NestedArray(node.data,node.type)
+        if(isinstance(node.data, nested_array.NestedArray)):
+            ndata = node.data.copy()
+        else:
+            ndata = nested_array.NestedArray(node.data,node.type)
         return ResultSlice.from_slice(ndata,node)
 
     def visitConvertSlice(self,node,slice):
@@ -385,16 +388,25 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             res.append(nslice)
         return res
     
+    def visitGather(self,node,slices):
+        res = []
+        for cur_slice, slice in zip(node._slices, slices):
+            slice.setSource(cur_slice)
+            res.append(slice)
+        return res
+   
     def castto_any(self,castname,node,slice):
         return slice.data.mapseq(lambda x:x,res_type=node.type)
 
     def castnumbers_numbers(self,castname,node,slice):
         return slice.data.mapseq(lambda x:x,res_type=node.type)
 
+
     def withinWithin(self, data, type1, type2, typeo, op):
         data1,data2 = data
         res = [elem in arr for elem,arr in zip(data1,data2)]
         return cutils.darray(res,bool)
+
 
     def simple_arithGeneral(self, data, type1, type2, typeo, op):
         data1,data2 = data
@@ -421,6 +433,12 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def numberGeneral(self, data, type_in, type_out, op):
         return numpy_unary_arith[op](data, sig=type_out.toNumpy())
+
+    def eachEach(self, data, type_in, type_out, op, eachfunc):
+        if(isinstance(eachfunc,context.Context)):
+            return cutils.darray([context._apply(eachfunc,elem) for elem in data],type_out.toNumpy())
+        else:
+            return cutils.darray([eachfunc(elem) for elem in data],type_out.toNumpy())
 
     def sortableArgSort(self, data, type_in, type_out, op, packdepth, descend=False):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())

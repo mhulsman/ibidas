@@ -225,8 +225,8 @@ class Representor(Node):
             condition = context._apply(condition, self)
         return repops_multi.Filter(self, condition, dim) 
 
-    def _getResultSlices(self, args={}):
-        query = query_context.QueryContext(self, args)
+    def _getResultSlices(self, args={}, endpoint=True):
+        query = query_context.QueryContext(self, args, endpoint)
         return tuple(engines.select_engine.run(query))
 
     def __call__(self, **args):
@@ -546,8 +546,8 @@ class Representor(Node):
         """
         return repops_slice.Bookmark(self, *names, **kwds)
 
-    def map(self, func, otype=rtypes.unknown, dim=None, *params, **kwds):
-        return repops_multi.rmap(self, func, otype, dim, *params, **kwds)
+    def each(self, eachfunc, dtype=rtypes.unknown):
+        return repops_funcs.Each(self, eachfunc=eachfunc, dtype=dtype)
     
     
     def pos(self, dim=None):
