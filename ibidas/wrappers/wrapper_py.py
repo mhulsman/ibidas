@@ -309,7 +309,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         
 
         ndata = slice.data.mapseq(func,type_in=slice.type,type_out=node.type,
-                                  res_type=node.type,op=node.funcname )
+                                  res_type=node.type,op=node.funcname, **node.kwargs)
         return slice.modify(data=ndata,rtype=node.type)
 
     def visitUnaryFuncSeqOpSlice(self,node, slice):
@@ -328,7 +328,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         
         ndata = ndata.pack(slice.type, min(node.packdepth,2))
         ndata = ndata.mapseq(func,type_in=slice.type,type_out=node.type,
-                                  res_type=node.type,op=node.funcname, packdepth=node.packdepth)
+                                  res_type=node.type,op=node.funcname, packdepth=node.packdepth, **node.kwargs)
         ndata = ndata.unpack(ldims, subtype=node.type)
         if(node.packdepth > 2):
             ndata = ndata.splitLastDim(nshapes)
@@ -351,7 +351,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             ndata = ndata.pack(slice.type)
 
         ndata = ndata.mapseq(func,type_in=slice.type,type_out=node.type,
-                                  res_type=node.type,op=node.funcname,packdepth=node.packdepth )
+                                  res_type=node.type,op=node.funcname,packdepth=node.packdepth, **node.kwargs)
         
         if(node.packdepth > 1):
             dim = dimensions.Dim(UNDEFINED,(True,))
@@ -373,7 +373,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         ndata = nested_array.co_mapseq(func,[slice.data for slice in slices],
                                        type1=slices[0].type,type2=slices[1].type,
                                        typeo=node.type,res_type=node.type,op=node.funcname,
-                                       bc_allow=True)
+                                       bc_allow=node.allow_partial_bc)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
     def visitFixate(self,node,slices):
@@ -390,6 +390,11 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def castnumbers_numbers(self,castname,node,slice):
         return slice.data.mapseq(lambda x:x,res_type=node.type)
+
+    def withinWithin(self, data, type1, type2, typeo, op):
+        data1,data2 = data
+        res = [elem in arr for elem,arr in zip(data1,data2)]
+        return cutils.darray(res,bool)
 
     def simple_arithGeneral(self, data, type1, type2, typeo, op):
         data1,data2 = data
@@ -417,12 +422,18 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def numberGeneral(self, data, type_in, type_out, op):
         return numpy_unary_arith[op](data, sig=type_out.toNumpy())
 
-    def sortableArgSort(self, data, type_in, type_out, op, packdepth):
+    def sortableArgSort(self, data, type_in, type_out, op, packdepth, descend=False):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(len(data.shape) < 2):
-            return cutils.darray([numpy.argsort(row,axis=0) for row in data],object)
+            if(descend):
+                res = cutils.darray([numpy.flipud(numpy.argsort(row,axis=0)) for row in data],object)
+            else:
+                res = cutils.darray([numpy.argsort(row,axis=0) for row in data],object)
         else:
-            return numpy.argsort(data,axis=1)
+            res = numpy.argsort(data,axis=1)
+            if(descend):
+                res = res[:,::-1,...]
+        return res
    
     def any_nodepPos(self, data, type_in, type_out, op, packdepth):
         dtype = type_out.toNumpy()

@@ -76,7 +76,7 @@ class Project(repops.UnaryOpRep):
 
             if(name):
                 assert len(elem) == 1, "Could not find a (unique) matching slice for " + name
-                nslices.append(slices.ChangeNameSlice(elem,name))
+                nslices.append(slices.ChangeNameSlice(elem[0],name))
             else:
                 nslices.extend(elem)
         

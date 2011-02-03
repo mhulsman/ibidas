@@ -126,8 +126,8 @@ class Filter(repops.MultiOpRep):
         return self._initialize(tuple(nslices),source._state)
                     
 
-
-def sort(source, *sortsources):
+def sort(source, *sortsources, **kwargs):
+    descend = kwargs.pop("descend",False)
     if len(sortsources) > 1:
         sortsource = Combine(*sortsources)
     elif len(sortsources) == 0:
@@ -140,7 +140,7 @@ def sort(source, *sortsources):
     if len(sortsource._slices) > 1:
         sortsource = sortsource.tuple()
 
-    constraint = repops_funcs.ArgSort(sortsource)
+    constraint = repops_funcs.ArgSort(sortsource, descend=descend)
     assert len(constraint._slices) == 1, "Sort field should have 1 slice"
     cslice = constraint._slices[0]
     return Filter(source, constraint.array(), dim=cslice.dims[-1])

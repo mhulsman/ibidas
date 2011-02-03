@@ -553,8 +553,8 @@ class Representor(Node):
     def pos(self, dim=None):
         return repops_funcs.Pos(self, dim)
     
-    def argsort(self, dim=None):
-        return repops_funcs.ArgSort(self, dim)
+    def argsort(self, dim=None, descend=False):
+        return repops_funcs.ArgSort(self, dim, descend=descend)
 
     def sum(self, dim=None):
         return repops_funcs.Sum(self, dim)
@@ -588,6 +588,12 @@ class Representor(Node):
 
     def set(self, dim=None):
         return repops_funcs.Set(self,dim)
+
+    def within(self, arrays):
+        return repops_funcs.Within(self,arrays)
+
+    def contains(self, elems):
+        return repops_funcs.Within(elems,self)
 
     def array(self):
         """Packages dimension into array type"""
@@ -631,12 +637,13 @@ class Representor(Node):
         For other possible sort slice selection formats, see ``get`` function. 
 
         """
+        descend = kwargs.pop("descend",False)
 
         if(slices or kwargs):
             sortsource = self.get(*slices,**kwargs)
-            return repops_multi.sort(self, sortsource)
+            return repops_multi.sort(self, sortsource, descend=descend)
         else:
-            return repops_multi.sort(self)
+            return repops_multi.sort(self, descend=descend)
 
     def get(self, *slices, **kwds):
         """Select slices in a new representor, combine with other slices.

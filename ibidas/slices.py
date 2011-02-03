@@ -577,20 +577,22 @@ class BinFuncOpSlice(MultiOpSlice):#{{{
         MultiOpSlice.__init__(self, (lslice, rslice), name=outparam.name, rtype=outparam.type, dims=dims, bookmarks=nbookmarks)#}}}
 
 class BinFuncElemOpSlice(BinFuncOpSlice):#{{{
-    __slots__ = []
+    __slots__ = ["allow_partial_bc"]
 
-    def __init__(self, funcname, sig, outparam, left, right):
+    def __init__(self, funcname, sig, outparam, left, right, allow_partial_bc=False):
         dims = left.dims
+        self.allow_partial_bc = allow_partial_bc
         assert all([d1 == d2 for d1, d2 in zip(dims, right.dims)]), \
                     "Dimensions of slices do not match"
         
         BinFuncOpSlice.__init__(self, left, right, funcname, sig, outparam, dims)#}}}
 
 class UnaryFuncOpSlice(UnaryOpSlice):#{{{
-    __slots__ = ["funcname","sig"]
-    def __init__(self, slice, funcname, sig, outparam, dims=None):
+    __slots__ = ["funcname","sig", "kwargs"]
+    def __init__(self, slice, funcname, sig, outparam, dims=None, **kwargs):
         self.funcname = funcname
         self.sig = sig
+        self.kwargs = kwargs
 
         if(dims is None):
             dims = slice.dims
@@ -605,10 +607,11 @@ class UnaryFuncElemOpSlice(UnaryFuncOpSlice):#{{{
 
 class UnaryFuncSeqOpSlice(UnaryFuncOpSlice):#{{{
     __slots__ = ["packdepth"]
+
     
-    def __init__(self, funcname, sig, outparam, packdepth, slice):
+    def __init__(self, funcname, sig, outparam, packdepth, slice, **kwargs):
         self.packdepth = packdepth
-        UnaryFuncOpSlice.__init__(self, slice, funcname, sig, outparam)
+        UnaryFuncOpSlice.__init__(self, slice, funcname, sig, outparam, **kwargs)
         #}}}
 
 

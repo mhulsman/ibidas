@@ -162,7 +162,7 @@ class UnaryFuncAggregateOp(UnaryFuncOp):
         for pos, slice in enumerate(source._slices):
             lastposs = slice.dims.matchDimPath(selpath)
             if(lastposs):
-                slice = self.prepareSlice(slice)
+                slice = self._prepareSlice(slice)
                 found = True
             for lastpos in lastposs:
                 packdepth = len(slice.dims) - lastpos
@@ -175,7 +175,7 @@ class UnaryFuncAggregateOp(UnaryFuncOp):
             raise RuntimeError, "No slice with dims to apply " + self.__class__.__name__
         return self._initialize(tuple(nslices),source._state)
 
-    def prepareSlice(self,slice):
+    def _prepareSlice(self,slice):
         return slice
 
 class BinaryFuncOp(repops.MultiOpRep, Func):
@@ -188,6 +188,7 @@ class BinaryFuncOp(repops.MultiOpRep, Func):
 
         
 class BinaryFuncElemOp(BinaryFuncOp):
+    _allow_partial_bc = True
     def _process(self, sources, **kwargs):
         lsource,rsource = sources
         state = lsource._state & rsource._state
@@ -202,6 +203,7 @@ class BinaryFuncElemOp(BinaryFuncOp):
         nslices = []
         nslice = max(len(lsource._slices), len(rsource._slices))
         for pos, binslices in enumerate(util.zip_broadcast(lsource._slices, rsource._slices)):
+            binslices = self._prepareSlices(*binslices)
             (lslice,rslice),plans = slices.broadcast(binslices,mode)
             sig, nkwargs, outparam = self._findSignature(left=lslice,right=rslice,**kwargs)
             if(isinstance(outparam, rtypes.TypeUnknown)):
@@ -216,9 +218,30 @@ class BinaryFuncElemOp(BinaryFuncOp):
                 outparam = Param(name, outparam)
             if(nslice > 1):
                 outparam = outparam.withNumber(pos)
-            nslices.append(slices.BinFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs))
+            nslices.append(slices.BinFuncElemOpSlice(self.__class__.__name__, sig,\
+                         outparam, allow_partial_bc=self._allow_partial_bc, **nkwargs))
         return self._initialize(tuple(nslices),state)
 
+    def _prepareSlices(self, lslice, rslice):
+        return (lslice,rslice)
+
+
+class WithinSignature(FuncSignature):
+    _allow_partial_bc = False
+    def check(self, left, right):#{{{
+        in1_type = left.type
+        in2_type = right.type
+
+        out_cls = rtypes.TypeBool
+        out_type = out_cls(in1_type.has_missing or in2_type.has_missing)
+        return out_type#}}}
+
+within_sig = WithinSignature("within")
+
+class Within(BinaryFuncElemOp):
+    _sigs = [within_sig]
+    def _prepareSlices(self,lslice,rslice):
+        return (lslice, slices.PackArraySlice(rslice,1))
 
 class BinArithSignature(FuncSignature):
     def check(self, left, right):
@@ -380,7 +403,7 @@ class UnaryTypeToTypeSignature(UnaryFixShapeSignature):
         self.otypecls = otypecls
         UnaryFixShapeSignature.__init__(self, name, check_dependent)
 
-    def check(self, slice, packdepth):#{{{
+    def check(self, slice, packdepth, **kwargs):#{{{
         if not UnaryFixShapeSignature.check(self,slice,packdepth):
             return False
 
@@ -478,6 +501,6 @@ setsig = SetSignature("set")
 class Set(UnaryFuncAggregateOp):
     _sigs = [setsig]
 
-    def prepareSlice(self,slice):
+    def _prepareSlice(self,slice):
         return slices.ensure_frozen(slice)
             
