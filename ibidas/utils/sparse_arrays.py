@@ -7,7 +7,7 @@ import array
 from itertools import izip_longest
 
 from missing import Missing
-
+import util
 _delay_import_(globals(),"cutils")
 #_delay_import_(globals(),"ibidas.itypes","Missing")
 
@@ -471,7 +471,7 @@ class FullSparse(numpy.ndarray):
     def map(self, func, **kwargs):
         if('out_empty' in kwargs):
             out_empty = kwargs['out_empty']
-            if('has_missing' in kwargs):
+            if(kwargs.get('has_missing',True)):
                 func = elem_empty_filter(func,out_empty)
         
         otype = kwargs.get('otype',self.dtype)
@@ -513,26 +513,25 @@ class FullSparse(numpy.ndarray):
             res = numpy.cast[otype](res)
         return res
     
-    def min(self,skip_sparse=True,out_empty=Missing):
+    def min(self,has_missing=True,skip_sparse=True,out_empty=Missing):
         if(len(self) == 0):
             return out_empty
 
-        if(skip_sparse):
+        if(has_missing and skip_sparse):
             res = self.val.min()  #missing acts as high value apparently
             if(res is Missing):
                 res = out_empty
             return res
         else:
-            if self.hasSparse():
+            if has_missing and self.hasMissing():
                 return out_empty
             else:
                 return self.val.min()
 
-    def max(self,skip_sparse=True,out_empty=Missing):
+    def max(self,has_missing=True,skip_sparse=True,out_empty=Missing):
         if(len(self) == 0):
             return out_empty
-
-        if(skip_sparse):
+        if(has_missing and skip_sparse):
             filter = ~numpy.equal(self,Missing)
             r = self[filter]
             if(len(r) == 0):

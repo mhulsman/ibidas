@@ -2,8 +2,8 @@ import operator
 import repops
 from constants import *
 from itypes import rtypes
+import slices
 _delay_import_(globals(),"utils","util")
-_delay_import_(globals(),"slices")
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","wrapper_py")
 _delay_import_(globals(),"itypes", "casts","dimpaths","dimensions")
@@ -128,15 +128,24 @@ class UnaryFuncElemOp(UnaryFuncOp):
             return
 
         nslices = []
-        for pos, slice in enumerate(source._slices):
+        for slice in source._slices:
+            slice = self._prepareSlice(slice)
             sig, nkwargs, outparam = self._findSignature(slice=slice,**kwargs)
             state &= outparam.state_mask
-            if(len(source._slices) > 0):
-                outparam = outparam.withNumber(pos)
-            nslices.append(slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs))
+            s = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
+            s = self._finishSlice(s)
+            nslices.append(s)
         return self._initialize(tuple(nslices),state)
 
-class UnaryFuncSeqOp(UnaryFuncOp):
+    def _prepareSlice(self,slice):
+        return slice
+
+    def _finishSlice(self, slice):
+        return slice
+
+class UnaryFuncDimOp(UnaryFuncOp):
+    _slicecls = slices.UnaryFuncSeqOpSlice
+
     def _process(self, source, dim=None, **kwargs):
         state = source._state
         if not state & RS_TYPES_KNOWN:
@@ -146,32 +155,7 @@ class UnaryFuncSeqOp(UnaryFuncOp):
 
         nslices = []
         found = False
-        for pos, slice in enumerate(source._slices):
-            lastposs = slice.dims.matchDimPath(selpath)
-            for lastpos in lastposs:
-                found = True
-                packdepth = len(slice.dims) - lastpos
-                sig, nkwargs, outparam = self._findSignature(slice=slice, packdepth=packdepth, **kwargs)
-                state &= outparam.state_mask
-                if(len(source._slices) > 0):
-                    outparam = outparam.withNumber(pos)
-                slice = slices.UnaryFuncSeqOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
-            nslices.append(slice)
-        if(not found):
-            raise RuntimeError, "No slice with dims to apply " + self.__class__.__name__
-        return self._initialize(tuple(nslices),state)
-
-class UnaryFuncAggregateOp(UnaryFuncOp):
-    def _process(self, source, dim=None, **kwargs):
-        state = source._state
-        if not state & RS_TYPES_KNOWN:
-            return
-
-        selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
-
-        nslices = []
-        found = False
-        for pos, slice in enumerate(source._slices):
+        for slice in source._slices:
             lastposs = slice.dims.matchDimPath(selpath)
             if(lastposs):
                 slice = self._prepareSlice(slice)
@@ -180,16 +164,23 @@ class UnaryFuncAggregateOp(UnaryFuncOp):
                 packdepth = len(slice.dims) - lastpos
                 sig, nkwargs, outparam = self._findSignature(slice=slice, packdepth=packdepth, **kwargs)
                 state &= outparam.state_mask
-                if(len(source._slices) > 1):
-                    outparam = outparam.withNumber(pos)
-                slice = slices.UnaryFuncAggregateOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
+                slice = self._slicecls(self.__class__.__name__, sig, outparam, **nkwargs)
+            if(lastposs):
+                slice = self._finishSlice(slice)
             nslices.append(slice)
         if(not found):
             raise RuntimeError, "No slice with dims to apply " + self.__class__.__name__
         return self._initialize(tuple(nslices),state)
+            
 
     def _prepareSlice(self,slice):
         return slice
+    
+    def _finishSlice(self, slice):
+        return slice
+
+class UnaryFuncAggregateOp(UnaryFuncDimOp):
+    _slicecls = slices.UnaryFuncAggregateOpSlice
 
 class BinaryFuncOp(repops.MultiOpRep, Func):
     def __init__(self, lsource, rsource, **kwargs):
@@ -232,8 +223,9 @@ class BinaryFuncElemOp(BinaryFuncOp):
             state &= outparam.state_mask
             if(nslice > 1):
                 outparam = outparam.withNumber(pos)
-            nslices.append(slices.BinFuncElemOpSlice(self.__class__.__name__, sig,\
-                         outparam, allow_partial_bc=self._allow_partial_bc, **nkwargs))
+            s = slices.BinFuncElemOpSlice(self.__class__.__name__, sig,\
+                         outparam, allow_partial_bc=self._allow_partial_bc, **nkwargs)
+            nslices.append(s)
         return self._initialize(tuple(nslices),state)
 
     def _prepareSlices(self, lslice, rslice):
@@ -379,13 +371,17 @@ class Greater(BinaryFuncElemOp):
 class EachSignature(FuncSignature):
     def check(self, slice, eachfunc, dtype=rtypes.unknown):#{{{
         if(not isinstance(dtype,rtypes.TypeUnknown)):
-            dtype = rtypes.createType(dtype) 
+            dtype = rtypes.createType(dtype,len(slice.dims)) 
+        dtype = dtype._setNeedConversionRecursive(True)
         nkwargs = {'eachfunc': eachfunc, 'slice':slice}
         return (nkwargs, Param(slice.name, dtype))#}}}
 eachsig = EachSignature("each")
 
 class Each(UnaryFuncElemOp):
     _sigs = [eachsig]
+
+    def _finishSlice(self, slice):
+        return slices.ensure_converted(slice)
 
 class UnaryArithSignature(FuncSignature):
     def check(self, slice):#{{{
@@ -448,16 +444,16 @@ sortablesig = UnaryTypeToTypeSignature("sortable", (rtypes.TypeScalar, rtypes.Ty
 boolsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeBool, rtypes.TypeBool)
 numbersig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber)
 int_tointsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeInteger,rtypes.TypePlatformInt)
-float_tofloatsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeInteger,rtypes.TypeReal64)
+float_tofloatsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeReal64,rtypes.TypeReal64)
 number_tofloatsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber,rtypes.TypeReal64)
 number_tointsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber,rtypes.TypePlatformInt)
 
 @repops.delayable()
-class ArgSort(UnaryFuncSeqOp):
+class ArgSort(UnaryFuncDimOp):
     _sigs = [sortablesig]
 
 @repops.delayable()
-class Pos(UnaryFuncSeqOp):
+class Pos(UnaryFuncDimOp):
     _sigs = [any_nodepsig]
 
 
@@ -528,4 +524,32 @@ class Set(UnaryFuncAggregateOp):
 
     def _prepareSlice(self,slice):
         return slices.ensure_frozen(slice)
-            
+
+
+class CorrSignature(FuncSignature):
+    def check(self, slice):
+        if(len(slice.dims) < 2):
+            return False
+
+        if(not isinstance(slice.type,rtypes.TypeNumber)):
+            return False
+
+        corrdim = slice.dims[-2]
+        corrdim2 = corrdim.insertDepDim(0,corrdim)
+        ndims = dimpaths.DimPath(corrdim, corrdim2)
+
+        ntype = rtypes.TypeReal64(slice.type.has_missing)
+        ntype = rtypes.TypeArray(subtypes=(ntype,),dims=ndims)
+
+        slice = slices.PackArraySlice(slice,2)
+        nkwargs = {'slice':slice}
+        return (nkwargs, Param(slice.name, ntype))
+corrsig = CorrSignature("corr")
+
+class Corr(UnaryFuncElemOp):
+    _sigs = [corrsig]
+
+    def _finishSlice(self,slice):
+        return slices.UnpackArraySlice(slice,2)
+
+        

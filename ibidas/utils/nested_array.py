@@ -89,26 +89,42 @@ class NestedArray(object):
             else:
                 variable = False
 
-            for pos in xrange(len(cdata)):
-                elem = cdata[pos]
-                if(variable):
-                    if(elem is Missing):
-                        idxres[pos,:] = -1
-                        continue
-                    idxres[pos,0] = curpos
-                    curpos = curpos + len(elem)
-                    idxres[pos,1] = curpos
-               
-                #check that elem shape is not smaller or larger than expected 
-                if(not isinstance(elem,numpy.ndarray)):
-                    elem = cutils.darray(list(elem),dtype,cdepth,cdepth)
+            if(variable):
+                for pos in xrange(len(cdata)):
+                    elem = cdata[pos]
+                    if(variable):
+                        if(elem is Missing):
+                            idxres[pos,:] = -1
+                            continue
+                        idxres[pos,0] = curpos
+                        curpos = curpos + len(elem)
+                        idxres[pos,1] = curpos
+                
+                    #check that elem shape is not smaller or larger than expected 
+                    if(cdepth > 1 and not isinstance(elem,numpy.ndarray)):
+                        elem = cutils.darray(list(elem),dtype,cdepth,cdepth)
+                    else:
+                        assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
+                    res.append(elem)
+                ndata = numpy.concatenate(res)
+            else:
+                if(cdepth == 1):
+                    r = []
+                    for elem in cdata:
+                        r.extend(elem)
+                    ndata = cutils.darray(r,dtype,1,1)
                 else:
-                    assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
-                res.append(elem)
-            
+                    for elem in cdata:
+                        #check that elem shape is not smaller or larger than expected 
+                        if(not isinstance(elem,numpy.ndarray)):
+                            elem = cutils.darray(list(elem),dtype,cdepth,cdepth)
+                        else:
+                            assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
+                        res.append(elem)
+                    ndata = numpy.concatenate(res)
+
             dimpath = dimpath[cdepth:]
 
-            ndata = numpy.concatenate(res)
             if(variable):
                 idxres.shape =  data.shape + (2,)
                 nself.idxs.append(idxres)

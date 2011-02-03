@@ -1086,7 +1086,7 @@ OUT_DIM = 5
 IN_SUBTYPE_DIM = 6
 
 
-def createType(name):#{{{
+def createType(name, dimpos=0):#{{{
     """Creates a type object from string representation.
 
     :param name: str
@@ -1122,7 +1122,7 @@ def createType(name):#{{{
         else:
             raise TypeError,"Unknown type description: " + str(name)
 
-    return _createType(name)#}}}
+    return _createType(name, dimpos)#}}}
 
 
 class Token(object):#{{{
@@ -1560,7 +1560,7 @@ class TypeStringASTInterpreter(object):#{{{
         
         return dimensions.Dim(shape,dependent,has_missing, name=name) #}}}
 
-def _createType(name):
+def _createType(name, dimpos=0):
     scanner = TypeStringScanner()
     tokens = scanner.tokenize(name)
 
@@ -1574,7 +1574,7 @@ def _createType(name):
     rewriter2 = TypeStringASTRewriterPass2()
     tree,dim_annotation = rewriter2.process(tree)
 
-    return TypeStringASTInterpreter(dim_annotation).processCreateType(tree)
+    return TypeStringASTInterpreter(dim_annotation).processCreateType(tree, dimpos)
 
 
 #### HELPER functions #########

@@ -58,7 +58,6 @@ class Nest(repops.MultiOpRep):
             nslices.append(slice)
         return self._initialize(tuple(nslices), state)
 
-
 class Combine(repops.MultiOpRep):
     def _process(self,sources):
         state = reduce(operator.__and__,[source._state for source in sources])

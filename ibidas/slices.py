@@ -88,6 +88,10 @@ class LinkSlice(UnaryOpSlice):#{{{
         assert isinstance(link,representor.Representor),"Link of LinkSlice should be a representor"
         UnaryOpSlice.__init__(self, source, name, rtype, dims, bookmarks)#}}}
 
+class ExtendSlice(Slice):#{{{
+    __slots__ = []
+#}}}
+
 class DataSlice(Slice):#{{{
     __slots__ = ['data']
     def __init__(self, data, name=None, rtype=None, dims=dimpaths.DimPath(), bookmarks=set()):

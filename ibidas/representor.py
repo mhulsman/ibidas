@@ -49,7 +49,7 @@ class Representor(Node):
             slices = self._getResultSlices()
             self._initialize(slices,state=RS_ALL_KNOWN | RS_INFERRED)
 
-    def __str__(self):
+    def __str__(self, print_data=True):
         self._checkState(filter=RS_ALL_KNOWN)
         table = []
         table.append(["Slices:", "Types:", "Dims:"])
@@ -66,9 +66,14 @@ class Representor(Node):
             table.append([slice.name, str(slice.type), dim_str])
 
         res = util.create_strtable(table) + "\n"
-        res += "Data: " + str(self())
+        if(print_data):
+            res += "Data: " + str(self())
         return res
-    
+
+    def _getInfo(self):
+        print self.__str__(False)
+    I=property(fget=_getInfo)
+
     #def __repr__(self):
     #    return str(self.__class__)
     __repr__ = __str__
@@ -117,9 +122,11 @@ class Representor(Node):
         raise AttributeError("No attribute with name: " + name + " found")
 
     def _getAttributeNames(self):
-        if not source._state & RS_SLICES_KNOWN:
+        if not self._state & RS_SLICES_KNOWN:
             return []
         else:
+            print ""
+            print self.__str__(False)
             return [slice.name for slice in self._slices]
 
     def copy(self):

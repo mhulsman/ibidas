@@ -1,23 +1,17 @@
 import os
 import csv
 
-
-import wrappr
+import wrapper
 from ..itypes import rtypes
+from .. import slices
+from ..constants import *
 
-_delay_import_(globals(),"wrapper_py","Result","rep")
-_delay_import_(globals(),"..utils","util")
-
-def read_tsv(filename, dialect=False, skiprows=-1, type=rtypes.unknown, fieldnames=None):
-    return TSVRepresentor(filename, dialect, skiprows, type, fieldnames)
-    
-
+_delay_import_(globals(),"wrapper_py")
+_delay_import_(globals(),"..itypes","detector")
+_delay_import_(globals(),"..utils","nested_array","util")
 
 class TSVRepresentor(wrapper.SourceRepresentor):
-    _select_indicator = None
-    _select_executor = None
-    
-    def __init__(self, filename, dialect, skiprows, type, fieldnames):
+    def __init__(self, filename, dialect=False, skiprows=-1, dtype=rtypes.unknown, fieldnames=None):
         file = open(filename)
 
         #determine dialect, create csv parser
@@ -34,7 +28,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             file.seek(0)
             reader = csv.reader(file, dialect)
         else:
-            if(isinstance(dialect, csv.Dialect)):
+            if(issubclass(dialect, csv.Dialect)):
                 reader = csv.reader(file, dialect)
             else:
                 reader = csv.reader(file, delimiter=dialect)
@@ -64,37 +58,77 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             file.readline()
         startpos = file.tell()
 
-        #determine fieldnames
-        if(not fieldnames):
-           sample = []
-           for line in file:
-               sample.append(line)
-               if(len(sample) > 10):
-                   break
-           file.seek(startpos)
-           fieldnames = reader.next()
-           if(not csv.Sniffer().has_header("\n".join(sample))):
-               file.seek(startpos)
-               fieldnames = None
-        elif(fieldnames == "auto"):
-            fieldnames = reader.next()
+        #determine type
+        if(dtype is None):
+            dtype = rtypes.unknown
+        elif(dtype == rtypes.unknown):
+            if(fieldnames is None):
+                sample = []
+                for line in file:
+                    sample.append(line)
+                    if(len(sample) > 10):
+                        break
+                file.seek(startpos)
+                fieldnames = reader.next()
+                if(not csv.Sniffer().has_header("\n".join(sample))):
+                    file.seek(startpos)
+                    fieldnames = None
+            elif(fieldnames == "auto"):
+                fieldnames = reader.next()
 
-        #parse data
+            startpos = file.tell()
+            #parse data
+            data = [tuple(row) for row in reader]
+            file.seek(startpos)
+
+            det = detector.Detector()
+            det.process(data)
+            dtype = det.getType()
+            if(not fieldnames is None and dtype != rtypes.unknown):
+                assert isinstance(dtype,rtypes.TypeArray),"Error while determining type"
+                assert isinstance(dtype.subtypes[0],rtypes.TypeTuple),"Error while determining type"
+                dtype.subtypes[0].fieldnames = tuple(fieldnames)
+        else:
+            if(isinstance(dtype,str)):
+                dtype = rtypes.createType(dtype)
+            dtype._setNeedConversionRecursive(True)
+
+        slice = slices.ensure_converted(TSVSlice(filename, dialect, startpos, dtype, "data"))
+        if(slice.type.__class__ is rtypes.TypeArray):
+            slice = slices.ensure_converted(slices.UnpackArraySlice(slice))
+        if(slice.type.__class__ is rtypes.TypeTuple):
+            nslices = [slices.ensure_converted(slices.UnpackTupleSlice(slice, idx))
+                                    for idx in range(len(slice.type.subtypes))]
+        else:
+            nslices = [slice]
+ 
+        if(any([slice.type == rtypes.unknown for slice in nslices])):
+            state = RS_SLICES_KNOWN
+        else:
+            state = RS_ALL_KNOWN
+        file.close()
+        self._initialize(tuple(nslices),state)
+
+
+class TSVSlice(slices.ExtendSlice):
+    __slots__ = ["filename", "dialect","startpos"]
+
+    def __init__(self, filename, dialect, startpos, rtype, name):
+        self.filename = filename
+        self.dialect = dialect
+        self.startpos = startpos
+        slices.ExtendSlice.__init__(self,name=name,rtype=rtype)
+
+    def py_exec(self):
+        file = open(self.filename)
+        file.seek(self.startpos)
+
+        if(issubclass(self.dialect, csv.Dialect)):
+            reader = csv.reader(file, self.dialect)
+        else:
+            reader = csv.reader(file, delimiter=self.dialect)
         data = [tuple(row) for row in reader]
-        self._res = rep(data, type)
-        
-        #assign fieldnames
-        if(fieldnames):
-            self._res = self._res/tuple([util.valid_name(fieldname) for fieldname in fieldnames])
-
-        #create representor object
-        self._data = data
-        tslices = self._res._active_slices
-        all_slices = dict([(slice.id, slice) for slice in tslices])
-        wrapper.SourceRepresentor.__init__(self, all_slices, tslices)
-
-    def pyexec(self, executor):
-        res = self._res._getResult()
-        return Result(res)
-
+        file.close()
+        ndata = nested_array.NestedArray(data,self.type)
+        return wrapper_py.ResultSlice.from_slice(ndata,self)
 

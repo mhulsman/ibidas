@@ -4,6 +4,8 @@ import getopt
 import os
 from ibidas import *
 from IPython.Shell import IPShellEmbed
+from IPython.ipapi import TryNext
+from IPython.genutils import dir2
 
 rc_path = "~/.ibidas_rc"
 rc_path = os.path.expanduser(rc_path)
@@ -12,10 +14,16 @@ _ConfigDefault = {
     "system.tmp_dir":"/tmp"
 }
 
+def rep_completer(self,event):
+    #FIXME: build parser that is representor, and context object  aware
+    raise TryNext
+
+
 if(__name__ == '__main__'):
     #config = config.loadConfig('~/.ibidas_rc', _ConfigDefault)
     #sys.argv = sys.argv[0] # remove commandline arguments so ipython doesn't see them
     
     ipshell = IPShellEmbed(banner='Welcome to the IBIDAS system',exit_msg='IBIDAS shutting down ...')
     del ipshell.IP.user_ns['_']
+    ipshell.IP.set_hook('complete_command', rep_completer, re_key = '.*')
     ipshell()

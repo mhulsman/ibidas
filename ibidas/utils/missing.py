@@ -16,6 +16,7 @@
     We have to make sure that this keeps working in Python (i.e. that set will not start to 
     use a pointer comparision shortcut). Maybe we can find a better solution in the future. 
 """
+import util
 
 hash_counter = 0
 class MissingType(object):#{{{

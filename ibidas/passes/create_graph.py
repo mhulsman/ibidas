@@ -39,6 +39,10 @@ class CreateGraph(VisitorFactory(prefixes=("visit",),
             self.graph.addEdge(query_graph.Edge(slice,node,"paramlist","slices",pos))
         self.queue.extend(node._slices)
 
+    def visitExtendSlice(self,node):
+        if(hasattr(node,'create_graph_exec')):
+            node.graph_exec(self)
+
     def visitDataSlice(self,node):
         pass
 

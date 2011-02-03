@@ -181,6 +181,8 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def visitelse(self,node, **kwargs):
         raise RuntimeError, "Unknown node type encountered: " + node.__class__.__name__ + " with  " + str(kwargs)
 
+    def visitExtendSlice(self,node, *args, **kwargs):
+        return node.py_exec(*args, **kwargs)
 
     def visitDataSlice(self,node):
         if(isinstance(node.data, nested_array.NestedArray)):
@@ -432,7 +434,17 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return res
 
     def numberGeneral(self, data, type_in, type_out, op):
+        util.debug_here()
         return numpy_unary_arith[op](data, sig=type_out.toNumpy())
+
+    def corrCorr(self, data, type_in, type_out, op):
+        intype = type_in.toNumpy()
+        res = []
+        for elem in data:
+            if(len(elem.shape) < 2):
+                elem = cutils.darray(list(elem),intype,2,2)
+            res.append(numpy.corrcoef(elem))
+        return cutils.darray(res,object,1,1)
 
     def eachEach(self, data, type_in, type_out, op, eachfunc):
         if(isinstance(eachfunc,context.Context)):

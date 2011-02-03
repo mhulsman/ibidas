@@ -69,6 +69,7 @@ import array
 from collections import defaultdict
 import operator
 import platform
+from itertools import chain
 
 import rtypes, convertors
 from ..constants import *
@@ -631,8 +632,8 @@ class ContainerScanner(TypeScanner):
         else:
             shapes = seq.map(getshape, otype=object, out_empty=Missing, has_missing=has_missing)
             shapelens = shapes.map(len, otype=object, out_empty=Missing, has_missing=has_missing)
-            min_dim = shapelens.min()
-            max_dim = shapelens.max()
+            min_dim = shapelens.min(has_missing=has_missing)
+            max_dim = shapelens.max(has_missing=has_missing)
 
             if self.min_dim is None:
                 self.min_dim = min_dim
@@ -653,9 +654,12 @@ class ContainerScanner(TypeScanner):
                 dr.processLengths(nelems.ravel(), has_missing=has_missing)
         
         d = self.getSubDetector()
-        for subseq in seq.ravel():
-            if not (subseq is Missing or subseq is None):
-                d.processSeq(subseq)
+        if(self.min_dim == 1 and not has_missing):
+            d.processSeq(list(chain(*seq.ravel())))
+        else: 
+            for subseq in seq.ravel():
+                if not (subseq is Missing or subseq is None):
+                    d.processSeq(subseq)
         return True
 
 def getshape(elem):
@@ -748,7 +752,7 @@ class StringScanner(TypeScanner):
         has_missing = self.detector.hasMissing()
         if not self.detector.objectclss.issubset(self.good_cls):
             return False
-        max_nchars = seq.map(len, otype=int, out_empty=-1, has_missing=has_missing).max()
+        max_nchars = seq.map(len, otype=int, out_empty=-1, has_missing=has_missing).max(has_missing=has_missing)
         self.max_nchars = max(self.max_nchars, max_nchars)
         return True
 registerTypeScanner(StringScanner)
