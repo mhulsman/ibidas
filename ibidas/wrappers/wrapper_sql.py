@@ -1,18 +1,19 @@
 import wrapper
 import sqlalchemy
-import rtypes
-import dimensions
-import slices
-import util
-from wrapper_py import Result
-from multi_visitor import VisitorFactory, NF_ELSE
 
+from .. import slices
+from ..constants import *
+from ..utils.multi_visitor import VisitorFactory, NF_ELSE
+
+_delay_import_(globals(),"..utils","util","nested_array")
+_delay_import_(globals(),"..itypes","rtypes","dimensions","dimpaths")
+_delay_import_(globals(),"wrapper_py")
 
 class TypeMapperToSQLAlchemy(VisitorFactory(prefixes=("convert",), 
                                       flags=NF_ELSE)):
     
     def convertTypeAny(self, rtype):
-        return sqlalchmy.PickleType()
+        return sqlalchemy.PickleType()
     
     def convertTypeUInt64(self, rtype): #to be checked: can databases handle uint64?
         return sqlalchemy.types.Integer()       
@@ -34,8 +35,8 @@ class TypeMapperToSQLAlchemy(VisitorFactory(prefixes=("convert",),
             return sqlalchemy.types.Text(length = rtype.dims[0].shape)
         else:
             return sqlalchemy.types.Text()
-
 tosa_typemapper = TypeMapperToSQLAlchemy()
+
 
 class TypeMapperFromSQLAlchemy(VisitorFactory(prefixes=("convert",), 
                                       flags=NF_ELSE)):
@@ -89,8 +90,8 @@ class TypeMapperFromSQLAlchemy(VisitorFactory(prefixes=("convert",),
         return self.convertString(dbtype, column)
 
     def convertString(self, dbtype, column, deftype="bytes"):
-        if(dbtype.length is None):
-            typestr = "bytes[]"
+        if(dbtype.length is None or dbtype.length > 32):
+            typestr = "bytes"
         else:
             typestr = "bytes[%d]" % dbtype.length
         if(column.nullable):
@@ -157,13 +158,13 @@ def convert(col_descriptor, type, engine, tablename=None):
                                     fieldnames = tuple(fieldnames))
 
     if(tablename):
-        ndims = (dimensions.Dim("*", did=str(tablename).lower()),)
+        ndims = dimpaths.DimPath(dimensions.Dim("*", name=str(tablename).lower()))
     else:
-        ndims = (dimensions.Dim("*"),)
+        ndims = dimpaths.DimPath(dimensions.Dim("*"))
 
     table_type = rtypes.TypeArray(dims=ndims,
                                     subtypes=(table_type,))
-    return (slices.Slice("data", table_type),)
+    return table_type
         
 
 def convert_mysql(col_descriptor, engine):
@@ -219,7 +220,7 @@ def convert_sqlalchemy(col_descriptor, engine):
 
     return fieldnames, subtypes
 
-def open(*args, **kwargs):
+def open_db(*args, **kwargs):
     con = sqlalchemy.create_engine(*args, **kwargs)
     return Connection(con)
 
@@ -237,8 +238,7 @@ class Connection(object):
 
         tabledict = {}
         for table in tables.values():
-            nslices = convert(table.columns,'sqlalchemy',self.engine, table.name)
-            t = SQLRepresentor(self.engine, table, nslices).E.A
+            t = TableRepresentor(self.engine, table).E.A
             tabledict[table.name] = t
         self.tabledict = tabledict 
 
@@ -250,6 +250,7 @@ class Connection(object):
                     self.__dict__[sname] = Connection(self.engine, sname);
             except:
                 raise
+                pass
 
     def __getattr__(self, name):
         return self.tabledict[name]
@@ -259,13 +260,7 @@ class Connection(object):
    
     
     def query(self, query):
-        res = self.engine.execute(query)
-        try:
-            slices = convert(res.context.compiled.statement.columns, "sqlalchemy", self.engine)
-        except AttributeError:
-            slices = convert(res.cursor.description, res.dialect.name, self.engine)
-        res.close() 
-        return QueryRepresentor(self.engine, query, slices).E.A
+        return QueryRepresentor(self.engine, query).E.A
 
     def __repr__(self):
         res = "Database: " + str(self.engine.url) + "\n"
@@ -324,36 +319,35 @@ class Connection(object):
         del self.sa_tables[name]
         del self.tabledict[name]
 
-class SQLRepresentor(wrapper.SourceRepresentor):
-    _select_indicator = None
-    _select_executor = None
-    
-    def __init__(self, conn, table, tslices):
-        all_slices = dict([(slice.id, slice) for slice in tslices])
-        wrapper.SourceRepresentor.__init__(self, all_slices, tslices)
-        self._table = table
-        self._conn = conn
-
-    def pyexec(self, executor):
-        s = sqlalchemy.sql.select([self._table])
-        result = self._conn.execute(s).fetchall()
-        res = {self._active_slices[0].id: result}
-        return Result(res)
+class TableRepresentor(wrapper.SourceRepresentor):
+    def __init__(self, engine, table):
+        table_type = convert(table.columns,'sqlalchemy',engine, table.name)
+        s = sqlalchemy.sql.select([table])
+        nslices = (SQLSlice(engine, s, table_type, table.name),)
+        self._initialize(nslices,RS_ALL_KNOWN)
 
 class QueryRepresentor(wrapper.SourceRepresentor):
-    _select_indicator = None
-    _select_executor = None
-    
-    def __init__(self, conn, query, tslices):
-        all_slices = dict([(slice.id, slice) for slice in tslices])
-        wrapper.SourceRepresentor.__init__(self, all_slices, tslices)
-        self._query = query
-        self._conn = conn
+    def __init__(self, engine, query):
+        res = self.engine.execute(query)
+        try:
+            query_type = convert(res.context.compiled.statement.columns, "sqlalchemy", self.engine)
+        except AttributeError:
+            query_type = convert(res.cursor.description, res.dialect.name, self.engine)
+        res.close() 
+        
+        nslices = (SQLSlice(engine, query, query_type),)
+        self._initialize(nslices,RS_ALL_KNOWN)
 
-    def pyexec(self, executor):
-        res = self._conn.execute(self._query)
+
+class SQLSlice(slices.ExtendSlice):
+    def __init__(self, conn, query, rtype, name="result"):
+        self.conn = conn
+        self.query = query
+        slices.ExtendSlice.__init__(self,name=name,rtype=rtype)
+
+    def py_exec(self):
+        res = self.conn.execute(self.query)
         result = res.fetchall()
-        res = {self._active_slices[0].id: result}
-        return Result(res)
-
+        ndata = nested_array.NestedArray(result,self.type)
+        return wrapper_py.ResultSlice.from_slice(ndata,self)
 

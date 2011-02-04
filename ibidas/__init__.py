@@ -23,6 +23,7 @@ from utils.infix import Infix,RevInfix
 from itypes import *
 from wrappers.wrapper_py import rep
 from wrappers.wrapper_tsv import TSVRepresentor
+from wrappers.wrapper_sql import open_db
 from representor import newdim
 from repops_dim import rlist, rarray
 from repops_multi import Broadcast as bcast, Combine as combine, sort
@@ -43,6 +44,8 @@ def read(url, **kwargs):
 
     if(format == 'tsv'):
         return TSVRepresentor(url, **kwargs) 
+    elif(format == "db"):
+        return open_db(url, **kwargs)
     else:
         raise RuntimeError("Unknown format specified")
     
