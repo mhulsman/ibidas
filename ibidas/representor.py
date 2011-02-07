@@ -454,7 +454,7 @@ class Representor(Node):
         """
         return repops_dim.PermuteDims(self,permute_idxs)
 
-    def flat(self, dim=-1,name=None):
+    def flat(self, dim=None,name=None):
         """Flattens (merges) a dimension with previous(parent) dim. 
 
         :param dim: Dim to flatten. By default, last dim.

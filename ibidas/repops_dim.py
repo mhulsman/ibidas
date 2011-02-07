@@ -160,7 +160,7 @@ class FlatAll(repops.UnaryOpRep):
         return self._initialize(tuple(nnslices),source._state)
 
 class Flat(repops.UnaryOpRep):
-    def _process(self,source,name=None,dim=-1):
+    def _process(self,source,name=None,dim=None):
         if not source._state & RS_SLICES_KNOWN:
             return
         

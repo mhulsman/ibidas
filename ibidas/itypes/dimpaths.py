@@ -488,9 +488,7 @@ def createDimParentDict(sourcepaths):#{{{
 
 def extendParentDim(path, sourcepaths, length=1):#{{{
     length -= len(path.strip())   
-    assert length >= 0, "Cannot shorten path"
-   
-    if(length == 0):
+    if(length <= 0):
         return path
     if path[0] is root:
         raise RuntimeError, "Could not get long enough dim path"

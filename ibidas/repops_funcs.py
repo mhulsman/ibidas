@@ -473,9 +473,37 @@ class Max(UnaryFuncAggregateOp):
 class Min(UnaryFuncAggregateOp):
     _sigs = [numbersig]
 
+class UnaryConcatenateSignature(UnaryFixShapeSignature):
+    def check(self, slice, packdepth, **kwargs):#{{{
+        if not UnaryFixShapeSignature.check(self,slice,packdepth):
+            return False
+
+        in_type = slice.type
+        if(not in_type.__class__ is rtypes.TypeArray):
+            return False
+        if(not in_type.dims):
+            return False
+
+        curdim = in_type.dims[0]
+        adim = slice.dims[-1]
+        stype = in_type.subtypes[0]
+        
+        if(not curdim.shape is UNDEFINED and not adim.shape is UNDEFINED):
+            nshape = curdim.shape * adim.shape
+        else:
+            nshape = UNDEFINED
+        nname = "s" + curdim.name
+        nin_type = in_type._removeDepDim(1,"concatenate")
+        ndim = dimensions.Dim(nshape, nin_type.dims[0].dependent, has_missing=nin_type.dims[0].has_missing, name = nname)
+
+        nin_type = nin_type._updateDepDim(0,ndim)
+        return Param(slice.name, nin_type)#}}}
+
+concatenate_sig = UnaryConcatenateSignature("arrayarray")
+
 @repops.delayable()
 class Sum(UnaryFuncAggregateOp):
-    _sigs = [int_tointsig, float_tofloatsig]
+    _sigs = [int_tointsig, float_tofloatsig,concatenate_sig]
 
 @repops.delayable()
 class Mean(UnaryFuncAggregateOp):

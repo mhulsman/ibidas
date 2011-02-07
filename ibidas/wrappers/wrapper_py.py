@@ -360,7 +360,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             func = getattr(self, node.sig.name + node.funcname)
         except AttributeError:
             func = getattr(self, node.sig.name + "General")
-        
+        util.debug_here() 
         ndata = slice.data
         if(node.packdepth > 1):
             if(node.packdepth > 2):
@@ -525,7 +525,15 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
            return cutils.darray([[set(subrow) for subrow in row.transpose()] for row in data],dtype,2,2)
         else:
            return cutils.darray([set(row) for row in data],dtype)
-  
+    
+    def arrayarraySum(self, data, type_in, type_out, op, packdepth):
+        util.debug_here()
+        data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
+        if(packdepth > 1):
+            return cutils.darray([[numpy.concatenate(list(subrow),axis=0) for subrow in row.transpose()] for row in data],object,2,2)
+        else:
+            return cutils.darray([numpy.concatenate(list(row),axis=0) for row in data],object)
+ 
     def fixdimGeneral(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         func = numpy_dimfuncs[op]
