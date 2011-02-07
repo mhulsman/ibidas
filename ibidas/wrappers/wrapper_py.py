@@ -360,7 +360,6 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             func = getattr(self, node.sig.name + node.funcname)
         except AttributeError:
             func = getattr(self, node.sig.name + "General")
-        util.debug_here() 
         ndata = slice.data
         if(node.packdepth > 1):
             if(node.packdepth > 2):
@@ -368,7 +367,6 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             ndata = ndata.pack(slice.type, 2)
         else:
             ndata = ndata.pack(slice.type)
-
         ndata = ndata.mapseq(func,type_in=slice.type,type_out=node.type,
                                   res_type=node.type,op=node.funcname,packdepth=node.packdepth, **node.kwargs)
         
@@ -379,7 +377,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 nshapes = nested_array.drop_prev_shapes_dim(ndata,nshapes)
                 ndata = ndata.splitLastDim(nshapes)
             
-        return slice.modify(data=ndata,rtype=node.type)
+        return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
 
 
@@ -527,7 +525,6 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
            return cutils.darray([set(row) for row in data],dtype)
     
     def arrayarraySum(self, data, type_in, type_out, op, packdepth):
-        util.debug_here()
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(packdepth > 1):
             return cutils.darray([[numpy.concatenate(list(subrow),axis=0) for subrow in row.transpose()] for row in data],object,2,2)

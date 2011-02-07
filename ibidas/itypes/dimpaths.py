@@ -131,8 +131,11 @@ class DimPath(tuple):
         ndims = []
         for p in xrange(max(pos + 1,0), len(self)):
             ndims.append(self[p].updateDepDim(p - pos, ndim))
-       
-        res = self[:max(pos,0)] + ndim + DimPath(*ndims)
+      
+        if pos >=0:
+            res = self[:max(pos,0)] + ndim + DimPath(*ndims)
+        else:
+            res = DimPath(*ndims)
 
         if(not subtype is None):     
             subtype = subtype._updateDepDim(dimdepth=len(self)-pos, ndim=ndim)

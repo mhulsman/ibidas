@@ -323,7 +323,6 @@ class FilterSlice(UnaryOpSlice):#{{{
     def __init__(self,slice,constraint, ndim):
         stype = slice.type
         assert isinstance(stype, rtypes.TypeArray), "Filter on non-array type not possible"
-
         sdims = stype.dims
         if(ndim is None):
             sdims, subtype = sdims.removeDim(0, constraint, stype.subtypes[0])
@@ -464,7 +463,7 @@ class GroupIndexSlice(MultiOpSlice):
         assert len(set([slice.dims for slice in slices])) == 1, "Group index slices should have same dimension"
         assert all([isinstance(slice.type,rtypes.TypeArray) for slice in slices]), "Group index slices should be arrays"
         ndims = slices[0].dims
-        
+         
         newdims = []
         dep = (True,) * len(ndims)
         for pos, slice in enumerate(slices):
