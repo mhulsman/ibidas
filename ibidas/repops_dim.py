@@ -214,12 +214,13 @@ class GroupIndex(repops.UnaryOpRep):
     def _process(self, source):
         if not source._state & RS_SLICES_KNOWN:
             return
-
-        nslices = slices.broadcast(source._slices,mode="dim")[0]
+        
+        nslices = [slices.ensure_frozen(slice) for slice in source._slices]
+        nslices = slices.broadcast(nslices,mode="dim")[0]
         nslices = [slices.PackArraySlice(nslice,1) for nslice in nslices]
 
         nslice = slices.GroupIndexSlice(nslices)
         nslice = slices.UnpackArraySlice(nslice, len(nslices))
         return self._initialize((nslice,),RS_ALL_KNOWN)
 
-    
+

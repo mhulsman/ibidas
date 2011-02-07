@@ -66,7 +66,7 @@ class MultiOpRep(representor.Representor):
         self._process(sources,*args, **kwds)
     
     def _process(self, sources):
-        raise RuntimError, "Process function should be overloaded for " + str(type(self))
+        raise RuntimeError, "Process function should be overloaded for " + str(type(self))
     
 
 class Fixate(UnaryOpRep):#{{{

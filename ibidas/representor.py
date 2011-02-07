@@ -490,18 +490,17 @@ class Representor(Node):
         return repops_dim.Shape(self)
 
     def group_by(self, *args, **kwargs):
-        keep = kwargs.pop("keep", {})
-        name = kwargs.pop("name", None)
-        group_slice = self.get(*args, **kwargs)
+        flat = kwargs.pop("flat", {})
+        group_source = self.get(*args, **kwargs)
         
-        if(isinstance(keep,dict)):
+        if(isinstance(flat,dict)):
             pass
-        elif(isinstance(keep, list)):
-            keep = {0:keep}
+        elif(isinstance(flat, list)):
+            flat = {0:flat}
         else:
-            keep = {0:[keep]}
+            flat = {0:[flat]}
             
-        return repops_multi.Group(self, group_slice, keep, name)
+        return repops_multi.Group(self, group_source, flat)
    
     def match(self, other, condleft, condright, group=False):
         return repops_multi.match(self, other, condleft, condright, group=group)
@@ -653,9 +652,9 @@ class Representor(Node):
 
         if(slices or kwargs):
             sortsource = self.get(*slices,**kwargs)
-            return repops_multi.sort(self, sortsource, descend=descend)
+            return repops_multi.Sort(self, sortsource, descend=descend)
         else:
-            return repops_multi.sort(self, descend=descend)
+            return repops_multi.Sort(self, descend=descend)
 
     def get(self, *slices, **kwds):
         """Select slices in a new representor, combine with other slices.

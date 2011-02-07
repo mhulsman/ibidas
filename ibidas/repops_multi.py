@@ -68,6 +68,26 @@ class Combine(repops.MultiOpRep):
         return self._initialize(nslices,state)
 
 
+class Group(repops.MultiOpRep):
+    def __init__(self,source,constraint,flat={}):
+        repops.MultiOpRep.__init__(self,(source,constraint),flat=flat)
+
+    def _process(self,sources, flat):
+        source, gsource = sources 
+        if not source._state & RS_SLICES_KNOWN or not gsource._state & RS_TYPES_KNOWN:
+            return
+
+        gslices = [slices.ensure_frozen(slice) for slice in gsource._slices]
+        gslices = slices.broadcast(gslices,mode="dim")[0]
+        gslices = [slices.PackArraySlice(gslice,1) for gslice in gslices]
+
+        gslice = slices.GroupIndexSlice(gslices)
+        gslice = slices.UnpackArraySlice(gslice, len(gslices))
+
+        nslices = Filter._apply(source._slices,gslice,gslices[0].type.dims[:1],"dim")
+        return self._initialize(tuple(nslices),source._state)
+
+
 class Filter(repops.MultiOpRep):
     def __init__(self,source,constraint,dim=None):
         if(not isinstance(constraint,representor.Representor)):
@@ -83,21 +103,32 @@ class Filter(repops.MultiOpRep):
 
         assert len(constraint._slices) == 1, "Filter constraint should have 1 slice"
         cslice = constraint._slices[0]
+        seldimpath = dimpaths.identifyUniqueDimPathSource(source, dim)
+        if(not seldimpath):
+            raise RuntimeError, "Attempting to perform filter on non-existing dimension"
+        
+        if(isinstance(constraint, repops.PlusPrefix)):
+            mode = "pos"
+        else:
+            mode = "dim"
 
-        dimset = dimpaths.createDimSet([slice.dims for slice in source._slices])
+        nslices = self._apply(source._slices,cslice,seldimpath,mode)
 
+        return self._initialize(tuple(nslices),source._state)
+
+    @classmethod
+    def _apply(cls,fslices,cslice,seldimpath, bcmode):
         if(isinstance(cslice.type,rtypes.TypeBool)):
             assert dim is None, "Cannot use bool or missing data type with specified filter dimension. Constraint dimension already specifies dimension."
             assert cslice.dims, "Constraint should have at least one dimension"
             ndim = dimensions.Dim(UNDEFINED,(True,) * (len(cslice.dims) -1),  False, name = "f" + cslice.dims[-1].name)
             dim_suffix = None
             seldimpath = cslice.dims[-1:]
+            dimset = dimpaths.createDimSet([slice.dims for slice in fslices])
             assert seldimpath[0] in dimset, "Cannot find last dimension of boolean filter in filter source (" + str(cslice.dims) + ")"
             cslice = slices.PackArraySlice(cslice,1)
         else:
-            seldimpath = dimpaths.identifyUniqueDimPathSource(source, dim)
-            if(not seldimpath):
-                raise RuntimeError, "Attempting to perform filter on non-existing dimension"
+            assert seldimpath, "Filter dimpath is empty"
 
             if(isinstance(cslice.type, rtypes.TypeInteger)):
                 ndim = None
@@ -111,39 +142,43 @@ class Filter(repops.MultiOpRep):
                 ndim = dimensions.Dim(UNDEFINED, (True,) * len(cslice.dims), False,name = "f" + cslice.name)
             else:
                 raise RuntimeError, "Unknown constraint type in filter: " + str(cslice.type)
-
-
-        if(isinstance(constraint, repops.PlusPrefix)):
-            mode = "pos"
-        else:
-            mode = "dim"
-
+        
         nslices = []
-        for slice in source._slices:
-            slice = slices.filter(slice, cslice, seldimpath, ndim, mode)
+        for slice in fslices:
+            slice = slices.filter(slice, cslice, seldimpath, ndim, bcmode)
             nslices.append(slice)
-        return self._initialize(tuple(nslices),source._state)
-                    
+        return nslices
 
-def sort(source, *sortsources, **kwargs):
-    descend = kwargs.pop("descend",False)
-    if len(sortsources) > 1:
-        sortsource = Combine(*sortsources)
-    elif len(sortsources) == 0:
-        if len(source._slices) > 1:
-            sortsource = source.tuple()
+class Sort(repops.MultiOpRep):
+    def __init__(self,source,constraint=None,descend=False):
+        if(constraint is None):
+            repops.MultiOpRep.__init__(self,(source,),descend=descend)
         else:
-            sortsource = source
-    else:
-        sortsource = sortsources[0]
-    if len(sortsource._slices) > 1:
-        sortsource = sortsource.tuple()
+            if(not isinstance(constraint,representor.Representor)):
+                constraint = repops.PlusPrefix(wrapper_py.rep(constraint,name="filter"))
+            repops.MultiOpRep.__init__(self,(source,constraint),descend=descend)
 
-    constraint = repops_funcs.ArgSort(sortsource, descend=descend)
-    assert len(constraint._slices) == 1, "Sort field should have 1 slice"
-    cslice = constraint._slices[0]
-    return Filter(source, constraint.array(), dim=cslice.dims[-1])
+    def _process(self, sources, descend):
+        if not any([s._state & RS_SLICES_KNOWN for s in sources]):
+            return
 
+        if(len(sources) == 1): #no explicit constraint, use data itself
+            source = sources[0]
+            if len(source._slices) > 1:
+                constraint = source.tuple()
+            else:
+                constraint = source
+        else:
+            source,constraint = sources 
+
+        if len(constraint._slices) > 1:
+            constraint = constraint.tuple()
+        
+        #fixme: make it slice-only (remove rep)
+        constraint = repops_funcs.ArgSort(constraint, descend=descend)
+        cslice = slices.PackArraySlice(constraint._slices[0])
+        nslices = ops.apply_filter(source._slices, cslice, cslice.type.dims[:1],"dim")
+        return self._initialize(tuple(nslices),source._state & constraint._state)
 
 
 class Match(repops.MultiOpRep):

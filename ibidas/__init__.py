@@ -26,7 +26,7 @@ from wrappers.wrapper_tsv import TSVRepresentor
 from wrappers.wrapper_sql import open_db
 from representor import newdim
 from repops_dim import rlist, rarray
-from repops_multi import Broadcast as bcast, Combine as combine, sort
+from repops_multi import Broadcast as bcast, Combine as combine, Sort as sort
 from repops_slice import RTuple as rtuple, HArray as harray
 from repops_funcs import ArgSort as argsort, Pos as pos, Any as rany, All as rall,\
                          Max as rmax, Min as rmin, ArgMax as argmax, ArgMin as argmin,\
