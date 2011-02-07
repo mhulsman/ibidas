@@ -487,24 +487,38 @@ def createDimParentDict(sourcepaths):#{{{
     return parents#}}}
 
 def extendParentDim(path, sourcepaths, length=1):#{{{
-    if(length <= len(path.strip())):
+    length -= len(path.strip())   
+    assert length >= 0, "Cannot shorten path"
+   
+    if(length == 0):
         return path
-
     if path[0] is root:
         raise RuntimeError, "Could not get long enough dim path"
-    
-    dimparents = createDimParentDict(sourcepaths)
 
-    while(len(path.strip()) < length):
-        parents = dimparents[path[0]]
-
-        if(len(parents) > 1):
+    ndims = []
+    xpaths = set()
+    for spath in sourcepaths:
+        lastposs = spath.matchDimPath(path)
+        for lastpos in lastposs:
+            r = spath[:(lastpos + 1 - len(path))]
+            xpaths.add(r)
+        
+    while(len(ndims) < length):
+        xdims = set()
+        nxpaths = set()
+        for xpath in xpaths:
+           if(not xpath):
+               continue
+           xdims.add(xpath[-1])
+           nxpaths.add(xpath[:-1])
+        
+            
+        if(not xdims or len(xdims) > 1):
             raise RuntimeError, "Cannot find unique parent for dim: " + str(path[0])
+        xpaths = nxpaths
+        ndims.append(xdims.pop())
 
-        parent = parents[0]
-        if(parent is None):
-            raise RuntimeError, "Dim: " + str(path[0]) + " is first dim, cannot find parent"
-        path = DimPath(*((parent,) + path))
+    path = DimPath(*(ndims[::-1])) + path
     return path
     #}}}
 

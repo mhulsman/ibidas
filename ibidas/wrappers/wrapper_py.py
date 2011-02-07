@@ -282,7 +282,14 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         for pos,planelem in enumerate(node.plan):
             if(planelem == BCEXIST):
                 dimpos = compare_slices[bcpos].dims.index(node.bcdims[pos])
-                repeat_dict[pos] = compare_slices[bcpos].data.getDimShape(dimpos)
+                
+                rshape = compare_slices[bcpos].data.getDimShape(dimpos)
+                #if it is a variable shape, keep only shape dims that are variable
+                if(not isinstance(rshape,int)):
+                    dim = compare_slices[bcpos].dims[dimpos]
+                    rshape = remove_independent(rshape,dim)
+                    rshape = add_independent(rshape,node.dims[pos])
+                repeat_dict[pos] = rshape
                 bcpos += 1
             elif(planelem == BCCOPY):
                 pass
@@ -305,6 +312,13 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def visitFlatDimSlice(self, node, slice):
         ndata = slice.data.mergeDim(node.flatpos-1)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
+
+
+    def visitGroupIndexSlice(self, node, slices):
+        ndata = nested_array.co_map(groupindex,[slice.data for slice in slices],
+                                        res_type = node.type, bc_allow=False)
+        
+        return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
     def visitUnaryFuncElemOpSlice(self,node, slice):
         try:
@@ -638,4 +652,56 @@ def ensure_fixeddims(seqs,packdepth,dtype):
     else:
         res = seqs
     return res
-            
+
+
+def groupindex(data):
+    indexes = []
+    if(len(data) > 1):
+        for dcol in data:
+            index = {}
+            pos = 0 
+            for elem in dcol:
+                if not elem in index:
+                    index[elem] = pos
+                    pos += 1
+            indexes.append(index)
+        
+        data_dict = defaultdict(list)
+        for pos, elems in enumerate(zip(*data)):
+            data_dict[elems].append(pos)
+       
+        shape = [len(index) for index in indexes]
+        indexdata = [cutils.darray([],int)] * numpy.prod(shape)
+        indexdata = cutils.darray(indexdata, object, 1).reshape(tuple(shape))
+        
+        for key, posses in data_dict.iteritems():
+            loc = tuple([index[keypart] for index, keypart in zip(indexes,key)])
+            indexdata[loc] = cutils.darray(posses, int)
+    else:
+        data_dict = defaultdict(list)
+        for pos, elems in enumerate(*data):
+            data_dict[elems].append(pos)
+
+        indexdata = [cutils.darray(elem, int) for elem in data_dict.values()]
+        indexdata = cutils.darray(indexdata, object, 1)
+   
+    return indexdata
+
+def remove_independent(data,dim):
+    wx = [0] * len(data.shape)
+    for pos, dep in enumerate(dim.dependent):
+        #FIXME: handle variable prev dims (move to nested_array)
+        if dep and len(wx) > pos:
+            wx[-(pos+1)] = slice(None,None)
+    data = data[wx]
+    return data
+
+def add_independent(data,dim):
+    wx = list(data.shape)[::-1]
+    for pos, dep in enumerate(dim.dependent):
+        if not dep:
+            wx.insert(pos,1)
+    data = numpy.reshape(data,wx[::-1])
+    return data
+
+   

@@ -337,12 +337,11 @@ class NestedArray(object):
         #fixed-fixed, fixed-var, var-fixed, var-var
         if(isinstance(ridx,int)):
             nextpos,nextobj = nself._get_next_obj(matchpoint+1)
+            oshape = nextobj.shape
             if(isinstance(lidx,int)):  #fixed-fixed
-                oshape = nextobj.shape
                 nshape = oshape[:lidx] + (oshape[lidx] * oshape[ridx],) + oshape[(ridx+1):]
             else:  #var-fixed
-                orshape = nextobj.shape[ridx]
-                diff = (lidx[...,-1] - lidx[...,0]) * orshape
+                diff = (lidx[...,-1] - lidx[...,0]) * oshape[ridx]
                 nlidx = numpy.zeros(lidx.shape,dtype=lidx.dtype)
                 nlidx[...,-1] = numpy.reshape(numpy.cumsum(diff.ravel()),diff.shape)
                 nlidx[...,0] = nlidx[...,-1] - diff
@@ -353,13 +352,14 @@ class NestedArray(object):
         else:
             if(isinstance(lidx,int)):  #fixed-var
                 oshape = ridx.shape
-                nshape = oshape[:-2] + (2 * oshape[-1],)
+                nshape = oshape[:-2] + (2 * oshape[-2],)
                 nridx = ridx.reshape(nshape)[...,[0, -1]]
                 nself.idxs[matchpoint] = nridx
             else:     #var-var
                 nlidx = numpy.zeros(lidx.shape,dtype=lidx.dtype)
                 nlidx[...,0] = ridx[lidx[...,0],0]
-                nlidx[...,-1] = ridx[lidx[...,-1],-1]
+                nlidx[...,-1] = numpy.roll(nlidx[...,0],-1)
+                nlidx.ravel()[-1] = ridx.ravel()[-1]
                 nself.idxs[matchpoint] = nlidx
         del nself.idxs[matchpoint+1]
         return nself
@@ -576,24 +576,25 @@ class NestedArray(object):
                     #perform some checks
                     ntr = len(tilerepeats)
                     assert nextobj.shape[ntr] == 1, "Varbroadcast on full dimension not possible"
-                    assert repeat.shape == nextobj.shape[:ntr],"Index shapes should match"
+                    bcshape = list(nextobj.shape[:(ntr - len(repeat.shape))])
+                    for l,d in zip(repeat.shape,nextobj.shape[len(repeat.shape):ntr]):
+                        if(l != d):
+                            assert l == 1, "Problem in broadcasting repeat shape"
+                            bcshape.append(d)
+                        else:
+                            bcshape.append(1)
+                    repeat = numpy.tile(repeat,bcshape) 
 
                     #collapse first dims
                     nextobj = dimpaths.flatFirstDims(nextobj,ntr)
 
                     #replace new idx
-                    nself.idxs[pos] = repeat
+                    nself.idxs[pos] = self._diffToIdx(repeat)
                   
-                    #calculate var array lengths
-                    varlength = dimpaths.flatFirstDims(repeat,len(repeat.shape)-1)
-
                     #repeat nextobj
-                    nextobj = numpy.repeat(nextobj,varlength,axis=0)
+                    nextobj = numpy.repeat(nextobj,repeat.ravel(),axis=0)
+                    nself._set_obj(nextpos,nextobj)
 
-                    if(nextpos == len(self.idxs)):
-                        nself.data = nextobj
-                    else:
-                        nself.idxs[pos] = nextobj
                     #update idxs 
                     for p in range(pos+1,nextpos):
                         nself.idxs[p] = p - pos
@@ -653,33 +654,32 @@ class NestedArray(object):
          
         idx = numpy.tile(idx,tilerepeats)
 
-        lastrepeat = 0
-        for tpos in xrange(len(tilerepeats)):
-            if(tilerepeats[tpos] > 1):
-                lastrepeat = tpos
-
-        lastrepeat += 1
         oshape = idx.shape
-        nshape = (numpy.multiply.reduce(oshape[:lastrepeat]),numpy.multiply.reduce(oshape[lastrepeat:]))
-        idx.shape = nshape
+        if(shapeok):
+            lastrepeat = 0
+            for tpos in xrange(len(tilerepeats)):
+                if(tilerepeats[tpos] > 1):
+                    lastrepeat = tpos
 
+            lastrepeat += 1
+            nshape = (numpy.multiply.reduce(oshape[:lastrepeat]),numpy.multiply.reduce(oshape[lastrepeat:]))
+            idx.shape = nshape
+        else:
+            idx = dimpaths.flatFirstDims(idx,len(idx.shape) -2)
         #make contigious (slices in order), affects nextobj
         nextpos, nextobj = self._get_next_obj(pos)
-        curpos = 0
+        lastpos = 0
         res = []
-        nidx = numpy.zeros(idx.shape,dtype=idx.dtype)
+        nidx = numpy.zeros(idx.shape,dtype=idx.dtype) + idx
         for rowpos in xrange(len(idx)):
             start = idx[rowpos,0]
             stop = idx[rowpos,-1]
             res.append(nextobj[start:stop])
-            nidx[rowpos,:] += curpos - start
-            curpos += stop - start
+            nidx[rowpos,:] += lastpos - start
+            lastpos += stop - start
         nextobj = numpy.concatenate(res)
         nidx.shape  = oshape
-        if(nextpos == len(self.idxs)):
-            self.data = nextobj
-        else:
-            self.idxs[nextpos] = nextobj
+        self._set_obj(nextpos,nextobj)
         self.idxs[pos] = nidx
         
 
@@ -727,10 +727,13 @@ def co_mapseq(func, nested_arrays, *args, **kwargs):
             data.append(seq)
     else:
         na_ref = nested_arrays[0]
+        #flatshape has tobe obtained from na_ref,
+        #as nested_arrays can have same dimensions but still have different
+        #flat shapes (nested dim of len 1, or fixed dim is same)
+        dummy,flatshape = na_ref._flatData()
         for na in nested_arrays:
-            seq,flatshape = na._flatData()
+            seq,dummy = na._flatData()
             data.append(seq)
-
     seq = func(data,*args, **kwargs)
     seq.shape = flatshape + seq.shape[1:]
 
@@ -740,15 +743,15 @@ def co_mapseq(func, nested_arrays, *args, **kwargs):
     return nself
 
 
-def co_map(func, nested_arrays, *args, **kwargs):
-    restype= kwargs.get("restype")
+def co_map(func, narrays, *args, **kwargs):
+    restype= kwargs.get("res_type")
     dtype=restype.toNumpy()
     
     def wrapfunc(seqs, *args, **kwargs):
         res = [func(elems, *args, **kwargs) for elems in zip(*seqs)]
         nseq = cutils.darray(res,dtype)
         return nseq
-    return self.co_mapseq(wrapfunc, *nested_arrays, **kwargs)
+    return co_mapseq(wrapfunc, narrays, **kwargs)
 
 def drop_prev_shapes_dim(ndata,shapes):
     cidx = ndata.idxs[-1]

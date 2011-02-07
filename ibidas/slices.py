@@ -356,7 +356,7 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
         #prepare adaptation of ndim.dependent
         if(not ndim is None):
             dep = list(ndim.dependent)
-            while(len(dep) < len(slice.dims)):
+            while(len(dep) < len(constraint.dims)):
                 dep.insert(0,False)
 
         #broadcast to constraint
@@ -364,7 +364,10 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
 
         #adapt ndim to braodcast, apply filter
         if(not ndim is None):
-            ndep = dimpaths.applyPlan(dep,splan,newvalue=True, copyvalue=True, ensurevalue=True)
+            if(isinstance(constraint.type,rtypes.TypeSlice)):
+                ndep = dimpaths.applyPlan(dep,cplan,newvalue=True, copyvalue=True, ensurevalue=True)
+            else:
+                ndep = dimpaths.applyPlan(dep,cplan,newvalue=False)
             xndim = ndim.changeDependent(tuple(ndep), slice.dims)
         else:
             xndim = ndim
@@ -411,6 +414,8 @@ class FlatDimSlice(UnaryOpSlice):#{{{
         self.flatpos = flatpos
         UnaryOpSlice.__init__(self, slice, rtype=stype,dims=sdims)#}}}
 
+
+
 class UnpackTupleSlice(UnaryOpSlice):#{{{
     """A slice which is the result of unpacking a tuple slice."""
     __slots__ = ["tuple_idx"]
@@ -453,6 +458,25 @@ class PackTupleSlice(MultiOpSlice):#{{{
         ntype = rtypes.TypeTuple(False, tuple(subtypes), tuple(fieldnames))
         nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
         MultiOpSlice.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)#}}}
+
+class GroupIndexSlice(MultiOpSlice):
+    def __init__(self, slices):
+        assert len(set([slice.dims for slice in slices])) == 1, "Group index slices should have same dimension"
+        assert all([isinstance(slice.type,rtypes.TypeArray) for slice in slices]), "Group index slices should be arrays"
+        ndims = slices[0].dims
+        
+        newdims = []
+        dep = (True,) * len(ndims)
+        for pos, slice in enumerate(slices):
+            xdep = (False,) * pos + dep
+            newdims.append(dimensions.Dim(UNDEFINED,dependent=xdep,name="g" + slice.name))
+
+        sdim = dimensions.Dim(UNDEFINED,(True,) * (len(ndims) + len(newdims)),name="g" + slices[0].type.dims[0].name)
+        stype = rtypes.TypeInt64()
+        rtype = rtypes.TypeArray(subtypes=(stype,), dims= dimpaths.DimPath(sdim))
+        rtype = rtypes.TypeArray(subtypes=(rtype,), dims= dimpaths.DimPath(*newdims))
+        MultiOpSlice.__init__(self,slices, name="groupindex", rtype=rtype, dims=ndims)
+
 
 class HArraySlice(MultiOpSlice):#{{{
     __slots__ = []

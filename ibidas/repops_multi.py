@@ -89,7 +89,7 @@ class Filter(repops.MultiOpRep):
         if(isinstance(cslice.type,rtypes.TypeBool)):
             assert dim is None, "Cannot use bool or missing data type with specified filter dimension. Constraint dimension already specifies dimension."
             assert cslice.dims, "Constraint should have at least one dimension"
-            ndim = dimensions.Dim(UNDEFINED,tuple(),  False, name = "f" + cslice.dims[-1].name)
+            ndim = dimensions.Dim(UNDEFINED,(True,) * (len(cslice.dims) -1),  False, name = "f" + cslice.dims[-1].name)
             dim_suffix = None
             seldimpath = cslice.dims[-1:]
             assert seldimpath[0] in dimset, "Cannot find last dimension of boolean filter in filter source (" + str(cslice.dims) + ")"
@@ -108,7 +108,7 @@ class Filter(repops.MultiOpRep):
                             "Multi-dimensional arrays cannot be used as filter. Please unpack the arrays."
                 ndim = cslice.type.dims[0]
             elif(isinstance(cslice.type, rtypes.TypeSlice)):
-                ndim = dimensions.Dim(UNDEFINED, seldimpath[-1].dependent, False,name = "f" + cslice.name)
+                ndim = dimensions.Dim(UNDEFINED, (True,) * len(cslice.dims), False,name = "f" + cslice.name)
             else:
                 raise RuntimeError, "Unknown constraint type in filter: " + str(cslice.type)
 

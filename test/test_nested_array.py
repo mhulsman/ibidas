@@ -2,7 +2,7 @@ import unittest
 import numpy
 
 from ibidas.utils import nested_array
-from ibidas.utils import cutils
+from ibidas.utils import cutils,util
 from ibidas.itypes import detector
 from ibidas import *
 
@@ -53,6 +53,7 @@ class TestArray(TestData):
         self.assertTrue(k[0] == self.fres0)
 
 
+
 class TestMatrix(TestArray):
     def setUp(self):
         self.data = numpy.array([[1,2,3,4,5],[1,2,3,4,5]])
@@ -69,6 +70,31 @@ class TestMatrix(TestArray):
                t1,t2 = self.transpose_couples[i]
                self.assertTrue(r.transpose(t1).transpose(t2) ==+ r)
         
+    def test_flat(self):
+       f1 = rep(self.data)
+       #backward
+       while(f1.Rdepth >= 2):
+            f1 = f1.flat()
+       #forward
+       f2 = rep(self.data)
+       while(f2.Rdepth >= 2):
+            f2 = f2.flat(f2._slices[0].dims[1].name)
+       #all
+       f3 = rep(self.data).flatall()
+       #compare
+       self.assertTrue(f1 ==+ f2)
+       self.assertTrue(f2 ==+ f3)
+       self.assertFalse(f2 ==+ (f3.sort()))
+
+
+    def test_filter3(self):
+        k = rep(self.data)
+        self.assertTrue(k[:1].flat() ==+ k[0])
+
+    def test_filter4(self):
+        k = rep(self.data)
+        self.assertTrue(k[rep([0],unpack=False)].flat() ==+ k[0])
+       
 
 class TestNestedArray(TestMatrix):
     def setUp(self):
@@ -100,6 +126,12 @@ class TestNestedNestedArray(TestMatrix):
     def test_filter2(self):
         k = rep(self.data)
         self.assertRaises(Exception,k[0])
+
+    def test_filter3(self):
+        pass 
+
+    def test_filter4(self):
+        pass
 
 class TestNestedNestedMatrix(TestMatrix):
     def setUp(self):
