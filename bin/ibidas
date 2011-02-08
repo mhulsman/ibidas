@@ -3,9 +3,12 @@ import sys
 import getopt
 import os
 from ibidas import *
+from ibidas.server import startServer
+
 from IPython.Shell import IPShellEmbed
 from IPython.ipapi import TryNext
 from IPython.genutils import dir2
+
 
 rc_path = "~/.ibidas_rc"
 rc_path = os.path.expanduser(rc_path)
