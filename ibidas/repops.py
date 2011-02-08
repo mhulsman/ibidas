@@ -2,7 +2,7 @@ import copy
 from constants import *
 import representor
 _delay_import_(globals(),"ops")
-_delay_import_(globals(),"dim_helpers")
+_delay_import_(globals(),"itypes","dimpaths")
 _delay_import_(globals(),"utils","context")
 
 
@@ -106,7 +106,7 @@ def apply_slice(slices, slicecls, dim_selector, *params, **kwds):
     :param dim_selector: select dimensions on which to apply the slicecls
     """
     if(not dim_selector is None):
-        dim_selector = dim_helpers.identifyUniqueDimPath(slices, dim_selector)
+        dim_selector = dimpaths.identifyUniqueDimPath(slices, dim_selector)
         nslices = []                       #new active slices
         for slice in slices:
             if(dim_selector in slice.dims):
