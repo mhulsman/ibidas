@@ -2,7 +2,7 @@ import operator
 import repops
 from constants import *
 from itypes import rtypes
-import slices
+import ops
 _delay_import_(globals(),"utils","util")
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","wrapper_py")
@@ -53,7 +53,7 @@ class Param(object):
         if(self.type is None):
             return val
         else:
-            if(not isinstance(val, slices.Slice)):
+            if(not isinstance(val, ops.UnaryOp)):
                 return False
             if not isinstance(val.type, self.type.__class__):
                 return False
@@ -106,7 +106,7 @@ class Func(object):
         #cannot find anything
         res = []
         for field,slice in kwargs.iteritems():
-            if(isinstance(slice, slices.Slice)):
+            if(isinstance(slice, ops.UnaryOp)):
                 res.append((str(slice.type) + " ",field))
             else:
                 res.append(("", field + "=" + str(slice)))
@@ -133,7 +133,7 @@ class UnaryFuncElemOp(UnaryFuncOp):
             slice = self._prepareSlice(slice)
             sig, nkwargs, outparam = self._findSignature(slice=slice,**kwargs)
             state &= outparam.state_mask
-            s = slices.UnaryFuncElemOpSlice(self.__class__.__name__, sig, outparam, **nkwargs)
+            s = ops.UnaryFuncElemOp(self.__class__.__name__, sig, outparam, **nkwargs)
             s = self._finishSlice(s)
             nslices.append(s)
         return self._initialize(tuple(nslices),state)
@@ -145,7 +145,7 @@ class UnaryFuncElemOp(UnaryFuncOp):
         return slice
 
 class UnaryFuncDimOp(UnaryFuncOp):
-    _slicecls = slices.UnaryFuncSeqOpSlice
+    _slicecls = ops.UnaryFuncSeqOp
 
     def _process(self, source, dim=None, **kwargs):
         state = source._state
@@ -190,7 +190,7 @@ class UnaryFuncDimOp(UnaryFuncOp):
         return slice
 
 class UnaryFuncAggregateOp(UnaryFuncDimOp):
-    _slicecls = slices.UnaryFuncAggregateOpSlice
+    _slicecls = ops.UnaryFuncAggregateOp
 
 class BinaryFuncOp(repops.MultiOpRep, Func):
     def __init__(self, lsource, rsource, **kwargs):
@@ -218,7 +218,7 @@ class BinaryFuncElemOp(BinaryFuncOp):
         nslice = max(len(lsource._slices), len(rsource._slices))
         for pos, binslices in enumerate(util.zip_broadcast(lsource._slices, rsource._slices)):
             binslices = self._prepareSlices(*binslices)
-            (lslice,rslice),plans = slices.broadcast(binslices,mode)
+            (lslice,rslice),plans = ops.broadcast(binslices,mode)
             sig, nkwargs, outparam = self._findSignature(left=lslice,right=rslice,**kwargs)
             if(isinstance(outparam, rtypes.TypeUnknown)):
                 if(binslices[0].name == binslices[1].name):
@@ -233,7 +233,7 @@ class BinaryFuncElemOp(BinaryFuncOp):
             state &= outparam.state_mask
             if(nslice > 1):
                 outparam = outparam.withNumber(pos)
-            s = slices.BinFuncElemOpSlice(self.__class__.__name__, sig,\
+            s = ops.BinFuncElemOp(self.__class__.__name__, sig,\
                          outparam, allow_partial_bc=self._allow_partial_bc, **nkwargs)
             nslices.append(s)
         return self._initialize(tuple(nslices),state)
@@ -257,7 +257,7 @@ within_sig = WithinSignature("within")
 class Within(BinaryFuncElemOp):
     _sigs = [within_sig]
     def _prepareSlices(self,lslice,rslice):
-        return (lslice, slices.PackArraySlice(rslice,1))
+        return (lslice, ops.PackArrayOp(rslice,1))
 
 class BinArithSignature(FuncSignature):
     def check(self, left, right):
@@ -387,7 +387,7 @@ class Each(UnaryFuncElemOp):
     _sigs = [eachsig]
 
     def _finishSlice(self, slice):
-        return slices.ensure_converted(slice)
+        return ops.ensure_converted(slice)
 
 class UnaryArithSignature(FuncSignature):
     def check(self, slice):#{{{
@@ -557,7 +557,7 @@ class Set(UnaryFuncAggregateOp):
 
     @classmethod
     def _prepareSlice(self,slice):
-        return slices.ensure_frozen(slice)
+        return ops.ensure_frozen(slice)
 
 
 class CorrSignature(FuncSignature):
@@ -575,7 +575,7 @@ class CorrSignature(FuncSignature):
         ntype = rtypes.TypeReal64(slice.type.has_missing)
         ntype = rtypes.TypeArray(subtypes=(ntype,),dims=ndims)
 
-        slice = slices.PackArraySlice(slice,2)
+        slice = ops.PackArrayOp(slice,2)
         nkwargs = {'slice':slice}
         return (nkwargs, Param(slice.name, ntype))
 corrsig = CorrSignature("corr")
@@ -584,6 +584,6 @@ class Corr(UnaryFuncElemOp):
     _sigs = [corrsig]
 
     def _finishSlice(self,slice):
-        return slices.UnpackArraySlice(slice,2)
+        return ops.UnpackArrayOp(slice,2)
 
         

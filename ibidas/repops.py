@@ -1,7 +1,7 @@
 import copy
 from constants import *
 import representor
-_delay_import_(globals(),"slices")
+_delay_import_(globals(),"ops")
 _delay_import_(globals(),"dim_helpers")
 _delay_import_(globals(),"utils","context")
 
@@ -119,8 +119,8 @@ def apply_slice(slices, slicecls, dim_selector, *params, **kwds):
     return tuple(nslices)
 
 def frozen(slices):
-    return apply_slice(slices, slices.ensure_frozen, None)
+    return apply_slice(slices, ops.ensure_frozen, None)
 
 def converted(slices):
-    return apply_slice(slices, slices.ensure_converted, None)
+    return apply_slice(slices, ops.ensure_converted, None)
 

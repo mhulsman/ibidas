@@ -5,7 +5,7 @@ import repops
 
 
 _delay_import_(globals(),"representor")
-_delay_import_(globals(),"slices")
+_delay_import_(globals(),"ops")
 _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"itypes","rtypes","dimpaths","casts")
 
@@ -88,7 +88,7 @@ class Project(repops.UnaryOpRep):
 
             if(name):
                 assert len(elem) == 1, "Could not find a (unique) matching slice for " + name
-                nslices.append(slices.ChangeNameSlice(elem[0],name))
+                nslices.append(ops.ChangeNameOp(elem[0],name))
             else:
                 nslices.extend(elem)
         assert nslices, "No slices found with: " + str(args) + " and " + str(kwds)
@@ -126,7 +126,7 @@ def unpack_tuple(slice,name="",unpack=True):
             raise RuntimeError, "No tuple to unpack"
 
     if(not name):
-        nslices = [slices.ensure_converted(slices.UnpackTupleSlice(slice, idx))
+        nslices = [ops.ensure_converted(ops.UnpackTupleOp(slice, idx))
                                             for idx in range(len(slice.type.subtypes))]
     else: 
         try:
@@ -135,12 +135,12 @@ def unpack_tuple(slice,name="",unpack=True):
             assert isinstance(name, str), \
                         "Tuple slice name should be a string"
             idx = slice.type.fieldnames.index(name)
-        nslices = [slices.ensure_converted(slices.UnpackTupleSlice(slice, idx))]
+        nslices = [ops.ensure_converted(ops.UnpackTupleOp(slice, idx))]
     
     if(unpack):
         for pos, nslice in enumerate(nslices):
             while(nslice.type.__class__ is rtypes.TypeArray):
-                nslice = slices.ensure_converted(slices.UnpackArraySlice(nslice))
+                nslice = ops.ensure_converted(ops.UnpackArrayOp(nslice))
             nslices[pos] = nslice
     return nslices
 
@@ -151,7 +151,7 @@ class Bookmark(repops.UnaryOpRep):
         
         nslices = source._slices
         if(len(names) == 1):
-            nslices = [slices.ChangeBookmarkSlice(slice,names[0]) for slice in nslices]
+            nslices = [ops.ChangeBookmarkOp(slice,names[0]) for slice in nslices]
         elif(len(names) > 1):
             unique_first_dims = util.unique([slice.dims[0] for slice in source._slices])
             assert (len(names) == len(unique_first_dims)), \
@@ -163,7 +163,7 @@ class Bookmark(repops.UnaryOpRep):
             nnslices = []
             for slice in source._slices:
                 if(slice.dims[0].name in kwds):
-                    nslice = slice.ChangeBookmarkSlice(slice,kdws[slice.dims[0].name])
+                    nslice = slice.ChangeBookmarkOp(slice,kdws[slice.dims[0].name])
                 else:
                     nslice = slice
                 nnslices.append(nslice)
@@ -181,13 +181,13 @@ class SliceRename(repops.UnaryOpRep):
         if(names):
             assert (len(names) == len(source._slices)), \
                 "Number of new slice names does not match number of slices"
-            nslices = [slices.ChangeNameSlice(slice,name) 
+            nslices = [ops.ChangeNameOp(slice,name) 
                     for slice, name in zip(source._slices, names)]
         else:
             nslices = []
             for slice in source._slices:
                 if(slice.name in kwds):
-                    nslice = slice.ChangeNameSlice(slice,kdws[slice.name])
+                    nslice = slice.ChangeNameOp(slice,kdws[slice.name])
                 else:
                     nslice = slice
                 nslices.append(nslice)
@@ -203,14 +203,14 @@ class SliceCast(repops.UnaryOpRep):
         if(newtypes):
             assert (len(newtypes) == len(source._slices)), \
                 "Number of new slice types does not match number of slices"
-            nslices = [slices.CastSlice(slice,rtypes.createType(newtype)) 
+            nslices = [ops.CastOp(slice,rtypes.createType(newtype)) 
                     for slice, newtype in zip(source._slices, newtypes)]
         else:
             nslices = []
             for slice in source._slices:
                 if(slice.name in kwds):
                     newtype = rtypes.createType(kwds[slice.name])
-                    nslice = slice.CastSlice(slice,newtype)
+                    nslice = slice.CastOp(slice,newtype)
                 else:
                     nslice = slice
                 nslices.append(nslice)
@@ -231,13 +231,13 @@ class RTuple(repops.UnaryOpRep):
             oslice = slice
             if(to_python):
                 while(len(slice.dims) > len(cdimpath)):
-                    slice = slices.PackListSlice(slice)
+                    slice = ops.PackListOp(slice)
             else:
                 if(len(slice.dims) > len(cdimpath)):
-                    slice = slices.PackArraySlice(slice, ndim=len(slice.dims) - len(cdimpath))
+                    slice = ops.PackArrayOp(slice, ndim=len(slice.dims) - len(cdimpath))
             nslices.append(slice)
     
-        nslice = slices.PackTupleSlice(nslices, to_python=to_python)
+        nslice = ops.PackTupleOp(nslices, to_python=to_python)
 
         #initialize object attributes
         return self._initialize((nslice,),RS_ALL_KNOWN)
@@ -254,7 +254,7 @@ class HArray(repops.UnaryOpRep):
         for slice in source._slices:
             oslice = slice
             if(len(slice.dims) > len(cdimpath)):
-                slice = slices.PackArraySlice(slice, ndim=len(slice.dims) - len(cdimpath))
+                slice = ops.PackArrayOp(slice, ndim=len(slice.dims) - len(cdimpath))
             nslices.append(slice)
 
         #cast to common type
@@ -262,10 +262,10 @@ class HArray(repops.UnaryOpRep):
         nnslices = []
         for slice in nslices:
             if(ntype != slice.type):
-                slice = slices.CastSlice(slice,ntype)
+                slice = ops.CastOp(slice,ntype)
             nnslices.append(slice)
     
-        nslice = slices.HArraySlice(nnslices)
+        nslice = ops.HArrayOp(nnslices)
 
         #initialize object attributes
         return self._initialize((nslice,),RS_ALL_KNOWN)

@@ -3,7 +3,7 @@ import csv
 
 import wrapper
 from ..itypes import rtypes
-from .. import slices
+from .. import ops
 from ..constants import *
 
 _delay_import_(globals(),"wrapper_py")
@@ -93,11 +93,11 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                 dtype = rtypes.createType(dtype)
             dtype._setNeedConversionRecursive(True)
 
-        slice = slices.ensure_converted(TSVSlice(filename, dialect, startpos, dtype, "data"))
+        slice = ops.ensure_converted(TSVOp(filename, dialect, startpos, dtype, "data"))
         if(slice.type.__class__ is rtypes.TypeArray):
-            slice = slices.ensure_converted(slices.UnpackArraySlice(slice))
+            slice = ops.ensure_converted(ops.UnpackArrayOp(slice))
         if(slice.type.__class__ is rtypes.TypeTuple):
-            nslices = [slices.ensure_converted(slices.UnpackTupleSlice(slice, idx))
+            nslices = [ops.ensure_converted(ops.UnpackTupleOp(slice, idx))
                                     for idx in range(len(slice.type.subtypes))]
         else:
             nslices = [slice]
@@ -110,14 +110,14 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         self._initialize(tuple(nslices),state)
 
 
-class TSVSlice(slices.ExtendSlice):
+class TSVOp(ops.ExtendOp):
     __slots__ = ["filename", "dialect","startpos"]
 
     def __init__(self, filename, dialect, startpos, rtype, name):
         self.filename = filename
         self.dialect = dialect
         self.startpos = startpos
-        slices.ExtendSlice.__init__(self,name=name,rtype=rtype)
+        ops.ExtendOp.__init__(self,name=name,rtype=rtype)
 
     def py_exec(self):
         file = open(self.filename)
@@ -130,5 +130,5 @@ class TSVSlice(slices.ExtendSlice):
         data = [tuple(row) for row in reader]
         file.close()
         ndata = nested_array.NestedArray(data,self.type)
-        return wrapper_py.ResultSlice.from_slice(ndata,self)
+        return wrapper_py.ResultOp.from_slice(ndata,self)
 

@@ -17,7 +17,7 @@ _delay_import_(globals(),"repops_multi")
 _delay_import_(globals(),"repops_dim")
 _delay_import_(globals(),"repops_slice")
 _delay_import_(globals(),"repops_funcs")
-_delay_import_(globals(),"slices")
+_delay_import_(globals(),"ops")
 
 
 

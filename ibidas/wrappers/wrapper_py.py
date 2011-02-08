@@ -9,7 +9,7 @@ from ..constants import *
 from ..utils.multi_visitor import VisitorFactory, DirectVisitorFactory, NF_ERROR, NF_ELSE
 from ..itypes import rtypes, dimpaths
 from ..passes import manager, create_graph, serialize_exec
-from .. import slices
+from .. import ops
 
 from ..utils.multi_visitor import VisitorFactory, DirectVisitorFactory, NF_ELSE
 
@@ -85,11 +85,11 @@ def rep(data=None, dtype=None, unpack=True, name=None):
     if(name is None):
         name = "data"
 
-    data_slice = slices.DataSlice(data,name=name,rtype=dtype)
-    data_slice = slices.ensure_converted(data_slice)
+    data_slice = ops.DataOp(data,name=name,rtype=dtype)
+    data_slice = ops.ensure_converted(data_slice)
     
     while(unpack and data_slice.type.__class__ is rtypes.TypeArray):
-        data_slice = slices.ensure_converted(slices.UnpackArraySlice(data_slice))
+        data_slice = ops.ensure_converted(ops.UnpackArrayOp(data_slice))
 
     res = wrapper.SourceRepresentor()
     res._initialize((data_slice,)) 
@@ -100,7 +100,7 @@ def rep(data=None, dtype=None, unpack=True, name=None):
     return res
 
 
-class ResultSlice(slices.DataSlice):
+class ResultOp(ops.DataOp):
     __slots__ = ["source"]
     def __init__(self, data=None, name=None, rtype=rtypes.unknown, dims=dimpaths.DimPath(), bookmarks=set()):
         self.name = name
@@ -125,7 +125,7 @@ class ResultSlice(slices.DataSlice):
         if(bookmarks is NOVAL):
             bookmarks = self.bookmarks
 
-        return ResultSlice(data, name, rtype, dims, bookmarks)
+        return ResultOp(data, name, rtype, dims, bookmarks)
 
     def setSource(self,source):
         self.source = source
@@ -181,35 +181,35 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def visitelse(self,node, **kwargs):
         raise RuntimeError, "Unknown node type encountered: " + node.__class__.__name__ + " with  " + str(kwargs)
 
-    def visitExtendSlice(self,node, *args, **kwargs):
+    def visitExtendOp(self,node, *args, **kwargs):
         return node.py_exec(*args, **kwargs)
 
-    def visitDataSlice(self,node):
+    def visitDataOp(self,node):
         if(isinstance(node.data, nested_array.NestedArray)):
             ndata = node.data.copy()
         else:
             ndata = nested_array.NestedArray(node.data,node.type)
-        return ResultSlice.from_slice(ndata,node)
+        return ResultOp.from_slice(ndata,node)
 
-    def visitConvertSlice(self,node,slice):
+    def visitConvertOp(self,node,slice):
         ndata = slice.data.mapseq(node.convertor.convert,
                                 node.type,res_type=node.type)
         return slice.modify(data=ndata)
    
-    def visitCastSlice(self,node,slice):
+    def visitCastOp(self,node,slice):
         ndata = self.cast(node.cast_name,node,slice)
         return slice.modify(data=ndata,rtype=node.type)
 
-    def visitChangeNameSlice(self,node,slice):
+    def visitChangeNameOp(self,node,slice):
         return slice.modify(name = node.name)
 
-    def visitChangeDimPathSlice(self,node,slice):
+    def visitChangeDimPathOp(self,node,slice):
         return slice.modify(dims=node.dims)
 
-    def visitChangeBookmarkSlice(self,node,slice):
+    def visitChangeBookmarkOp(self,node,slice):
         return slice.modify(bookmarks=node.bookmarks)
 
-    def visitDetectTypeSlice(self,node,slice):
+    def visitDetectTypeOp(self,node,slice):
         if(slice.type == rtypes.unknown):
             det = detector.Detector()
             det.setParentDimensions(node.dims)
@@ -218,45 +218,45 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         else:
             return slice
     
-    def visitUnpackArraySlice(self,node,slice):
+    def visitUnpackArrayOp(self,node,slice):
         ndata=slice.data.unpack(node.unpack_dims, subtype=node.type)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
-    def visitPackArraySlice(self, node, slice):
+    def visitPackArrayOp(self, node, slice):
         ndata=slice.data.pack(node.type, len(node.type.dims))
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
-    def visitInsertDimSlice(self,node,slice):
+    def visitInsertDimOp(self,node,slice):
         ndata = slice.data.insertDim(node.matchpoint)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
-    def visitPermuteDimsSlice(self, node, slice):
+    def visitPermuteDimsOp(self, node, slice):
         ndata=slice.data.permuteDims(node.permute_idxs)
         return slice.modify(data=ndata,dims=node.dims,rtype=node.type)
 
-    def visitSplitDimSlice(self, node, slice):
+    def visitSplitDimOp(self, node, slice):
         ndata=slice.data.splitDim(node.pos,node.lshape,node.rshape)
         return slice.modify(data=ndata,dims=node.dims,rtype=node.type)
 
-    def visitPackListSlice(self, node, slice):
+    def visitPackListOp(self, node, slice):
         ndata=slice.data.pack(node.type, len(node.type.dims))
         ndata=ndata.map(list,res_type=node.type)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
-    def visitUnpackTupleSlice(self,node,slice):
+    def visitUnpackTupleOp(self,node,slice):
         func = operator.itemgetter(node.tuple_idx)
         ndata = slice.data.map(func,res_type=node.type)
         return slice.modify(data=ndata,rtype=node.type,name=node.name)
  
-    def visitPackTupleSlice(self,node, slices):
+    def visitPackTupleOp(self,node, slices):
         ndata = nested_array.co_mapseq(speedtuplify,[slice.data for slice in slices],res_type=node.type)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
     
-    def visitHArraySlice(self,node, slices):
+    def visitHArrayOp(self,node, slices):
         ndata = nested_array.co_mapseq(speedarrayify,[slice.data for slice in slices],dtype=node.type.subtypes[0].toNumpy(), res_type=node.type)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
-    def visitEnsureCommonDimSlice(self,node,slice,compare_slice):
+    def visitEnsureCommonDimOp(self,node,slice,compare_slice):
         checkdim = node.dims[node.checkpos]
         selfshape = slice.data.getDimShape(node.checkpos)
 
@@ -266,17 +266,17 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
         return slice.modify(rtype=node.type,dims=node.dims)
 
-    def visitShapeSlice(self, node, slice):
+    def visitShapeOp(self, node, slice):
         d = slice.data.getDimShape(node.pos)
         ndata = nested_array.NestedArray(d,node.type)
         return slice.modify(ndata,rtype=node.type,dims=node.dims,name=node.name)
 
-    def visitFreezeSlice(self, node, slice):
+    def visitFreezeOp(self, node, slice):
         func = lambda x: type_attribute_freeze.freeze_protocol.execFreeze(slice.type,x)
         ndata = slice.data.mapseq(func,res_type=node.type)
         return slice.modify(data=ndata)
 
-    def visitBroadcastSlice(self,node,slice,compare_slices):
+    def visitBroadcastOp(self,node,slice,compare_slices):
         repeat_dict = {}
         bcpos = 0
         for pos,planelem in enumerate(node.plan):
@@ -299,28 +299,28 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(data=ndata,dims=node.dims)
 
 
-    def visitFilterSlice(self,node, slice, constraint):
+    def visitFilterOp(self,node, slice, constraint):
         func = speedfilter
         ndata = nested_array.co_mapseq(func,[slice.data, constraint.data],
                                        res_type=node.type, dtype=node.type.toNumpy(), bc_allow=True)
         return slice.modify(data=ndata,rtype=node.type)
 
-    def visitFlatAllSlice(self, node, slice):
+    def visitFlatAllOp(self, node, slice):
         ndata = slice.data.mergeAllDims()
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
     
-    def visitFlatDimSlice(self, node, slice):
+    def visitFlatDimOp(self, node, slice):
         ndata = slice.data.mergeDim(node.flatpos-1)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
 
-    def visitGroupIndexSlice(self, node, slices):
+    def visitGroupIndexOp(self, node, slices):
         ndata = nested_array.co_map(groupindex,[slice.data for slice in slices],
                                         res_type = node.type, bc_allow=False)
         
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
-    def visitUnaryFuncElemOpSlice(self,node, slice):
+    def visitUnaryFuncElemOp(self,node, slice):
         try:
             func = getattr(self, node.sig.name + node.funcname)
         except AttributeError:
@@ -331,7 +331,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                                   res_type=node.type,op=node.funcname, **node.kwargs)
         return slice.modify(data=ndata,rtype=node.type)
 
-    def visitUnaryFuncSeqOpSlice(self,node, slice):
+    def visitUnaryFuncSeqOp(self,node, slice):
         try:
             func = getattr(self, node.sig.name + node.funcname)
         except AttributeError:
@@ -355,7 +355,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(data=ndata,rtype=node.type)
 
        
-    def visitUnaryFuncAggregateOpSlice(self,node, slice):
+    def visitUnaryFuncAggregateOp(self,node, slice):
         try:
             func = getattr(self, node.sig.name + node.funcname)
         except AttributeError:
@@ -381,7 +381,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
 
 
-    def visitBinFuncElemOpSlice(self,node, slices):
+    def visitBinFuncElemOp(self,node, slices):
         try:
             func = getattr(self, node.sig.name + node.funcname)
         except AttributeError:

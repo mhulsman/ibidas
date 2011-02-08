@@ -1,7 +1,7 @@
 import wrapper
 import sqlalchemy
 
-from .. import slices
+from .. import ops
 from ..constants import *
 from ..utils.multi_visitor import VisitorFactory, NF_ELSE
 
@@ -323,7 +323,7 @@ class TableRepresentor(wrapper.SourceRepresentor):
     def __init__(self, engine, table):
         table_type = convert(table.columns,'sqlalchemy',engine, table.name)
         s = sqlalchemy.sql.select([table])
-        nslices = (SQLSlice(engine, s, table_type, table.name),)
+        nslices = (SQLOp(engine, s, table_type, table.name),)
         self._initialize(nslices,RS_ALL_KNOWN)
 
 class QueryRepresentor(wrapper.SourceRepresentor):
@@ -335,19 +335,19 @@ class QueryRepresentor(wrapper.SourceRepresentor):
             query_type = convert(res.cursor.description, res.dialect.name, self.engine)
         res.close() 
         
-        nslices = (SQLSlice(engine, query, query_type),)
+        nslices = (SQLOp(engine, query, query_type),)
         self._initialize(nslices,RS_ALL_KNOWN)
 
 
-class SQLSlice(slices.ExtendSlice):
+class SQLOp(ops.ExtendOp):
     def __init__(self, conn, query, rtype, name="result"):
         self.conn = conn
         self.query = query
-        slices.ExtendSlice.__init__(self,name=name,rtype=rtype)
+        ops.ExtendOp.__init__(self,name=name,rtype=rtype)
 
     def py_exec(self):
         res = self.conn.execute(self.query)
         result = res.fetchall()
         ndata = nested_array.NestedArray(result,self.type)
-        return wrapper_py.ResultSlice.from_slice(ndata,self)
+        return wrapper_py.ResultOp.from_slice(ndata,self)
 

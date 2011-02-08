@@ -55,7 +55,7 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
         
         self.server.setNodeLabel(self.network, "name", "","default")
         self.server.setDiscreteNodeShapeMapper(self.network, 'default',
-                'type', 'diamond', {'else':'ellipse', 'slice':'octagon', 'rep':'round_rect'}, True)
+                'type', 'diamond', {'else':'ellipse', 'unaryop':'octagon', 'rep':'round_rect'}, True)
         self.server.setEdgeTargetArrowRule(self.network,"type","Arrow",["paramlist","paramchoicelist"],["T","T"])
         self.server.setEdgeLineStyleRule(self.network,"type","SOLID",["paramchoice","paramchoicelist"],["DOT","DOT"])
         self.server.performLayout(self.network, "hierarchical")
@@ -78,11 +78,10 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
         self.node_type[name] = "else"
         return name
     
-    def nodeSlice(self,node):
+    def nodeUnaryOp(self,node):
         name =self.nodeelse(node)
-        self.node_type[name] = "slice"
-        if(node.__class__.__name__.endswith("Slice")):
-            self.node_name[name] = node.__class__.__name__[:-5]
+        self.node_type[name] = "unaryop"
+        self.node_name[name] = node.__class__.__name__
 
     def edgeelse(self,edge):
         self.edge_from.append(self.names[edge.source])

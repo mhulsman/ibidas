@@ -39,40 +39,40 @@ class CreateGraph(VisitorFactory(prefixes=("visit",),
             self.graph.addEdge(query_graph.Edge(slice,node,"paramlist","slices",pos))
         self.queue.extend(node._slices)
 
-    def visitExtendSlice(self,node):
+    def visitExtendOp(self,node):
         if(hasattr(node,'create_graph_exec')):
             node.graph_exec(self)
 
-    def visitDataSlice(self,node):
+    def visitDataOp(self,node):
         pass
 
-    def visitUnaryOpSlice(self,node):
+    def visitUnaryUnaryOp(self,node):
         self.graph.addNode(node.source)
         self.graph.addEdge(query_graph.Edge(node.source,node,"param","slice",0))
         self.queue.append(node.source)
     
-    def visitMultiOpSlice(self,node):
+    def visitMultiUnaryOp(self,node):
         for pos, slice in enumerate(node.sources):
             self.graph.addNode(slice)
             self.graph.addEdge(query_graph.Edge(slice,node,"paramlist","slices",pos))
         self.queue.extend(node.sources)
     
-    def visitFilterSlice(self,node):
-        self.visitUnaryOpSlice(node)
+    def visitFilterOp(self,node):
+        self.visitUnaryUnaryOp(node)
         self.graph.addNode(node.constraint)
         self.graph.addEdge(query_graph.Edge(node.constraint,node,"param","constraint",0))
         self.queue.append(node.constraint)
 
    
-    def visitEnsureCommonDimSlice(self,node):
-        self.visitUnaryOpSlice(node)
+    def visitEnsureCommonDimOp(self,node):
+        self.visitUnaryUnaryOp(node)
         for slice in node.refslices:
             self.graph.addNode(slice)
             self.graph.addEdge(query_graph.Edge(slice,node,"paramchoice","compare_slice",0))
         self.queue.extend(node.refslices)
      
-    def visitBroadcastSlice(self,node):
-        self.visitUnaryOpSlice(node)
+    def visitBroadcastOp(self,node):
+        self.visitUnaryUnaryOp(node)
         for pos, slicelist in enumerate(node.refsliceslist):
             for slice in slicelist:
                 self.graph.addNode(slice)

@@ -3,7 +3,7 @@ import repops
 from itertools import izip_longest
 
 _delay_import_(globals(),"itypes","rtypes","dimpaths","dimensions")
-_delay_import_(globals(),"slices")
+_delay_import_(globals(),"ops")
 _delay_import_(globals(),"utils","util")
 
 class UnpackArray(repops.UnaryOpRep):
@@ -23,9 +23,9 @@ class UnpackArray(repops.UnaryOpRep):
                 if(not name is None):
                     dimindex = slice.type.dims.getDimIndexByName(name)
                     if(not dimindex is None):
-                        slice = slices.ensure_converted(slices.UnpackArraySlice(slice,ndim=dimindex))
+                        slice = ops.ensure_converted(ops.UnpackArrayOp(slice,ndim=dimindex))
                 else:
-                    slice = slices.ensure_converted(slices.UnpackArraySlice(slice,ndim=ndim))
+                    slice = ops.ensure_converted(ops.UnpackArrayOp(slice,ndim=ndim))
             nslices.append(slice)
 
         return self._initialize(tuple(nslices),RS_CHECK)
@@ -44,7 +44,7 @@ class DimRename(repops.UnaryOpRep):#{{{
                 name_dict[dim] = newname
             kwds.update(name_dict)
         
-        nslices = [slices.ChangeDimPathSlice(slice, slice.dims.changeNames(kwds))
+        nslices = [ops.ChangeDimPathOp(slice, slice.dims.changeNames(kwds))
                                                     for slice in source._slices]
         return self._initialize(tuple(nslices),source._state)#}}}
 
@@ -60,7 +60,7 @@ class Shape(repops.UnaryOpRep):
             for pos, dim in enumerate(slice.dims):
                 if dim.name in dimnames:
                     continue
-                nslice = slices.ShapeSlice(slice,pos)
+                nslice = ops.ShapeOp(slice,pos)
                 nslices.append(nslice)
                 dimnames.add(dim.name)
         return self._initialize(tuple(nslices),RS_SLICES_KNOWN)
@@ -75,7 +75,7 @@ class InsertDim(repops.UnaryOpRep):
         ndim = dimensions.Dim(1,name=name)
         nslices = []
         for slice in source._slices:
-            slice = slices.InsertDimSlice(slice,insertpoint,ndim)
+            slice = ops.InsertDimOp(slice,insertpoint,ndim)
             nslices.append(slice)
         return self._initialize(tuple(nslices),source._state)
 
@@ -100,7 +100,7 @@ class SplitDim(repops.UnaryOpRep):
         for slice in source._slices:
             lastposs = slice.dims.matchDimPath(selpath)
             for lastpos in lastposs:
-                slice = slices.SplitDimSlice(slice,lastpos,lshape,rshape,ldim,rdim)
+                slice = ops.SplitDimOp(slice,lastpos,lshape,rshape,ldim,rdim)
             nslices.append(slice)
             
         return self._initialize(tuple(nslices),source._state)
@@ -121,24 +121,24 @@ class PermuteDims(repops.UnaryOpRep):
         nslices = []
         for slice in source._slices:
             pidx = list(permute_idxs) + range(max(permute_idxs) + 1, len(slice.dims))
-            slice = slices.PermuteDimsSlice(slice,pidx)
+            slice = ops.PermuteDimsOp(slice,pidx)
             nslices.append(slice)
         return self._initialize(tuple(nslices),source._state)
 
 
 @repops.delayable()
 def rarray(source, dim=None, ndim=1):
-    return repops.ApplyFuncRep(source, repops.apply_slice, slices.PackArraySlice, dim, ndim=1)
+    return repops.ApplyFuncRep(source, repops.apply_slice, ops.PackArrayOp, dim, ndim=1)
 
 @repops.delayable()
 def rlist(source, dim=None):
-    return repops.ApplyFuncRep(source, repops.apply_slice, slices.PackListSlice, dim)
+    return repops.ApplyFuncRep(source, repops.apply_slice, ops.PackListOp, dim)
 
 class FlatAll(repops.UnaryOpRep):
     def _process(self,source,name=None):
         if not source._state & RS_SLICES_KNOWN:
             return
-        nslices = slices.broadcast(source._slices,mode="dim")[0]
+        nslices = ops.broadcast(source._slices,mode="dim")[0]
         dims = nslices[0].dims
         
         shape = 1
@@ -155,7 +155,7 @@ class FlatAll(repops.UnaryOpRep):
         
         nnslices = []
         for slice in nslices:
-            nnslices.append(slices.FlatAllSlice(slice, ndim))
+            nnslices.append(ops.FlatAllOp(slice, ndim))
 
         return self._initialize(tuple(nnslices),source._state)
 
@@ -201,11 +201,11 @@ class Flat(repops.UnaryOpRep):
             while(lastpos):
                 flatpos = lastpos[0] + 1
                 if(len(sdims) <= flatpos or sdims[flatpos] != selpath[-1]):
-                    slice = slices.InsertDimSlice(slice,flatpos,bcdim)
+                    slice = ops.InsertDimOp(slice,flatpos,bcdim)
                     bcdims = slice.dims[:flatpos] + (selpath[-1],) + slice.dims[flatpos:]
                     plan = [BCCOPY] * len(slice.dims[:flatpos]) + [BCEXIST] + [BCCOPY] * len(slice.dims[flatpos:])
-                    slice = slices.BroadcastSlice(slice,[refslices],plan,bcdims)
-                slice = slices.FlatDimSlice(slice,flatpos,ndim)
+                    slice = ops.BroadcastOp(slice,[refslices],plan,bcdims)
+                slice = ops.FlatDimOp(slice,flatpos,ndim)
                 if(len(lastpos) > 1):
                     sdims = slice.dims
                     lastpos = sdims.matchDimPath(selpath[:-1])
@@ -219,12 +219,12 @@ class GroupIndex(repops.UnaryOpRep):
         if not source._state & RS_SLICES_KNOWN:
             return
         
-        nslices = [slices.ensure_frozen(slice) for slice in source._slices]
-        nslices = slices.broadcast(nslices,mode="dim")[0]
-        nslices = [slices.PackArraySlice(nslice,1) for nslice in nslices]
+        nslices = [ops.ensure_frozen(slice) for slice in source._slices]
+        nslices = ops.broadcast(nslices,mode="dim")[0]
+        nslices = [ops.PackArrayOp(nslice,1) for nslice in nslices]
 
-        nslice = slices.GroupIndexSlice(nslices)
-        nslice = slices.UnpackArraySlice(nslice, len(nslices))
+        nslice = ops.GroupIndexOp(nslices)
+        nslice = ops.UnpackArrayOp(nslice, len(nslices))
         return self._initialize((nslice,),RS_ALL_KNOWN)
 
 

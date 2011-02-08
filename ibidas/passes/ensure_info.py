@@ -7,7 +7,7 @@ from ..constants import *
 _delay_import_(globals(),"..repops")
 _delay_import_(globals(),"..repops_multi")
 _delay_import_(globals(),"..representor")
-_delay_import_(globals(),"..slices")
+_delay_import_(globals(),"..ops")
 
 class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"), 
                                       flags=NF_ERROR | F_CACHE), manager.Pass):
@@ -20,7 +20,7 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
                 self.copied_nodes = dict()
                 first_known_nodes = self.findFirstKnown(query_root)
                 temp_root = repops_multi.Combine(first_known_nodes)
-                temp_root = repops.ApplyFuncRep(temp_root,repops.apply_slice,slices.DetectTypeSlice,None)
+                temp_root = repops.ApplyFuncRep(temp_root,repops.apply_slice,ops.DetectTypeOp,None)
                 known_slices = temp_root._getResultSlices(endpoint=False)
 
                 self.inferred_node_slices = dict()

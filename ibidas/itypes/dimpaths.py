@@ -7,7 +7,6 @@ from dimensions import Dim
 #_delay_import_(globals(),"dimensions","Dim")
 _delay_import_(globals(),"rtypes")
 _delay_import_(globals(),"..representor")
-_delay_import_(globals(),"..slices")
 _delay_import_(globals(),"..utils","toposort","util","context")
 
 class PathError(Exception):

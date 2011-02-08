@@ -4,7 +4,7 @@ from constants import *
 import repops
 
 _delay_import_(globals(),"utils","util","context")
-_delay_import_(globals(),"slices")
+_delay_import_(globals(),"ops")
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","wrapper_py")
 _delay_import_(globals(),"itypes","rtypes","dimensions","dimpaths")
@@ -19,7 +19,7 @@ class Broadcast(repops.MultiOpRep):
 
         nslices = []
         for bcslices in util.zip_broadcast(*[source._slices for source in sources]):
-            nslices.extend(slices.broadcast(bcslices,mode)[0])
+            nslices.extend(ops.broadcast(bcslices,mode)[0])
         return self._initialize(tuple(nslices),state)
 
 
@@ -54,8 +54,8 @@ class Nest(repops.MultiOpRep):
         for slice in rsource._slices:
             odims = slice.dims
             for dimpos in xrange(len(joinpath)):
-                slice = slices.InsertDimSlice(slice,dimpos,idims[dimpos])
-            slice = slices.BroadcastSlice(slice,references,plan,joinpath + odims)
+                slice = ops.InsertDimOp(slice,dimpos,idims[dimpos])
+            slice = ops.BroadcastOp(slice,references,plan,joinpath + odims)
             nslices.append(slice)
         return self._initialize(tuple(nslices), state)
 
@@ -71,8 +71,8 @@ class Combine(repops.MultiOpRep):
     def _apply(cls, *xslicelists):
         if(len(xslicelists) == 2):
             lslices,rslices = xslicelists
-            lslices = [slices.ChangeBookmarkSlice(lslice,add_bookmark="!L",update_auto_bookmarks="L") for lslice in lslices]
-            rslices = [slices.ChangeBookmarkSlice(rslice,add_bookmark="!R",update_auto_bookmarks="R") for rslice in rslices]
+            lslices = [ops.ChangeBookmarkOp(lslice,add_bookmark="!L",update_auto_bookmarks="L") for lslice in lslices]
+            rslices = [ops.ChangeBookmarkOp(rslice,add_bookmark="!R",update_auto_bookmarks="R") for rslice in rslices]
             return tuple(lslices + rslices)
         else:
             return sum([tuple(xslices) for xslices in xslicelists],tuple())
@@ -86,12 +86,12 @@ class Group(repops.MultiOpRep):
         if not source._state & RS_SLICES_KNOWN or not gsource._state & RS_TYPES_KNOWN:
             return
 
-        gslices = [slices.ensure_frozen(slice) for slice in gsource._slices]
-        gslices = slices.broadcast(gslices,mode="dim")[0]
-        gslices = [slices.PackArraySlice(gslice,1) for gslice in gslices]
+        gslices = [ops.ensure_frozen(slice) for slice in gsource._slices]
+        gslices = ops.broadcast(gslices,mode="dim")[0]
+        gslices = [ops.PackArrayOp(gslice,1) for gslice in gslices]
 
-        gslice = slices.GroupIndexSlice(gslices)
-        gslice = slices.UnpackArraySlice(gslice, len(gslices))
+        gslice = ops.GroupIndexOp(gslices)
+        gslice = ops.UnpackArrayOp(gslice, len(gslices))
 
         nslices = Filter._apply(source._slices,gslice,gslices[0].type.dims[:1],"dim")
         return self._initialize(tuple(nslices),source._state)
@@ -134,7 +134,7 @@ class Filter(repops.MultiOpRep):
             seldimpath = cslice.dims[-1:]
             dimset = dimpaths.createDimSet([slice.dims for slice in fslices])
             assert seldimpath[0] in dimset, "Cannot find last dimension of boolean filter in filter source (" + str(cslice.dims) + ")"
-            cslice = slices.PackArraySlice(cslice,1)
+            cslice = ops.PackArrayOp(cslice,1)
         else:
             assert seldimpath, "Filter dimpath is empty"
 
@@ -153,7 +153,7 @@ class Filter(repops.MultiOpRep):
         
         nslices = []
         for slice in fslices:
-            slice = slices.filter(slice, cslice, seldimpath, ndim, bcmode)
+            slice = ops.filter(slice, cslice, seldimpath, ndim, bcmode)
             nslices.append(slice)
         return nslices
 
@@ -184,7 +184,7 @@ class Sort(repops.MultiOpRep):
         
         #fixme: make it slice-only (remove rep)
         constraint = repops_funcs.ArgSort(constraint, descend=descend)
-        cslice = slices.PackArraySlice(constraint._slices[0])
+        cslice = ops.PackArrayOp(constraint._slices[0])
         nslices = Filter._apply(source._slices, cslice, cslice.type.dims[:1],"dim")
         return self._initialize(tuple(nslices),source._state & constraint._state)
 
@@ -231,8 +231,8 @@ class Join(repops.MultiOpRep):
         filters = Filter._apply([leftpos,rightpos],cslice, None,"dim")
         leftflat,rightflat = repops_dim.Flat._apply(filters, filters[0].dims[-1:])
 
-        leftflat = slices.PackArraySlice(leftflat)
-        rightflat = slices.PackArraySlice(rightflat)
+        leftflat = ops.PackArrayOp(leftflat)
+        rightflat = ops.PackArrayOp(rightflat)
 
         lslices = Filter._apply(lsource._slices, leftflat, ldimpath, "dim")
         rslices = Filter._apply(rsource._slices, rightflat, rdimpath, "dim")
@@ -302,8 +302,8 @@ class Match(repops.MultiOpRep):
         for slice in rsource._slices:
             odims = slice.dims
             for dimpos in xrange(len(joinpath)):
-                slice = slices.InsertDimSlice(slice,dimpos,idims[dimpos])
-            slice = slices.BroadcastSlice(slice,references,plan,joinpath + odims)
+                slice = ops.InsertDimOp(slice,dimpos,idims[dimpos])
+            slice = ops.BroadcastOp(slice,references,plan,joinpath + odims)
             nslices.append(slice)
         return self._initialize(tuple(nslices), state)
       
