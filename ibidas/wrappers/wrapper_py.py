@@ -240,8 +240,14 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def visitPackListOp(self, node, slice):
         ndata=slice.data.pack(node.type, len(node.type.dims))
-        ndata=ndata.map(list,res_type=node.type)
+        func = lambda x: x.tolist()
+        ndata=ndata.map(func,res_type=node.type)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
+
+    def visitToPythonOp(self,  node, slice):
+        func = lambda x: convertors.rpc_convertor.execConvert(slice.type,x)
+        ndata = slice.data.mapseq(func,res_type=node.type)
+        return slice.modify(data=ndata, rtype=node.type)
 
     def visitUnpackTupleOp(self,node,slice):
         func = operator.itemgetter(node.tuple_idx)

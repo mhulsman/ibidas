@@ -273,7 +273,7 @@ def apply_broadcast_plan(slices,bcdims, bcplan):#{{{
             slice = BroadcastOp(slice,[references[bcdim] for bcdim in active_bcdims],nplan,bcdims)
         nslices.append(slice)#}}}
 
-class PermuteDimsOp(UnaryUnaryOp):
+class PermuteDimsOp(UnaryUnaryOp):#{{{
     __slots__ = ["permute_idxs"]
     
     def __init__(self,slice,permute_idxs):
@@ -281,9 +281,9 @@ class PermuteDimsOp(UnaryUnaryOp):
         
         ndims,ntype = slice.dims.permuteDims(permute_idxs,slice.type)
         self.permute_idxs = permute_idxs
-        UnaryUnaryOp.__init__(self,slice, dims=ndims,rtype=ntype)
+        UnaryUnaryOp.__init__(self,slice, dims=ndims,rtype=ntype)#}}}
 
-class SplitDimOp(UnaryUnaryOp):
+class SplitDimOp(UnaryUnaryOp):#{{{
     __slots__ = ["pos","lshape","rshape"]
 
     def __init__(self,slice, pos,lshape,rshape,ldim,rdim):
@@ -292,16 +292,15 @@ class SplitDimOp(UnaryUnaryOp):
         self.lshape = lshape
         self.rshape = rshape
 
-        UnaryUnaryOp.__init__(self,slice,dims=npath,rtype=ntype)
+        UnaryUnaryOp.__init__(self,slice,dims=npath,rtype=ntype)#}}}
 
-class ShapeOp(UnaryUnaryOp):
+class ShapeOp(UnaryUnaryOp):#{{{
     __slots__ = ["pos"]
     def __init__(self,slice,pos):
         d = slice.dims[pos]
         ntype = rtypes.unknown
         self.pos = pos
-        UnaryUnaryOp.__init__(self,slice, name=d.name,rtype=ntype,dims=dimpaths.DimPath())
-        
+        UnaryUnaryOp.__init__(self,slice, name=d.name,rtype=ntype,dims=dimpaths.DimPath())#}}}
 
 class FilterOp(UnaryUnaryOp):#{{{
     __slots__ = ["constraint"]
@@ -399,8 +398,6 @@ class FlatDimOp(UnaryUnaryOp):#{{{
         self.flatpos = flatpos
         UnaryUnaryOp.__init__(self, slice, rtype=stype,dims=sdims)#}}}
 
-
-
 class UnpackTupleOp(UnaryUnaryOp):#{{{
     """A slice which is the result of unpacking a tuple slice."""
     __slots__ = ["tuple_idx"]
@@ -429,7 +426,6 @@ class UnpackTupleOp(UnaryUnaryOp):#{{{
         UnaryUnaryOp.__init__(self, slice, name=name, rtype=ntype)
         self.tuple_idx = idx#}}}
 
-
 class PackArrayOp(UnaryUnaryOp):#{{{
     __slots__ = []
 
@@ -444,9 +440,10 @@ class PackArrayOp(UnaryUnaryOp):#{{{
 class PackListOp(PackArrayOp):#{{{
     __slots__ = []
 
-    def __init__(self, pslice, ndim=1):
-        assert ndim == 1, "Python lists do not support multi-dimensional data"
-        PackArrayOp.__init__(self, pslice, ndim)#}}}
+    def __init__(self, pslice):
+        PackArrayOp.__init__(self, pslice, 1)
+        self.type._setNeedConversion(True)
+        #}}}
 
 class ConvertOp(UnaryUnaryOp):#{{{
     __slots__ = ["convertor"]
@@ -460,6 +457,16 @@ class ConvertOp(UnaryUnaryOp):#{{{
 
         self.convertor = slice.type._getConvertor()
         UnaryUnaryOp.__init__(self, slice, rtype=ntype)#}}}
+
+class ToPythonOp(UnaryUnaryOp):
+    __slots__ = []
+
+    def __init__(self, pslice):
+        ntype = pslice.type.copy()
+        ntype._setNeedConversion(True)
+        UnaryUnaryOp.__init__(self, pslice, rtype=ntype)#}}}
+        
+
 
 class FreezeOp(UnaryUnaryOp):#{{{
     __slots__ = []
@@ -504,7 +511,6 @@ class UnaryFuncSeqOp(UnaryFuncOp):#{{{
         UnaryFuncOp.__init__(self, slice, funcname, sig, outparam, **kwargs)
         #}}}
 
-
 class UnaryFuncAggregateOp(UnaryFuncOp):#{{{
     __slots__ = ["packdepth"]
     
@@ -516,13 +522,12 @@ class UnaryFuncAggregateOp(UnaryFuncOp):#{{{
         self.type = ntype
         #}}}
 
-class MultiUnaryOp(UnaryOp):
+class MultiUnaryOp(UnaryOp):#{{{
     __slots__ = ["sources"]
     def __init__(self, source_slices, name, rtype=rtypes.unknown, 
                             dims=dimpaths.DimPath(), bookmarks=set()):
         self.sources = tuple(source_slices)
         UnaryOp.__init__(self, name, rtype, dims, bookmarks)#}}}
-
 
 class BinFuncOp(MultiUnaryOp):#{{{
     __slots__ = ["funcname","sig"]
@@ -548,7 +553,6 @@ class BinFuncElemOp(BinFuncOp):#{{{
         
         BinFuncOp.__init__(self, left, right, funcname, sig, outparam, dims)#}}}
 
-
 class PackTupleOp(MultiUnaryOp):#{{{
     __slots__ = ["to_python"]
 
@@ -564,7 +568,7 @@ class PackTupleOp(MultiUnaryOp):#{{{
         nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
         MultiUnaryOp.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)#}}}
 
-class GroupIndexOp(MultiUnaryOp):
+class GroupIndexOp(MultiUnaryOp):#{{{
     def __init__(self, slices):
         assert len(set([slice.dims for slice in slices])) == 1, "Group index slices should have same dimension"
         assert all([isinstance(slice.type,rtypes.TypeArray) for slice in slices]), "Group index slices should be arrays"
@@ -580,8 +584,7 @@ class GroupIndexOp(MultiUnaryOp):
         stype = rtypes.TypeInt64()
         rtype = rtypes.TypeArray(subtypes=(stype,), dims= dimpaths.DimPath(sdim))
         rtype = rtypes.TypeArray(subtypes=(rtype,), dims= dimpaths.DimPath(*newdims))
-        MultiUnaryOp.__init__(self,slices, name="groupindex", rtype=rtype, dims=ndims)
-
+        MultiUnaryOp.__init__(self,slices, name="groupindex", rtype=rtype, dims=ndims)#}}}
 
 class HArrayOp(MultiUnaryOp):#{{{
     __slots__ = []

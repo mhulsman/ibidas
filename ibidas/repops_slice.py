@@ -219,15 +219,20 @@ class SliceCast(repops.UnaryOpRep):
         #}}}
 
 
-@repops.delayable()
 class RTuple(repops.UnaryOpRep):
-    def _process(self, source, to_python=False):
+    def _process(self, source):
         if not source._state & RS_SLICES_KNOWN:
             return
         
-        cdimpath = dimpaths.commonDimPath([slice.dims for slice in source._slices])
+        nslice = self._apply(source._slices)
+        #initialize object attributes
+        return self._initialize((nslice,),RS_ALL_KNOWN)
+
+    @classmethod
+    def _apply(cls, slices, to_python=False):
+        cdimpath = dimpaths.commonDimPath([slice.dims for slice in slices])
         nslices = []
-        for slice in source._slices:
+        for slice in slices:
             oslice = slice
             if(to_python):
                 while(len(slice.dims) > len(cdimpath)):
@@ -237,10 +242,9 @@ class RTuple(repops.UnaryOpRep):
                     slice = ops.PackArrayOp(slice, ndim=len(slice.dims) - len(cdimpath))
             nslices.append(slice)
     
-        nslice = ops.PackTupleOp(nslices, to_python=to_python)
+        return ops.PackTupleOp(nslices, to_python=to_python)
+       
 
-        #initialize object attributes
-        return self._initialize((nslice,),RS_ALL_KNOWN)
 
 @repops.delayable()
 class HArray(repops.UnaryOpRep):
@@ -270,3 +274,29 @@ class HArray(repops.UnaryOpRep):
         #initialize object attributes
         return self._initialize((nslice,),RS_ALL_KNOWN)
 
+
+
+class ToPythonRep(repops.UnaryOpRep):
+    def _process(self, source):
+        if not source._state & RS_TYPES_KNOWN:
+            return
+
+        nslices = []
+        for slice in source._slices:
+            if slice.type._requiresRPCconversion():
+                slice = ops.ToPythonOp(slice)
+            nslices.append(slice)
+       
+        if(len(nslices) > 1):
+            nslice = RTuple._apply(nslices,to_python=True)
+        else:
+            nslice = nslices[0]
+
+        while(nslice.dims):
+            nslice = ops.PackListOp(nslice)
+
+        return self._initialize((nslice,), RS_ALL_KNOWN)
+
+
+
+        

@@ -632,23 +632,13 @@ class Representor(Node):
         """Packages dimension into array type"""
         return repops_dim.rarray(self)
 
-    def list(self):
-        """Packages dimension using python list."""
-        return repops_dim.rlist(self)
-    
-    def tuple(self, to_python=False):
+    def tuple(self):
         """Combines slices into a tuple type"""
-        return repops_slice.RTuple(self, to_python)
+        return repops_slice.RTuple(self)
 
     def to_python(self):
         """Converts data into python data structure"""
-        if(len(self._slices) > 1):
-            self = self.tuple(to_python=True)
-
-        while(self._slices[0].dims):
-            self = self.list()
-
-        return self()
+        return repops_slice.ToPythonRep(self)()
 
     def sort(self, *slices, **kwargs):
         """Performs sort on data.

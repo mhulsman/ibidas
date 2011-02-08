@@ -2,6 +2,7 @@ import numpy
 import operator
 import collections
 from ..constants import *
+from ..utils.multi_visitor import VisitorFactory, NF_ERROR, NF_ELSE
 
 _delay_import_(globals(), "..utils","sparse_arrays","cutils","missing","util")
 _delay_import_(globals(), "..utils.missing","Missing")
@@ -204,4 +205,71 @@ class TupleConvertor(BaseConvertor):
             subseq = cutils.darray([getitem(elem) for elem in seq],subtype.toNumpy())
             columns.append(subseq)
         return cutils.darray(zip(*columns))
+
+
+
+
+
+class slicetuple(tuple):
+    def __new__(self,s):
+        res = tuple.__new__(self,(s.start,s.stop,s.step))
+        return res
+
+class RPCConvertor(VisitorFactory(prefixes=("execConvert","fconvert"),flags=NF_ELSE)):
+    def fconvertobject(self, obj):
+        if(hasattr(obj, "__rpc_convert__")):
+            return obj.__rpc_convert__()
+        else:
+            return str(obj)
+
+    def _fnoconvert(self,obj):
+        return obj
+    fconvertint=_fnoconvert
+    fconvertfloat=_fnoconvert
+    fconvertstr=_fnoconvert
+    fconvertunicode=_fnoconvert
+
+    def fconverttuple(self, obj):
+        return tuple([self.fconvert(elem) for elem in obj])
+
+    def _fconvertsequence(self, obj):
+        return [self.fconvert(elem) for elem in obj]
+    fconvertlist = _fconvertsequence
+    fconvertset = _fconvertsequence
+
+    def fconvertndarray(self, obj):
+        if(obj.dtype == object):
+            return [self.fconvert(elem) for elem in obj]
+        else:
+            return obj.tolist()
+
+    def fconvertslice(self, obj):
+        return slicetuple(obj)
+
+    def map(self, func, parent_type, seq):
+        if(parent_type.has_missing):
+            seqres = []
+            for elem in seq:
+                if(elem is Missing):
+                    seqres.append(Missing)
+                else: 
+                    seqres.append(func(elem))
+        else:
+            seqres = [func(elem) for elem in seq]
+        
+        seqres = cutils.darray(seqres,seq.dtype)
+        return seqres 
+    
+
+    def execConvertTypeUnknown(self, ptype, seq):
+        seq = self.map(self.fconvert, ptype, seq)
+        return seq
+   
+    def execConvertTypeSlice(self, ptype, seq):
+        return self.map(self.fconvertslice, ptype, seq)
+
+    def execConvertTypeSet(self, ptype, seq):
+        return self.map(self.fconvertset, ptype, seq)
+   
+rpc_convertor = RPCConvertor()   
 

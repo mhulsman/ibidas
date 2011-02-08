@@ -94,12 +94,16 @@ class Type(object):#{{{
     _defval = None
     _need_conversion=False
     _convertor=convertors.BaseConvertor
+    _reqRPCcon=True
     has_missing = True
 
     @classmethod
     def commonType(cls, type1, type2):
         """Returns a common supertype for type1 and type2"""
         return unknown
+
+    def _requiresRPCconversion(self):
+        return self._reqRPCcon
 
     def toNumpy(self):
         """Returns numpy dtype compatible with this type
@@ -781,6 +785,7 @@ addType(TypeArray)#}}}
 class TypeSet(TypeArray):#{{{
     name = "set"
     _convertor = convertors.SetConvertor 
+
     def __init__(self, has_missing=False, dims=(), subtypes=(unknown,), need_conversion=False, convertor=None):
 
         assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
@@ -807,6 +812,7 @@ class TypeString(TypeArray):#{{{
     _dtype = "U"
     _defval = u""
     _convertor=convertors.StringConvertor
+    _reqRPCcon=False
     
     def __init__(self, has_missing=False, dims=(), need_conversion=False, convertor=None):
         assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
@@ -923,6 +929,7 @@ class TypeReal64(TypeComplex128):#{{{
     _dtype = "float64"
     _scalar = numpy.float64
     _defval = 0.0
+    _reqRPCcon=False
 addType(TypeReal64)#}}}
 
 class TypeReal32(TypeReal64, TypeComplex64):#{{{
@@ -1051,6 +1058,7 @@ class TypeBool(TypeUInt8, TypeInt8):#{{{
     _dtype = "bool"
     _scalar = numpy.bool
     _defval = False
+    _reqRPCcon=True
     
 addType(TypeBool)#}}}
 
