@@ -3,12 +3,13 @@ import operator
 from constants import *
 import repops
 
-_delay_import_(globals(),"utils","util")
+_delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"slices")
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","wrapper_py")
 _delay_import_(globals(),"itypes","rtypes","dimensions","dimpaths")
 _delay_import_(globals(),"repops_funcs")
+_delay_import_(globals(),"repops_dim")
 
 class Broadcast(repops.MultiOpRep):
     def _process(self,sources, mode="dim"):
@@ -63,10 +64,18 @@ class Combine(repops.MultiOpRep):
         state = reduce(operator.__and__,[source._state for source in sources])
         if not state & RS_SLICES_KNOWN:
             return
-
-        nslices = sum([source._slices for source in sources],tuple())
+        nslices = self._apply(*[source._slices for source in sources])
         return self._initialize(nslices,state)
 
+    @classmethod
+    def _apply(cls, *xslicelists):
+        if(len(xslicelists) == 2):
+            lslices,rslices = xslicelists
+            lslices = [slices.ChangeBookmarkSlice(lslice,add_bookmark="!L",update_auto_bookmarks="L") for lslice in lslices]
+            rslices = [slices.ChangeBookmarkSlice(rslice,add_bookmark="!R",update_auto_bookmarks="R") for rslice in rslices]
+            return tuple(lslices + rslices)
+        else:
+            return sum([tuple(xslices) for xslices in xslicelists],tuple())
 
 class Group(repops.MultiOpRep):
     def __init__(self,source,constraint,flat={}):
@@ -119,7 +128,6 @@ class Filter(repops.MultiOpRep):
     @classmethod
     def _apply(cls,fslices,cslice,seldimpath, bcmode):
         if(isinstance(cslice.type,rtypes.TypeBool)):
-            assert dim is None, "Cannot use bool or missing data type with specified filter dimension. Constraint dimension already specifies dimension."
             assert cslice.dims, "Constraint should have at least one dimension"
             ndim = dimensions.Dim(UNDEFINED,(True,) * (len(cslice.dims) -1),  False, name = "f" + cslice.dims[-1].name)
             dim_suffix = None
@@ -177,8 +185,68 @@ class Sort(repops.MultiOpRep):
         #fixme: make it slice-only (remove rep)
         constraint = repops_funcs.ArgSort(constraint, descend=descend)
         cslice = slices.PackArraySlice(constraint._slices[0])
-        nslices = ops.apply_filter(source._slices, cslice, cslice.type.dims[:1],"dim")
+        nslices = Filter._apply(source._slices, cslice, cslice.type.dims[:1],"dim")
         return self._initialize(tuple(nslices),source._state & constraint._state)
+
+
+class Join(repops.MultiOpRep):
+    def __init__(self, lsource, rsource, constraint):
+        if(isinstance(constraint,context.Context)):
+            c = Combine((lsource,rsource))
+            constraint = context._apply(constraint,c)
+        repops.MultiOpRep.__init__(self,(lsource,rsource, constraint))
+
+    def _process(self, sources):
+        lsource, rsource, constraint = sources
+        if not lsource._state & RS_SLICES_KNOWN or not rsource._state & RS_SLICES_KNOWN \
+           or not constraint._state & RS_TYPES_KNOWN:
+            return
+        
+        ldims = dimpaths.createDimSet([s.dims for s in lsource._slices])
+        rdims = dimpaths.createDimSet([s.dims for s in rsource._slices])
+        
+        assert len(constraint._slices) == 1, "Constraint should have only one slice"
+        cslice = constraint._slices[0]
+
+        if not cslice.dims[-1] in rdims:
+            rdims,ldims = ldims,rdims
+            lsource,rsource = rsource,lsource
+            reverse = True
+            assert cslice.dims[-1] in rdims, "Last dimension of constraint should be in one of the sources"
+        else:
+            reverse = False
+        rdimpath = dimpaths.DimPath(cslice.dims[-1])
+        for dim in cslice.dims[::-1]:
+            if dim in ldims:
+                ldimpath = dimpaths.DimPath(dim)
+
+
+                break
+        else:
+            raise RuntimeError, "No dimension found for one of the sources in constraint"
+
+        leftpos = repops_funcs.Pos._apply([cslice], ldimpath)[0]
+        rightpos = repops_funcs.Pos._apply([cslice], rdimpath)[0]
+        
+        filters = Filter._apply([leftpos,rightpos],cslice, None,"dim")
+        leftflat,rightflat = repops_dim.Flat._apply(filters, filters[0].dims[-1:])
+
+        leftflat = slices.PackArraySlice(leftflat)
+        rightflat = slices.PackArraySlice(rightflat)
+
+        lslices = Filter._apply(lsource._slices, leftflat, ldimpath, "dim")
+        rslices = Filter._apply(rsource._slices, rightflat, rdimpath, "dim")
+
+        if(reverse):
+            nslices = Combine._apply(rslices,lslices)
+        else:
+            nslices = Combine._apply(lslices,rslices)
+        return self._initialize(tuple(nslices),lsource._state & rsource._state)
+
+
+
+        
+
 
 
 class Match(repops.MultiOpRep):

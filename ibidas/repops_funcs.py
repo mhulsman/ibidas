@@ -90,8 +90,9 @@ class ParamFuncSignature(object):
 class Func(object):
     _sigs = []
 
-    def _findSignature(self, **kwargs):
-        for sig in self._sigs:
+    @classmethod
+    def _findSignature(cls, **kwargs):
+        for sig in cls._sigs:
             res = sig.check(**kwargs)
             if(res is False):
                 continue
@@ -111,7 +112,7 @@ class Func(object):
                 res.append(("", field + "=" + str(slice)))
         res.sort(key=operator.itemgetter(1))
         res = [a + b for a,b in res]
-        raise RuntimeError, "Cannot find func " + str(self.__class__.__name__)  + " with signature (" + ", ".join(res) + ")"
+        raise RuntimeError, "Cannot find func " + str(cls.__name__)  + " with signature (" + ", ".join(res) + ")"
         
        
 
@@ -150,32 +151,41 @@ class UnaryFuncDimOp(UnaryFuncOp):
         state = source._state
         if not state & RS_TYPES_KNOWN:
             return
-
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
+        nslices,state = self._apply(source._slices, selpath, source._state, **kwargs)
+        return self._initialize(tuple(nslices),state)
 
+    @classmethod
+    def _apply(cls, xslices, selpath, state=None, **kwargs):
         nslices = []
         found = False
-        for slice in source._slices:
+        for slice in xslices:
             lastposs = slice.dims.matchDimPath(selpath)
             if(lastposs):
-                slice = self._prepareSlice(slice)
+                slice = cls._prepareSlice(slice)
                 found = True
             for lastpos in lastposs:
                 packdepth = len(slice.dims) - lastpos
-                sig, nkwargs, outparam = self._findSignature(slice=slice, packdepth=packdepth, **kwargs)
-                state &= outparam.state_mask
-                slice = self._slicecls(self.__class__.__name__, sig, outparam, **nkwargs)
+                sig, nkwargs, outparam = cls._findSignature(slice=slice, packdepth=packdepth, **kwargs)
+                if state:
+                    state &= outparam.state_mask
+                slice = cls._slicecls(cls.__name__, sig, outparam, **nkwargs)
             if(lastposs):
-                slice = self._finishSlice(slice)
+                slice = cls._finishSlice(slice)
             nslices.append(slice)
+
         if(not found):
             raise RuntimeError, "No slice with dims to apply " + self.__class__.__name__
-        return self._initialize(tuple(nslices),state)
-            
+        
+        if state:
+            return nslices, state      
+        else:
+            return nslices
 
+    @classmethod 
     def _prepareSlice(self,slice):
         return slice
-    
+    @classmethod
     def _finishSlice(self, slice):
         return slice
 
@@ -293,34 +303,33 @@ class SetSetSignature(FuncSignature):
         return out_type#}}}
 setset_sig = SetSetSignature("simple_arith")
 
-@repops.delayable()
 class Add(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
-@repops.delayable()
+
 class Subtract(BinaryFuncElemOp):
    _sigs = [bin_arithsig, setset_sig]
-@repops.delayable()
+
 class Multiply(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
-@repops.delayable()
+
 class Modulo(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
-@repops.delayable()
+
 class Divide(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
-@repops.delayable()
+
 class FloorDivide(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
-@repops.delayable()
+
 class And(BinaryFuncElemOp):
    _sigs = [bin_arithsig, setset_sig]
-@repops.delayable()
+
 class Or(BinaryFuncElemOp):
    _sigs = [bin_arithsig, setset_sig]
-@repops.delayable()
+
 class Xor(BinaryFuncElemOp):
    _sigs = [bin_arithsig, setset_sig]
-@repops.delayable()
+
 class Power(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
 
@@ -346,24 +355,21 @@ compareanysig = CompareSignature("simple_cmp",rtypes.TypeAny)
 comparesetsig = CompareSignature("simple_cmp",rtypes.TypeSet)
 comparestringsig = CompareSignature("string_cmp",rtypes.TypeString)
 
-@repops.delayable()
 class Equal(BinaryFuncElemOp):
     _sigs = [comparestringsig,comparesetsig,compareanysig]
-@repops.delayable()
+
 class NotEqual(BinaryFuncElemOp):
     _sigs = [comparestringsig,comparesetsig,compareanysig]
 
-@repops.delayable()
 class LessEqual(BinaryFuncElemOp):
     _sigs = [comparestringsig,comparesetsig,compareanysig]
-@repops.delayable()
+
 class Less(BinaryFuncElemOp):
     _sigs = [comparestringsig,comparesetsig,compareanysig]
     
-@repops.delayable()
 class GreaterEqual(BinaryFuncElemOp):
     _sigs = [comparestringsig,comparesetsig,compareanysig]
-@repops.delayable()
+
 class Greater(BinaryFuncElemOp):
     _sigs = [comparestringsig,comparesetsig,compareanysig]
 
@@ -448,13 +454,13 @@ float_tofloatsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeReal64,rtypes.T
 number_tofloatsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber,rtypes.TypeReal64)
 number_tointsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber,rtypes.TypePlatformInt)
 
-@repops.delayable()
 class ArgSort(UnaryFuncDimOp):
     _sigs = [sortablesig]
+argsort = repops.delayable(ArgSort)
 
-@repops.delayable()
 class Pos(UnaryFuncDimOp):
     _sigs = [any_nodepsig]
+pos = repops.delayable(Pos)
 
 
 @repops.delayable()
@@ -549,6 +555,7 @@ setsig = SetSignature("set")
 class Set(UnaryFuncAggregateOp):
     _sigs = [setsig]
 
+    @classmethod
     def _prepareSlice(self,slice):
         return slices.ensure_frozen(slice)
 

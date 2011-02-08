@@ -28,7 +28,7 @@ from representor import newdim
 from repops_dim import rlist, rarray
 from repops_multi import Broadcast as bcast, Combine as combine, Sort as sort
 from repops_slice import RTuple as rtuple, HArray as harray
-from repops_funcs import ArgSort as argsort, Pos as pos, Any as rany, All as rall,\
+from repops_funcs import argsort, pos, Any as rany, All as rall,\
                          Max as rmax, Min as rmin, ArgMax as argmax, ArgMin as argmin,\
                          Sum as rsum, Mean as mean, Median as median, Count as count,\
                          Corr as corr

@@ -103,6 +103,28 @@ class Representor(Node):
     def _axisB(self, name):
         return repops_slice.ProjectBookmark(self,name)
 
+    def _axisL(self, name):
+        bname = "!L"
+        while(name and (name[0] == "L" or name[0] == "R")):
+            bname = bname + name[0]
+            name = name[1:]
+
+        r = repops_slice.ProjectBookmark(self,bname)
+        if(name):
+            r = self.__getattr__(name)
+        return r
+        
+    def _axisR(self, name):
+        bname = "!R"
+        while(name and (name[0] == "L" or name[0] == "R")):
+            bname = bname + name[0]
+            name = name[1:]
+
+        r = repops_slice.ProjectBookmark(self,bname)
+        if(name):
+            r = self.__getattr__(name)
+        return r
+
     def __getattr__(self, name):
         if(not name):
             return self
@@ -505,8 +527,8 @@ class Representor(Node):
     def match(self, other, condleft, condright, group=False):
         return repops_multi.match(self, other, condleft, condright, group=group)
     
-    def join(self, other, cond=None, ldim=None, rdim=None):
-        return repops_multi.join(self, other, cond, ldim, rdim)
+    def join(self, other, cond):
+        return repops_multi.Join(self, other, cond)
 
     def rename(self, *names, **kwds):
         """Rename slices.

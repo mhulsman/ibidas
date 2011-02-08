@@ -5,8 +5,8 @@ from itertools import izip_longest
 from constants import *
 from utils import util
 from itypes import rtypes,dimpaths
-from query_graph import Node
 
+from query_graph import Node
 
 _delay_import_(globals(),"itypes","dimensions","typeops","convertors","casts")
 _delay_import_(globals(),"itypes.type_attribute_freeze","freeze_protocol")
@@ -25,7 +25,7 @@ class Slice(Node):#{{{
     but the same id. An id represents similarity of the content 
     on element level, dims the packaging."""
 
-    __slots__ = ['name', 'type', 'dims','bookmarks']
+    __slots__ = ['name', 'type', 'dims','bookmarks','link']
 
 
     def __init__(self, name, rtype = rtypes.unknown, dims=dimpaths.DimPath(), bookmarks=set()):
@@ -41,12 +41,12 @@ class Slice(Node):#{{{
         assert isinstance(dims, dimpaths.DimPath), "Dimensions of a slice should be a DimPath"
         assert isinstance(bookmarks,set), "Bookmarks should be a set"
         assert all([isinstance(bm,(str,unicode)) for bm in bookmarks]),"Bookmarks should be a string"
-        assert all([bm.lower() == bm for bm in bookmarks]), "Bookmarks should be in lowercase"
 
         self.name = name
         self.type = rtype
         self.dims = dims
         self.bookmarks = bookmarks
+        self.link = None
     
     def __repr__(self):
         res = self.name
@@ -81,12 +81,6 @@ class MultiOpSlice(Slice):#{{{
                             dims=dimpaths.DimPath(), bookmarks=set()):
         self.sources = tuple(source_slices)
         Slice.__init__(self, name, rtype, dims, bookmarks)#}}}
-
-class LinkSlice(UnaryOpSlice):#{{{
-    __slots__ = ['link']
-    def __init__(self, source, link, name, rtype=rtypes.unknown, dims=dimpaths.DimPath(), bookmarks=set()):
-        assert isinstance(link,representor.Representor),"Link of LinkSlice should be a representor"
-        UnaryOpSlice.__init__(self, source, name, rtype, dims, bookmarks)#}}}
 
 class ExtendSlice(Slice):#{{{
     __slots__ = []

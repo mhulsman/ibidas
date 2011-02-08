@@ -164,9 +164,15 @@ class Flat(repops.UnaryOpRep):
         if not source._state & RS_SLICES_KNOWN:
             return
         
-        #create new merged dimension
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
-        selpath = dimpaths.extendParentDim(selpath,[s.dims for s in source._slices],max(2,1 + len(selpath[-1].dependent)))
+        nslices = self._apply(source._slices, selpath, name)
+
+        return self._initialize(tuple(nslices),source._state)
+
+    @classmethod
+    def _apply(cls, fslices, selpath, name=None):
+        #create new merged dimension
+        selpath = dimpaths.extendParentDim(selpath,[s.dims for s in fslices],max(2,1 + len(selpath[-1].dependent)))
         
         #determine new dim
         if(selpath[-1].shape != UNDEFINED and selpath[-2].shape != UNDEFINED):
@@ -185,11 +191,11 @@ class Flat(repops.UnaryOpRep):
         bcdim = dimensions.Dim(1)
 
         #find refslices
-        refslices = [s for s in source._slices if selpath[-1] in s.dims]
+        refslices = [s for s in fslices if selpath[-1] in s.dims]
 
         #process slices
         nslices = []
-        for slice in source._slices:
+        for slice in fslices:
             sdims = slice.dims
             lastpos = sdims.matchDimPath(selpath[:-1])
             while(lastpos):
@@ -206,9 +212,7 @@ class Flat(repops.UnaryOpRep):
                 else:
                     lastpos = []
             nslices.append(slice)
-                
-        return self._initialize(tuple(nslices),source._state)
-
+        return nslices
 
 class GroupIndex(repops.UnaryOpRep):
     def _process(self, source):
@@ -222,5 +226,6 @@ class GroupIndex(repops.UnaryOpRep):
         nslice = slices.GroupIndexSlice(nslices)
         nslice = slices.UnpackArraySlice(nslice, len(nslices))
         return self._initialize((nslice,),RS_ALL_KNOWN)
+
 
 

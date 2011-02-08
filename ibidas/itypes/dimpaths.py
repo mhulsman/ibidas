@@ -157,8 +157,7 @@ class DimPath(tuple):
         else:
             return res#}}}
 
-
-    def permuteDims(self,permute_idxs, subtype=None, prevdims=tuple()):
+    def permuteDims(self,permute_idxs, subtype=None, prevdims=tuple()):#{{{
         ndims = []
         if(prevdims):
             permute_start = len(permute_idxs) - len(prevdims)
@@ -194,7 +193,7 @@ class DimPath(tuple):
             subtype = subtype._permuteDepDim(prevdims=res, permute_idxs=permute_idxs)
             return (res,subtype)
         else:
-            return res
+            return res#}}}
 
     def contigiousFixedNDims(self):#{{{
         """Returns number of contigious non-variable non-missing dims from 
@@ -435,8 +434,7 @@ def planBroadcastMatchDim(paths):#{{{
         plans.append(plan[::-1])
     return (bcdims,plans)#}}}
 
-
-def applyPlan(seq,plan,newvalue=None,copyvalue=NOVAL,existvalue=NOVAL,ensurevalue=NOVAL):
+def applyPlan(seq,plan,newvalue=None,copyvalue=NOVAL,existvalue=NOVAL,ensurevalue=NOVAL):#{{{
     elempos = 0
     nseq = []
     for planelem in plan:
@@ -463,7 +461,7 @@ def applyPlan(seq,plan,newvalue=None,copyvalue=NOVAL,existvalue=NOVAL,ensurevalu
         else:
             raise RuntimeError, "Unknown plan type"
     nseq.extend(seq[elempos:])
-    return nseq
+    return nseq#}}}
 
 def flatFirstDims(array,ndim):#{{{
     """Flattens first ndim dims in numpy array into next dim"""
@@ -632,7 +630,7 @@ def identifyDimPathParse(sourcepaths, dim_selector):#{{{
         res.update(identifyDimPathParseHelper(spath, dim_sel))
     return res#}}}
 
-def identifyDimPathParseHelper(spath, dim_sel, outer=True):
+def identifyDimPathParseHelper(spath, dim_sel, outer=True):#{{{
     res = set()
     ds = dim_sel[0]
     
@@ -667,9 +665,9 @@ def identifyDimPathParseHelper(spath, dim_sel, outer=True):
             if(spath and spath[0].name == ds):
                 _processRest(spath[1:], dim_sel[1:], res, (spath[0],))
         
-    return res        
+    return res        #}}}
 
-def _processRest(spath, dim_selector, res, pathprefix):
+def _processRest(spath, dim_selector, res, pathprefix):#{{{
     if(not dim_selector):
         if(pathprefix):
             res.add(DimPath(*pathprefix))
@@ -678,7 +676,7 @@ def _processRest(spath, dim_selector, res, pathprefix):
     pathsuffixes = identifyDimPathParseHelper(spath, dim_selector,outer=False)
     for s in pathsuffixes:
         res.add(DimPath(*(pathprefix + s)))
-        return
+        return#}}}
 
 
 #}}}
