@@ -93,7 +93,68 @@ class Group(repops.MultiOpRep):
         gslice = ops.GroupIndexOp(gslices)
         gslice = ops.UnpackArrayOp(gslice, len(gslices))
 
-        nslices = Filter._apply(source._slices,gslice,gslices[0].type.dims[:1],"dim")
+        #determine which slices to flatten
+        oslices = list(source._slices)
+        nslices = [None] * len(oslices)
+        xflat = {}
+        #specified slices
+        for key,values in flat.iteritems():
+            if(isinstance(key,tuple)):
+                keyslices = gsource.get(*key)
+            else:
+                keyslices = gsource.get(key)
+            nkey = tuple([gsource._slices.index(keyslice) for keyslice in keyslices._slices])
+             
+            if(isinstance(values,tuple)):
+                vslices = source.get(*values)
+            else:
+                vslices = source.get(values)
+            
+            pos = []
+            for slice in vslices._slices:
+                assert slice in oslices, "Cannot find slice specified in group flat argument"
+                p = oslices.index(slice)
+                pos.append(p)
+                oslices[p] = None
+            xflat[nkey] = set(pos)
+
+        #group slices
+        for pos, slice in enumerate(gsource._slices):
+            p = oslices.index(slice)
+            key = (pos,)
+            if(key in xflat):
+                xflat[key].add(p)
+            else:
+                xflat[key] = set([p])
+            oslices[p] = None
+
+        #filter remaining slices first
+        pos = [p for p,s in enumerate(oslices) if not s is None]
+        if(pos):
+            fslices = [s for s in oslices if not s is None]
+            fslices = Filter._apply(fslices,gslice,gslices[0].type.dims[:1],"dim")
+            for p,fslice in zip(pos,fslices):
+                nslices[p] = fslice
+
+        #filter flattened slices 
+        gidx = range(len(gsource._slices))
+        gdims = gslice.dims[-len(gsource._slices):]
+        firstelem = wrapper_py.rep(0)._slices[0]
+        for key, pos in xflat.iteritems():
+            tslice = gslice
+            for elem in gidx:
+                if not elem in key:
+                    selpath = dimpaths.DimPath(gdims[elem])
+                    tslice = repops_funcs.Sum._apply([tslice],selpath)[0]
+            tslice = ops.UnpackArrayOp(tslice,1)
+            tslice = Filter._apply([tslice], firstelem,tslice.dims,"dim")[0]
+            tslice = ops.PackArrayOp(tslice,1)
+            pos = list(pos)
+            fslices = [source._slices[p] for p in pos]
+            fslices = Filter._apply(fslices,tslice,gslices[0].type.dims[:1],"dim")
+            for p,fslice in zip(pos,fslices):
+                nslices[p] = fslice
+            
         return self._initialize(tuple(nslices),source._state)
 
 

@@ -628,6 +628,9 @@ class Representor(Node):
 
     def set(self, dim=None):
         return repops_funcs.Set(self,dim)
+    
+    def unique(self, dim=None):
+        return repops_funcs.Unique(self,dim)
 
     def within(self, arrays):
         return repops_funcs.Within(self,arrays)

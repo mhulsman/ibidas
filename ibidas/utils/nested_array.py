@@ -101,7 +101,7 @@ class NestedArray(object):
                         idxres[pos,1] = curpos
                 
                     #check that elem shape is not smaller or larger than expected 
-                    if(cdepth > 1 and not isinstance(elem,numpy.ndarray)):
+                    if(not isinstance(elem,numpy.ndarray)):
                         elem = cutils.darray(list(elem),dtype,cdepth,cdepth)
                     else:
                         assert len(elem.shape) == cdepth, "Number of dimensions incorrect"

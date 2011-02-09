@@ -456,11 +456,11 @@ number_tointsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber,rtypes.Ty
 
 class ArgSort(UnaryFuncDimOp):
     _sigs = [sortablesig]
-argsort = repops.delayable(ArgSort)
+argsort = repops.delayable()(ArgSort)
 
 class Pos(UnaryFuncDimOp):
     _sigs = [any_nodepsig]
-pos = repops.delayable(Pos)
+pos = repops.delayable(default_slice="#")(Pos)
 
 
 @repops.delayable()
@@ -506,9 +506,9 @@ class UnaryConcatenateSignature(UnaryFixShapeSignature):
 
 concatenate_sig = UnaryConcatenateSignature("arrayarray")
 
-@repops.delayable()
 class Sum(UnaryFuncAggregateOp):
     _sigs = [int_tointsig, float_tofloatsig,concatenate_sig]
+rsum = repops.delayable()(Sum)
 
 @repops.delayable()
 class Mean(UnaryFuncAggregateOp):
@@ -545,7 +545,7 @@ class SetSignature(UnaryFixShapeSignature):
         if not UnaryFixShapeSignature.check(self,slice,packdepth):
             return False
         
-        has_missing = len(slice.dims) > 1 and slice.dims[-2].has_missing
+        has_missing = slice.dims[-1].has_missing
         subtypes = (slice.type,)
         dim = dimensions.Dim(UNDEFINED,(True,) * len(slice.dims), slice.type.has_missing, name="s" + slice.dims[-packdepth].name)
         nstype = rtypes.TypeSet(has_missing,dimpaths.DimPath(dim),subtypes)
@@ -559,6 +559,28 @@ class Set(UnaryFuncAggregateOp):
     def _prepareSlice(self,slice):
         return ops.ensure_frozen(slice)
 
+class UniqueSignature(UnaryFixShapeSignature):
+    def check(self, slice, packdepth):#{{{
+        if not UnaryFixShapeSignature.check(self,slice,packdepth):
+            return False
+        
+        has_missing = slice.dims[-1].has_missing
+        subtypes = (slice.type,)
+        dim = dimensions.Dim(UNDEFINED,(True,) * len(slice.dims), slice.type.has_missing, name="s" + slice.dims[-packdepth].name)
+        nstype = rtypes.TypeArray(has_missing,dimpaths.DimPath(dim),subtypes)
+        return Param(slice.name, nstype)#}}}
+uniquesig = UniqueSignature("set")
+
+class Unique(UnaryFuncAggregateOp):
+    _sigs = [uniquesig]
+
+    @classmethod
+    def _prepareSlice(self,slice):
+        return ops.ensure_frozen(slice)
+
+    @classmethod
+    def _finishSlice(self,slice):
+        return ops.UnpackArrayOp(slice)
 
 class CorrSignature(FuncSignature):
     def check(self, slice):

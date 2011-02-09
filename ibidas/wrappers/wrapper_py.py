@@ -532,7 +532,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         else:
             return cutils.darray([data.shape[1]] * data.shape[0],dtype)
     
-    def setSet(self, data, type_in, type_out, op, packdepth):
+    def setGeneral(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         dtype = type_out.toNumpy()
         if(packdepth > 1):
