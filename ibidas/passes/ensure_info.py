@@ -109,3 +109,20 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
             nnode._process(nnode._sources,*node._params[0], **node._params[1])
             return nnode
 
+    def processQueryMatch(self, node):
+        if(node._state & RS_SLICES_KNOWN):
+            return self.processQueryRepresentor(node)
+        else:
+            nnode = self.getNodeCopy(node)
+            lsource, rsource, lslice, rslice = node._sources
+            if(lslice is None or rslice is None):
+                lsource = self.processQuery(lsource)
+                rsource = self.processQuery(rsource)
+                nnode._process((lsource,rsource,lslice,rslice),*node._params[0], **node._params[1])
+                lsource, rsource, lslice, rslice = node._sources
+
+            assert not lslice is None and not rslice is None, "Cannot determine left and/or right slice for Match operation"
+            nnode._sources = tuple([self.processQuery(source) for source in node._sources])
+            nnode._process(nnode._sources,*node._params[0], **node._params[1])
+            return nnode
+

@@ -695,7 +695,6 @@ class NestedArray(object):
 
 def co_mapseq(func, nested_arrays, *args, **kwargs):
     restype= kwargs.pop("res_type")
-    dtype=restype.toNumpy()
     bc_allow=kwargs.pop("bc_allow",False)
     idxlen = set([len(na.idxs) for na in nested_arrays])
     data = []
@@ -735,22 +734,40 @@ def co_mapseq(func, nested_arrays, *args, **kwargs):
             seq,dummy = na._flatData()
             data.append(seq)
     seq = func(data,*args, **kwargs)
-    seq.shape = flatshape + seq.shape[1:]
-
-    nself = na_ref.copy()
-    nself.data = seq
-    nself.cur_type = restype
-    return nself
+    if(isinstance(restype,tuple)):
+        nselfs = []
+        for elem,rtype in zip(seq,restype):
+            elem.shape = flatshape + elem.shape[1:]
+            nself = na_ref.copy()
+            nself.data = elem
+            nself.cur_type = rtype
+            nselfs.append(nself)
+        return nselfs
+    else:
+        seq.shape = flatshape + seq.shape[1:]
+        nself = na_ref.copy()
+        nself.data = seq
+        nself.cur_type = restype
+        return nself
 
 
 def co_map(func, narrays, *args, **kwargs):
     restype= kwargs.get("res_type")
-    dtype=restype.toNumpy()
-    
-    def wrapfunc(seqs, *args, **kwargs):
-        res = [func(elems, *args, **kwargs) for elems in zip(*seqs)]
-        nseq = cutils.darray(res,dtype)
-        return nseq
+    if(isinstance(restype,tuple)):
+        dtypes = [rtype.toNumpy() for rtype in restype]
+        def wrapfunc(seqs, *args, **kwargs):
+            res = [func(elems, *args, **kwargs) for elems in zip(*seqs)]
+            xres = []
+            for pos,dtype in enumerate(dtypes):
+                nseq = cutils.darray([row[pos] for row in res],dtype)
+                xres.append(nseq)
+            return tuple(xres)
+    else: 
+        dtype=restype.toNumpy()
+        def wrapfunc(seqs, *args, **kwargs):
+            res = [func(elems, *args, **kwargs) for elems in zip(*seqs)]
+            nseq = cutils.darray(res,dtype)
+            return nseq
     return co_mapseq(wrapfunc, narrays, **kwargs)
 
 def drop_prev_shapes_dim(ndata,shapes):

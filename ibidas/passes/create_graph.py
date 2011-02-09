@@ -56,7 +56,13 @@ class CreateGraph(VisitorFactory(prefixes=("visit",),
             self.graph.addNode(slice)
             self.graph.addEdge(query_graph.Edge(slice,node,"paramlist","slices",pos))
         self.queue.extend(node.sources)
-    
+
+    def visitMultiMultiOp(self, node):
+        for pos, slice in enumerate(node.sources):
+            self.graph.addNode(slice)
+            self.graph.addEdge(query_graph.Edge(slice,node,"paramlist","slices",pos))
+        self.queue.extend(node.sources)
+        
     def visitFilterOp(self,node):
         self.visitUnaryUnaryOp(node)
         self.graph.addNode(node.constraint)

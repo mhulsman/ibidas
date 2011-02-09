@@ -189,6 +189,10 @@ class Representor(Node):
     Rdepth=property(fget=getDepth)
     
 
+    def getNames(self):
+        return [slice.name for slice in self._slices]
+    Rnames=property(fget=getNames)
+
     def __getitem__(self, condition):
         if(not isinstance(condition, tuple)):
             condition = (condition,)
@@ -529,6 +533,9 @@ class Representor(Node):
     
     def join(self, other, cond):
         return repops_multi.Join(self, other, cond)
+    
+    def match(self, other, lslice=None,rslice=None, jointype="inner"):
+        return repops_multi.Match(self, other, lslice, rslice, jointype)
 
     def rename(self, *names, **kwds):
         """Rename slices.

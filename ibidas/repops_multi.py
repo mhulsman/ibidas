@@ -219,8 +219,6 @@ class Join(repops.MultiOpRep):
         for dim in cslice.dims[::-1]:
             if dim in ldims:
                 ldimpath = dimpaths.DimPath(dim)
-
-
                 break
         else:
             raise RuntimeError, "No dimension found for one of the sources in constraint"
@@ -244,66 +242,54 @@ class Join(repops.MultiOpRep):
         return self._initialize(tuple(nslices),lsource._state & rsource._state)
 
 
-
-        
-
-
-
 class Match(repops.MultiOpRep):
-    def __init__(self, lsource, rsource, lfield=None, rfield=None):
-        repops.MultiOpRep.__init__(self,(lsource,rsource),lfield=lfield,rfield=rfield)
+    def __init__(self, lsource, rsource, lslice=None, rslice=None, jointype="inner"):
+        assert jointype in set(["inner","left","right","full"]), "Jointype should be inner, left, right or full"
+        if(isinstance(lslice,context.Context)):
+            lslice = context._apply(lslice,lsource)
+        if(isinstance(rslice,context.Context)):
+            rslice = context._apply(rslice,rsource)
+        repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice),jointype=jointype)
 
-    def _process(self, sources, lfield, rfield):
-        assert len(sources) == 2, "Match expects two representor objects"
-        state = reduce(operator.__and__,[source._state for source in sources])
-        if not state & RS_SLICES_KNOWN:
+    def _process(self, sources, jointype):
+        lsource, rsource, lslice,rslice = sources
+        if not lsource._state & RS_SLICES_KNOWN or not rsource._state & RS_SLICES_KNOWN:
             return
-        lsource,rsource = sources
-        if(lfield is None and rfield is None):
-            rnames = set([slice.name for slice in rsource._slices])
-            r = [slice for slice in lsource._slices if slice.name in rnames and slice.dims]
-            if(len(r) != 1):
-                raise RuntimeError, "Cannot find unique similarly named field to match. Please specify."
-            name = r.pop()
-            lslices = [slice for slice in lsource._slices if slice.name == name]
-            rslices = [slice for slice in rsource._slices if slice.name == name]
-        elif(rfield is None):
-            lslices = [slice for slice in lsource._slices if slice.name == lfield]
-            rslices = [slice for slice in rsource._slices if slice.name == lfield]
-        else:
-            lslices = [slice for slice in lsource._slices if slice.name == lfield]
-            rslices = [slice for slice in rsource._slices if slice.name == rfield]
-            
-        if(len(lslices) > 1 or len(rslices) > 1):
-            raise RuntimeError, "Matching slices in name not unique. Please rename or specify other slices."
-        lslice = lslices[0]
-        rslice = rslices[0]
+         
+        if(lslice is None):
+            if(rslice is None):
+                common_names = set(lsource.Rnames) & set(rsource.Rnames)
+                if(len(common_names) != 1):
+                    raise RuntimeError, "Cannot find a unique common named slice"
+                name = common_names.pop()
+                lslice = getattr(lsource,name)
+                rslice = getattr(rsource,name)
+            else:
+                lslice = getattr(lsource,rslice.Rnames[0])
+        elif(rslice is None):
+            rslice = getattr(rsource,lslice.Rnames[0])
+        assert len(rslice._slices) == 1, "rslice parameter in match should have only one slice"
+        assert len(lslice._slices) == 1, "lslice parameter in match should have only one slice"
 
-       
-
-
-        joinpath = dimpaths.identifyUniqueDimPathSource(lsource, dim)
-
-        idims = []
-        for i in xrange(len(joinpath)):
-            idims.append(dimensions.Dim(1))
+        self._sources = (lsource, rsource, lslice, rslice)
+        if not lslice._state & RS_TYPES_KNOWN or not rslice._state & RS_TYPES_KNOWN:
+            return
         
-        
-        references = []
-        for ndim in joinpath:
-            nrefs = []
-            for slice in lsource._slices:
-                if ndim in slice.dims:
-                    nrefs.append(slice)
-            references.append(nrefs)
+        lslice = lslice._slices[0]
+        rslice = rslice._slices[0]
 
-        nslices = []
-        plan = [BCEXIST] * len(idims)
-        for slice in rsource._slices:
-            odims = slice.dims
-            for dimpos in xrange(len(joinpath)):
-                slice = ops.InsertDimOp(slice,dimpos,idims[dimpos])
-            slice = ops.BroadcastOp(slice,references,plan,joinpath + odims)
-            nslices.append(slice)
-        return self._initialize(tuple(nslices), state)
-      
+        lindex,rindex = ops.EquiJoinIndexOp(lslice,rslice, jointype=jointype).results
+
+        lslices = list(lsource._slices)
+        rslices = list(rsource._slices)
+        if(lslice.name == rslice.name and jointype=="inner" and lslice in lslices and rslice in rslices):
+            rslices.pop(rslices.index(rslice))
+
+        lslices = Filter._apply(lslices, lindex, lslice.dims, "dim")
+        rslices = Filter._apply(rslices, rindex, rslice.dims, "dim")
+
+
+        nslices = Combine._apply(lslices,rslices)
+        return self._initialize(tuple(nslices),lsource._state & rsource._state)
+
+

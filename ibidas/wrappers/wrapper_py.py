@@ -306,9 +306,9 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
 
     def visitFilterOp(self,node, slice, constraint):
-        func = speedfilter
-        ndata = nested_array.co_mapseq(func,[slice.data, constraint.data],
-                                       res_type=node.type, dtype=node.type.toNumpy(), bc_allow=True)
+        ndata = nested_array.co_map(speedfilter,[slice.data, constraint.data],
+                                       has_missing = node.has_missing,ctype=constraint.type,
+                                       res_type=node.type, bc_allow=True)
         return slice.modify(data=ndata,rtype=node.type)
 
     def visitFlatAllOp(self, node, slice):
@@ -398,6 +398,16 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                                        typeo=node.type,res_type=node.type,op=node.funcname,
                                        bc_allow=node.allow_partial_bc)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
+
+    def visitEquiJoinIndexOp(self, node, slices):
+        ndatas = nested_array.co_map(joinindex,[slice.data for slice in slices],
+                                       jointype=node.jointype,
+                                       res_type=(node.results[0].type,node.results[1].type),
+                                       bc_allow=False)
+        return slices[0].modify(data=ndatas,name=None,rtype=None,dims=None, bookmarks=None)
+
+    def visitSelectOp(self, node, slice):
+        return slice.modify(data=slice.data[node.index],name=node.name, rtype=node.type, dims=node.dims, bookmarks=node.bookmarks)
 
     def visitFixate(self,node,slices):
         res = []
@@ -639,12 +649,36 @@ def speedarrayify(seqs,dtype):
     return nseq
 
 
-def speedfilter(seqs,dtype):
+def speedfilter(seqs,has_missing, ctype):
     data,constraint = seqs
-    res = []
-    for pos in xrange(len(data)):
-        res.append(data[pos][constraint[pos]])
-    return cutils.darray(res,dtype)
+    if(has_missing):
+        if(isinstance(ctype,rtypes.TypeArray)):
+            if(isinstance(ctype.subtypes[0],rtypes.TypeBool)):
+                data = data.ravel()
+                res = []
+                for pos, elem in enumerate(constraint.ravel()):
+                    if(elem is Missing):
+                        res.append(Missing)
+                    elif(elem is True):
+                        res.append(data[pos])
+                res = cutils.darray(res,object)
+            else:#indices
+                data = data.ravel()
+                res = []
+                for elem in constraint.ravel():
+                    if(elem is Missing):
+                        res.append(Missing)
+                    else:
+                        res.append(data[elem])
+                res = cutils.darray(res,object)
+        else:
+            if(constraint is Missing):
+                return Missing
+            else:
+                return data[constraint]
+    else:
+        res = data[constraint]
+    return res
 
 def ensure_fixeddims(seqs,packdepth,dtype):
     if(packdepth > 1):
@@ -691,12 +725,69 @@ def groupindex(data):
     else:
         data_dict = defaultdict(list)
         for pos, elems in enumerate(*data):
-            data_dict[elems].append(pos)
-
+            if(elems is Missing):
+                data_dict["__TEMP__" + str(elems.__hash__())].append(pos)
+            else:
+                data_dict[elems].append(pos)
         indexdata = [cutils.darray(elem, int) for elem in data_dict.values()]
         indexdata = cutils.darray(indexdata, object, 1)
    
     return indexdata
+
+
+def create_elem_pos_dict(data):
+    res = {}
+    for pos, elem in enumerate(data):
+        if elem in res:
+            res[elem].append(pos)
+        else:
+            res[elem] = [pos]
+    return res
+
+def joinindex(data, jointype):
+    lelempos = create_elem_pos_dict(data[0])
+    relempos = create_elem_pos_dict(data[1])
+
+    tlpos = []
+    trpos = []
+    leftouter = (jointype == "left" or jointype == "full")
+    rightouter = (jointype == "right" or jointype == "full")
+    for elem,lpos in lelempos.iteritems():
+        if not elem in relempos:
+            if(leftouter):
+                tlpos.extend(lpos)
+                trpos.extend([Missing] * len(lpos))
+            continue
+        rpos = relempos[elem]
+        if(len(lpos) == 1):
+            if len(rpos) == 1:
+                tlpos.append(lpos[0])
+                trpos.append(rpos[0])
+            else:
+                tlpos.extend(lpos * len(rpos))
+                trpos.extend(rpos)
+        else:
+            if len(rpos) == 1:
+                tlpos.extend(lpos)
+                trpos.extend(rpos * len(lpos))
+            else:
+                tlpos.extend(lpos * len(rpos))
+                trpos.extend(numpy.repeat(rpos,len(lpos)))
+    
+    if(rightouter):
+        unused_keys = list(set(range(len(data[1]))) - set(trpos))
+        tlpos.extend([Missing] * len(unused_keys))
+        trpos.extend(unused_keys)
+        ldtype = object
+    else:
+        ldtype = int
+
+    if(leftouter):
+        rdtype = object
+    else:
+        rdtype = int
+
+    return (cutils.darray(tlpos,ldtype), cutils.darray(trpos,rdtype))
 
 def remove_independent(data,dim):
     wx = [0] * len(data.shape)

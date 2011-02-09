@@ -303,7 +303,7 @@ class ShapeOp(UnaryUnaryOp):#{{{
         UnaryUnaryOp.__init__(self,slice, name=d.name,rtype=ntype,dims=dimpaths.DimPath())#}}}
 
 class FilterOp(UnaryUnaryOp):#{{{
-    __slots__ = ["constraint"]
+    __slots__ = ["constraint","has_missing"]
 
     def __init__(self,slice,constraint, ndim):
         stype = slice.type
@@ -313,9 +313,24 @@ class FilterOp(UnaryUnaryOp):#{{{
             sdims, subtype = sdims.removeDim(0, constraint, stype.subtypes[0])
         else:
             sdims, subtype = sdims.updateDim(0, ndim, stype.subtypes[0])
+        
+        if(isinstance(constraint.type,rtypes.TypeArray)):
+            has_missing = constraint.type.subtypes[0].has_missing
+        else:
+            has_missing = constraint.type.has_missing
+        self.has_missing = has_missing            
+        
+        array_has_missing = stype.has_missing
+        if(has_missing):
+            if(isinstance(constraint.type,rtypes.TypeSlice)):
+                array_has_missing = True 
+            else:
+                if not subtype.has_missing:
+                    subtype = subtype.copy()
+                    subtype.has_missing = True
 
         if(sdims):
-            ntype = rtypes.TypeArray(stype.has_missing, sdims, (subtype,))
+            ntype = rtypes.TypeArray(array_has_missing, sdims, (subtype,))
         else:
             ntype = subtype
         
@@ -604,11 +619,56 @@ class HArrayOp(MultiUnaryOp):#{{{
 
 class MultiOp(Op):
     __slots__ = ["results"]
+    
+    def __init__(self, results):
+        assert isinstance(results, tuple), "Results should be a tuple"
+        self.results = results
+
+class SelectOp(UnaryUnaryOp):
+    __slots__ = ["index"]
+    def __init__(self, slice, index, name, rtype, ndims, bookmarks):
+        assert isinstance(slice, MultiOp), "Source lice of SelectOp should be a multiop"
+        self.index = index
+        UnaryUnaryOp.__init__(self, slice, name=name, rtype=rtype, dims=ndims, bookmarks=bookmarks)
 
 class UnaryMultiOp(MultiOp):
     __slots__ = ["source"]
 
 class MultiMultiOp(MultiOp):
     __slots__ = ["sources"]
+
+    def __init__(self, sources, results):
+        assert isinstance(sources, tuple), "Sources should be a tuple"
+        self.sources = sources
+        MultiOp.__init__(self, results)
+
+class EquiJoinIndexOp(MultiMultiOp):
+    __slots__ = ["jointype"]
+
+    def __init__(self, leftslice, rightslice, jointype="inner"):
+        leftslice = ensure_frozen(leftslice)
+        rightslice = ensure_frozen(rightslice)
+
+        leftslice = PackArrayOp(leftslice)
+        rightslice = PackArrayOp(rightslice)
+        
+        leftslice,rightslice= broadcast((leftslice,rightslice),mode="dim")[0]
+
+        assert leftslice.dims == rightslice.dims, "Parent dims of join fields should be equal"
+        name="j" + leftslice.type.dims[0].name + "_" + rightslice.type.dims[0].name
+        ndim = dimensions.Dim(UNDEFINED, (True,) * len(leftslice.dims), name=name)
+
+        ltype = rtypes.TypePlatformInt(has_missing=(jointype == "right" or jointype=="full"))
+        ltype = rtypes.TypeArray(subtypes=(ltype,), dims=dimpaths.DimPath(ndim))
+        
+        rtype = rtypes.TypePlatformInt(has_missing=(jointype == "left" or jointype=="full"))
+        rtype = rtypes.TypeArray(subtypes=(rtype,), dims=dimpaths.DimPath(ndim))
+
+        r1 = SelectOp(self,0,leftslice.name, ltype,leftslice.dims, leftslice.bookmarks)
+        r2 = SelectOp(self,1,rightslice.name, rtype,leftslice.dims, rightslice.bookmarks)
+        self.jointype = jointype
+        MultiMultiOp.__init__(self, (leftslice,rightslice),(r1,r2))
+
+
 
 
