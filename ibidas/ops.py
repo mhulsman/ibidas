@@ -14,8 +14,9 @@ _delay_import_(globals(),"itypes.type_attribute_freeze","freeze_protocol")
 class Op(Node):
     __slots__ = ["link"]
 
-    def setLink(self,link):
-        self.link = link
+    def assignLink(self,link):
+        if(not hasattr(self, "link")):
+            self.link = link
 
 #pylint: disable-msg=E1101
 class UnaryOp(Op):#{{{
@@ -617,6 +618,14 @@ class HArrayOp(MultiUnaryOp):#{{{
         nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
         MultiUnaryOp.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)#}}}
 
+class FixateOp(MultiUnaryOp):
+    __slots__ = []
+    def __init__(self, slices):
+        MultiUnaryOp.__init__(self, slices, "result")
+
+class GatherOp(FixateOp):
+    __slots__ = []
+
 class MultiOp(Op):
     __slots__ = ["results"]
     
@@ -641,6 +650,7 @@ class MultiMultiOp(MultiOp):
         assert isinstance(sources, tuple), "Sources should be a tuple"
         self.sources = sources
         MultiOp.__init__(self, results)
+
 
 class EquiJoinIndexOp(MultiMultiOp):
     __slots__ = ["jointype"]

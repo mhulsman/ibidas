@@ -36,6 +36,7 @@ class Representor(Node):
     def _initialize(self, slices, state=RS_ALL_KNOWN):
         assert isinstance(slices, tuple), "slices should be a tuple"
         self._slices = slices
+
         if(state == RS_CHECK):
             if(slices):
                 state |= RS_SLICES_KNOWN
@@ -158,7 +159,7 @@ class Representor(Node):
 
     def copy(self):
         res = wrapper.SourceRepresentor()
-        res._initialize(tuple(self._getResultSlices(endpoint=False)))
+        res._initialize(tuple(self._getResultSlices(endpoint=False)),state=RS_CHECK)
         return res
 
    

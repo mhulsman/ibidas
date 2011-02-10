@@ -73,15 +73,23 @@ class Fixate(UnaryOpRep):#{{{
     """Operation used by optimizer to fixate end of tree,
     such that there are no exception situations, and slice retrieval
     is handled correctly."""
-    pass
 
+    def _process(self, source):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+        nslice = ops.FixateOp(source._slices)
+        self._initialize((nslice,), RS_SLICES_KNOWN)
     #}}}
 
 class Gather(Fixate):#{{{
     """Operation used by optimizer to fixate end of tree,
     such that there are no exception situations, and slice retrieval
     is handled correctly."""
-    pass
+    def _process(self, source):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+        nslice = ops.GatherOp(source._slices)
+        self._initialize((nslice,), RS_SLICES_KNOWN)
 
 class PlusPrefix(UnaryOpRep):#{{{
     pass

@@ -409,16 +409,16 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def visitSelectOp(self, node, slice):
         return slice.modify(data=slice.data[node.index],name=node.name, rtype=node.type, dims=node.dims, bookmarks=node.bookmarks)
 
-    def visitFixate(self,node,slices):
+    def visitFixateOp(self,node,slices):
         res = []
-        for cur_slice, slice in zip(node._slices, slices):
+        for cur_slice, slice in zip(node.sources, slices):
             ndata = slice.data.getStructuredData()
             nslice = slice.modify(data=ndata)
             nslice.setSource(cur_slice)
             res.append(nslice)
         return res
     
-    def visitGather(self,node,slices):
+    def visitGatherOp(self,node,slices):
         res = []
         for cur_slice, slice in zip(node._slices, slices):
             slice.setSource(cur_slice)

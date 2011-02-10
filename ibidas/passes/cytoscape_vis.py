@@ -7,6 +7,8 @@ from ..utils.multi_visitor import VisitorFactory, DirectVisitorFactory, NF_ELSE
 from ..utils import util
 import xmlrpclib
 
+_delay_import_(globals(),"..representor")
+
 networkid = util.seqgen().next
 class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
                      DirectVisitorFactory(prefixes=("edge",), flags=NF_ELSE), manager.Pass):
@@ -17,6 +19,7 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
         self = cls()
         self.rand = random.randint(0,10000000)
         self.graph = run_manager.pass_results[create_graph.CreateGraph]
+        self.graph.pruneGraph()
         self.server = xmlrpclib.ServerProxy("http://localhost:9000").Cytoscape
         self.network = self.server.createNetwork("network" + str(networkid()))
         
@@ -26,6 +29,7 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
         self.node_name = dict()
         self.node_class = dict()
         self.node_type = dict()
+        self.node_rep = dict()
 
         self.edge_from = []
         self.edge_to = []
@@ -39,25 +43,33 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
         for source,edges in self.graph.edge_source.iteritems():
             for edge in edges:
                 assert edge.source is source, "Source in edge and index not equal"
-                self.edgeKey(edge.type,edge)
+                self.edgeKey(edge.__class__.__name__,edge)
         
         self.edgeids = self.server.createEdges(self.network,self.edge_from, self.edge_to, self.edge_type,[True] * len(self.edge_type),False)
 
         self.server.addNodeAttributes("name","STRING",self.node_name,False)
         self.server.addNodeAttributes("type","STRING",self.node_type,False)
         self.server.addNodeAttributes("class","STRING",self.node_class,False)
+        self.server.addNodeAttributes("rep","STRING",self.node_rep,False)
         self.server.addEdgeAttributes("type","STRING",dict(zip(self.edgeids,self.edge_type)))
         self.server.addEdgeAttributes("attr","STRING",dict(zip(self.edgeids,self.edge_attr)))
 
         for attribute,attribute_dict in self.graph.node_attributes.iteritems():
-            attribute_name_dict = dict([(node_name, str(attribute_dict.get(node,""))) for node,node_name in self.names.iteritems()])
+            attribute_name_dict = {}
+            for node, node_name in self.names.iteritems():
+                r = attribute_dict.get(node,"")
+                if(isinstance(r, representor.Representor)):
+                    r = str(r.__class__.__name__)
+                else:
+                    r = str(r)
+                attribute_name_dict[node_name] = r
             self.server.addNodeAttributes(attribute,"STRING",attribute_name_dict,False)
         
         self.server.setNodeLabel(self.network, "name", "","default")
         self.server.setDiscreteNodeShapeMapper(self.network, 'default',
                 'type', 'diamond', {'else':'ellipse', 'unaryop':'octagon', 'rep':'round_rect'}, True)
-        self.server.setEdgeTargetArrowRule(self.network,"type","Arrow",["paramlist","paramchoicelist"],["T","T"])
-        self.server.setEdgeLineStyleRule(self.network,"type","SOLID",["paramchoice","paramchoicelist"],["DOT","DOT"])
+        self.server.setEdgeTargetArrowRule(self.network,"type","Arrow",["ParamListEdge","ParamChoiceListEdge"],["T","T"])
+        self.server.setEdgeLineStyleRule(self.network,"type","SOLID",["ParamChoiceEdge","ParamChoiceListEdge"],["DOT","DOT"])
         self.server.performLayout(self.network, "hierarchical")
    
     def createUniqueName(self,name):
@@ -76,6 +88,7 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
         self.node_name[name] = node.__class__.__name__
         self.node_class[name] = node.__class__.__name__
         self.node_type[name] = "else"
+        self.node_rep[name] = str(node)
         return name
     
     def nodeUnaryOp(self,node):
@@ -86,7 +99,7 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
     def edgeelse(self,edge):
         self.edge_from.append(self.names[edge.source])
         self.edge_to.append(self.names[edge.target])
-        self.edge_type.append(edge.type)
-        self.edge_attr.append(str(edge.attr))
+        self.edge_type.append(edge.__class__.__name__)
+        self.edge_attr.append(str(edge))
 
 

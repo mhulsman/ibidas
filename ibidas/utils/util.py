@@ -179,6 +179,14 @@ def create_strtable(table):
         res += "\n"
     return res
 
+def transpose_table(table):
+    ncols = len(table[0])
+    cols = []
+    for col in range(ncols):
+        cols.append([row[col] for row in table])
+    return cols
+        
+
 
 def contained_in(inner_tuple, outer_tuple):
     pos = 0

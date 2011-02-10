@@ -1,4 +1,5 @@
-from ..utils import topological_sort
+import time, math
+from ..utils import topological_sort, util
 
 class Pass(topological_sort.TopologicalSortable):
     """Pass object. Each pass should inherit from
@@ -23,10 +24,11 @@ class PassManager(object):
     """Class to handle passes. Passes are objects which 
     perform some function on a query object."""
 
-    def __init__(self):
+    def __init__(self, log=False):
         """Initializes pass manager"""
         self.objs = []
         self.params = []
+        self.log = log
 
     def register(self, objcls, *args, **kwargs):
         """Registers a new pass.
@@ -43,31 +45,63 @@ class PassManager(object):
         """Performs registered passes on query, by
         performing a stable topological sort."""
 
-        return PassManagerRun(self, query).run()
+        return PassManagerRun(self, query, self.log).run()
+
+units = [u"s", u"ms",u'us',"ns"]
+scaling = [1, 1e3, 1e6, 1e9]
+
+def format_runtime(rtime):
+    if rtime > 0.0 and rtime < 1000.0:
+        order = min(-int(math.floor(math.log10(rtime)) // 3), 3)
+    elif rtime >= 1000.0:
+        order = 0
+    else:
+        order = 3
+    return u"%.*g %s" % (3, rtime * scaling[order],units[order])
 
 class PassManagerRun(object):
-    def __init__(self,manager, query):
+    def __init__(self,manager, query, log):
         self.query = query
         self.topoiter = topological_sort.topo_sorted(manager.objs,return_index=True)
         self.pass_results = {}
         self.objects = list(manager.objs)
         self.params = list(manager.params)
+        self.log = log
 
 
     def invalidate(self, ipass):
         self.topoiter.invalidate(ipass)
         self.pass_results.pop(ipass)
 
-    def add_pass(self, ipass):
-        self.topoiter.add_pass(ipass)
+    def add_pass(self, ipass, *params, **kwds):
+        self.topoiter.prepend(ipass)
+        self.objects.append(ipass)
+        self.params.append((params,kwds))
 
     def run(self):
+        if self.log:
+            logtable = []
+            totalstart = time.time()
         for cur_pass_idx in self.topoiter:
             cur_pass = self.objects[cur_pass_idx]
             param_args, param_kwds = self.params[cur_pass_idx]
 
+            if(self.log):
+                start = time.time()
             res = cur_pass.run(self.query, self, *param_args, **param_kwds)
+            if(self.log):
+                rtime = time.time() - start
+                logtable.append((cur_pass.__name__, rtime))
             if(not res is None):
                 self.pass_results[cur_pass] = res
                 result = res
+        if(self.log):
+            totaltime = time.time() - totalstart
+            restable = []
+            for name, rtime in logtable:
+                restable.append((name, format_runtime(rtime), u"(%.2f%%)" % (100 * (rtime/totaltime)),))
+            print util.create_strtable(util.transpose_table(restable))
+            print "-------------"
+            print u"Total : %s" % (format_runtime(totaltime))
+
         return result

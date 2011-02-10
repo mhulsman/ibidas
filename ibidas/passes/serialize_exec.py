@@ -3,8 +3,9 @@ import operator
 import manager
 import create_graph
 from ..utils.multi_visitor import VisitorFactory, NF_ELSE
-
-class SerializeExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), manager.Pass):
+from ..utils import util
+_delay_import_(globals(),"..query_graph")
+class SerializeExec(VisitorFactory(prefixes=("visit","assign"), flags=NF_ELSE), manager.Pass):
 
     after = set([create_graph.CreateGraph])
 
@@ -28,24 +29,9 @@ class SerializeExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), manager.
             else:
                 param_idx = self.visit(source)
             self.graph.na['param_usecount'][source] += 1
-            
-            if edge.type == "param":
-                params[edge.subtype] = param_idx
-            elif(edge.type == "paramlist"):
-                if(not edge.subtype in params):
-                    params[edge.subtype] = [None]
-                while(len(params[edge.subtype]) <= edge.attr):
-                    params[edge.subtype].append(None)
-                params[edge.subtype][edge.attr] = param_idx
-            elif(edge.type == "paramchoice"):
-                params[edge.subtype] = param_idx
-            elif(edge.type == "paramchoicelist"):
-                if(not edge.subtype in params):
-                    params[edge.subtype] = [None]
-                while(len(params[edge.subtype]) <= edge.attr):
-                    params[edge.subtype].append(None)
-                params[edge.subtype][edge.attr] = param_idx
-                
+
+            self.assign(edge, params, param_idx)
+               
 
         command_id = len(self.commands)
         self.commands.append(node)
@@ -53,4 +39,15 @@ class SerializeExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), manager.
         self.graph.na['param_idxs'][node] = params
         self.graph.na['param_usecount'][node] = 0
         return command_id
+
+    def assignParamEdge(self, edge, params, param_idx):
+        params[edge.name] = param_idx
+
+    def assignParamListEdge(self, edge, params, param_idx):
+        if(not edge.name in params):
+            params[edge.name] = [None]
+        while(len(params[edge.name]) <= edge.pos):
+            params[edge.name].append(None)
+        params[edge.name][edge.pos] = param_idx
+
 

@@ -1,9 +1,13 @@
 import wrapper
 import sqlalchemy
+from sqlalchemy.sql import expression as sql
 
 from .. import ops
 from ..constants import *
-from ..utils.multi_visitor import VisitorFactory, NF_ELSE
+from ..utils.multi_visitor import VisitorFactory, NF_ELSE, F_CACHE, NF_ERROR
+
+from ..passes import manager, create_graph, annotate_replinks, serialize_exec
+from .. import query_graph
 
 _delay_import_(globals(),"..utils","util","nested_array")
 _delay_import_(globals(),"..itypes","rtypes","dimensions","dimpaths")
@@ -325,8 +329,7 @@ class Connection(object):
 class TableRepresentor(wrapper.SourceRepresentor):
     def __init__(self, engine, table):
         table_type = convert(table.columns,'sqlalchemy',engine, table.name)
-        s = sqlalchemy.sql.select([table])
-        nslices = (SQLOp(engine, s, table_type, table.name),)
+        nslices = (SQLOp(engine, table, table_type, table.name),)
         self._initialize(nslices,RS_ALL_KNOWN)
 
 class QueryRepresentor(wrapper.SourceRepresentor):
@@ -342,15 +345,152 @@ class QueryRepresentor(wrapper.SourceRepresentor):
         self._initialize(nslices,RS_ALL_KNOWN)
 
 
+
+class SQLResultEdge(query_graph.Edge):
+    __slots__ = ["realedge","pos"]
+    def __init__(self, source, target, realedge, fieldpos):
+        self.realedge = realedge
+        self.pos = fieldpos
+        query_graph.Edge.__init__(self, source, target)
+
+class SQLPlanner(VisitorFactory(prefixes=("eat","finish"), 
+                                      flags=NF_ERROR | F_CACHE), manager.Pass):
+    after=set([create_graph.CreateGraph, annotate_replinks.AnnotateRepLinks])
+    before=set([serialize_exec.SerializeExec])
+
+    @classmethod
+    def run(cls, query, run_manager):
+        self = cls()
+        self.graph = run_manager.pass_results[create_graph.CreateGraph]
+        self.expressions = run_manager.pass_results[annotate_replinks.AnnotateRepLinks]
+
+        self.eat_front = self.graph.getSources()
+
+        changes = True
+        while(changes and self.eat_front):
+            changes=False
+            for node in list(self.eat_front):
+                changes = changes or self.eat(node) 
+
+        for node in self.eat_front:
+            self.finish(node)
+
+
+    def eatSQLOp(self, node):
+        o = SQLQuery(node.conn)
+        self.graph.addNode(o)
+
+        self.eat_front.discard(node)
+        self.eat_front.add(o)
+
+        etargets = list(self.graph.edge_source[node])
+        assert len(etargets) == 1, "Expected one target slice after sql op"
+        anode = etargets[0].target
+        assert isinstance(anode,ops.UnpackArrayOp), "Expected array unpack operation after sql op"
+        
+        targets = [edge.target for edge in self.graph.edge_source[anode]]
+        columns = list(node.query.columns)
+        ncolumns = []
+        
+        for pos,target in enumerate(targets):
+            assert isinstance(target,ops.UnpackTupleOp), "Expected tuple unpack operation after sql op array unpack"
+            ncolumns.append(columns[target.tuple_idx])
+            for edge in self.graph.edge_source[target]:
+                self.graph.addEdge(SQLResultEdge(o, edge.target, edge, pos))
+
+        o.setColumns(ncolumns)
+        o.setResults(tuple(targets))
+        return True
+    
+    def eatOp(self, node):
+        self.eat_front.discard(node)
+        return True
+
+    def eatSQLQuery(self, node):
+        return False
+
+
+    def finishSQLQuery(self, node):
+        query = node.compile()
+        tslice = ops.PackTupleOp(node.results)
+        aslice = ops.PackArrayOp(tslice)
+        
+        sslice = SQLOp(node.conn, node.compile(), aslice.type)
+        rslice = ops.UnpackArrayOp(sslice)
+        self.addPairToGraph(sslice,rslice)
+        
+        rslices = []
+        for oslice, i in zip(node.results, range(len(node.results))):
+            r = ops.UnpackTupleOp(rslice,i)
+            self.addPairToGraph(rslice,r)
+
+            if(r.bookmarks):
+                r2 = ops.ChangeBookmarkOp(r)
+                r2.bookmarks = oslice.bookmarks
+                self.addPairToGraph(r,r2)
+                r= r2
+
+            rslices.append(r)
+      
+        for edge in list(self.graph.edge_source[node]):
+            self.graph.dropEdge(edge.realedge)
+            self.graph.dropEdge(edge)
+            
+            redge = edge.realedge
+            redge.source = rslices[edge.pos]
+            self.graph.addEdge(redge)
+        
+    def addPairToGraph(self, node, node2):
+        self.graph.addNode(node)
+        self.graph.addNode(node2)
+        self.graph.addEdge(query_graph.ParamEdge(node,node2,"slice"))
+        
+
+
 class SQLOp(ops.ExtendOp):
+    __slots__ = []
+    passes = [SQLPlanner]
     def __init__(self, conn, query, rtype, name="result"):
         self.conn = conn
         self.query = query
         ops.ExtendOp.__init__(self,name=name,rtype=rtype)
 
     def py_exec(self):
-        res = self.conn.execute(self.query)
+        if(isinstance(self.query, sqlalchemy.sql.expression.Executable)):
+            res = self.conn.execute(self.query)
+        else:
+            res = self.conn.execute(sql.select([self.query]))
         result = res.fetchall()
         ndata = nested_array.NestedArray(result,self.type)
         return wrapper_py.ResultOp.from_slice(ndata,self)
+
+    def __str__(self):
+        if(isinstance(self.query, sqlalchemy.sql.expression.Executable)):
+            return ops.ExtendOp.__str__(self) + ":\n" +  str(self.query.compile())
+        else:
+            return ops.ExtendOp.__str__(self) + ":\n" +  str(sql.select(self.query).compile())
+
+
+
+class SQLQuery(ops.MultiOp):
+    def __init__(self, conn):
+        self.conn = conn
+        self.columns = []
+        
+        ops.MultiOp.__init__(self, tuple())
+
+
+    def setColumns(self, columns):
+        self.columns = columns
+
+    def setResults(self, slices):
+        self.results = slices
+
+    def compile(self):
+        return sql.select(self.columns)
+
+
+
+
+
 

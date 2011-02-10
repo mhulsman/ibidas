@@ -46,14 +46,16 @@ class topo_sorted(object):
     def append(self, obj):
         self._addobj(obj)
         self.objs.append(obj)
-        self.obj_idxs.append(self.totalobj + 1)
-        self.total_obj += 1
+        self.obj_idxs.append(self.totalobj)
+        self.totalobj += 1
+        return self.totalobj
 
     def prepend(self, obj):
         self._addobj(obj)
         self.objs.insert(0, obj)
-        self.obj_idxs.insert(0, self.totalobj + 1)
-        self.total_obj += 1
+        self.obj_idxs.insert(0, self.totalobj)
+        self.totalobj += 1
+        return self.totalobj
     
     def __iter__(self):
         return self
