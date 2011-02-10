@@ -388,6 +388,8 @@ class TypeTuple(TypeAny):#{{{
         else:
             subtypes = [casts.castImplicitCommonType(lstype, rstype)
                       for lstype, rstype in zip(type1.subtypes, type2.subtypes)]
+            if(False in subtypes):
+                return False
             res = cls(type1.has_missing or type2.has_missing, tuple(subtypes), type1.fieldnames, 
                       need_conversion=type1._need_conversion or type2._need_conversion)
         return res
@@ -586,6 +588,8 @@ class TypeArray(TypeAny):#{{{
         else:
             subtypes = [casts.castImplicitCommonType(lstype, rstype)
                         for lstype, rstype in zip(type1.subtypes, type2.subtypes)]
+            if(False in subtypes):
+                return False
             dims = type1.dims 
             res = cls(has_missing=type1.has_missing or type2.has_missing, dims=dims, subtypes=tuple(subtypes), 
                       need_conversion=_type1._need_conversion or type2._need_conversion)

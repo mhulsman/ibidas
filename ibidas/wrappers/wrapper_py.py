@@ -443,6 +443,22 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         if(data1 is Missing or data2 is Missing):
             return Missing
         return numpy_arith[op](data1, data2, sig=typeo.toNumpy())
+    
+    def string_add_stringAdd(self, data, type1, type2, typeo, op):
+        data1,data2 = data
+        if(data1 is Missing or data2 is Missing):
+            return Missing
+        return numpy_arith[op](numpy.cast[object](data1), numpy.cast[object](data2), sig=typeo.toNumpy())
+    
+    def array_add_arrayAdd(self, data, type1, type2, typeo, op):
+        data1,data2 = data
+        if(data1 is Missing or data2 is Missing):
+            return Missing
+        res = []
+        dtype = typeo.toNumpy()
+        for lelem, relem in zip(data1,data2):
+            res.append(numpy.concatenate([numpy.cast[dtype](lelem),numpy.cast[dtype](relem)],axis=0))
+        return cutils.darray(res,object)
 
     def simple_cmpGeneral(self, data, type1, type2, typeo, op):
         #a numpy bug gives all true arrays when using

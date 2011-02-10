@@ -303,8 +303,64 @@ class SetSetSignature(FuncSignature):
         return out_type#}}}
 setset_sig = SetSetSignature("simple_arith")
 
+class StringAddStringSignature(FuncSignature):
+    def check(self, left, right):
+        in1_type = left.type
+        in2_type = right.type
+        if(not isinstance(in1_type, rtypes.TypeString) or not isinstance(in2_type, rtypes.TypeString)):
+            return False
+       
+        if(in1_type.dims[0].shape == UNDEFINED or in2_type.dims[0].shape == UNDEFINED):
+            nshape =  UNDEFINED
+        else:
+            nshape = in1_type.dims[0].shape + in2_type.dims[0].shape
+
+        in1_impli_cls = casts.findImplicitCastTypes(in1_type.__class__)
+        in2_impli_cls = casts.findImplicitCastTypes(in2_type.__class__)
+        out_impli_cls = in1_impli_cls & in2_impli_cls
+        out_impli_cls = rtypes.mostSpecializedTypesCls(out_impli_cls)
+        assert len(out_impli_cls) == 1, "Multiple output types for " + \
+                    "arithmetic operation found: " + str(out_impli_cls)
+        out_cls = out_impli_cls[0]
+        
+        ndim = dimensions.Dim(nshape,dependent=(True,) * len(left.dims), name = in1_type.dims[0].name + "_" + in2_type.dims[0].name)
+        out_type = out_cls(in1_type.has_missing or in2_type.has_missing, dims=dimpaths.DimPath(ndim))
+        return out_type#}}}
+stringaddstring_sig = StringAddStringSignature("string_add_string")
+
+class ArrayAddArraySignature(FuncSignature):
+    def check(self, left, right):
+        in1_type = left.type
+        in2_type = right.type
+        if(not in1_type.__class__ is rtypes.TypeArray or not in2_type.__class__ is rtypes.TypeArray):
+            return False
+
+        if(in1_type.dims[1:]):
+            subtype1 = rtypes.TypeArray(subtypes=in1_type.subtypes, dims=in1_type.dims[1:])
+        else:
+            subtype1 = in1_type.subtypes[0]
+        
+        if(in2_type.dims[1:]):
+            subtype2 = rtypes.TypeArray(subtypes=in2_type.subtypes, dims=in2_type.dims[1:])
+        else:
+            subtype2 = in2_type.subtypes[0]
+
+        nsubtype = casts.castImplicitCommonType(subtype1,subtype2)
+        if(nsubtype is False):
+            return False
+            
+        if(in1_type.dims[0].shape == UNDEFINED or in2_type.dims[0].shape == UNDEFINED):
+            nshape =  UNDEFINED
+        else:
+            nshape = in1_type.dims[0].shape + in2_type.dims[0].shape
+        
+        ndim = dimensions.Dim(nshape,dependent=(True,) * len(left.dims), name = in1_type.dims[0].name + "_" + in2_type.dims[0].name)
+        out_type = rtypes.TypeArray(in1_type.has_missing or in2_type.has_missing, dims=dimpaths.DimPath(ndim), subtypes=(nsubtype,))
+        return out_type#}}}
+arrayaddarray_sig = ArrayAddArraySignature("array_add_array")
+
 class Add(BinaryFuncElemOp):
-   _sigs = [bin_arithsig]
+   _sigs = [bin_arithsig, stringaddstring_sig, arrayaddarray_sig]
 
 class Subtract(BinaryFuncElemOp):
    _sigs = [bin_arithsig, setset_sig]
