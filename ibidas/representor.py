@@ -9,7 +9,7 @@ from constants import *
 
 _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"itypes", "dimensions","dimpaths")
-_delay_import_(globals(),"wrappers","wrapper_py")
+_delay_import_(globals(),"wrappers","wrapper_py","wrapper")
 _delay_import_(globals(),"query_context")
 _delay_import_(globals(),"engines")
 _delay_import_(globals(),"repops")
@@ -157,7 +157,9 @@ class Representor(Node):
             return [slice.name for slice in self._slices]
 
     def copy(self):
-        return wrapper_py.PyRepresentor(self._getResultSlices())
+        res = wrapper.SourceRepresentor()
+        res._initialize(tuple(self._getResultSlices(endpoint=False)))
+        return res
 
    
     def __reduce__(self):
