@@ -238,7 +238,7 @@ class Connection(object):
 
         tabledict = {}
         for table in tables.values():
-            t = TableRepresentor(self.engine, table).E.A
+            t = TableRepresentor(self.engine, table).elements().attributes()
             tabledict[table.name] = t
         self.tabledict = tabledict 
 
@@ -249,7 +249,6 @@ class Connection(object):
                     sname = sname[0]
                     self.__dict__[sname] = Connection(self.engine, sname);
             except:
-                raise
                 pass
 
     def __getattr__(self, name):
@@ -260,7 +259,7 @@ class Connection(object):
    
     
     def query(self, query):
-        return QueryRepresentor(self.engine, query).E.A
+        return QueryRepresentor(self.engine, query).elements().attributes()
 
     def __repr__(self):
         res = "Database: " + str(self.engine.url) + "\n"
@@ -273,7 +272,7 @@ class Connection(object):
     def store(self, name, rep, primary_slices=None, indexes = {}, unique = {}):
         if(not name in self.tabledict):
             columns = []
-            for slice in rep._active_slices:
+            for slice in rep._slices:
                 stype= tosa_typemapper.convert(slice.type)
                 nullable = slice.type.has_missing
                 columns.append(sqlalchemy.Column(slice.name, stype, nullable = nullable))
@@ -283,35 +282,39 @@ class Connection(object):
      
             self.sa_tables[name] = newtable
             table = self.meta.tables[name]
-            nslices = convert(table.columns,'sqlalchemy',self.engine, table.name)
-            t = SQLRepresentor(self.engine, table, nslices).E.A
+            t = TableRepresentor(self.engine, table).elements().attributes()
             self.tabledict[name] = t
         
         self._append(name, rep)
         return self.tabledict[name]
     
     def _append(self, name, rep):
-       w = dict([(s.name,s) for s in rep._active_slices])
-       cols = [slice for slice in self.tabledict[name]._active_slices if slice.name in w]
-       assert len(cols) == len(w), "Unused fields: " + set(w) - set(colnames)
+       w = dict([(s.name,s) for s in rep._slices])
+       cols = [slice for slice in self.tabledict[name]._slices if slice.name in w]
+       assert len(cols) == len(w), "Slices not in table: " + set(w) - set(colnames)
        
        for s in cols:
           if not s.type >=w[s.name].type:
               raise RuntimeError, "Incompatible types: " + str(s.type) + " " + str(w[s.name].type)
        rep = rep.get(*[slice.name for slice in cols])
        
-       trep = rep.tuple(True)
-       tbdims = set([slice.dims for slice in trep._active_slices])
+       trep = rep.tuple()
+       tbdims = set([slice.dims for slice in trep._slices])
        assert len(tbdims) == 1 and len(tbdims.pop()) == 1, \
             "Only a representor object with one common parent dimension can be \
                 stored as a table"
 
-       data = trep.to_python()
+       data = rep.to_python()
        values = [{} for elem in data]
-       for colnr, slice in enumerate(cols):
-           sname = slice.name
-           for pos in xrange(len(values)):
-               values[pos][sname] = data[pos][colnr]
+       if(len(cols) == 1):
+            sname = cols[0].name
+            for pos in xrange(len(values)):
+                values[pos][sname] = data[pos]
+       else:
+            for colnr, slice in enumerate(cols):
+                sname = slice.name
+                for pos in xrange(len(values)):
+                    values[pos][sname] = data[pos][colnr]
        self.engine.execute(self.sa_tables[name].insert(), values)
 
     def drop(self, name):
