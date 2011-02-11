@@ -353,36 +353,73 @@ class SQLResultEdge(query_graph.Edge):
         self.pos = fieldpos
         query_graph.Edge.__init__(self, source, target)
 
-class SQLPlanner(VisitorFactory(prefixes=("eat","finish", "valueEat", "expressionEat"), 
+class SQLTransEdge(SQLResultEdge):
+    __slots__ = ["targetpos"]
+    def __init__(self, source, target, realedge, fieldpos, tpos):
+        self.targetpos = tpos
+        SQLResultEdge.__init__(self,source,target,realedge,fieldpos)
+    
+
+class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"), 
                                       flags=NF_ELSE), manager.Pass):
     after=set([create_graph.CreateGraph, annotate_replinks.AnnotateRepLinks])
     before=set([serialize_exec.SerializeExec])
 
     @classmethod
-    def run(cls, query, run_manager):
+    def run(cls, query, run_manager, debug_mode=False):
         self = cls()
         self.graph = run_manager.pass_results[create_graph.CreateGraph]
         self.expressions = run_manager.pass_results[annotate_replinks.AnnotateRepLinks]
 
+        self.done = set()
+        self.sql_obj = set()
         self.eat_front = self.graph.getSources()
 
-        changes = True
-        while(changes and self.eat_front):
-            changes=False
+        while(self.eat_front):
+            self.next_round = set()
+            if(debug_mode):
+                from ..passes.cytoscape_vis import DebugVisualizer
+                DebugVisualizer.run(query,run_manager)
             for node in list(self.eat_front):
-                r = self.eat(node)
-                changes |= r
+                self.eat(node)
+            
+            self.eat_front = self.next_round
 
-        for node in self.eat_front:
-            self.finish(node)
+        for node in self.sql_obj:
+            if(isinstance(node, SQLQuery)):
+                self.finish(node)
+            else:
+                self.graph.dropNode(node)
+
+    #UTILS
+    def allSQLParams(self, in_slice, expression):
+        edges = self.graph.edge_target[in_slice]
+        paramedges = set()
+        sqlparamedges = set()
+        for edge in edges:
+            if(edge.source in expression.all_slices):
+                continue
+            if isinstance(edge, query_graph.ParamEdge):
+                paramedges.add(edge)
+            elif isinstance(edge, SQLResultEdge):
+                sqlparamedges.add(edge.realedge)
+        return paramedges == sqlparamedges
+
+    def getSQLEdge(self, edge):
+        etargets = self.graph.edge_target[edge.target]
+        for etarget in etargets:
+            if isinstance(etarget,SQLResultEdge):
+                if(etarget.realedge == edge):
+                   return etarget
+        return False
 
     #SOURCE OBJECTS
     def eatSQLOp(self, node):
         o = SQLQuery(node.conn)
         self.graph.addNode(o)
 
-        self.eat_front.discard(node)
-        self.eat_front.add(o)
+        self.next_round.add(o)
+        self.sql_obj.add(o)
 
         etargets = list(self.graph.edge_source[node])
         assert len(etargets) == 1, "Expected one target slice after sql op"
@@ -401,81 +438,94 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","finish", "valueEat", "expressio
 
         o.setColumns(ncolumns)
         o.setResults(tuple(targets))
-        return True
     
     def eatOp(self, node):
-        self.eat_front.discard(node)
-        return True
+        pass
 
     def eatDataOp(self, node):
         o = SQLValue(node.data, node)
         self.graph.addNode(o)
-        self.eat_front.discard(node)
-        self.eat_front.add(o)
+        self.next_round.add(o)
+        self.sql_obj.add(o)
+
         for edge in self.graph.edge_source[node]:
             self.graph.addEdge(SQLResultEdge(o, edge.target, edge, 0))
-        return True
     
     #SQL QUERY
-    def eatSQLQuery(self, node):
-        return self.expressionEat(node)
+    def eatSQLElement(self, node):
+        self.expressionEat(node)
 
     #SQL VALUE
     def eatSQLValue(self, node):
         targets = [edge.target for edge in self.graph.edge_source[node]]
-        if(len(targets) == 1):
-            return self.valueEat(targets[0], node)
+        if(len(targets) == 1 and isinstance(targets[0], ops.ConvertOp)):
+            target = targets[0]
+            edge = self.graph.getEdge(node, target)
+            self.graph.dropEdge(edge)
+
+            etargets = list(self.graph.edge_source[target])
+            for edge in etargets:
+                self.graph.addEdge(SQLResultEdge(node, edge.target, edge, 0))
+            
+            self.next_round.add(node)
         else:
             return self.expressionEat(node)
-        return False
-   
-    def valueEatelse(self, node, o):
-        return False
-
-    def valueEatConvertOp(self, node, o):
-        edge = self.graph.getEdge(o, node)
-        self.graph.dropEdge(edge)
-
-        etargets = list(self.graph.edge_source[node])
-        for edge in etargets:
-            self.graph.addEdge(SQLResultEdge(o, edge.target, edge, 0))
-        return True
 
     #EXPRESSIONS
     def expressionEatSQLElement(self, node):
+        util.debug_here()
         targets = [edge.target for edge in self.graph.edge_source[node]]
         links = self.graph.node_attributes['links']
         expressions = set([links[target] for target in targets if target in links])
-        r = False
-        for expression in expressions:
-            if all([self.allSQLParams(in_slice) for in_slice in expression.in_slices]):
-                r = self.expressionEat(expression) or r
-        return r 
 
-    def allSQLParams(self, in_slice):
-        edges = self.graph.edge_target[in_slice]
-        paramedges = set()
-        sqlparamedges = set()
-        for edge in edges:
-            if isinstance(edge, query_graph.ParamEdge):
-                paramedges.add(edge)
-            elif isinstance(edge, SQLResultEdge):
-                sqlparamedges.add(edge.realedge)
-        return paramedges == sqlparamedges
+        for expression in expressions:
+            if expression in self.done:
+                continue
+            if all([self.allSQLParams(in_slice, expression) for in_slice in expression.in_slices]):
+                self.expressionEat(expression)
 
     def expressionEatExpression(self, node):
-        return False
-    
-    def expressionEatBinFuncElemExpression(self, node):
-        print "bfunc"
-        return False
-
-    #FINISH
-    def finishSQLValue(self, node):
         pass
-        #self.graph.dropNode(node)
 
-    def finishSQLQuery(self, node):
+    def expressionEatFilterExpression(self, expression):
+        fedges,cedge, onodes = expression.getInfo(self.graph)
+        
+        print "HOI"
+    
+    def expressionEatBinFuncElemExpression(self, expression):
+        op = expression.getOp()
+        if(not op in SQLOperators):
+            return
+
+        #check dimensions
+        leftedge,rightedge = expression.getLeftRightInEdges(self.graph)
+        ldims, rdims = leftedge.source.dims, rightedge.source.dims
+        if len(ldims) > 1 or len(rdims) > 1:
+            return
+        if ldims != rdims and len(rdims) == len(ldims):
+            return
+        
+        sqlleftedge = self.getSQLEdge(leftedge)
+        sqlrightedge = self.getSQLEdge(rightedge)
+
+        left = sqlleftedge.source
+        right = sqlrightedge.source
+       
+        out = expression.getOutSlice()
+        res = SQLBinOp(left.getColumn(sqlleftedge.pos), right.getColumn(sqlrightedge.pos), SQLOperators[op], out)
+        self.graph.addNode(res)
+        self.graph.addEdge(SQLTransEdge(left, res, sqlleftedge, sqlleftedge.pos, 0))
+        self.graph.addEdge(SQLTransEdge(right, res, sqlrightedge, sqlrightedge.pos, 1))
+
+        out_edges = expression.getOutEdges(self.graph)
+        for out_edge in out_edges:
+            self.graph.addEdge(SQLResultEdge(res,out_edge.target,out_edge,0))
+
+        self.next_round.add(res)
+        self.sql_obj.add(res)
+        self.done.add(expression)
+
+    def finish(self, node):
         query = node.compile()
         tslice = ops.PackTupleOp(node.results)
         aslice = ops.PackArrayOp(tslice)
@@ -502,14 +552,24 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","finish", "valueEat", "expressio
             self.graph.dropEdge(edge)
             
             redge = edge.realedge
-            redge.source = rslices[edge.pos]
-            self.graph.addEdge(redge)
+            if(isinstance(redge,query_graph.ParamEdge)):
+                redge.source = rslices[edge.pos]
+                self.graph.addEdge(redge)
         
     def addPairToGraph(self, node, node2):
         self.graph.addNode(node)
         self.graph.addNode(node2)
         self.graph.addEdge(query_graph.ParamEdge(node,node2,"slice"))
         
+SQLOperators = {'Equal':lambda x, y: x==y,
+                'NotEqual': lambda x, y: x!=y,
+                'Less': lambda x, y: x < y,
+                'LessEqual': lambda x, y: x <= y,
+                'Greater': lambda x,y: x > y,
+                'GreaterEqual': lambda x,y: x >= y,
+                'And': sql.and_,
+                'Or': sql.or_,
+                'Add': lambda x, y: x + y}
 
 
 class SQLOp(ops.ExtendOp):
@@ -533,12 +593,11 @@ class SQLOp(ops.ExtendOp):
         if(isinstance(self.query, sqlalchemy.sql.expression.Executable)):
             return ops.ExtendOp.__str__(self) + ":\n" +  str(self.query.compile())
         else:
-            return ops.ExtendOp.__str__(self) + ":\n" +  str(sql.select(self.query).compile())
+            return ops.ExtendOp.__str__(self) + ":\n" +  str(sql.select([self.query]).compile())
 
 
 class SQLElement(ops.MultiOp):
     pass
-
 
 class SQLQuery(SQLElement):
     def __init__(self, conn):
@@ -547,6 +606,8 @@ class SQLQuery(SQLElement):
         
         ops.MultiOp.__init__(self, tuple())
 
+    def getColumn(self, pos):   
+        return self.columns[pos]
 
     def setColumns(self, columns):
         self.columns = columns
@@ -568,8 +629,26 @@ class SQLValue(SQLElement):
     def setResult(self, slice):
         self.results = (slice,)
 
+    def getColumn(self, pos):
+        assert pos == 0, "Illegal pos for SQLValue"
+        return self.value
+
     def compile(self):
-        pass
+        return self.value
 
     def __str__(self):
         return str(self.results[0]) + ": " + str(self.value)
+
+class SQLBinOp(SQLElement):
+    def __init__(self, left, right, op, slice):
+        self.op = op
+        self.left = left
+        self.right = right
+        ops.MultiOp.__init__(self, (slice,))
+
+    def compile(self):
+        return self.op(self.left, self.right)
+
+    def __str__(self):
+        return str(self.results[0]) + ": " + str(self.compile())
+

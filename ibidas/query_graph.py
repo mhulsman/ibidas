@@ -41,7 +41,16 @@ class Graph(object):
     def dropEdge(self, edge):
         self.edge_source[edge.source].discard(edge)
         self.edge_target[edge.target].discard(edge)
-    
+   
+    def getDataEdge(self, node, pos=0, name="slice"):
+        for edge in self.edge_target[node]:
+            if(isinstance(edge,ParamEdge) and edge.name == name):
+                assert pos == 0, "Cannot have pos larger than 0"
+                return edge
+            elif(isinstance(edge,ParamListEdge) and edge.name == name + "s" and edge.pos == pos):
+                return edge
+        raise RuntimeError, "Edge with pos: " + str(pos) + " not found for node: " + str(node) + ":" + str(node.__class__.__name__)
+
     def getEdge(self, source, target):
         res = self.getEdges(source, target)
         assert len(res) == 1, "More than one edge found"

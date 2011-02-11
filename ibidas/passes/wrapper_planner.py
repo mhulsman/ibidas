@@ -12,7 +12,7 @@ class WrapperPlanner(VisitorFactory(prefixes=("link","distribute"),
     after=set([create_graph.CreateGraph])
 
     @classmethod
-    def run(cls, query, run_manager):
+    def run(cls, query, run_manager, debug_mode):
         self = cls()
         self.graph = run_manager.pass_results[create_graph.CreateGraph]
 
@@ -22,5 +22,5 @@ class WrapperPlanner(VisitorFactory(prefixes=("link","distribute"),
                 passes.update(node.passes)
         
         for p in passes:
-            run_manager.add_pass(p)
+            run_manager.add_pass(p, debug_mode=debug_mode)
 
