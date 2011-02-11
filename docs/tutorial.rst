@@ -1,31 +1,5 @@
-Tutorial
-========
-
-Installing ibidas
------------------
-
-If one has the ``setuptools`` package installed, one can simply perform::
-
-    easy_install ibidas
-
-to install ibidas and its necessary dependencies. 
-
-
-Starting ibidas
----------------
-To start ibidas, one can simply execute::
-
-    ibidas
-
-on the command line prompt. This will load the ``IPython`` interpreter, with
-Ibidas already loaded. 
-
-If one wants to load ibidas within an script or interpreter process instead, 
-one can simply use::
-
-    from ibidas import *
-
-For the rest of this tutorial, we assume the standard ibidas interpreter is loaded.
+Basic concepts
+==============
 
 Representation
 --------------
@@ -37,34 +11,95 @@ Once they are wihtin a representation object they are all handled similarly.
 
 We start with a simple example, in which we package an integer object::
 
-    >>> r = rep(3)
+    >>> rep(3)
     Slices: data  
-    Types:  int32
+    Types:  int64
     Dims:         
     
     Data: 3
 
-When one executes ``rep`` without specifying a type, ibidas will automatically 
-detect the type itself. In this case, the detected type is ``int32``. 
-
-.. note::
-    Depending on the platform you use, the type can also be ``int64``.
-
-.. note::
-   In this tutorial we let r = rep(3) output the data description. In reality, this
-   will not happen as this is an assignment. Only non-assignment operations are automatically
-   printed. To still get the output, one can simply execute::
-   
-        >>> r
-   
-   For brevity, we will leave this step out in the tutorial. Also, we will sometimes omit the data row.
-
 .. tip::
-    The concepts ``slices`` and ``dims`` will be explained later.
+    The concepts ``slices``, ``types`` and ``dims`` will be explained in the next sections
+
+
+One can perform all kind of operations with data that is in a representation object, e.g::
+
+    >>> rep([1,2,3]) + 3
+    Slices: data  
+    Types:  int64 
+    Dims:   d1:3  
+
+    Data: [4 5 6]
+
+Summary:
+    * A representor object encapsulates a data source. 
+
+    * Data sources can be python objects, but also files or databases.
+
+Lazy execution
+--------------
+
+You might have noted that executing the previous commands resulted immediatly in a printout 
+of the contents of the representation object. This is due to the IPython interpreter, 
+which will print a representation of the result of all non-assignment operations. 
+So, if we instead would have executed::
+    
+    >>> r = rep([1,2,3]) + 3
+
+no output would have been printed. More importantly however, Ibidas would also not have performed the
+requested addition operation. I.e. ``r`` would have only been a representation of the requested operations 
+and data sources, and thus not the result of those operations.
+
+.. important::
+    Operations are executed lazily. I.e. only when output is requested by the user.
+
+The reason for this behaviour is that it allows optimizations which are otherwise not possible. For example, it 
+enables the system to translate queries against a database (partially) into the query language SQL. This way, 
+instead of moving unnecessary data to Ibidas, operations can be moved to the database.
+
+.. note::
+   For brevity, we will sometimes print output in this tutorial after assignments (e.g. ``r = rep(3)``.
+   In reality this does not happen. One can still get the output after such statements, by simply execting ``r``
+
+Often, one wants to just see a description of the contents of a representation object, not the actual data result itself.
+This can be done using the information attribute ``I``::
+
+    >>> r = rep(["geneA","geneB"])
+    >>> r.I
+    Slices: data     
+    Types:  bytes[5] 
+    Dims:   d1:2 
+
+Note that the data is not printed. Especially in case of slow operations or data sources this can be useful.
+
+
+Getting data out of a representor object is simple, one simply appends ``()`` to a query to let it return the 
+results as normal ``numpy`` or python objects::
+
+    >>> r()
+    array(['geneA', 'geneB'], dtype='|S5')
+
+As you can see, Ibidas has packaged the data in a numpy array. 
+
+Summary:
+    * Operations are only executed when needed, to allow for optimizations
+
+    * One can ask for a description of the representor contents using the ``I`` attribute.
+
+    * One can get the data results by transforming the query into a function call by appending ``()``
+
+Types
+-----
+When one executes ``rep`` without specifying a type, the type is detected automatically.
+For example, in the first example, the detect type was ``int64``. 
+
+.. note::
+    Depending on the platform you use, the type can also be ``int32``.
 
 The type determines how operations on the representor are handled.
-As this is an integer type, one can perform standard integer operations on the representor::
+For example, with an integer type, one can perform standard integer operations on the representor::
     
+    >>> r = rep(3)
     >>> (r + 3) * r
     Slices: data 
     Types:  int32 
@@ -72,33 +107,26 @@ As this is an integer type, one can perform standard integer operations on the r
 
     Data: 18
 
-Now, lets do this on a list of integers::
-    
-    >>> r = rep([1,2,3])
-    Slices: data
-    Types:  int32
-    Dims:   d1:3
+Similarly, in case of the string type, the addition operation becomes concatenation::
 
-    Data: [1 2 3]
+    >>> rep(["geneA", "geneB"])  + "_geneC"
+    Slices: data      
+    Types:  bytes[11] 
+    Dims:   d1:2      
 
-    >>> (r + 3) * r
-    Slices: data  
-    Types:  int32 
-    Dims:   d1:3  
-    
-    Data: [ 4 10 18]
+    Data: ['geneA_geneC' 'geneB_geneC']
 
-One might have noted that, although we now represent a list of integers, the type has not changed.
+One might have noted that, although we now represent a list of thins, the type still represents the
+type of the list elements. 
 
 This is because ``rep`` (by default) **unpacks** the data. By unpacking, operations
-will not be performed at the *list* level, but instead at the *list elements* level.
+will not be performed at the *list* level, but instead at the *list elements* level. Unpacking/packing will be explained
+further in one of the next sections.
 
 Summary:
-    * A representor object encapsulates a data source. 
+    * A type is assigned automatically when packaging data using ``rep``
 
-    * Data sources can be python objects, but also files or databases.
-
-    * The current type describes at which level operations are executed. 
+    * The type indicates at which data nesting level operations are executed. 
 
 
 Slices
@@ -106,6 +134,7 @@ Slices
 
 Whereas lists in Ibidas are used to denote collections of data with the same type,
 tuples are used to describe data compositions of different types. 
+
 You might have know such compositions as *records*, or simply as table rows.
 
 So, lets load a simple table::

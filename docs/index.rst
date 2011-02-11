@@ -11,7 +11,9 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   installation
    tutorial
+
    ibidas_module
    ibidas_rep
    ibidas_type

@@ -448,7 +448,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         data1,data2 = data
         if(data1 is Missing or data2 is Missing):
             return Missing
-        return numpy_arith[op](numpy.cast[object](data1), numpy.cast[object](data2), sig=typeo.toNumpy())
+        return cutils.darray(list(numpy_arith[op](numpy.cast[object](data1), numpy.cast[object](data2))),typeo.toNumpy())
     
     def array_add_arrayAdd(self, data, type1, type2, typeo, op):
         data1,data2 = data
