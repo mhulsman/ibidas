@@ -27,10 +27,29 @@ class Graph(object):
         self.edge_source[edge.source].add(edge)
         self.edge_target[edge.target].add(edge)
 
+    def dropNode(self, node):
+        if node in self.edge_source:
+            for edge in list(self.edge_source[node]):
+                self.dropEdge(edge)
+            del self.edge_source[node]
+        if node in self.edge_target:
+            for edge in list(self.edge_target[node]):
+                self.dropEdge(edge)
+            del self.edge_target[node]
+        self.nodes.discard(node)
+
     def dropEdge(self, edge):
         self.edge_source[edge.source].discard(edge)
         self.edge_target[edge.target].discard(edge)
-       
+    
+    def getEdge(self, source, target):
+        res = self.getEdges(source, target)
+        assert len(res) == 1, "More than one edge found"
+        return res[0]
+    
+    def getEdges(self, source, target):
+        edges = self.edge_source[source]
+        return [edge for edge in edges if edge.target == target]
 
     def getSources(self):
         targets = set()

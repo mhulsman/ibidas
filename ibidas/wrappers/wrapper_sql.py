@@ -353,8 +353,8 @@ class SQLResultEdge(query_graph.Edge):
         self.pos = fieldpos
         query_graph.Edge.__init__(self, source, target)
 
-class SQLPlanner(VisitorFactory(prefixes=("eat","finish"), 
-                                      flags=NF_ERROR | F_CACHE), manager.Pass):
+class SQLPlanner(VisitorFactory(prefixes=("eat","finish", "valueEat", "expressionEat"), 
+                                      flags=NF_ELSE), manager.Pass):
     after=set([create_graph.CreateGraph, annotate_replinks.AnnotateRepLinks])
     before=set([serialize_exec.SerializeExec])
 
@@ -370,12 +370,13 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","finish"),
         while(changes and self.eat_front):
             changes=False
             for node in list(self.eat_front):
-                changes = changes or self.eat(node) 
+                r = self.eat(node)
+                changes |= r
 
         for node in self.eat_front:
             self.finish(node)
 
-
+    #SOURCE OBJECTS
     def eatSQLOp(self, node):
         o = SQLQuery(node.conn)
         self.graph.addNode(o)
@@ -406,9 +407,73 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","finish"),
         self.eat_front.discard(node)
         return True
 
+    def eatDataOp(self, node):
+        o = SQLValue(node.data, node)
+        self.graph.addNode(o)
+        self.eat_front.discard(node)
+        self.eat_front.add(o)
+        for edge in self.graph.edge_source[node]:
+            self.graph.addEdge(SQLResultEdge(o, edge.target, edge, 0))
+        return True
+    
+    #SQL QUERY
     def eatSQLQuery(self, node):
+        return self.expressionEat(node)
+
+    #SQL VALUE
+    def eatSQLValue(self, node):
+        targets = [edge.target for edge in self.graph.edge_source[node]]
+        if(len(targets) == 1):
+            return self.valueEat(targets[0], node)
+        else:
+            return self.expressionEat(node)
+        return False
+   
+    def valueEatelse(self, node, o):
         return False
 
+    def valueEatConvertOp(self, node, o):
+        edge = self.graph.getEdge(o, node)
+        self.graph.dropEdge(edge)
+
+        etargets = list(self.graph.edge_source[node])
+        for edge in etargets:
+            self.graph.addEdge(SQLResultEdge(o, edge.target, edge, 0))
+        return True
+
+    #EXPRESSIONS
+    def expressionEatSQLElement(self, node):
+        targets = [edge.target for edge in self.graph.edge_source[node]]
+        links = self.graph.node_attributes['links']
+        expressions = set([links[target] for target in targets if target in links])
+        r = False
+        for expression in expressions:
+            if all([self.allSQLParams(in_slice) for in_slice in expression.in_slices]):
+                r = self.expressionEat(expression) or r
+        return r 
+
+    def allSQLParams(self, in_slice):
+        edges = self.graph.edge_target[in_slice]
+        paramedges = set()
+        sqlparamedges = set()
+        for edge in edges:
+            if isinstance(edge, query_graph.ParamEdge):
+                paramedges.add(edge)
+            elif isinstance(edge, SQLResultEdge):
+                sqlparamedges.add(edge.realedge)
+        return paramedges == sqlparamedges
+
+    def expressionEatExpression(self, node):
+        return False
+    
+    def expressionEatBinFuncElemExpression(self, node):
+        print "bfunc"
+        return False
+
+    #FINISH
+    def finishSQLValue(self, node):
+        pass
+        #self.graph.dropNode(node)
 
     def finishSQLQuery(self, node):
         query = node.compile()
@@ -471,8 +536,11 @@ class SQLOp(ops.ExtendOp):
             return ops.ExtendOp.__str__(self) + ":\n" +  str(sql.select(self.query).compile())
 
 
+class SQLElement(ops.MultiOp):
+    pass
 
-class SQLQuery(ops.MultiOp):
+
+class SQLQuery(SQLElement):
     def __init__(self, conn):
         self.conn = conn
         self.columns = []
@@ -489,8 +557,19 @@ class SQLQuery(ops.MultiOp):
     def compile(self):
         return sql.select(self.columns)
 
+    def __str__(self):
+        return str(self.compile())
 
+class SQLValue(SQLElement):
+    def __init__(self, value, slice):
+        self.value = value
+        ops.MultiOp.__init__(self, (slice,))
 
+    def setResult(self, slice):
+        self.results = (slice,)
 
+    def compile(self):
+        pass
 
-
+    def __str__(self):
+        return str(self.results[0]) + ": " + str(self.value)

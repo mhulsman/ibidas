@@ -1,5 +1,6 @@
 from collections import defaultdict
 import random
+import numpy
 
 import manager
 import create_graph
@@ -64,12 +65,18 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
                     r = str(r)
                 attribute_name_dict[node_name] = r
             self.server.addNodeAttributes(attribute,"STRING",attribute_name_dict,False)
-        
+            if(attribute == 'links'):
+                import matplotlib.cm
+                cm = discrete_color_map(attribute_name_dict.values(), matplotlib.cm.gist_rainbow)
+                self.server.createDiscreteMapper('default','links', 'Node Color','#444444',cm)
+    
+            
+
         self.server.setNodeLabel(self.network, "name", "","default")
         self.server.setDiscreteNodeShapeMapper(self.network, 'default',
                 'type', 'diamond', {'else':'ellipse', 'unaryop':'octagon', 'rep':'round_rect'}, True)
         self.server.setEdgeTargetArrowRule(self.network,"type","Arrow",["ParamListEdge","ParamChoiceListEdge"],["T","T"])
-        self.server.setEdgeLineStyleRule(self.network,"type","SOLID",["ParamChoiceEdge","ParamChoiceListEdge"],["DOT","DOT"])
+        self.server.setEdgeLineStyleRule(self.network,"type","SOLID",["ParamChoiceEdge","ParamChoiceListEdge",'SQLResultEdge'],["DOT","DOT","SINEWAVE"])
         self.server.performLayout(self.network, "hierarchical")
    
     def createUniqueName(self,name):
@@ -85,7 +92,10 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
     def nodeelse(self,node):
         name = self.createUniqueName(node.__class__.__name__)
         self.names[node] = name
-        self.node_name[name] = node.__class__.__name__
+        if(node.__class__.__name__[-2:] == "Op"):
+            self.node_name[name] = node.__class__.__name__[:-2]
+        else:
+            self.node_name[name] = node.__class__.__name__
         self.node_class[name] = node.__class__.__name__
         self.node_type[name] = "else"
         self.node_rep[name] = str(node)
@@ -94,12 +104,27 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
     def nodeUnaryOp(self,node):
         name =self.nodeelse(node)
         self.node_type[name] = "unaryop"
-        self.node_name[name] = node.__class__.__name__
 
     def edgeelse(self,edge):
         self.edge_from.append(self.names[edge.source])
         self.edge_to.append(self.names[edge.target])
         self.edge_type.append(edge.__class__.__name__)
         self.edge_attr.append(str(edge))
+
+
+
+
+def discrete_color_map(elems, colormap):
+    import matplotlib.colors
+    cconv = matplotlib.colors.ColorConverter()
+    z = set(elems)
+    res = {}
+
+    steps = numpy.linspace(0.0, 1.0, len(z))
+    colors = colormap(steps)
+    for elem, colorrow in zip(z, colors):
+        res[elem] = matplotlib.colors.rgb2hex(cconv.to_rgb(colorrow))
+
+    return res
 
 

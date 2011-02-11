@@ -23,14 +23,15 @@ class SerializeExec(VisitorFactory(prefixes=("visit","assign"), flags=NF_ELSE), 
     def visitNode(self,node):
         params = dict()
         for edge in self.graph.edge_target[node]:
-            source = edge.source
-            if(source in self.graph.na['exec_order']):
-                param_idx = self.graph.na['exec_order'][source]
-            else:
-                param_idx = self.visit(source)
-            self.graph.na['param_usecount'][source] += 1
+            if(isinstance(edge, query_graph.ParamEdge)):
+                source = edge.source
+                if(source in self.graph.na['exec_order']):
+                    param_idx = self.graph.na['exec_order'][source]
+                else:
+                    param_idx = self.visit(source)
+                self.graph.na['param_usecount'][source] += 1
 
-            self.assign(edge, params, param_idx)
+                self.assign(edge, params, param_idx)
                
 
         command_id = len(self.commands)
