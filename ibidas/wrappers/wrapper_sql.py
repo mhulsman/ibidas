@@ -542,20 +542,15 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         if(not lsource.conn == rsource.conn):
             return
 
-        compareterm = clsource.getColumn(scledge.pos) == crsource.getColumn(scredge.pos)
 
         jointype = expression.getType()
         if not jointype in set(["inner","left","right"]):
             return 
 
-        if(jointype == "inner"):
-            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=compareterm)
-        elif(jointype == "left"):
-            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=compareterm,isouter=True)
-        elif(jointype == "right"):
-            fromobj = rsource.from_obj.join(lsource.from_obj, onclause=compareterm,isouter=True)
 
-        nqueryobj = lsources[0].join(rsources[0], fromobj)
+        lcol = clsource.getColumn(scledge.pos)
+        rcol = crsource.getColumn(scredge.pos)
+        nqueryobj = lsources[0].equijoin(rsources[0], lcol, rcol)
 
         nlcolumns = len(lsource.columns)
 
@@ -791,9 +786,21 @@ class SQLQuery(SQLElement):#{{{
     def setFromObj(self, from_obj):
         self.from_obj = from_obj
 
-    def join(self, other, newfromobj):
+    def equijoin(self, other, lcol, rcol):
         assert self.conn == other.conn, "Different connections in join not allowed"
         s = SQLQuery(self.conn)
+        other = other.to_subquery()
+
+        if(jointype == "inner"):
+            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=compareterm)
+        elif(jointype == "left"):
+            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=compareterm,isouter=True)
+        elif(jointype == "right"):
+            fromobj = rsource.from_obj.join(lsource.from_obj, onclause=compareterm,isouter=True)
+        
+        
+
+
         s.columns = self.columns + other.columns
         s.where = self.where + other.where
         s.from_obj = newfromobj
@@ -813,6 +820,7 @@ class SQLQuery(SQLElement):#{{{
         ns = SQLQuery(self.conn)
         q = self.compile().alias()
         ns.columns = list(q.columns)
+        ns.from_obj = q
         return ns
 
     def addWhere(self, where):

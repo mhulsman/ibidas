@@ -19,7 +19,6 @@ class AnnotateRepLinks(VisitorFactory(prefixes=("link","distribute","createExp")
         self = cls()
         query_root = query.root
         self.graph = run_manager.pass_results[create_graph.CreateGraph]
-
         self.links = self.graph.na['links']
         self.link(query_root)
 
