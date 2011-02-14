@@ -443,7 +443,8 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         if(data1 is Missing or data2 is Missing):
             return Missing
         return numpy_arith[op](data1, data2, sig=typeo.toNumpy())
-    
+    boolboolGeneral = simple_arithGeneral
+
     def string_add_stringAdd(self, data, type1, type2, typeo, op):
         data1,data2 = data
         if(data1 is Missing or data2 is Missing):

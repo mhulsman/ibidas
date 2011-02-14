@@ -111,6 +111,9 @@ class Dim(object):
         while(dep and dep[-1] is False):
             dep = dep[:-1]
 
+        if(dep == self.dependent):
+            return self
+
         redim_cache = self._getRedimCache()
         key = (3, tuple([ndim.id for d, ndim in zip(dep,ndims) if d]))
 

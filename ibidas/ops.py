@@ -665,7 +665,7 @@ class EquiJoinIndexOp(MultiMultiOp):
         leftslice,rightslice= broadcast((leftslice,rightslice),mode="dim")[0]
 
         assert leftslice.dims == rightslice.dims, "Parent dims of join fields should be equal"
-        name="j" + leftslice.type.dims[0].name + "_" + rightslice.type.dims[0].name
+        name= leftslice.type.dims[0].name + "_" + rightslice.type.dims[0].name
         ndim = dimensions.Dim(UNDEFINED, (True,) * len(leftslice.dims), name=name)
 
         ltype = rtypes.TypePlatformInt(has_missing=(jointype == "right" or jointype=="full"))

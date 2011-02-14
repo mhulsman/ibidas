@@ -1,3 +1,4 @@
+import copy
 import wrapper
 import sqlalchemy
 from sqlalchemy.sql import expression as sql
@@ -5,15 +6,16 @@ from sqlalchemy.sql import expression as sql
 from .. import ops
 from ..constants import *
 from ..utils.multi_visitor import VisitorFactory, NF_ELSE, F_CACHE, NF_ERROR
+from ..utils import util
 
 from ..passes import manager, create_graph, annotate_replinks, serialize_exec
 from .. import query_graph
 
-_delay_import_(globals(),"..utils","util","nested_array")
+_delay_import_(globals(),"..utils","nested_array")
 _delay_import_(globals(),"..itypes","rtypes","dimensions","dimpaths")
 _delay_import_(globals(),"wrapper_py")
 
-class TypeMapperToSQLAlchemy(VisitorFactory(prefixes=("convert",), 
+class TypeMapperToSQLAlchemy(VisitorFactory(prefixes=("convert",), #{{{
                                       flags=NF_ELSE)):
     
     def convertTypeAny(self, rtype):
@@ -38,11 +40,11 @@ class TypeMapperToSQLAlchemy(VisitorFactory(prefixes=("convert",),
         if(rtype.dims and rtype.dims[0].shape > 0):
             return sqlalchemy.types.Text(length = rtype.dims[0].shape)
         else:
-            return sqlalchemy.types.Text()
+            return sqlalchemy.types.Text()#}}}
 tosa_typemapper = TypeMapperToSQLAlchemy()
 
 
-class TypeMapperFromSQLAlchemy(VisitorFactory(prefixes=("convert",), 
+class TypeMapperFromSQLAlchemy(VisitorFactory(prefixes=("convert",), #{{{
                                       flags=NF_ELSE)):
     
     def convertAny(self, dbtype, column, typestr="any"):
@@ -110,12 +112,12 @@ class TypeMapperFromSQLAlchemy(VisitorFactory(prefixes=("convert",),
         if(column.nullable):
             typestr += "$"
         typestr += ")"
-        return rtypes.createType(typestr)
+        return rtypes.createType(typestr)#}}}
 
 sa_typemapper = TypeMapperFromSQLAlchemy()
 
 postgres_types = {}
-def _getPostgresTypes(engine):
+def _getPostgresTypes(engine):#{{{
     """Returns a list of dictionaries with 
         information on each type in the database"""
     if(not engine in postgres_types):
@@ -133,7 +135,7 @@ def _getPostgresTypes(engine):
                             'type':til[7]}
                              ) for til in type_info_lists])
         postgres_types[engine] = type_info_dicts
-    return postgres_types[engine]
+    return postgres_types[engine]#}}}
 pgtoibidas = {'int2':'int16','varchar':'string[]','int4':'int32','text':'string[]', 'float4':'real32', 'float8':'real64'}
 
 
@@ -146,7 +148,7 @@ mysqlid_toibidas = {0:'real64',1:'int8',2:'int16',3:'int32',4:'real32',5:'real64
                     11:'any', 12:'any',13:'uint16',14:'any',15:'string[]',16:'bool',246:'any',247:'any',248:'any',249:'any',250:'any',
                     251:'any',252:'any',253:'string[]',254:'string[]',255:'any'};
 
-def convert(col_descriptor, type, engine, tablename=None):
+def convert(col_descriptor, type, engine, tablename=None):#{{{
     if(type == 'postgres'):
         fieldnames, subtypes = convert_postgres(col_descriptor, engine)
     elif(type == 'sqlalchemy'):
@@ -168,10 +170,10 @@ def convert(col_descriptor, type, engine, tablename=None):
 
     table_type = rtypes.TypeArray(dims=ndims,
                                     subtypes=(table_type,))
-    return table_type
+    return table_type#}}}
         
 
-def convert_mysql(col_descriptor, engine):
+def convert_mysql(col_descriptor, engine):#{{{
     fieldnames = []
     subtypes = []
     for col in col_descriptor:
@@ -182,10 +184,10 @@ def convert_mysql(col_descriptor, engine):
                 d += "$"
         subtypes.append(rtypes.createType(d))
         fieldnames.append(util.valid_name(name))
-    return (fieldnames, subtypes)
+    return (fieldnames, subtypes)#}}}
    
 
-def convert_postgres(col_descriptor, engine):
+def convert_postgres(col_descriptor, engine):#{{{
     fieldnames = []
     subtypes = []
     for col in col_descriptor:
@@ -213,7 +215,7 @@ def convert_postgres(col_descriptor, engine):
                 d += "$"
         subtypes.append(rtypes.createType(d))
         fieldnames.append(util.valid_name(name))
-    return (fieldnames, subtypes)
+    return (fieldnames, subtypes)#}}}
 
 def convert_sqlalchemy(col_descriptor, engine):
     fieldnames = []
@@ -229,7 +231,7 @@ def open_db(*args, **kwargs):
     return Connection(con)
 
 class Connection(object):
-    def __init__(self, engine, schemaname=None):
+    def __init__(self, engine, schemaname=None):#{{{
         self.engine = engine
         self.meta = sqlalchemy.MetaData()
         if(schemaname):
@@ -253,7 +255,7 @@ class Connection(object):
                     sname = sname[0]
                     self.__dict__[sname] = Connection(self.engine, sname);
             except:
-                pass
+                pass#}}}
 
     def __getattr__(self, name):
         return self.tabledict[name]
@@ -273,7 +275,7 @@ class Connection(object):
         return res
 
 
-    def store(self, name, rep, primary_slices=None, indexes = {}, unique = {}):
+    def store(self, name, rep, primary_slices=None, indexes = {}, unique = {}):#{{{
         if(not name in self.tabledict):
             columns = []
             for slice in rep._slices:
@@ -290,9 +292,9 @@ class Connection(object):
             self.tabledict[name] = t
         
         self._append(name, rep)
-        return self.tabledict[name]
+        return self.tabledict[name]#}}}
     
-    def _append(self, name, rep):
+    def _append(self, name, rep):#{{{
        w = dict([(s.name,s) for s in rep._slices])
        cols = [slice for slice in self.tabledict[name]._slices if slice.name in w]
        assert len(cols) == len(w), "Slices not in table: " + set(w) - set(colnames)
@@ -319,20 +321,20 @@ class Connection(object):
                 sname = slice.name
                 for pos in xrange(len(values)):
                     values[pos][sname] = data[pos][colnr]
-       self.engine.execute(self.sa_tables[name].insert(), values)
+       self.engine.execute(self.sa_tables[name].insert(), values)#}}}
 
-    def drop(self, name):
+    def drop(self, name):#{{{
         self.sa_tables[name].drop(bind=self.engine, checkfirst=True)
         del self.sa_tables[name]
-        del self.tabledict[name]
+        del self.tabledict[name]#}}}
 
-class TableRepresentor(wrapper.SourceRepresentor):
+class TableRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, table):
         table_type = convert(table.columns,'sqlalchemy',engine, table.name)
         nslices = (SQLOp(engine, table, table_type, table.name),)
-        self._initialize(nslices,RS_ALL_KNOWN)
+        self._initialize(nslices,RS_ALL_KNOWN)#}}}
 
-class QueryRepresentor(wrapper.SourceRepresentor):
+class QueryRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, query):
         res = self.engine.execute(query)
         try:
@@ -342,22 +344,22 @@ class QueryRepresentor(wrapper.SourceRepresentor):
         res.close() 
         
         nslices = (SQLOp(engine, query, query_type),)
-        self._initialize(nslices,RS_ALL_KNOWN)
+        self._initialize(nslices,RS_ALL_KNOWN)#}}}
 
 
 
-class SQLResultEdge(query_graph.Edge):
+class SQLResultEdge(query_graph.Edge):#{{{
     __slots__ = ["realedge","pos"]
     def __init__(self, source, target, realedge, fieldpos):
         self.realedge = realedge
         self.pos = fieldpos
-        query_graph.Edge.__init__(self, source, target)
+        query_graph.Edge.__init__(self, source, target)#}}}
 
-class SQLTransEdge(SQLResultEdge):
+class SQLTransEdge(SQLResultEdge):#{{{
     __slots__ = ["targetpos"]
     def __init__(self, source, target, realedge, fieldpos, tpos):
         self.targetpos = tpos
-        SQLResultEdge.__init__(self,source,target,realedge,fieldpos)
+        SQLResultEdge.__init__(self,source,target,realedge,fieldpos)#}}}
     
 
 class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"), 
@@ -366,7 +368,7 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
     before=set([serialize_exec.SerializeExec])
 
     @classmethod
-    def run(cls, query, run_manager, debug_mode=False):
+    def run(cls, query, run_manager, debug_mode=False):#{{{
         self = cls()
         self.graph = run_manager.pass_results[create_graph.CreateGraph]
         self.expressions = run_manager.pass_results[annotate_replinks.AnnotateRepLinks]
@@ -389,10 +391,10 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
             if(isinstance(node, SQLQuery)):
                 self.finish(node)
             else:
-                self.graph.dropNode(node)
+                self.graph.dropNode(node)#}}}
 
     #UTILS
-    def allSQLParams(self, in_slice, expression):
+    def allSQLParams(self, in_slice, expression):#{{{
         edges = self.graph.edge_target[in_slice]
         paramedges = set()
         sqlparamedges = set()
@@ -403,18 +405,43 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
                 paramedges.add(edge)
             elif isinstance(edge, SQLResultEdge):
                 sqlparamedges.add(edge.realedge)
-        return paramedges == sqlparamedges
+        return paramedges == sqlparamedges#}}}
 
-    def getSQLEdge(self, edge):
+    def getSQLEdge(self, edge):#{{{
         etargets = self.graph.edge_target[edge.target]
         for etarget in etargets:
             if isinstance(etarget,SQLResultEdge):
                 if(etarget.realedge == edge):
                    return etarget
-        return False
+        return False#}}}
+
+    def compatible(self,elem1,elem2):#{{{
+        if(isinstance(elem1, SQLValue) or isinstance(elem2, SQLValue)):
+            return True
+
+        if(isinstance(elem2, SQLTerm)):
+            elem1, elem2 = elem2, elem1
+
+        if(isinstance(elem1, SQLTerm)):
+            s = elem1.getSource(self.graph)
+            if(isinstance(elem2, SQLQuery)):
+                return s == elem2 or s is None
+            elif(isinstance(elem2, SQLTerm)):
+                s2 = elem2.getSource(self.graph)
+                return s == s2 or s is None or s2 is None
+        elif(isinstance(elem1, SQLQuery)):
+            if(isinstance(elem2, SQLQuery)):
+                return elem1 == elem2        
+         
+        raise RuntimeError, "Encountered unknown type of SQL object: " + str(elem1) + " and " + str(elem2)#}}}
+            
+    def addPairToGraph(self, node, node2):#{{{
+        self.graph.addNode(node)
+        self.graph.addNode(node2)
+        self.graph.addEdge(query_graph.ParamEdge(node,node2,"slice"))#}}}
 
     #SOURCE OBJECTS
-    def eatSQLOp(self, node):
+    def eatSQLOp(self, node):#{{{
         o = SQLQuery(node.conn)
         self.graph.addNode(o)
 
@@ -437,26 +464,27 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
                 self.graph.addEdge(SQLResultEdge(o, edge.target, edge, pos))
 
         o.setColumns(ncolumns)
-        o.setResults(tuple(targets))
+        o.setFromObj(node.query)
+        #}}}
     
-    def eatOp(self, node):
-        pass
+    def eatOp(self, node):#{{{
+        pass#}}}
 
-    def eatDataOp(self, node):
+    def eatDataOp(self, node):#{{{
         o = SQLValue(node.data, node)
         self.graph.addNode(o)
         self.next_round.add(o)
         self.sql_obj.add(o)
 
         for edge in self.graph.edge_source[node]:
-            self.graph.addEdge(SQLResultEdge(o, edge.target, edge, 0))
+            self.graph.addEdge(SQLResultEdge(o, edge.target, edge, 0))#}}}
     
     #SQL QUERY
-    def eatSQLElement(self, node):
-        self.expressionEat(node)
+    def eatSQLElement(self, node):#{{{
+        self.expressionEat(node)#}}}
 
     #SQL VALUE
-    def eatSQLValue(self, node):
+    def eatSQLValue(self, node):#{{{
         targets = [edge.target for edge in self.graph.edge_source[node]]
         if(len(targets) == 1 and isinstance(targets[0], ops.ConvertOp)):
             target = targets[0]
@@ -469,11 +497,10 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
             
             self.next_round.add(node)
         else:
-            return self.expressionEat(node)
+            return self.expressionEat(node)#}}}
 
     #EXPRESSIONS
-    def expressionEatSQLElement(self, node):
-        util.debug_here()
+    def expressionEatSQLElement(self, node):#{{{
         targets = [edge.target for edge in self.graph.edge_source[node]]
         links = self.graph.node_attributes['links']
         expressions = set([links[target] for target in targets if target in links])
@@ -482,20 +509,139 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
             if expression in self.done:
                 continue
             if all([self.allSQLParams(in_slice, expression) for in_slice in expression.in_slices]):
-                self.expressionEat(expression)
+                self.expressionEat(expression)#}}}
 
-    def expressionEatExpression(self, node):
-        pass
+    def expressionEatExpression(self, node):#{{{
+        pass#}}}
+    def expressionEatMatchExpression(self, expression):
+        ldimpathset, rdimpathset = expression.getDims(self.graph)
+        if(len(ldimpathset) > 1 or len(rdimpathset) > 1):
+            return
+        if(len(ldimpathset.pop()) > 1 or len(rdimpathset.pop()) > 1):
+            return
 
-    def expressionEatFilterExpression(self, expression):
+        cledge,credge = expression.getComparisonEdges(self.graph)
+        ledges,redges,olnodes,ornodes = expression.getInfo(self.graph)
+
+        scledge = self.getSQLEdge(cledge)
+        scredge = self.getSQLEdge(credge)
+        sledges = [self.getSQLEdge(ledge) for ledge in ledges]
+        sredges = [self.getSQLEdge(redge) for redge in redges]
+
+        lsources = list(set([sledge.source for sledge in sledges]))
+        rsources = list(set([sredge.source for sredge in sredges]))
+        clsource = scledge.source
+        crsource = scredge.source
+
+        if(len(lsources) > 1 or len(rsources) > 1):
+            return
+        lsource = lsources[0]
+        rsource = rsources[0]
+        if(not self.compatible(lsource,clsource) or not self.compatible(rsource,crsource)):
+            return
+        if(not lsource.conn == rsource.conn):
+            return
+
+        compareterm = clsource.getColumn(scledge.pos) == crsource.getColumn(scredge.pos)
+
+        jointype = expression.getType()
+        if not jointype in set(["inner","left","right"]):
+            return 
+
+        if(jointype == "inner"):
+            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=compareterm)
+        elif(jointype == "left"):
+            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=compareterm,isouter=True)
+        elif(jointype == "right"):
+            fromobj = rsource.from_obj.join(lsource.from_obj, onclause=compareterm,isouter=True)
+
+        nqueryobj = lsources[0].join(rsources[0], fromobj)
+
+        nlcolumns = len(lsource.columns)
+
+        self.graph.addNode(nqueryobj)
+
+        for onode, ledge in zip(olnodes,sledges):
+            for edge in self.graph.edge_source[onode]:
+                self.graph.addEdge(SQLResultEdge(nqueryobj,edge.target,edge, ledge.pos))
+        
+        for onode, redge in zip(ornodes,sredges):
+            for edge in self.graph.edge_source[onode]:
+                self.graph.addEdge(SQLResultEdge(nqueryobj,edge.target,edge, nlcolumns + redge.pos))
+
+        self.next_round.add(nqueryobj)
+        self.sql_obj.add(nqueryobj)
+        self.done.add(expression)#}}}
+
+    def expressionEatFilterExpression(self, expression):#{{{
+        #check filter dim
+        dimpathset = expression.getDims()
+        if(len(dimpathset) > 1 or len(dimpathset.pop()) != 0):
+            return
+
         fedges,cedge, onodes = expression.getInfo(self.graph)
         
-        print "HOI"
-    
-    def expressionEatBinFuncElemExpression(self, expression):
-        op = expression.getOp()
-        if(not op in SQLOperators):
+        if(not isinstance(cedge.source.type,(rtypes.TypeBool,rtypes.TypeSlice))):
             return
+
+        scedge = self.getSQLEdge(cedge) 
+        sfedges = [self.getSQLEdge(fedge) for fedge in fedges]
+
+        fsources = list(set([sfedge.source for sfedge in sfedges]))
+        if(len(fsources) != 1 or not isinstance(fsources[0],SQLQuery)):
+            return 
+
+        fsource = fsources[0]
+        csource = scedge.source
+
+        nsource = fsource.copy()
+        #check filter type
+        if(isinstance(cedge.source.type,rtypes.TypeBool)):
+            if(not isinstance(csource, SQLTerm)):
+                return
+            #check sql compatibility
+            if not self.compatible(fsource,csource):
+                return
+            
+            nsource = nsource.addWhere(csource)
+
+        else: #typeslice
+            if(not isinstance(csource, SQLValue)):
+                return
+            if not isinstance(csource.value,slice):
+                return
+            if not csource.value.step is None: 
+                return
+            start = csource.value.start
+            stop = csource.value.stop
+            if(not start is None and start < 0):
+                return
+            if(not stop is None and stop < 0):
+                return
+            
+            nsource = nsource.addLimit(start, stop)
+        
+
+        self.graph.addNode(nsource)
+        
+        for onode, fedge in zip(onodes,sfedges):
+            for edge in self.graph.edge_source[onode]:
+                self.graph.addEdge(SQLResultEdge(nsource,edge.target,edge, fedge.pos))
+        
+        self.next_round.add(nsource)
+        self.sql_obj.add(nsource)
+        self.done.add(expression)#}}}
+    
+    def expressionEatBinFuncElemExpression(self, expression):#{{{
+        sig, op = expression.getOp()
+        #check sig
+        #check sql compatibility
+        if(not op in SQLOperators and not (sig + op) in SQLOperators):
+            return
+        if(op in SQLOperators):
+            opfunc = SQLOperators[op]
+        else:
+            opfunc = SQLOperators[sig + op]
 
         #check dimensions
         leftedge,rightedge = expression.getLeftRightInEdges(self.graph)
@@ -510,9 +656,12 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
 
         left = sqlleftedge.source
         right = sqlrightedge.source
+
+        if(not self.compatible(left, right)):
+            return
        
         out = expression.getOutSlice()
-        res = SQLBinOp(left.getColumn(sqlleftedge.pos), right.getColumn(sqlrightedge.pos), SQLOperators[op], out)
+        res = SQLBinTerm(left.getColumn(sqlleftedge.pos), right.getColumn(sqlrightedge.pos), opfunc, out)
         self.graph.addNode(res)
         self.graph.addEdge(SQLTransEdge(left, res, sqlleftedge, sqlleftedge.pos, 0))
         self.graph.addEdge(SQLTransEdge(right, res, sqlrightedge, sqlrightedge.pos, 1))
@@ -523,19 +672,37 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
 
         self.next_round.add(res)
         self.sql_obj.add(res)
-        self.done.add(expression)
+        self.done.add(expression)#}}}
 
-    def finish(self, node):
-        query = node.compile()
-        tslice = ops.PackTupleOp(node.results)
+
+    def finish(self, node):#{{{
+        #filter out unnecessary fields
+        used_pos = set()
+        posresult = dict()
+        results = []
+        for edge in list(self.graph.edge_source[node]):
+            if(isinstance(edge.realedge,query_graph.ParamEdge)):
+                used_pos.add(edge.pos)
+                posresult[edge.pos]= edge.realedge.source
+
+        used_pos = list(used_pos)
+        opos_to_npos = dict([(opos,npos) for npos, opos in enumerate(used_pos)])
+        
+        columns = [node.columns[pos] for pos in used_pos]
+        results = [posresult[pos] for pos in used_pos]
+        fnode = node.copy()
+        fnode.setColumns(columns)
+
+        #compile, create unpack slices
+        tslice = ops.PackTupleOp(results)
         aslice = ops.PackArrayOp(tslice)
         
-        sslice = SQLOp(node.conn, node.compile(), aslice.type)
+        sslice = SQLOp(fnode.conn, fnode.compile(), aslice.type)
         rslice = ops.UnpackArrayOp(sslice)
         self.addPairToGraph(sslice,rslice)
         
         rslices = []
-        for oslice, i in zip(node.results, range(len(node.results))):
+        for oslice, i in zip(results, range(len(results))):
             r = ops.UnpackTupleOp(rslice,i)
             self.addPairToGraph(rslice,r)
 
@@ -553,13 +720,9 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
             
             redge = edge.realedge
             if(isinstance(redge,query_graph.ParamEdge)):
-                redge.source = rslices[edge.pos]
-                self.graph.addEdge(redge)
+                redge.source = rslices[opos_to_npos[edge.pos]]
+                self.graph.addEdge(redge)#}}}
         
-    def addPairToGraph(self, node, node2):
-        self.graph.addNode(node)
-        self.graph.addNode(node2)
-        self.graph.addEdge(query_graph.ParamEdge(node,node2,"slice"))
         
 SQLOperators = {'Equal':lambda x, y: x==y,
                 'NotEqual': lambda x, y: x!=y,
@@ -567,12 +730,20 @@ SQLOperators = {'Equal':lambda x, y: x==y,
                 'LessEqual': lambda x, y: x <= y,
                 'Greater': lambda x,y: x > y,
                 'GreaterEqual': lambda x,y: x >= y,
-                'And': sql.and_,
-                'Or': sql.or_,
-                'Add': lambda x, y: x + y}
+                'boolboolAnd': sql.and_,
+                'boolboolOr': sql.or_,
+                'boolboolXor': lambda x, y: x ^ y,
+                'simple_arithAdd': lambda x, y: x + y,
+                'string_add_stringAdd': lambda x, y: x + y,
+                'Subtract': lambda x, y: x - y,
+                'Multiply': lambda x, y: x * y,
+                'Modulo': lambda x, y: x % y,
+                "Divide": lambda x, y: x / y,
+                'Power': lambda x, y: x ** y
+                }
 
 
-class SQLOp(ops.ExtendOp):
+class SQLOp(ops.ExtendOp):#{{{
     __slots__ = []
     passes = [SQLPlanner]
     def __init__(self, conn, query, rtype, name="result"):
@@ -593,18 +764,23 @@ class SQLOp(ops.ExtendOp):
         if(isinstance(self.query, sqlalchemy.sql.expression.Executable)):
             return ops.ExtendOp.__str__(self) + ":\n" +  str(self.query.compile())
         else:
-            return ops.ExtendOp.__str__(self) + ":\n" +  str(sql.select([self.query]).compile())
+            return ops.ExtendOp.__str__(self) + ":\n" +  str(sql.select([self.query]).compile())#}}}
 
 
 class SQLElement(ops.MultiOp):
-    pass
+    def getSource(self, graph):
+        return self
 
-class SQLQuery(SQLElement):
+class SQLQuery(SQLElement):#{{{
     def __init__(self, conn):
         self.conn = conn
         self.columns = []
+        self.where = []
+        self.limit = None
+        self.offset = None
+        self.from_obj = None
         
-        ops.MultiOp.__init__(self, tuple())
+        SQLElement.__init__(self, tuple())
 
     def getColumn(self, pos):   
         return self.columns[pos]
@@ -612,22 +788,66 @@ class SQLQuery(SQLElement):
     def setColumns(self, columns):
         self.columns = columns
 
-    def setResults(self, slices):
-        self.results = slices
+    def setFromObj(self, from_obj):
+        self.from_obj = from_obj
+
+    def join(self, other, newfromobj):
+        assert self.conn == other.conn, "Different connections in join not allowed"
+        s = SQLQuery(self.conn)
+        s.columns = self.columns + other.columns
+        s.where = self.where + other.where
+        s.from_obj = newfromobj
+        return s
 
     def compile(self):
-        return sql.select(self.columns)
+        if(self.where):
+            where=sql.and_(*self.where)
+        else:
+            where = None
+        return sql.select(self.columns, whereclause=where,limit=self.limit,offset=self.offset, from_obj=self.from_obj,use_labels=True)
+
+    def copy(self):
+        return copy.copy(self)
+
+    def to_subquery(self):
+        ns = SQLQuery(self.conn)
+        q = self.compile().alias()
+        ns.columns = list(q.columns)
+        return ns
+
+    def addWhere(self, where):
+        assert isinstance(where, SQLTerm), "Adding non-term where expression"
+        self.where.append(where.compile())
+        return self
+
+    def addLimit(self, start, stop):
+        assert start is None or start >= 0, "Start cannot be smaller than 0"
+        assert stop is None or stop >= 0, "Stop cannot be smaller than 0"
+
+        if(not start is None):
+            xoffset = max(self.offset,0)#None to 0
+            if(self.limit is None):
+                self.offset = xoffset + start
+            else:
+                start = min(start, self.limit)
+                self.offset = xoffset + start
+                self.limit -= start
+            
+        if(not stop is None):
+            if(self.limit is None):
+                self.limit = stop - max(start,0)
+            else:
+                self.limit = min(stop - max(start,0), self.limit)
+                
+        return self.to_subquery()
 
     def __str__(self):
-        return str(self.compile())
+        return str(self.compile())#}}}
 
-class SQLValue(SQLElement):
+class SQLValue(SQLElement):#{{{
     def __init__(self, value, slice):
         self.value = value
-        ops.MultiOp.__init__(self, (slice,))
-
-    def setResult(self, slice):
-        self.results = (slice,)
+        SQLElement.__init__(self, (slice,))
 
     def getColumn(self, pos):
         assert pos == 0, "Illegal pos for SQLValue"
@@ -637,18 +857,34 @@ class SQLValue(SQLElement):
         return self.value
 
     def __str__(self):
-        return str(self.results[0]) + ": " + str(self.value)
+        return str(self.value)#}}}
 
-class SQLBinOp(SQLElement):
+class SQLTerm(SQLElement):#{{{
+    def getSource(self, graph):
+        tedges = [edge for edge in graph.edge_target[self] if isinstance(edge, SQLTransEdge)]
+        sources = set([edge.source.getSource(graph) for edge in tedges])
+
+        fsources = [source for source in sources if not isinstance(source, SQLValue)]
+        if not fsources:
+            return None
+        else:
+            assert len(fsources) == 1, "Found multiple SQLQuery sources for SQLOp"
+            return fsources[0]#}}}
+
+class SQLBinTerm(SQLTerm):#{{{
     def __init__(self, left, right, op, slice):
         self.op = op
         self.left = left
         self.right = right
-        ops.MultiOp.__init__(self, (slice,))
+        SQLTerm.__init__(self, (slice,))
 
     def compile(self):
         return self.op(self.left, self.right)
+    
+    def getColumn(self, pos):
+        assert pos == 0, "Illegal pos for SQLBinTerm"
+        return self.compile()
 
     def __str__(self):
-        return str(self.results[0]) + ": " + str(self.compile())
+        return str(self.compile())#}}}
 

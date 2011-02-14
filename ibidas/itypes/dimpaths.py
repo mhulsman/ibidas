@@ -261,10 +261,10 @@ def commonDimPath(dimpaths):#{{{
     pos = 0
     minlen = min([len(dp) for dp in dimpaths])
     while(pos < minlen):
-        cdim = set([dp[pos] for slice in dimpaths])
-        pos += 1
+        cdim = set([dp[pos] for dp in dimpaths])
         if(len(cdim) != 1):
             break
+        pos += 1
     return list(dimpaths)[0][:pos]#}}}
 
 def uniqueDimPath(dimpaths,only_complete=True):#{{{

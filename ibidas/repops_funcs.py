@@ -377,20 +377,7 @@ class Divide(BinaryFuncElemOp):
 class FloorDivide(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
 
-class And(BinaryFuncElemOp):
-   _sigs = [bin_arithsig, setset_sig]
-
-class Or(BinaryFuncElemOp):
-   _sigs = [bin_arithsig, setset_sig]
-
-class Xor(BinaryFuncElemOp):
-   _sigs = [bin_arithsig, setset_sig]
-
-class Power(BinaryFuncElemOp):
-   _sigs = [bin_arithsig]
-
-
-class CompareSignature(FuncSignature):
+class BoolOutSignature(FuncSignature):
     def __init__(self,name,clss):
         self.comparecls = clss
         FuncSignature.__init__(self,name)
@@ -407,9 +394,25 @@ class CompareSignature(FuncSignature):
 
         return out_type#}}}
        
-compareanysig = CompareSignature("simple_cmp",rtypes.TypeAny)
-comparesetsig = CompareSignature("simple_cmp",rtypes.TypeSet)
-comparestringsig = CompareSignature("string_cmp",rtypes.TypeString)
+boolboolsig = BoolOutSignature("boolbool",rtypes.TypeBool)
+
+class And(BinaryFuncElemOp):
+   _sigs = [boolboolsig, bin_arithsig, setset_sig]
+
+class Or(BinaryFuncElemOp):
+   _sigs = [boolboolsig, bin_arithsig, setset_sig]
+
+class Xor(BinaryFuncElemOp):
+   _sigs = [boolboolsig, bin_arithsig, setset_sig]
+
+class Power(BinaryFuncElemOp):
+   _sigs = [bin_arithsig]
+
+
+       
+compareanysig = BoolOutSignature("simple_cmp",rtypes.TypeAny)
+comparesetsig = BoolOutSignature("simple_cmp",rtypes.TypeSet)
+comparestringsig = BoolOutSignature("string_cmp",rtypes.TypeString)
 
 class Equal(BinaryFuncElemOp):
     _sigs = [comparestringsig,comparesetsig,compareanysig]

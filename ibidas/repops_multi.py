@@ -170,7 +170,6 @@ class Filter(repops.MultiOpRep):
             return
         if not constraint._state & RS_TYPES_KNOWN:
             return
-
         assert len(constraint._slices) == 1, "Filter constraint should have 1 slice"
         cslice = constraint._slices[0]
         seldimpath = dimpaths.identifyUniqueDimPathSource(source, dim)
@@ -208,7 +207,7 @@ class Filter(repops.MultiOpRep):
                             "Multi-dimensional arrays cannot be used as filter. Please unpack the arrays."
                 ndim = cslice.type.dims[0]
             elif(isinstance(cslice.type, rtypes.TypeSlice)):
-                ndim = dimensions.Dim(UNDEFINED, (True,) * len(cslice.dims), False,name = "f" + cslice.name)
+                ndim = dimensions.Dim(UNDEFINED, (True,) * len(cslice.dims), False,name = "f" + seldimpath.strip()[-1].name)
             else:
                 raise RuntimeError, "Unknown constraint type in filter: " + str(cslice.type)
         

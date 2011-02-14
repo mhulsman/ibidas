@@ -83,3 +83,6 @@ class AnnotateRepLinks(VisitorFactory(prefixes=("link","distribute","createExp")
 
     def createExpBinaryFuncElemOp(self, rep):
         return BinFuncElemExpression(rep.__class__.__name__, rep)
+    
+    def createExpMatch(self, rep):
+        return MatchExpression(rep.__class__.__name__, rep)

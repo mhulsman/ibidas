@@ -53,7 +53,6 @@ class NestedArray(object):
         data = nself.data
         depth = len(dimpath)
         odimpath = dimpath
-        dtype=subtype.toNumpy()
 
         while(depth>0):        
             idxdepth = nself._curIdxDepth()
@@ -88,6 +87,12 @@ class NestedArray(object):
                     cdepth = 1 + tot_dimpath[1:].contigiousFixedNDims()
             else:
                 variable = False
+            
+            if(len(dimpath) > cdepth):
+                dtype = object
+            else:
+                dtype = subtype.toNumpy()
+
 
             if(variable):
                 for pos in xrange(len(cdata)):

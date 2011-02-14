@@ -2,10 +2,12 @@ import sys
 import copy
 import itertools
 from collections import defaultdict
+import numpy
 
 from query_graph import Node
 from itypes import rtypes
 from constants import *
+from thirdparty import tableprint, console
 
 _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"itypes", "dimensions","dimpaths")
@@ -52,8 +54,18 @@ class Representor(Node):
 
     def __str__(self, print_data=True):
         self._checkState(filter=RS_ALL_KNOWN)
-        table = []
-        table.append(["Slices:", "Types:", "Dims:"])
+        
+        names = ["Slices:"] + [slice.name for slice in self._slices]
+        types = ["Type:"] + [str(slice.type) for slice in self._slices]
+        longdims = ["Dims:"]
+        for slice in self._slices:
+            dim_str = []
+            for  dim in slice.dims:
+                dim_str.append(str(dim))
+            dim_str = "<".join(dim_str)
+            longdims.append(dim_str)
+                
+        dims = ["Dims:"]
         last_dim = ()
         for slice in self._slices:
             dim_str = []
@@ -64,12 +76,61 @@ class Representor(Node):
                     dim_str.append(str(dim))
             last_dim = slice.dims
             dim_str = "<".join(dim_str)
-            table.append([slice.name, str(slice.type), dim_str])
+            dims.append(dim_str)
+        
+        rows = [names, types, longdims]
 
-        res = util.create_strtable(table)
         if(print_data):
-            res += "\nData: " + str(self())
-        return res
+            table_length = 10
+
+            if(any([slice.dims for slice in self._slices])):
+                data = self[:(table_length+1)]()
+            else:
+                data = self()
+            if(len(self._slices) == 1):
+                data = (data,)
+
+            cols = [[""] * 11]
+            maxlen = 0
+            
+            maxwidth = [0]
+            for dcol,slice in zip(data, self._slices):
+                if(len(slice.dims) >= 1):
+                    col = [str(row).replace('\n','; ') for row in dcol]
+                    if(len(col) > table_length):
+                        col[-1] = "..."
+                    maxlen = max(len(col),maxlen)
+                else:
+                    col = [""] * (table_length + 1)
+                    col[0] = str(dcol)
+                    maxlen = max(1,maxlen)
+                cols.append(col)
+            
+            rows.append([""] * len(rows[0]))
+            rows[-1][0] = "Data:"
+            for i in range(maxlen):
+                row = [col[i] for col in cols]
+                rows.append(row)
+        
+        console_height, console_width = console.getTerminalSize()
+        widths = tableprint.calc_width(rows)
+        indices = tableprint.advise_splits(console_width, widths, 3)
+
+        res = ""
+        for i in range(len(indices)):
+            srows = tableprint.select_cols(rows, indices[i])
+            if(i > 0):
+                res += "\n\n"
+                col0 = tableprint.select_cols(rows,0)
+                srows = tableprint.prepend_col(srows,col0)
+            widths = tableprint.calc_width(srows)
+            nwidths = tableprint.optimize_width(console_width, widths, 3)
+            srows = tableprint.row_crop(nwidths, srows)
+            res += tableprint.indent(srows,hasHeader=True) 
+        return res 
+
+
+
 
     def _getInfo(self):
         class Info(object):

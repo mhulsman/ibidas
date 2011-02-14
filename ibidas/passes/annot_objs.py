@@ -30,13 +30,15 @@ class Expression(object):
         links = graph.node_attributes['links']
         
         edges = [edge for edge in graph.edge_source[node] if isinstance(edge,query_graph.ParamEdge)]
-        assert len(edges) == 1, "Cannot decide on target data node"
         edge = edges[0]
+        if len(edges) > 1:
+            assert all([links[edge.target] != self for edge in edges]), "Cannot decide on target data node"
 
         while(links[edge.target] == self):
             edges = [edge for edge in graph.edge_source[edge.target] if isinstance(edge,query_graph.ParamEdge)]
-            assert len(edges) == 1, "Cannot decide on target data node"
             edge = edges[0]
+            if len(edges) > 1:
+                assert all([links[edge.target] != self for edge in edges]), "Cannot decide on target data node"
 
         return edge.source
    
@@ -53,7 +55,7 @@ class Expression(object):
 
 class BinFuncElemExpression(Expression):
     def getOp(self):
-        return self.eobj.__class__.__name__
+        return (self.getOutSlice().sig.name, self.eobj.__class__.__name__)
 
     def getOutSlice(self):
         return self.getNodeByClass(ops.BinFuncElemOp)
@@ -68,10 +70,13 @@ class BinFuncElemExpression(Expression):
     def getOutEdges(self, graph):
         c = self.getNodeByClass(ops.BinFuncElemOp)
         out_edges = graph.edge_source[c]
-        assert len(out_edges) == 1, "Assuming that binfunc has only one out node!"
         return out_edges
 
 class FilterExpression(Expression):
+    def getDims(self):
+        filters = self.getNodesByClass(ops.FilterOp)
+        return set([filter.dims for filter in filters])
+        
     
     def getInfo(self, graph):
         filters = self.getNodesByClass(ops.FilterOp)
@@ -81,3 +86,50 @@ class FilterExpression(Expression):
         return (fedges,cedge, onodes)
 
 
+class MatchExpression(Expression):
+    def getDims(self, graph):
+        sops = self.getNodesByClass(ops.SelectOp)
+        assert len(sops) == 2, "Unexpected number of select operations"
+        lsop,rsop = sops
+        if(lsop.index == 1):
+            lsop,rsop = rsop,lsop
+        
+        lfilters = [edge.target for edge in graph.edge_source[lsop]]
+        rfilters = [edge.target for edge in graph.edge_source[rsop]]
+
+        assert all([isinstance(lfilter,ops.FilterOp) for lfilter in lfilters]), "Non-filter target of select in match"
+        assert all([isinstance(rfilter,ops.FilterOp) for rfilter in rfilters]), "Non-filter target of select in match"
+
+        ldims = set([lfilter.dims for lfilter in lfilters])
+        rdims = set([rfilter.dims for rfilter in rfilters])
+        return ldims, rdims
+
+    def getType(self):
+        sops = self.getNodeByClass(ops.EquiJoinIndexOp)
+        return sops.jointype
+        
+    
+    def getComparisonEdges(self,graph):
+        jindex = self.getNodeByClass(ops.EquiJoinIndexOp)
+        ledge = self.sourceDataEdge(graph.getDataEdge(jindex,pos=0),graph)
+        redge = self.sourceDataEdge(graph.getDataEdge(jindex,pos=1),graph)
+        return (ledge,redge)
+
+    def getInfo(self,graph):
+        sops = self.getNodesByClass(ops.SelectOp)
+        assert len(sops) == 2, "Unexpected number of select operations"
+        lsop,rsop = sops
+        if(lsop.index == 1):
+            lsop,rsop = rsop,lsop
+        
+        lfilters = [edge.target for edge in graph.edge_source[lsop]]
+        rfilters = [edge.target for edge in graph.edge_source[rsop]]
+        ledges = [self.sourceDataEdge(graph.getDataEdge(lfilter,0),graph) for lfilter in lfilters]
+        redges = [self.sourceDataEdge(graph.getDataEdge(rfilter,0),graph) for rfilter in rfilters]
+
+        olnodes = [self.targetDataNode(lfilter,graph) for lfilter in lfilters]
+        ornodes = [self.targetDataNode(rfilter,graph) for rfilter in rfilters]
+
+        return (ledges,redges,olnodes,ornodes)
+
+       
