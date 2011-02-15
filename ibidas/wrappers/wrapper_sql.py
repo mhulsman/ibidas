@@ -389,7 +389,7 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
             self.eat_front = self.next_round
 
         for node in self.sql_obj:
-            if(isinstance(node, SQLQuery)):
+            if(isinstance(node, Query)):
                 self.finish(node)
             else:
                 self.graph.dropNode(node)#}}}
@@ -443,9 +443,9 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
 
     #SOURCE OBJECTS
     def eatSQLOp(self, node):#{{{
-        o = SQLQuery(node.conn)
+        o = Query(node.conn, Table(node.query))
+        
         self.graph.addNode(o)
-
         self.next_round.add(o)
         self.sql_obj.add(o)
 
@@ -455,7 +455,7 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         assert isinstance(anode,ops.UnpackArrayOp), "Expected array unpack operation after sql op"
         
         targets = [edge.target for edge in self.graph.edge_source[anode]]
-        columns = list(node.query.columns)
+        columns = o.getColumns()
         ncolumns = []
         
         for pos,target in enumerate(targets):
@@ -465,14 +465,13 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
                 self.graph.addEdge(SQLResultEdge(o, edge.target, edge, pos))
 
         o.setColumns(ncolumns)
-        o.setFromObj(node.query)
         #}}}
     
     def eatOp(self, node):#{{{
         pass#}}}
 
     def eatDataOp(self, node):#{{{
-        o = SQLValue(node.data, node)
+        o = Value(node.data)
         self.graph.addNode(o)
         self.next_round.add(o)
         self.sql_obj.add(o)
@@ -481,11 +480,11 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
             self.graph.addEdge(SQLResultEdge(o, edge.target, edge, 0))#}}}
     
     #SQL QUERY
-    def eatSQLElement(self, node):#{{{
+    def eatElement(self, node):#{{{
         self.expressionEat(node)#}}}
 
     #SQL VALUE
-    def eatSQLValue(self, node):#{{{
+    def eatValue(self, node):#{{{
         targets = [edge.target for edge in self.graph.edge_source[node]]
         if(len(targets) == 1 and isinstance(targets[0], ops.ConvertOp)):
             target = targets[0]
@@ -501,7 +500,7 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
             return self.expressionEat(node)#}}}
 
     #EXPRESSIONS
-    def expressionEatSQLElement(self, node):#{{{
+    def expressionEatElement(self, node):#{{{
         targets = [edge.target for edge in self.graph.edge_source[node]]
         links = self.graph.node_attributes['links']
         expressions = set([links[target] for target in targets if target in links])
@@ -514,6 +513,7 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
 
     def expressionEatExpression(self, node):#{{{
         pass#}}}
+        
     def expressionEatMatchExpression(self, expression):
         ldimpathset, rdimpathset = expression.getDims(self.graph)
         if(len(ldimpathset) > 1 or len(rdimpathset) > 1):
@@ -538,23 +538,19 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
             return
         lsource = lsources[0]
         rsource = rsources[0]
-        if(not self.compatible(lsource,clsource) or not self.compatible(rsource,crsource)):
-            return
         if(not lsource.conn == rsource.conn):
             return
-
-
+        
         jointype = expression.getType()
         if not jointype in set(["inner","left","right"]):
             return 
 
-
         lcol = clsource.getColumn(scledge.pos)
         rcol = crsource.getColumn(scredge.pos)
-        nqueryobj = lsources[0].equijoin(rsources[0], lcol, rcol)
+        cond = Term(lambda x,y: x == y,lcol,rcol)
+        nqueryobj = lsources[0].join(rsources[0], cond, jointype)
 
         nlcolumns = len(lsource.columns)
-
         self.graph.addNode(nqueryobj)
 
         for onode, ledge in zip(olnodes,sledges):
@@ -584,7 +580,7 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         sfedges = [self.getSQLEdge(fedge) for fedge in fedges]
 
         fsources = list(set([sfedge.source for sfedge in sfedges]))
-        if(len(fsources) != 1 or not isinstance(fsources[0],SQLQuery)):
+        if(len(fsources) != 1 or not isinstance(fsources[0],Query)):
             return 
 
         fsource = fsources[0]
@@ -593,23 +589,19 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         nsource = fsource.copy()
         #check filter type
         if(isinstance(cedge.source.type,rtypes.TypeBool)):
-            if(not isinstance(csource, SQLTerm)):
+            if(not isinstance(csource, Term)):
                 return
-            #check sql compatibility
-            if not self.compatible(fsource,csource):
-                return
-            
             nsource = nsource.addWhere(csource)
 
         else: #typeslice
-            if(not isinstance(csource, SQLValue)):
+            if(not isinstance(csource, Value)):
                 return
-            if not isinstance(csource.value,slice):
+            if not isinstance(csource.data,slice):
                 return
-            if not csource.value.step is None: 
+            if not csource.data.step is None: 
                 return
-            start = csource.value.start
-            stop = csource.value.stop
+            start = csource.data.start
+            stop = csource.data.stop
             if(not start is None and start < 0):
                 return
             if(not stop is None and stop < 0):
@@ -634,6 +626,7 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         #check sql compatibility
         if(not op in SQLOperators and not (sig + op) in SQLOperators):
             return
+
         if(op in SQLOperators):
             opfunc = SQLOperators[op]
         else:
@@ -653,11 +646,8 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         left = sqlleftedge.source
         right = sqlrightedge.source
 
-        if(not self.compatible(left, right)):
-            return
-       
         out = expression.getOutSlice()
-        res = SQLBinTerm(left.getColumn(sqlleftedge.pos), right.getColumn(sqlrightedge.pos), opfunc, out)
+        res = Term(opfunc, left.getColumn(sqlleftedge.pos), right.getColumn(sqlrightedge.pos))
         self.graph.addNode(res)
         self.graph.addEdge(SQLTransEdge(left, res, sqlleftedge, sqlleftedge.pos, 0))
         self.graph.addEdge(SQLTransEdge(right, res, sqlrightedge, sqlrightedge.pos, 1))
@@ -762,120 +752,22 @@ class SQLOp(ops.ExtendOp):#{{{
         else:
             return ops.ExtendOp.__str__(self) + ":\n" +  str(sql.select([self.query]).compile())#}}}
 
+class Element(query_graph.Node):
+    pass
 
-class SQLElement(ops.MultiOp):
-    def getSource(self, graph):
-        return self
-
-class SQLQuery(SQLElement):#{{{
-    def __init__(self, conn):
-        self.conn = conn
-        self.columns = []
-        self.where = []
-        self.limit = None
-        self.offset = None
-        self.from_obj = None
-        
-        SQLElement.__init__(self, tuple())
-
-    def getColumn(self, pos):   
-        return self.columns[pos]
-
-    def setColumns(self, columns):
-        self.columns = columns
-
-    def setFromObj(self, from_obj):
-        self.from_obj = from_obj
-
-    def equijoin(self, other, lcol, rcol):
-        assert self.conn == other.conn, "Different connections in join not allowed"
-        s = SQLQuery(self.conn)
-        other = other.to_subquery()
-
-        s.columns = self.columns + other.columns
-        s.where = self.where + other.where
-        s.from_obj = newfromobj
-        return s
-
-    def compile(self):
-        if(self.where):
-            where=sql.and_(*self.where)
-        else:
-            where = None
-        return sql.select(self.columns, whereclause=where,limit=self.limit,offset=self.offset, from_obj=self.from_obj,use_labels=True)
-
-    def copy(self):
-        return copy.copy(self)
-
-    def to_subquery(self):
-        ns = SQLQuery(self.conn)
-        q = self.compile().alias()
-        ns.columns = list(q.columns)
-        ns.from_obj = q
-        return ns
-
-    def addWhere(self, where):
-        assert isinstance(where, SQLTerm), "Adding non-term where expression"
-        self.where.append(where.compile())
-        return self
-
-
-    def __str__(self):
-        return str(self.compile())#}}}
-
-class SQLValue(SQLElement):#{{{
-    def __init__(self, value, slice):
-        self.value = value
-        SQLElement.__init__(self, (slice,))
-
-    def getColumn(self, pos):
-        assert pos == 0, "Illegal pos for SQLValue"
-        return self.value
-
-    def compile(self):
-        return self.value
-
-    def __str__(self):
-        return str(self.value)#}}}
-
-class SQLTerm(SQLElement):#{{{
-    def getSource(self, graph):
-        tedges = [edge for edge in graph.edge_target[self] if isinstance(edge, SQLTransEdge)]
-        sources = set([edge.source.getSource(graph) for edge in tedges])
-
-        fsources = [source for source in sources if not isinstance(source, SQLValue)]
-        if not fsources:
-            return None
-        else:
-            assert len(fsources) == 1, "Found multiple SQLQuery sources for SQLOp"
-            return fsources[0]#}}}
-
-class SQLBinTerm(SQLTerm):#{{{
-    def __init__(self, left, right, op, slice):
-        self.op = op
-        self.left = left
-        self.right = right
-        SQLTerm.__init__(self, (slice,))
-
-    def compile(self):
-        return self.op(self.left, self.right)
-    
-    def getColumn(self, pos):
-        assert pos == 0, "Illegal pos for SQLBinTerm"
-        return self.compile()
-
-    def __str__(self):
-        return str(self.compile())#}}}
-
-
-class Column(object):
-    def __init__(self, table, name):
+class Column(Element):
+    def __init__(self, table, name, id):
         self.table = table
         self.name = name
+        self.id = id
+
+    def getColumn(self, pos):
+        assert pos == 0, "Cannot request column past position 0 for Column object"
+        return self
 
     def realias(self, realias_dict):
         if(self.table in realias_dict):
-            return Column(realias_dict[self.table],self.name)
+            return Column(realias_dict[self.table],self.name, self.id)
         else:
             return self
 
@@ -883,22 +775,21 @@ class Column(object):
         return column_dict.get(self,self)
 
     def compile(self):
-        c = list(self.table.compile().columns)
-        for col in cols:
-            if col.name == self.name:
-                return col
-        raise RuntimeError, "Could not find colunm " + str(self.name) + " in table " + str(self.table.compile())
-
+        pos = self.table.getColPos(self.id)
+        return list(self.table.compile().columns)[pos]
 
     def getTables(self):
         return set([self.table])
+
+    def __str__(self):
+        return str(self.table) + ":" + str(self.name)
 
 class Value(Column):
     def __init__(self, data):
         self.data = data
 
     def compile(self):
-        return self
+        return self.data
 
     def realias(self, realias_dict):
         return self
@@ -909,6 +800,9 @@ class Value(Column):
     def getTables(self):
         return set()
 
+    def __str__(self):
+        return str(self.data)
+
 class Term(Column):
     def __init__(self, func, *sources):
         self.sources = sources
@@ -916,30 +810,36 @@ class Term(Column):
 
     def realias(self, realias_dict):
         nsources = [source.realias(realias_dict) for source in self.sources]
-        return Term(nsources, self.func)
+        return Term(self.func, *nsources)
         
     def recol(self, column_dict):
         nsources = [source.recol(column_dict) for source in self.sources]
-        return Term(nsources, self.func)
+        return Term(self.func, *nsources)
 
     def compile(self):
-        nc = [source.compile() for source in sources]
+        nc = [source.compile() for source in self.sources]
         return self.func(*nc)
 
     def getTables(self):
         return reduce(operator.__or__,[source.getTables() for source in self.sources],set())
 
+    def __str__(self):
+        return str(self.compile())
 
 class Table(object):
     def __init__(self, source_descriptor):
         self.source_descriptor = source_descriptor
+        self.colids = range(len(list(self.source_descriptor.columns)))
 
     def getSource(self):
         return self.source_descriptor
 
     def getColumns(self):
         cols = list(self.getSource().columns)
-        return [Column(self, colname) for col in cols]
+        return [Column(self, col.name, colid) for col,colid in zip(cols,self.colids)]
+
+    def getColPos(self, id):
+        return self.colids.index(id)
 
     def realias(self, realias_dict):
         return realias_dict.get(self, self)
@@ -955,6 +855,9 @@ class Table(object):
     def compile(self):
         return self.source_descriptor
 
+    def __str__(self):
+        return str(self.compile())
+
 class AliasTable(Table):
     def __init__(self, origtable):
         self.origtable = origtable
@@ -966,7 +869,7 @@ class AliasTable(Table):
 class Join(Table):
     def __init__(self, left, right, jointype, condition):
         assert not left.getTables() & right.getTables(), "Overlap in tables in join condition"
-        assert not (self.condition.getTables() - (left.getTables() | right.getTables())), "Condition has tables outside join"
+        assert not (condition.getTables() - (left.getTables() | right.getTables())), "Condition has tables outside join"
         self.left = left
         self.right = right
         self.jointype = jointype
@@ -984,18 +887,20 @@ class Join(Table):
     def compile(self):
         lsource = self.left.compile()
         rsource = self.right.compile()
-        if(jointype == "inner"):
-            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=self.condition)
-        elif(jointype == "left"):
-            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=self.condition,isouter=True)
-        elif(jointype == "right"):
-            fromobj = rsource.from_obj.join(lsource.from_obj, onclause=self.condition,isouter=True)
+        if(self.jointype == "inner"):
+            fromobj = lsource.join(rsource, onclause=self.condition.compile())
+        elif(self.jointype == "left"):
+            fromobj = lsource.join(rsource, onclause=self.condition.compile(),isouter=True)
+        elif(self.jointype == "right"):
+            fromobj = rsource.join(lsource, onclause=self.condition.compile(),isouter=True)
         return fromobj
 
 
-class Query(Table):
+class Query(Element):
     def __init__(self, conn, from_obj):
         self.conn = conn
+        assert isinstance(from_obj, Table), "from obj should be a table"
+
         self.from_obj = from_obj
         self.columns = self.from_obj.getColumns()
         self.limit = None
@@ -1006,12 +911,29 @@ class Query(Table):
         self.havingclause = []
         self.orderedby_clause = []
 
+    def copy(self):
+        s =  copy.copy(self)
+        s.whereclause = list(s.whereclause)
+        s.groupby_clause = list(s.groupby_clause)
+        s.havingclause = list(s.havingclause)
+        s.orderedby_clause = list(s.orderedby_clause)
+        return s
+
+    def hasTables(self, tables):
+        return len(set(tables) - self.getTables()) == 0
+
     def setColumns(self, cols):
         assert not (reduce(operator.__or__,[col.getTables() for col in cols],set()) - self.from_obj.getTables()), "Column tables not in from obj"
         self.columns = cols
 
+    def getColumn(self, pos):
+        return self.columns[pos]
+
+    def getColumns(self):
+        return self.columns
+
     def _clause_subquery(self, clause):
-        nself = self.alias()
+        nself = self.to_subquery()
         column_dict = dict(zip(self.columns,nself.columns))
         return (nself, clause.recol(column_dict))
 
@@ -1090,10 +1012,9 @@ class Query(Table):
     def getTables(self):
         return self.from_obj.getTables()
 
-    def alias(self, realias_dict):
-        n = AliasQuery(self.conn, self)
-        realias_dict[self] = n
-        n.setColumns([Column(x, col.name) for col in self.columns])
+    def to_subquery(self):
+        nt = AliasSubQuery(self)
+        n = Query(self.conn,nt)
         return n
 
     def _from_compile(self):
@@ -1103,27 +1024,60 @@ class Query(Table):
         columns = [c.compile() for c in self.columns]
         from_obj = self._from_compile()
         whereclause = sql.and_(*[wc.compile() for wc in self.whereclause])
-        return sql.select([columns],whereclause=whereclause, from_obj = from_obj, limit=self.limit, offset = self.offset, distinct=self.distinct, use_labels = True)
+        return sql.select(columns,whereclause=whereclause, from_obj = from_obj, limit=self.limit, offset = self.offset, distinct=self.distinct, use_labels = True)
 
-class AliasQuery(Query, Table):
+    def join(self, other, condition, jointype):
+        if (self.groupby_clause or self.distinct or self.limit or self.offset):
+            self, condition = self._clause_subquery(condition)
+        if (other.groupby_clause or other.distinct or other.limit or other.offset):
+            other, condition = other._clause_subquery(condition)
+
+        tableintersect = self.getTables() & other.getTables()
+        if(tableintersect):
+            realias_dict = {}
+            for table in tableintersect:
+                table.alias(realias_dict)
+            other = other.realias(realias_dict)
+            condition = condition.realias(realias_dict)
+        j = Join(self.from_obj, other.from_obj, jointype, condition)
+        assert self.conn == other.conn, "Mismatch in connections"
+        q = Query(self.conn, j)
+        q.setColumns(self.getColumns() + other.getColumns())
+        q.whereclause = self.whereclause + other.whereclause
+        return q
+    def __str__(self):
+        return str(self.compile())
+
+aliasid = util.seqgen().next
+class AliasSubQuery(Table):
+    def __init__(self, source):
+        self.source = source
+        self.colids = range(len(source.columns))
+        self.cached = None
 
     def getColumns(self):
-        return self.columns
+        return [Column(self, col.name, colid) for col,colid in zip(self.source.columns, self.colids)]
 
     def realias(self, realias_dict):
         self = realias_dict[self]
-        self = self.from_obj.realias(realias_dict)
+        self.source = self.source.realias(realias_dict)
+        self.cached = None
         return self
 
     def alias(self, realias_dict):
-        return self.from_obj.alias(realias_dict)
+        n = self.source.to_subquery()
+        realias_dict[self] = n
+        return n
 
     def getSource(self):
-        return self.from_obj
+        return self.source
 
     def getTables(self):
-        return set([self]) | self.from_obj.getTables()
+        return set([self]) | self.source.getTables()
 
-    def _from_compile(self):
-        return self.from_obj.compile().alias()
+    def compile(self):
+        if(self.cached is None):
+            self.cached = self.source.compile().alias()
+        return self.cached
+
 

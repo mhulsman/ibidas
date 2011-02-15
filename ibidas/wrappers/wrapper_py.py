@@ -129,6 +129,7 @@ class ResultOp(ops.DataOp):
 
     def setSource(self,source):
         self.source = source
+        self.bookmarks = source.bookmarks
 
     def __repr__(self):
         return  "\nName: " + str(self.name) + ", Type:   " + str(self.type) + ", Dims: " + str(self.dims) + \
@@ -420,7 +421,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     
     def visitGatherOp(self,node,slices):
         res = []
-        for cur_slice, slice in zip(node._slices, slices):
+        for cur_slice, slice in zip(node.sources, slices):
             slice.setSource(cur_slice)
             res.append(slice)
         return res
