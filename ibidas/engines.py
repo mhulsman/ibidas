@@ -2,7 +2,7 @@
 import passes
 from wrappers import wrapper_py
 
-select_engine = passes.PassManager(log=True)
+select_engine = passes.PassManager(log=False)
 select_engine.register(passes.EnsureInfo)
 select_engine.register(passes.CreateGraph)
 select_engine.register(passes.AnnotateRepLinks)

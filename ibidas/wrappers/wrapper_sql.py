@@ -172,7 +172,6 @@ def convert(col_descriptor, type, engine, tablename=None):#{{{
     table_type = rtypes.TypeArray(dims=ndims,
                                     subtypes=(table_type,))
     return table_type#}}}
-        
 
 def convert_mysql(col_descriptor, engine):#{{{
     fieldnames = []
@@ -186,7 +185,6 @@ def convert_mysql(col_descriptor, engine):#{{{
         subtypes.append(rtypes.createType(d))
         fieldnames.append(util.valid_name(name))
     return (fieldnames, subtypes)#}}}
-   
 
 def convert_postgres(col_descriptor, engine):#{{{
     fieldnames = []
@@ -346,8 +344,6 @@ class QueryRepresentor(wrapper.SourceRepresentor):#{{{
         
         nslices = (SQLOp(engine, query, query_type),)
         self._initialize(nslices,RS_ALL_KNOWN)#}}}
-
-
 
 class SQLResultEdge(query_graph.Edge):#{{{
     __slots__ = ["realedge","pos"]
@@ -755,7 +751,7 @@ class SQLOp(ops.ExtendOp):#{{{
 class Element(query_graph.Node):
     pass
 
-class Column(Element):
+class Column(Element):#{{{
     def __init__(self, table, name, id):
         self.table = table
         self.name = name
@@ -782,9 +778,9 @@ class Column(Element):
         return set([self.table])
 
     def __str__(self):
-        return str(self.table) + ":" + str(self.name)
+        return str(self.table) + ":" + str(self.name)#}}}
 
-class Value(Column):
+class Value(Column):#{{{
     def __init__(self, data):
         self.data = data
 
@@ -801,9 +797,9 @@ class Value(Column):
         return set()
 
     def __str__(self):
-        return str(self.data)
+        return str(self.data)#}}}
 
-class Term(Column):
+class Term(Column):#{{{
     def __init__(self, func, *sources):
         self.sources = sources
         self.func = func
@@ -824,9 +820,9 @@ class Term(Column):
         return reduce(operator.__or__,[source.getTables() for source in self.sources],set())
 
     def __str__(self):
-        return str(self.compile())
+        return str(self.compile())#}}}
 
-class Table(object):
+class Table(object):#{{{
     def __init__(self, source_descriptor):
         self.source_descriptor = source_descriptor
         self.colids = range(len(list(self.source_descriptor.columns)))
@@ -856,17 +852,17 @@ class Table(object):
         return self.source_descriptor
 
     def __str__(self):
-        return str(self.compile())
+        return str(self.compile())#}}}
 
-class AliasTable(Table):
+class AliasTable(Table):#{{{
     def __init__(self, origtable):
         self.origtable = origtable
         Table.__init__(self,origtable.getSource().alias())
 
     def alias(self, realias_dict):
-        return self.origtable.alias(realias_dict)
+        return self.origtable.alias(realias_dict)#}}}
  
-class Join(Table):
+class Join(Table):#{{{
     def __init__(self, left, right, jointype, condition):
         assert not left.getTables() & right.getTables(), "Overlap in tables in join condition"
         assert not (condition.getTables() - (left.getTables() | right.getTables())), "Condition has tables outside join"
@@ -893,10 +889,10 @@ class Join(Table):
             fromobj = lsource.join(rsource, onclause=self.condition.compile(),isouter=True)
         elif(self.jointype == "right"):
             fromobj = rsource.join(lsource, onclause=self.condition.compile(),isouter=True)
-        return fromobj
+        return fromobj#}}}
 
 
-class Query(Element):
+class Query(Element):#{{{
     def __init__(self, conn, from_obj):
         self.conn = conn
         assert isinstance(from_obj, Table), "from obj should be a table"
@@ -1046,10 +1042,10 @@ class Query(Element):
         q.whereclause = self.whereclause + other.whereclause
         return q
     def __str__(self):
-        return str(self.compile())
+        return str(self.compile())#}}}
 
 aliasid = util.seqgen().next
-class AliasSubQuery(Table):
+class AliasSubQuery(Table):#{{{
     def __init__(self, source):
         self.source = source
         self.colids = range(len(source.columns))
@@ -1078,6 +1074,6 @@ class AliasSubQuery(Table):
     def compile(self):
         if(self.cached is None):
             self.cached = self.source.compile().alias()
-        return self.cached
+        return self.cached#}}}
 
 
