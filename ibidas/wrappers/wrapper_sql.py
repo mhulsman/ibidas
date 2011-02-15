@@ -1,5 +1,6 @@
 import copy
 import wrapper
+import operator
 import sqlalchemy
 from sqlalchemy.sql import expression as sql
 
@@ -791,16 +792,6 @@ class SQLQuery(SQLElement):#{{{
         s = SQLQuery(self.conn)
         other = other.to_subquery()
 
-        if(jointype == "inner"):
-            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=compareterm)
-        elif(jointype == "left"):
-            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=compareterm,isouter=True)
-        elif(jointype == "right"):
-            fromobj = rsource.from_obj.join(lsource.from_obj, onclause=compareterm,isouter=True)
-        
-        
-
-
         s.columns = self.columns + other.columns
         s.where = self.where + other.where
         s.from_obj = newfromobj
@@ -828,26 +819,6 @@ class SQLQuery(SQLElement):#{{{
         self.where.append(where.compile())
         return self
 
-    def addLimit(self, start, stop):
-        assert start is None or start >= 0, "Start cannot be smaller than 0"
-        assert stop is None or stop >= 0, "Stop cannot be smaller than 0"
-
-        if(not start is None):
-            xoffset = max(self.offset,0)#None to 0
-            if(self.limit is None):
-                self.offset = xoffset + start
-            else:
-                start = min(start, self.limit)
-                self.offset = xoffset + start
-                self.limit -= start
-            
-        if(not stop is None):
-            if(self.limit is None):
-                self.limit = stop - max(start,0)
-            else:
-                self.limit = min(stop - max(start,0), self.limit)
-                
-        return self.to_subquery()
 
     def __str__(self):
         return str(self.compile())#}}}
@@ -895,4 +866,264 @@ class SQLBinTerm(SQLTerm):#{{{
 
     def __str__(self):
         return str(self.compile())#}}}
+
+
+class Column(object):
+    def __init__(self, table, name):
+        self.table = table
+        self.name = name
+
+    def realias(self, realias_dict):
+        if(self.table in realias_dict):
+            return Column(realias_dict[self.table],self.name)
+        else:
+            return self
+
+    def recol(self, column_dict):
+        return column_dict.get(self,self)
+
+    def compile(self):
+        c = list(self.table.compile().columns)
+        for col in cols:
+            if col.name == self.name:
+                return col
+        raise RuntimeError, "Could not find colunm " + str(self.name) + " in table " + str(self.table.compile())
+
+
+    def getTables(self):
+        return set([self.table])
+
+class Value(Column):
+    def __init__(self, data):
+        self.data = data
+
+    def compile(self):
+        return self
+
+    def realias(self, realias_dict):
+        return self
+
+    def recol(self, realias_dict):
+        return self
+
+    def getTables(self):
+        return set()
+
+class Term(Column):
+    def __init__(self, func, *sources):
+        self.sources = sources
+        self.func = func
+
+    def realias(self, realias_dict):
+        nsources = [source.realias(realias_dict) for source in self.sources]
+        return Term(nsources, self.func)
+        
+    def recol(self, column_dict):
+        nsources = [source.recol(column_dict) for source in self.sources]
+        return Term(nsources, self.func)
+
+    def compile(self):
+        nc = [source.compile() for source in sources]
+        return self.func(*nc)
+
+    def getTables(self):
+        return reduce(operator.__or__,[source.getTables() for source in self.sources],set())
+
+
+class Table(object):
+    def __init__(self, source_descriptor):
+        self.source_descriptor = source_descriptor
+
+    def getSource(self):
+        return self.source_descriptor
+
+    def getColumns(self):
+        cols = list(self.getSource().columns)
+        return [Column(self, colname) for col in cols]
+
+    def realias(self, realias_dict):
+        return realias_dict.get(self, self)
+
+    def alias(self, realias_dict):
+        n = AliasTable(self)
+        realias_dict[self] = n
+        return n
+    
+    def getTables(self):
+        return set([self])
+
+    def compile(self):
+        return self.source_descriptor
+
+class AliasTable(Table):
+    def __init__(self, origtable):
+        self.origtable = origtable
+        Table.__init__(self,origtable.getSource().alias())
+
+    def alias(self, realias_dict):
+        return self.origtable.alias(realias_dict)
+ 
+class Join(Table):
+    def __init__(self, left, right, jointype, condition):
+        assert not left.getTables() & right.getTables(), "Overlap in tables in join condition"
+        assert not (self.condition.getTables() - (left.getTables() | right.getTables())), "Condition has tables outside join"
+        self.left = left
+        self.right = right
+        self.jointype = jointype
+        self.condition = condition
+
+    def realias(self, realias_dict):
+        n = Join(self.left.realias(realias_dict), self.right.realias(realias_dict), self.jointype, self.condition.realias(realias_dict))
+
+    def getTables(self):
+        return self.left.getTables() | self.right.getTables() | self.condition.getTables()
+
+    def getColumns(self):
+        return self.left.getColumns() + self.right.getColumns()
+
+    def compile(self):
+        lsource = self.left.compile()
+        rsource = self.right.compile()
+        if(jointype == "inner"):
+            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=self.condition)
+        elif(jointype == "left"):
+            fromobj = lsource.from_obj.join(rsource.from_obj, onclause=self.condition,isouter=True)
+        elif(jointype == "right"):
+            fromobj = rsource.from_obj.join(lsource.from_obj, onclause=self.condition,isouter=True)
+        return fromobj
+
+
+class Query(Table):
+    def __init__(self, conn, from_obj):
+        self.conn = conn
+        self.from_obj = from_obj
+        self.columns = self.from_obj.getColumns()
+        self.limit = None
+        self.offset = None
+        self.distinct = False
+        self.whereclause = []
+        self.groupby_clause = []
+        self.havingclause = []
+        self.orderedby_clause = []
+
+    def setColumns(self, cols):
+        assert not (reduce(operator.__or__,[col.getTables() for col in cols],set()) - self.from_obj.getTables()), "Column tables not in from obj"
+        self.columns = cols
+
+    def _clause_subquery(self, clause):
+        nself = self.alias()
+        column_dict = dict(zip(self.columns,nself.columns))
+        return (nself, clause.recol(column_dict))
+
+    def addWhere(self, clause):
+        if (self.groupby_clause or self.limit or self.offset):
+            self, clause = self._clause_subquery(clause)
+
+        assert not clause.getTables() - self.from_obj.getTables(), "Where tables not in from obj"
+        self.whereclause.append(clause)
+        return self
+
+    def addHaving(self, clause):
+        assert self.groupby_clause and not (self.limit or self.offset), "Having clause should be added to queries with group, and without offset/limit"
+        assert not clause.getTables() - self.from_obj.getTables(), "Having tables not in from obj"
+        self.havingclause.append(clause)
+        return self
+
+    def addGroupBy(self, clause):
+        if (self.limit or self.offset):
+            assert not self.groupby_clause, "Cannot perform group as limit or offset has been set inbetween"
+            self, clause = self._clause_subquery(clause)
+
+        assert not clause.getTables() - self.from_obj.getTables(), "Group tables not in from obj"
+        self.groupby_clause.append(clause)
+        return self
+
+    def addOrderedBy(self, clause):
+        if (self.limit or self.offset or self.groupby_clause):
+            assert not self.orderedby_clause, "Cannot perform order as limit or offset has been set inbetween"
+            self, clause = self._clause_subquery(clause)
+ 
+        assert not clause.getTables() - self.from_obj.getTables(), "Group tables not in from obj"
+        self.orderedby_clause.append(clause)
+     
+    def setDistinct(self, distinct):
+        assert not (self.limit or self.offset or self.groupby_clause), "Cannot set distinct on query with group"
+        self.distinct = distinct
+        return self
+
+    def addLimit(self, start, stop):
+        assert start is None or start >= 0, "Start cannot be smaller than 0"
+        assert stop is None or stop >= 0, "Stop cannot be smaller than 0"
+
+        if(not start is None):
+            xoffset = max(self.offset,0)#None to 0
+            if(self.limit is None):
+                self.offset = xoffset + start
+            else:
+                start = min(start, self.limit)
+                self.offset = xoffset + start
+                self.limit -= start
+            
+        if(not stop is None):
+            if(self.limit is None):
+                self.limit = stop - max(start,0)
+            else:
+                self.limit = min(stop - max(start,0), self.limit)
+        return self
+
+
+    def realias(self, realias_dict):
+        n = Query(self.conn, self.from_obj.realias(realias_dict))
+        n.columns = [col.realias(realias_dict) for col in self.columns]
+        n.whereclause = [wc.realias(realias_dict) for wc in self.whereclause]
+        n.groupby_clause = [gc.realias(realias_dict) for gc in self.groupby_clause]
+        n.orderedby_clause = [oc.realias(realias_dict) for oc in self.orderedby_clause]
+        n.havingclause = [hc.realias(realias_dict) for hc in self.havingclause]
+        n.limit = self.limit
+        n.offset = self.offset
+        n.distinct = self.distinct
+        return n
+
+    def getTable(self):
+        return self
+
+    def getTables(self):
+        return self.from_obj.getTables()
+
+    def alias(self, realias_dict):
+        n = AliasQuery(self.conn, self)
+        realias_dict[self] = n
+        n.setColumns([Column(x, col.name) for col in self.columns])
+        return n
+
+    def _from_compile(self):
+        return self.from_obj.compile()
+
+    def compile(self):
+        columns = [c.compile() for c in self.columns]
+        from_obj = self._from_compile()
+        whereclause = sql.and_(*[wc.compile() for wc in self.whereclause])
+        return sql.select([columns],whereclause=whereclause, from_obj = from_obj, limit=self.limit, offset = self.offset, distinct=self.distinct, use_labels = True)
+
+class AliasQuery(Query, Table):
+
+    def getColumns(self):
+        return self.columns
+
+    def realias(self, realias_dict):
+        self = realias_dict[self]
+        self = self.from_obj.realias(realias_dict)
+        return self
+
+    def alias(self, realias_dict):
+        return self.from_obj.alias(realias_dict)
+
+    def getSource(self):
+        return self.from_obj
+
+    def getTables(self):
+        return set([self]) | self.from_obj.getTables()
+
+    def _from_compile(self):
+        return self.from_obj.compile().alias()
 
