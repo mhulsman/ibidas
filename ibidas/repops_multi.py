@@ -318,16 +318,16 @@ class Match(repops.MultiOpRep):
          
         if(lslice is None):
             if(rslice is None):
-                common_names = set(lsource.Rnames) & set(rsource.Rnames)
+                common_names = set(lsource.Inames) & set(rsource.Inames)
                 if(len(common_names) != 1):
                     raise RuntimeError, "Cannot find a unique common named slice"
                 name = common_names.pop()
                 lslice = getattr(lsource,name)
                 rslice = getattr(rsource,name)
             else:
-                lslice = getattr(lsource,rslice.Rnames[0])
+                lslice = getattr(lsource,rslice.Inames[0])
         elif(rslice is None):
-            rslice = getattr(rsource,lslice.Rnames[0])
+            rslice = getattr(rsource,lslice.Inames[0])
         assert len(rslice._slices) == 1, "rslice parameter in match should have only one slice"
         assert len(lslice._slices) == 1, "lslice parameter in match should have only one slice"
 

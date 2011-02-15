@@ -480,7 +480,6 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return res
 
     def numberGeneral(self, data, type_in, type_out, op):
-        util.debug_here()
         return numpy_unary_arith[op](data, sig=type_out.toNumpy())
 
     def corrCorr(self, data, type_in, type_out, op):

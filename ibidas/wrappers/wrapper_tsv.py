@@ -91,7 +91,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         else:
             if(isinstance(dtype,str)):
                 dtype = rtypes.createType(dtype)
-            dtype._setNeedConversionRecursive(True)
+            dtype = dtype._setNeedConversionRecursive(True)
 
         slice = ops.ensure_converted(TSVOp(filename, dialect, startpos, dtype, "data"))
         if(slice.type.__class__ is rtypes.TypeArray):

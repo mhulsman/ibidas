@@ -52,7 +52,10 @@ class Representor(Node):
             slices = self._getResultSlices()
             self._initialize(slices,state=RS_ALL_KNOWN | RS_INFERRED)
 
-    def __str__(self, print_data=True):
+    def show(self,table_length=10):
+        print self.__str__(table_length=table_length)
+
+    def __str__(self, print_data=True, table_length=10):
         self._checkState(filter=RS_ALL_KNOWN)
         
         names = ["Slices:"] + [slice.name for slice in self._slices]
@@ -81,8 +84,6 @@ class Representor(Node):
         rows = [names, types, longdims]
 
         if(print_data):
-            table_length = 10
-
             if(any([slice.dims for slice in self._slices])):
                 data = self[:(table_length+1)]()
             else:
@@ -90,8 +91,8 @@ class Representor(Node):
             if(len(self._slices) == 1):
                 data = (data,)
 
-            cols = [[""] * 11]
-            maxlen = 0
+            cols = [[""] * (table_length + 1)]
+            minlen = table_length + 1
             
             maxwidth = [0]
             for dcol,slice in zip(data, self._slices):
@@ -99,16 +100,16 @@ class Representor(Node):
                     col = [str(row).replace('\n','; ') for row in dcol]
                     if(len(col) > table_length):
                         col[-1] = "..."
-                    maxlen = max(len(col),maxlen)
+                    minlen = min(len(col),minlen)
                 else:
                     col = [""] * (table_length + 1)
                     col[0] = str(dcol)
-                    maxlen = max(1,maxlen)
+                    minlen = min(1,minlen)
                 cols.append(col)
             
             rows.append([""] * len(rows[0]))
             rows[-1][0] = "Data:"
-            for i in range(maxlen):
+            for i in range(minlen):
                 row = [col[i] for col in cols]
                 rows.append(row)
         
@@ -243,19 +244,19 @@ class Representor(Node):
             return rtypes.TypeTuple(False, 
                     tuple([slice.type for slice in self._slices]), 
                     tuple([slice.name for slice in self._slices]))
-    Rtype=property(fget=getType)
+    Itype=property(fget=getType)
 
     def getDepth(self):
         """Returns max dimension depth (number of dimensins) of
            slices in this representor. 
         """
         return max([len(slice.dims) for slice in self._slices])
-    Rdepth=property(fget=getDepth)
+    Idepth=property(fget=getDepth)
     
 
     def getNames(self):
         return [slice.name for slice in self._slices]
-    Rnames=property(fget=getNames)
+    Inames=property(fget=getNames)
 
     def __getitem__(self, condition):
         if(not isinstance(condition, tuple)):
@@ -741,6 +742,13 @@ class Representor(Node):
             return repops_multi.Sort(self, sortsource, descend=descend)
         else:
             return repops_multi.Sort(self, descend=descend)
+
+    def to(self, *slices, **kwargs):
+        return repops_slice.To(self, *slices, **kwargs)
+              
+              
+
+
 
     def get(self, *slices, **kwds):
         """Select slices in a new representor, combine with other slices.

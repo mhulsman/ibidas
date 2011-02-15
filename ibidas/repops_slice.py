@@ -27,12 +27,45 @@ class ProjectBookmark(repops.UnaryOpRep):
         assert nslices,  "Cannot find matching slices for bookmark: " + str(name)
         self._initialize(tuple(nslices),RS_CHECK)
 
+
+class To(repops.UnaryOpRep):
+    def _process(self, source, *slicesel, **kwargs):
+        if not source._state & RS_SLICES_KNOWN:
+           return
+        
+        do = kwargs.pop("do")
+        assert not kwargs, "Unknown parameters: " + str(kwargs)
+
+        nslices = list(source._slices)
+        for ssel in slicesel:
+            r = source.get(ssel) 
+            assert len(r._slices) == 1, "To action can only be applied to single slices"
+            slice = r._slices[0]
+            assert slice in source._slices, "Selected slice in to should not be operated upon"
+            pos = source._slices.index(slice)
+
+            if(isinstance(do, context.Context)):
+                r = context._apply(do, r)
+            else:
+                r = do(r)
+
+            nslices = nslices[:pos] + list(r._slices) + nslices[(pos+1):]
+
+        self._initialize(tuple(nslices),RS_CHECK)
+       
+
 class Project(repops.UnaryOpRep):
     def __init__(self,source,*args, **kwds):
         self._project_sources = []
         repops.UnaryOpRep.__init__(self,source,*args, **kwds)
 
-    def _getUsedSourceSlicesSet(self,nslices):
+    def _getUsedSourceSlicesSet(self,project_sources):
+        nslices = []
+        for name, elem in project_sources:
+            if isinstance(elem, representor.Representor):
+                nslices.extend(elem._slices)
+            else:
+                nslices.extend(elem)
         return nslices
 
     def _process(self, source, *args, **kwds):
@@ -49,8 +82,8 @@ class Project(repops.UnaryOpRep):
                     elem = context._apply(elem, self._source)
                 elif(isinstance(elem,str)):
                     if(elem == "~"):
-                        used_slices = self._getUsedSourceSlicesSet(nslices)
-                        nelem = [slice for slice in cur_slices if slice not in used_slices]
+                        used_slices = set([slice.name for slice in self._getUsedSourceSlicesSet(project_sources)])
+                        nelem = [slice for slice in cur_slices if slice.name not in used_slices]
                     elif(elem == "#"):
                         common_dims = set([slice.dims for slice in cur_slices])
                         if len(common_dims) != 1:

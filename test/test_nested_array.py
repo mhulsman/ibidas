@@ -62,7 +62,7 @@ class TestMatrix(TestArray):
 
     def test_tranpose(self):
         r = self.getRep()
-        pidx = range(r.Rdepth)
+        pidx = range(r.Idepth)
         self.assertTrue(r.transpose(pidx) ==+ r)
        
         if(hasattr(self,'transpose_couples')):
@@ -73,11 +73,11 @@ class TestMatrix(TestArray):
     def test_flat(self):
        f1 = rep(self.data)
        #backward
-       while(f1.Rdepth >= 2):
+       while(f1.Idepth >= 2):
             f1 = f1.flat()
        #forward
        f2 = rep(self.data)
-       while(f2.Rdepth >= 2):
+       while(f2.Idepth >= 2):
             f2 = f2.flat(f2._slices[0].dims[1].name)
        #all
        f3 = rep(self.data).flatall()

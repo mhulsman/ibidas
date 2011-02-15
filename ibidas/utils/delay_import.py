@@ -28,6 +28,15 @@ def ximport(name, module, args=[]):
     try: 
         if(not args):
             module[name.split('.')[0]] = __import__(name,module,module,[],level)
+        elif(len(args) == 1 and args[0] == "*"):
+            res = __import__(name,module,module,[],level)
+            for arg in res.__dict__.keys():
+                if(arg.startswith('__')):
+                    continue
+                try:
+                    module[arg] = getattr(res,arg)
+                except AttributeError,e:
+                    raise RuntimeError,"importing " + str(arg) + " from " + name + " into " + module['__name__'] + " did not succeed"
         else:
             try:
                 res = __import__(name,module,module,args,level)

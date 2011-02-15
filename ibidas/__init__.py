@@ -2,7 +2,7 @@
 The ibidas module contains all main functions for working with ibidas objects.
 """
 
-__all__ = ["rep","read","_",
+__all__ = ["rep","read","connect","_",
            "rarray","rlist","rtuple","combine","harray",
            "pos","argsort",
            "rany","rall",
@@ -13,7 +13,8 @@ __all__ = ["rep","read","_",
            "count",
            "bcast","createType",
            "newdim","Missing",
-           "corr","within","contains"
+           "corr","within","contains",
+           "download","get"
            ]
 
 from utils import delay_import
@@ -32,11 +33,13 @@ from repops_funcs import argsort, pos, Any as rany, All as rall,\
                          Max as rmax, Min as rmin, ArgMax as argmax, ArgMin as argmin,\
                          rsum, Mean as mean, Median as median, Count as count,\
                          Corr as corr
+from download_cache import DownloadCache
+from pre import predefined_sources as get
 
+download = DownloadCache()
 within = Infix(repops_funcs.Within)
 contains = RevInfix(repops_funcs.Within)
 
-delay_import.perform_delayed_imports()
 
 
 def read(url, **kwargs):
@@ -44,8 +47,14 @@ def read(url, **kwargs):
 
     if(format == 'tsv'):
         return TSVRepresentor(url, **kwargs) 
-    elif(format == "db"):
+    else:
+        raise RuntimeError("Unknown format specified")
+
+def connect(url, **kwargs):
+    format = kwargs.pop('format','db')
+    if(format == "db"):
         return open_db(url, **kwargs)
     else:
         raise RuntimeError("Unknown format specified")
-    
+
+delay_import.perform_delayed_imports()

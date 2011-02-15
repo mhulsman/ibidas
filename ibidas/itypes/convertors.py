@@ -1,3 +1,4 @@
+import math
 import numpy
 import operator
 import collections
@@ -117,14 +118,13 @@ class StringConvertor(BaseConvertor):
         return seq
 
 
-class StringFloatConvertor(BaseConvertor):
+class FloatConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
-        nan = float("nan")
         if(elem_type.has_missing):
             seqres = []
             for elem in seq:
-                if(not elem):
-                    seqres.append(nan)
+                if(elem is Missing or elem == ""):
+                    seqres.append(Missing)
                 else: 
                     seqres.append(float(elem))
         else:
@@ -132,12 +132,12 @@ class StringFloatConvertor(BaseConvertor):
          
         return cutils.darray(seqres,elem_type.toNumpy())
 
-class StringIntegerConvertor(BaseConvertor):
+class IntegerConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
         if(elem_type.has_missing):
             seqres = []
             for elem in seq:
-                if(not elem):
+                if(elem is Missing or elem == ""):
                     seqres.append(Missing)
                 else: 
                     seqres.append(int(elem))

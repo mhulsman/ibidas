@@ -262,7 +262,7 @@ class TypeAny(TypeUnknown):#{{{
         """Returns dtype of a numpy container which
         can hold this type efficiently.
         """
-        if(self.has_missing):
+        if(self.has_missing or self._need_conversion):
             return numpy.dtype(object)
         else:
             return numpy.dtype(self._dtype)
@@ -840,7 +840,7 @@ class TypeString(TypeArray):#{{{
         """Returns dtype of a numpy container which
            can hold this type efficiently."""
 
-        if(self.dims[0].shape == UNDEFINED or self.has_missing or self.dims[0].shape > 32):
+        if(self.dims[0].shape == UNDEFINED or self.has_missing or self.dims[0].shape > 32 or self._need_conversion):
             return numpy.dtype(object)
         else:
             return numpy.dtype(self._dtype + str(self.dims[0].shape))
@@ -908,7 +908,10 @@ class TypeComplex(TypeNumber):#{{{
         """Returns dtype of a numpy container which
         can hold this type efficiently.
         """
-        return numpy.dtype(self._dtype)
+        if(self.has_missing or self._need_conversion):
+            return numpy.dtype(object)
+        else:
+            return numpy.dtype(self._dtype)
     
 addType(TypeComplex)#}}}
 
@@ -934,6 +937,7 @@ class TypeReal64(TypeComplex128):#{{{
     _scalar = numpy.float64
     _defval = 0.0
     _reqRPCcon=False
+    _convertor=convertors.FloatConvertor
 addType(TypeReal64)#}}}
 
 class TypeReal32(TypeReal64, TypeComplex64):#{{{
@@ -948,6 +952,7 @@ class TypeInteger(TypeReal32):#{{{
     name = "long"
     _dtype = "object"
     _minmax = (-numpy.inf, numpy.inf)
+    _convertor=convertors.IntegerConvertor
     
     @classmethod
     def getMinValue(cls):
@@ -965,7 +970,7 @@ class TypeInteger(TypeReal32):#{{{
         """Returns dtype of a numpy container which
         can hold this type efficiently.
         """
-        if(self.has_missing):
+        if(self.has_missing or self._need_conversion):
             return numpy.dtype(object)
         else:
             return numpy.dtype(self._dtype)

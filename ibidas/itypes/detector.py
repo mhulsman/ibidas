@@ -787,11 +787,12 @@ class NumberScanner(TypeScanner):
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
         self.has_nan = False
+        self.has_missing = False
 
     def getType(self):
         if not self.detector.hasMissing():
             pass
-        has_missing = self.detector.hasMissing()
+        has_missing = self.detector.hasMissing() or self.has_missing
         cv = self.convertor(self.detector.objectclss.copy()) 
 
         return self.typecls(has_missing, need_conversion=True, convertor=cv)
@@ -829,6 +830,7 @@ class IntegerScanner(TypeScanner):
         TypeScanner.__init__(self, detector)
         self.max_val = 0
         self.min_val = 0
+        self.has_missing = False
 
     def getType(self):
         out_type = rtypes.TypeInteger
@@ -849,7 +851,7 @@ class IntegerScanner(TypeScanner):
                         out_type = rtype
                         break
         cv = self.convertor(self.detector.objectclss.copy()) 
-        return out_type(self.detector.hasMissing(), need_conversion=True, convertor=cv)
+        return out_type(self.detector.hasMissing() or self.has_missing, need_conversion=True, convertor=cv)
 
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
@@ -877,41 +879,38 @@ class BoolScanner(TypeScanner):
 registerTypeScanner(BoolScanner)
 
 
-
 class StringRealScanner(RealScanner):
     good_cls = set([str, unicode, None.__class__, MissingType, numpy.string_, numpy.unicode_])
     parentcls = StringScanner
-    convertor=convertors.StringFloatConvertor
+    convertor=convertors.FloatConvertor
 
     def scan(self, seq):
         has_missing = self.detector.hasMissing()
         if not self.detector.objectclss.issubset(self.good_cls):
             return False
         try:
-            if has_missing:
-                float_vals = seq.map(int, otype=object, out_empty=Missing, has_missing=has_missing)
-            else:
-                float_vals = seq.map(int, otype=float, has_missing=has_missing)
+            float_vals = [float(elem) for elem in seq if elem != "" and not elem is Missing]
+            if(len(float_vals) < len(seq)):
+                self.has_missing = True
         except ValueError:
             return False
         return RealScanner.scan(self, float_vals)
 registerTypeScanner(StringRealScanner)
 
-
 class StringIntegerScanner(IntegerScanner):
     good_cls = set([str, unicode, None.__class__, MissingType, numpy.string_, numpy.unicode_])
     parentcls = StringRealScanner
-    convertor=convertors.StringIntegerConvertor
+    convertor=convertors.IntegerConvertor
 
     def scan(self, seq):
         has_missing = self.detector.hasMissing()
         if not self.detector.objectclss.issubset(self.good_cls):
             return False
         try:
-            if has_missing:
-                int_vals = seq.map(int, otype=object, out_empty=Missing, has_missing=has_missing)
-            else:
-                int_vals = seq.map(int, otype=int, has_missing=has_missing)
+            int_vals = [int(elem) for elem in seq if elem]
+            if(len(int_vals) < len(seq)):
+                self.has_missing = True
+            int_vals = sparse_arrays.FullSparse(cutils.darray(int_vals))
         except ValueError:
             return False
         return IntegerScanner.scan(self, int_vals)
