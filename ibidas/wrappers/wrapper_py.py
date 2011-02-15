@@ -74,7 +74,6 @@ def rep(data=None, dtype=None, unpack=True, name=None):
     if(not dtype is None):
         if(isinstance(dtype,str)):
             dtype = rtypes.createType(dtype)
-        dtype = dtype._setNeedConversionRecursive(True)
     else:
         det = detector.Detector()
         det.process(data)
@@ -86,10 +85,9 @@ def rep(data=None, dtype=None, unpack=True, name=None):
         name = "data"
 
     data_slice = ops.DataOp(data,name=name,rtype=dtype)
-    data_slice = ops.ensure_converted(data_slice)
     
     while(unpack and data_slice.type.__class__ is rtypes.TypeArray):
-        data_slice = ops.ensure_converted(ops.UnpackArrayOp(data_slice))
+        data_slice = ops.UnpackArrayOp(data_slice)
 
     res = wrapper.SourceRepresentor()
     res._initialize((data_slice,)) 
@@ -192,11 +190,6 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             ndata = nested_array.NestedArray(node.data,node.type)
         return ResultOp.from_slice(ndata,node)
 
-    def visitConvertOp(self,node,slice):
-        ndata = slice.data.mapseq(node.convertor.convert,
-                                node.type,res_type=node.type)
-        return slice.modify(data=ndata)
-   
     def visitCastOp(self,node,slice):
         ndata = self.cast(node.cast_name,node,slice)
         return slice.modify(data=ndata,rtype=node.type)
@@ -427,11 +420,31 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return res
    
     def castto_any(self,castname,node,slice):
-        return slice.data.mapseq(lambda x:x,res_type=node.type)
+        dtype = node.type.toNumpy()
+        return slice.data.mapseq(lambda x:numpy.cast[dtype](x),res_type=node.type)
 
     def castnumbers_numbers(self,castname,node,slice):
-        return slice.data.mapseq(lambda x:x,res_type=node.type)
+        dtype = node.type.toNumpy()
+        return slice.data.mapseq(lambda x:numpy.cast[dtype](x),res_type=node.type)
 
+    def caststring_to_int(self, castname, node, slice):
+        if(node.type.has_missing):
+            func = string_to_int_missing
+        else:
+            func = string_to_int
+        dtype = node.type.toNumpy()
+
+        return slice.data.mapseq(lambda x: func(x,dtype),res_type=node.type)
+    
+    def caststring_to_real(self, castname, node, slice):
+        if(node.type.has_missing):
+            func = string_to_real_missing
+        else:
+            func = string_to_real
+        dtype = node.type.toNumpy()
+
+        return slice.data.mapseq(lambda x: func(x,dtype),res_type=node.type)
+       
 
     def withinWithin(self, data, type1, type2, typeo, op):
         data1,data2 = data
@@ -823,4 +836,34 @@ def add_independent(data,dim):
     data = numpy.reshape(data,wx[::-1])
     return data
 
-   
+
+def string_to_int_missing(seq, dtype):
+    res = []
+    for elem in seq:
+        if elem is Missing or elem == "":
+            res.append(Missing)
+        else:
+            try:
+                res.append(int(elem))
+            except ValueError:
+                res.append(Missing)
+    return cutils.darray(res,dtype)
+
+def string_to_int(seq, dtype):
+    return cutils.darray([int(elem) for elem in seq],dtype)
+
+
+def string_to_real_missing(seq, dtype):
+    res = []
+    for elem in seq:
+        if elem is Missing or elem == "":
+            res.append(Missing)
+        else:
+            try:
+                res.append(float(elem))
+            except ValueError:
+                res.append(Missing)
+    return cutils.darray(res,dtype)
+
+def string_to_real(seq, dtype):
+    return cutils.darray([float(elem) for elem in seq],dtype)

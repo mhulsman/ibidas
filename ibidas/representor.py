@@ -52,40 +52,43 @@ class Representor(Node):
             slices = self._getResultSlices()
             self._initialize(slices,state=RS_ALL_KNOWN | RS_INFERRED)
 
-    def show(self,table_length=10):
+    def show(self,table_length=100):
         print self.__str__(table_length=table_length)
 
-    def __str__(self, print_data=True, table_length=10):
+    def __str__(self, print_data=True, table_length=15):
         self._checkState(filter=RS_ALL_KNOWN)
         
-        names = ["Slices:"] + [slice.name for slice in self._slices]
-        types = ["Type:"] + [str(slice.type) for slice in self._slices]
+        names = ["Slices:"] + [s.name for s in self._slices]
+        types = ["Type:"] + [str(s.type) for s in self._slices]
         longdims = ["Dims:"]
-        for slice in self._slices:
+        for s in self._slices:
             dim_str = []
-            for  dim in slice.dims:
+            for  dim in s.dims:
                 dim_str.append(str(dim))
             dim_str = "<".join(dim_str)
             longdims.append(dim_str)
                 
         dims = ["Dims:"]
         last_dim = ()
-        for slice in self._slices:
+        for s in self._slices:
             dim_str = []
-            for pos, dim in enumerate(slice.dims):
+            for pos, dim in enumerate(s.dims):
                 if len(last_dim) > pos and dim == last_dim[pos]:
                     dim_str.append(".")
                 else:
                     dim_str.append(str(dim))
-            last_dim = slice.dims
+            last_dim = s.dims
             dim_str = "<".join(dim_str)
             dims.append(dim_str)
         
         rows = [names, types, longdims]
 
         if(print_data):
-            if(any([slice.dims for slice in self._slices])):
-                data = self[:(table_length+1)]()
+            first_dims = set([s.dims[0] for s in self._slices if s.dims])
+            if(first_dims):
+                for dim in first_dims:
+                    self = self.filter(slice(None,table_length + 1),dim=dim)
+                data = self()
             else:
                 data = self()
             if(len(self._slices) == 1):
@@ -95,8 +98,8 @@ class Representor(Node):
             minlen = table_length + 1
             
             maxwidth = [0]
-            for dcol,slice in zip(data, self._slices):
-                if(len(slice.dims) >= 1):
+            for dcol,s in zip(data, self._slices):
+                if(len(s.dims) >= 1):
                     col = [str(row).replace('\n','; ') for row in dcol]
                     if(len(col) > table_length):
                         col[-1] = "..."

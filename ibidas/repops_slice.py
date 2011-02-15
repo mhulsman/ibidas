@@ -159,8 +159,7 @@ def unpack_tuple(slice,name="",unpack=True):
             raise RuntimeError, "No tuple to unpack"
 
     if(not name):
-        nslices = [ops.ensure_converted(ops.UnpackTupleOp(slice, idx))
-                                            for idx in range(len(slice.type.subtypes))]
+        nslices = [ops.UnpackTupleOp(slice, idx) for idx in range(len(slice.type.subtypes))]
     else: 
         try:
             idx = int(name)
@@ -168,12 +167,12 @@ def unpack_tuple(slice,name="",unpack=True):
             assert isinstance(name, str), \
                         "Tuple slice name should be a string"
             idx = slice.type.fieldnames.index(name)
-        nslices = [ops.ensure_converted(ops.UnpackTupleOp(slice, idx))]
+        nslices = [ops.UnpackTupleOp(slice, idx)]
     
     if(unpack):
         for pos, nslice in enumerate(nslices):
             while(nslice.type.__class__ is rtypes.TypeArray):
-                nslice = ops.ensure_converted(ops.UnpackArrayOp(nslice))
+                nslice = ops.UnpackArrayOp(nslice)
             nslices[pos] = nslice
     return nslices
 

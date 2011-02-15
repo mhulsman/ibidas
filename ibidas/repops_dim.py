@@ -23,9 +23,9 @@ class UnpackArray(repops.UnaryOpRep):
                 if(not name is None):
                     dimindex = slice.type.dims.getDimIndexByName(name)
                     if(not dimindex is None):
-                        slice = ops.ensure_converted(ops.UnpackArrayOp(slice,ndim=dimindex))
+                        slice = ops.UnpackArrayOp(slice,ndim=dimindex)
                 else:
-                    slice = ops.ensure_converted(ops.UnpackArrayOp(slice,ndim=ndim))
+                    slice = ops.UnpackArrayOp(slice,ndim=ndim)
             nslices.append(slice)
 
         return self._initialize(tuple(nslices),RS_CHECK)

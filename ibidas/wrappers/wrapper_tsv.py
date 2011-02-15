@@ -91,14 +91,12 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         else:
             if(isinstance(dtype,str)):
                 dtype = rtypes.createType(dtype)
-            dtype = dtype._setNeedConversionRecursive(True)
 
-        slice = ops.ensure_converted(TSVOp(filename, dialect, startpos, dtype, "data"))
+        slice = TSVOp(filename, dialect, startpos, dtype, "data")
         if(slice.type.__class__ is rtypes.TypeArray):
-            slice = ops.ensure_converted(ops.UnpackArrayOp(slice))
+            slice = ops.UnpackArrayOp(slice)
         if(slice.type.__class__ is rtypes.TypeTuple):
-            nslices = [ops.ensure_converted(ops.UnpackTupleOp(slice, idx))
-                                    for idx in range(len(slice.type.subtypes))]
+            nslices = [ops.UnpackTupleOp(slice, idx) for idx in range(len(slice.type.subtypes))]
         else:
             nslices = [slice]
  

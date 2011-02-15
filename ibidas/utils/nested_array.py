@@ -8,12 +8,11 @@ class NestedArray(object):
     def __init__(self,data,cur_type):
         self.data = cutils.darray([data],object)
         self.cur_type = cur_type
-
         self.idxs = [0]
         
     def copy(self):
         res = copy.copy(self)
-        res.data = numpy.array(self.data)
+        res.data = self.data.view(numpy.ndarray)
         res.idxs = list(self.idxs)
         return res
   
@@ -53,7 +52,6 @@ class NestedArray(object):
         data = nself.data
         depth = len(dimpath)
         odimpath = dimpath
-
         while(depth>0):        
             idxdepth = nself._curIdxDepth()
             rem_dims = len(data.shape) - idxdepth
@@ -74,7 +72,6 @@ class NestedArray(object):
             #This allows to unpack a multi-dimensional part of the data
             tot_dimpath = dimpath + dimpaths.getArrayDimPathFromType(subtype)
             cdepth = tot_dimpath.contigiousFixedNDims()
-            res = []
             
             #prepare fixed (multi-)dimensions and variable scenario
             if(not cdepth): 
@@ -95,6 +92,7 @@ class NestedArray(object):
 
 
             if(variable):
+                res = []
                 for pos in xrange(len(cdata)):
                     elem = cdata[pos]
                     if(variable):
@@ -109,6 +107,7 @@ class NestedArray(object):
                     if(not isinstance(elem,numpy.ndarray)):
                         elem = cutils.darray(list(elem),dtype,cdepth,cdepth)
                     else:
+                        elem = validate_array(elem,cdepth,dtype)
                         assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
                     res.append(elem)
                 ndata = numpy.concatenate(res)
@@ -119,16 +118,16 @@ class NestedArray(object):
                         r.extend(elem)
                     ndata = cutils.darray(r,dtype,1,1)
                 else:
+                    res = []
                     for elem in cdata:
                         #check that elem shape is not smaller or larger than expected 
                         if(not isinstance(elem,numpy.ndarray)):
                             elem = cutils.darray(list(elem),dtype,cdepth,cdepth)
                         else:
-                            assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
+                            elem = validate_array(elem,cdepth,dtype)
                         res.append(elem)
                     ndata = numpy.concatenate(res)
 
-            dimpath = dimpath[cdepth:]
 
             if(variable):
                 idxres.shape =  data.shape + (2,)
@@ -140,6 +139,7 @@ class NestedArray(object):
                 nself.idxs.append(len(data.shape))
             data = ndata    
             depth -= 1
+            dimpath = dimpath[1:]
         
         nself.cur_type = subtype
         nself.data = data
@@ -804,3 +804,27 @@ def drop_prev_shapes_dim(ndata,shapes):
                 sel = slice(0,numpy.sum(rshape))
         nshapes.append((lshape,rshape))
     return nshapes
+ 
+
+def validate_array(seq, cdepth, dtype):
+    if(len(seq.shape) < cdepth):
+        oshape = seq.shape
+        rem_ndims = cdepth - len(seq.shape) + 1
+        seq = cutils.darray(list(seq.ravel()),dtype,rem_ndims,rem_ndims)
+        seq.shape = oshape + seq.shape[1:]
+        assert len(seq.shape) == cdepth, "Non array values encountered for dims " + str(dims[len(seq.shape):])
+    elif(len(seq.shape) > cdepth):
+        oshape = seq.shape
+        seq = dimpaths.flatFirstDims(seq,cdepth-1)
+        seq = cutils.darray([subelem for subelem in seq],object,1,1)
+        seq.shape = oshape[:cdepth]
+
+    if not seq.dtype == dtype:
+        if(dtype.char == 'S' or dtype.char == 'U' or dtype.char == 'V'):
+            z = numpy.zeros(seq.shape,dtype)
+            z[:] = seq
+            seq = z
+        else:
+            seq = numpy.cast[dtype](seq)
+    return seq
+

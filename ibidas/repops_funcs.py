@@ -437,16 +437,12 @@ class EachSignature(FuncSignature):
     def check(self, slice, eachfunc, dtype=rtypes.unknown):#{{{
         if(not isinstance(dtype,rtypes.TypeUnknown)):
             dtype = rtypes.createType(dtype,len(slice.dims)) 
-        dtype = dtype._setNeedConversionRecursive(True)
         nkwargs = {'eachfunc': eachfunc, 'slice':slice}
         return (nkwargs, Param(slice.name, dtype))#}}}
 eachsig = EachSignature("each")
 
 class Each(UnaryFuncElemOp):
     _sigs = [eachsig]
-
-    def _finishSlice(self, slice):
-        return ops.ensure_converted(slice)
 
 class UnaryArithSignature(FuncSignature):
     def check(self, slice):#{{{

@@ -46,7 +46,6 @@ import platform
 import copy
 import numpy
 import operator
-import convertors
 from collections import defaultdict
 
 from ..constants import *
@@ -75,16 +74,6 @@ def addType(newtypecls):
     for basecls in newtypecls.__bases__:
         __typechildren__[basecls].append(newtypecls)
 
-
-
-#Combining types requires combining type attribures
-#such as has_missing. 
-#Here, you can register functions which do such combining
-#for common type attributes
-_type_attribute_common = {}
-def addTypeAttribute(name, common_visitor):
-    _type_attribute_common[name] = common_visitor
-
 class Type(object):#{{{
     """Base type class. Represents the type of a data structure.
     """
@@ -92,8 +81,6 @@ class Type(object):#{{{
     _dtype = "object"
     _scalar = numpy.object
     _defval = None
-    _need_conversion=False
-    _convertor=convertors.BaseConvertor
     _reqRPCcon=True
     has_missing = True
 
@@ -136,22 +123,6 @@ class Type(object):#{{{
         """
         return self
 
-    #conversion
-    def _needConversion(self):
-        return self._need_conversion
-
-    def _getConvertor(self):
-        if(isinstance(self._convertor, convertors.BaseConvertor)):
-            return self._convertor
-        else:
-            return self._convertor()
-
-    def _setNeedConversion(self,value):
-        return self
-    
-    def _setNeedConversionRecursive(self,value):
-        return self
-   
     #dim changes
     def _removeDepDim(self, dimdepth, elem_specifier):
         return self._callSubtypes("_removeDepDim",dimdepth, elem_specifier)
@@ -241,7 +212,7 @@ class TypeAny(TypeUnknown):#{{{
 
     name = "any"
 
-    def __init__(self, has_missing=False, need_conversion=False, convertor=None):
+    def __init__(self, has_missing=False):
         """
         Creates type object.
 
@@ -249,38 +220,20 @@ class TypeAny(TypeUnknown):#{{{
         """
         TypeUnknown.__init__(self)
         self.has_missing = has_missing
-
-        self._need_conversion = need_conversion
-        if(not convertor is None):
-            self._convertor = convertor
         
     @classmethod
     def commonType(cls, type1, type2):
-        return cls(type1.has_missing or type2.has_missing, need_conversion=type1._need_conversion or type2._need_conversion)
+        return cls(type1.has_missing or type2.has_missing)
    
     def toNumpy(self):
         """Returns dtype of a numpy container which
         can hold this type efficiently.
         """
-        if(self.has_missing or self._need_conversion):
+        if(self.has_missing):
             return numpy.dtype(object)
         else:
             return numpy.dtype(self._dtype)
     
-    #conversion
-    def _setNeedConversionRecursive(self,value):
-        nself = self._callSubtypes("_setNeedConversionRecursive",value)
-        if(nself is self):
-            nself = self.copy()
-        nself._need_conversion = value
-        return nself
-    
-    #conversion
-    def _setNeedConversion(self,value):
-        nself = self.copy()
-        nself._need_conversion = value
-        return nself
-
     def getSubType(self, subtype_id=0):
         """Returns subtype if this is a non-scalar type.
         Otherwise, raises TypeError. If subtype_id invalid, raised IndexError.
@@ -358,7 +311,7 @@ class TypeTuple(TypeAny):#{{{
     name = "tuple"
 
     def __init__(self, has_missing=False, subtypes=(), 
-                       fieldnames=(), need_conversion=False, convertor=None):
+                       fieldnames=()):
         """
         Creates type object.
 
@@ -376,7 +329,7 @@ class TypeTuple(TypeAny):#{{{
         assert not fieldnames or len(fieldnames) == len(subtypes), \
             "Length of fieldnames should be equal to length of tuples (or empty"
 
-        TypeAny.__init__(self, has_missing, need_conversion, convertor)
+        TypeAny.__init__(self, has_missing)
         self.subtypes = subtypes
         self.fieldnames = fieldnames
     
@@ -384,14 +337,13 @@ class TypeTuple(TypeAny):#{{{
     def commonType(cls, type1, type2):
         if(not type1.subtypes or not type2.subtypes or
             len(type1.subtypes) != len(type2.subtypes)):
-            return cls(type1.has_missing or type2.has_missing, need_conversion=type1._need_conversion or type2._need_conversion)
+            return cls(type1.has_missing or type2.has_missing)
         else:
             subtypes = [casts.castImplicitCommonType(lstype, rstype)
                       for lstype, rstype in zip(type1.subtypes, type2.subtypes)]
             if(False in subtypes):
                 return False
-            res = cls(type1.has_missing or type2.has_missing, tuple(subtypes), type1.fieldnames, 
-                      need_conversion=type1._need_conversion or type2._need_conversion)
+            res = cls(type1.has_missing or type2.has_missing, tuple(subtypes), type1.fieldnames) 
         return res
     
     def toDefval(self):
@@ -527,9 +479,8 @@ class TypeTuple(TypeAny):#{{{
         return res
 addType(TypeTuple)#}}}
 
-class TypeDict(TypeTuple):#{{{
+class TypeFieldDict(TypeTuple):#{{{
     name = "dict"
-    _convertor = convertors.DictConvertor
 
     def __repr__(self):
         res = '{' 
@@ -544,17 +495,16 @@ class TypeDict(TypeTuple):#{{{
             res += "$"
         return res
 
-addType(TypeDict)#}}}
+addType(TypeFieldDict)#}}}
 
 #pylint: disable-msg=E1101
 class TypeArray(TypeAny):#{{{
     """Type representing a collection of values, 
        possibly in an dimensional structure"""
     name = "array"
-    _convertor = convertors.ArrayConvertor
 
     def __init__(self, has_missing=False, dims=(), \
-                       subtypes=(unknown,), need_conversion=False, convertor=None):
+                       subtypes=(unknown,)):
         """
         Creates type object.
 
@@ -577,22 +527,21 @@ class TypeArray(TypeAny):#{{{
 
         self.subtypes = subtypes
         self.dims = dims
-        TypeAny.__init__(self, has_missing, need_conversion=need_conversion,convertor=convertor)
+        TypeAny.__init__(self, has_missing)
     
     @classmethod
     def commonType(cls, type1, type2):
         if(not type1.dims or not type2.dims or
             len(type1.dims) != len(type2.dims)
             or type1.dims != type2.dims):
-            return cls(type1.has_missing or type2.has_missing, need_conversion=_type1._need_conversion or type2._need_conversion)
+            return cls(type1.has_missing or type2.has_missing)
         else:
             subtypes = [casts.castImplicitCommonType(lstype, rstype)
                         for lstype, rstype in zip(type1.subtypes, type2.subtypes)]
             if(False in subtypes):
                 return False
             dims = type1.dims 
-            res = cls(has_missing=type1.has_missing or type2.has_missing, dims=dims, subtypes=tuple(subtypes), 
-                      need_conversion=_type1._need_conversion or type2._need_conversion)
+            res = cls(has_missing=type1.has_missing or type2.has_missing, dims=dims, subtypes=tuple(subtypes)) 
         return res
 
     def toDefval(self):
@@ -788,9 +737,8 @@ addType(TypeArray)#}}}
 
 class TypeSet(TypeArray):#{{{
     name = "set"
-    _convertor = convertors.SetConvertor 
 
-    def __init__(self, has_missing=False, dims=(), subtypes=(unknown,), need_conversion=False, convertor=None):
+    def __init__(self, has_missing=False, dims=(), subtypes=(unknown,)):
 
         assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
                 "Dimensions of a set should be a dimpath of size 1"
@@ -799,7 +747,7 @@ class TypeSet(TypeArray):#{{{
                  "Number of subtypes should be 1"
         
         TypeArray.__init__(self, has_missing, dims, 
-                                 subtypes, need_conversion, convertor)
+                                 subtypes)
     def __repr__(self):
         res = ""
         if(self.has_missing):
@@ -815,14 +763,13 @@ class TypeString(TypeArray):#{{{
     name = "string"
     _dtype = "U"
     _defval = u""
-    _convertor=convertors.StringConvertor
     _reqRPCcon=False
     
-    def __init__(self, has_missing=False, dims=(), need_conversion=False, convertor=None):
+    def __init__(self, has_missing=False, dims=()):
         assert (isinstance(dims, dimpaths.DimPath) and len(dims) == 1), \
             "Dimensions of a string should be a dimpath of size 1"
         TypeArray.__init__(self, has_missing, dims, 
-                                    (TypeChar(),), need_conversion, convertor)
+                                    (TypeChar(),))
 
     @classmethod
     def commonType(cls, type1, type2):
@@ -833,14 +780,14 @@ class TypeString(TypeArray):#{{{
             shape = max(type1.dims[0].shape, type2.dims[0].shape)
         dim = dimensions.Dim(shape)
         res = cls(has_missing=type1.has_missing or type2.has_missing, 
-                  dims=dimpaths.DimPath(dim), need_conversion=type1._need_conversion or type2._need_conversion)
+                  dims=dimpaths.DimPath(dim))
         return res
 
     def toNumpy(self):
         """Returns dtype of a numpy container which
            can hold this type efficiently."""
 
-        if(self.dims[0].shape == UNDEFINED or self.has_missing or self.dims[0].shape > 32 or self._need_conversion):
+        if(self.dims[0].shape == UNDEFINED or self.has_missing or self.dims[0].shape > 32):
             return numpy.dtype(object)
         else:
             return numpy.dtype(self._dtype + str(self.dims[0].shape))
@@ -894,8 +841,8 @@ class TypeNumber(TypeScalar):#{{{
     name = "number"
     _defval = 0
     
-    def __init__(self, has_missing=False, need_conversion=False, convertor=None):
-        TypeScalar.__init__(self, has_missing, need_conversion, convertor)
+    def __init__(self, has_missing=False):
+        TypeScalar.__init__(self, has_missing)
     
 addType(TypeNumber)#}}}
 
@@ -908,7 +855,7 @@ class TypeComplex(TypeNumber):#{{{
         """Returns dtype of a numpy container which
         can hold this type efficiently.
         """
-        if(self.has_missing or self._need_conversion):
+        if(self.has_missing):
             return numpy.dtype(object)
         else:
             return numpy.dtype(self._dtype)
@@ -937,7 +884,6 @@ class TypeReal64(TypeComplex128):#{{{
     _scalar = numpy.float64
     _defval = 0.0
     _reqRPCcon=False
-    _convertor=convertors.FloatConvertor
 addType(TypeReal64)#}}}
 
 class TypeReal32(TypeReal64, TypeComplex64):#{{{
@@ -952,7 +898,6 @@ class TypeInteger(TypeReal32):#{{{
     name = "long"
     _dtype = "object"
     _minmax = (-numpy.inf, numpy.inf)
-    _convertor=convertors.IntegerConvertor
     
     @classmethod
     def getMinValue(cls):
@@ -970,7 +915,7 @@ class TypeInteger(TypeReal32):#{{{
         """Returns dtype of a numpy container which
         can hold this type efficiently.
         """
-        if(self.has_missing or self._need_conversion):
+        if(self.has_missing):
             return numpy.dtype(object)
         else:
             return numpy.dtype(self._dtype)
@@ -1618,10 +1563,11 @@ TypeAll = set(TypeAny.getDescendantTypes())
 TypeNumbers = set(TypeNumber.getDescendantTypes())
 TypeStrings = set(TypeString.getDescendantTypes())
 TypeArrays = set(TypeArray.getDescendantTypes())
-
+TypeIntegers = set(TypeInteger.getDescendantTypes())
+TypeReals = set(TypeReal64.getDescendantTypes()) - TypeIntegers
 
 if(platform.architecture()[0] == "32bit"):
     TypePlatformInt = TypeInt32
 else:
     TypePlatformInt = TypeInt64
-    
+__typenames__["int"] = TypePlatformInt    

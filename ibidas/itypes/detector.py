@@ -71,7 +71,7 @@ import operator
 import platform
 from itertools import chain
 
-import rtypes, convertors
+import rtypes
 from ..constants import *
 from ..utils import sparse_arrays
 from ..utils.missing import *
@@ -84,8 +84,8 @@ _scanchildren = defaultdict(list)
 def registerTypeScanner(newscancls):
     _scanchildren[newscancls.parentcls].append(newscancls)
 
-missing_cls = set([None.__class__, MissingType])
-missing_val = set([None, Missing])
+missing_cls = set([MissingType])
+missing_val = set([Missing])
 
 
 class Detector(object):
@@ -109,7 +109,7 @@ class Detector(object):
         self.processSeq(sparse_arrays.FullSparse(cutils.darray([obj])))
 
     def processSeq(self, seq):
-        if not isinstance(seq, (sparse_arrays.FullSparse, sparse_arrays.PosSparse)):
+        if not isinstance(seq, (sparse_arrays.FullSparse)):
             if isinstance(seq, (set, frozenset)):
                 seq = cutils.darray(list(seq))
             elif not isinstance(seq, numpy.ndarray):
@@ -151,11 +151,7 @@ class Detector(object):
         assert not len(restypes) == 0,'BUG: no valid type could be detected'
 
         if len(restypes) > 1:
-            #FIXME
-            if len(restypes) > 1:
-                if len(restypes) > 1:
-                    if len(restypes) > 1:
-                        raise RuntimeError, 'Could not decide between types: ' + str(restypes)
+            raise RuntimeError, 'Could not decide between types: ' + str(restypes)
         return restypes[0]
 
     def _findAcceptableDescendants(self, seq, scanner=None):
@@ -185,6 +181,8 @@ LENGTH_NOINIT = 0    #length type not yet initialized
 LENGTH_FIXED = 1     #lengths are fixed (all the same or missing)
 LENGTH_VAR = 2       #variable lengths
 LENGTH_REPEAT = 3    #lengths repeated in a pattern dictated by parent dimensions
+
+
 class DimRep(object):
     def __init__(self, parent_scanner, index=0):
         self.parent_scanner = parent_scanner
@@ -204,8 +202,8 @@ class DimRep(object):
         self.has_missing = max(self.has_missing, has_missing)
         self.dirty = True
 
-        if has_missing and lengths.dtype == object:
-            lengths = lengths.full(empty_replace=-1, otype=int)
+        if has_missing:
+            lenghts = lengths.replace_missing(-1, otype=int)
 
         if self.length_type == LENGTH_FIXED or self.length_type == LENGTH_NOINIT:
             lenset = set(lengths)
@@ -396,7 +394,6 @@ class DimEqualizer(object):
 class TypeScanner(object):
     typecls = rtypes.TypeAny
     good_cls = set()
-    convertor=convertors.BaseConvertor
 
     def __init__(self, detector):
         self.detector = detector
@@ -413,8 +410,7 @@ class TypeScanner(object):
         return self.detector.objectclss.issubset(self.good_cls)
 
     def getType(self):
-        cv = self.convertor(self.detector.objectclss.copy()) 
-        return self.typecls(self.detector.hasMissing(), need_conversion=True, convertor=cv)
+        return self.typecls(self.detector.hasMissing())
 
     def getAncestorScanners(self):
         if not hasattr(self.__class__, 'ancest_cls_cache'):
@@ -433,7 +429,7 @@ class TypeScanner(object):
             d = Detector(self, self.detector.dim_eq)
             setattr(self, id, d)
             if self.detector.count_elem:
-                d.processSeq(sparse_arrays.PosSparse([], shape=(self.detector.count_elem,)))
+                d.processSeq([Missing] * self.detector.count_elem)
         return getattr(self, id)
 
     def getDimReps(self, last_index=None):
@@ -455,7 +451,7 @@ class TypeScanner(object):
             assert len(self.dimreps) == i,'DimReps not requested in order'
             d = DimRep(self, i)
             if self.detector.count_elem:
-                d.processLengths(sparse_arrays.PosSparse([], shape=(self.detector.count_elem,)), has_missing=True)
+                d.processLengths(sparse_arrays.FullSparse([Missing] * self.detector.count_elem), has_missing=True)
             self.detector.dim_eq.registerDimRep(d)
             self.dimreps.append(d)
         return self.dimreps[i]
@@ -484,8 +480,7 @@ TypeScanner.parentcls = AnyScanner
 
 
 class TupleScanner(TypeScanner):
-    good_cls = set([tuple, None.__class__, MissingType])
-    convertor=convertors.TupleConvertor
+    good_cls = set([tuple, MissingType])
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -495,16 +490,13 @@ class TupleScanner(TypeScanner):
     def getType(self):
         fieldnames = ['f' + str(i) for i in xrange(self.max_len)]
         subtypes = tuple([self.getSubDetector(i).getType() for i in xrange(self.max_len)])
-        cv = self.convertor(self.detector.objectclss.copy()) 
-        need_conversion = self.min_len < self.max_len
-        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, need_conversion=need_conversion, convertor=cv)
-
+        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames)
     
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
             return False
 
-        l = seq.map(len, otype=int, out_empty=0, has_missing=self.detector.hasMissing())
+        l = seq.map(len, out_empty=0, has_missing=self.detector.hasMissing(), otype=int)
 
         maxlen = l.max(out_empty=0)
         minlen = l.min(out_empty=self.min_len)
@@ -515,9 +507,9 @@ class TupleScanner(TypeScanner):
             d = self.getSubDetector(i)
             f = operator.itemgetter(i)
             if i < self.min_len:
-                subseq = seq.map(f, otype=object, out_empty=Missing)
+                subseq = seq.map(f, has_missing=self.detector.hasMissing())
             else:
-                subseq = seq.sparse_filter(l > i).map(f, out_empty=Missing, otype=object, has_missing=True)
+                subseq = seq.tomissing_filter(l > i).map(f, out_empty=Missing, otype=object, has_missing=True)
             d.processSeq(subseq)
         return True
 registerTypeScanner(TupleScanner)
@@ -525,7 +517,6 @@ registerTypeScanner(TupleScanner)
 
 class NamedTupleScanner(TypeScanner):
     bad_cls = set([tuple])
-    convertor=convertors.NamedTupleConvertor
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -534,15 +525,14 @@ class NamedTupleScanner(TypeScanner):
     def getType(self):
         fieldnames = [name for name in self.names]
         subtypes = tuple([self.getSubDetector(name).getType() for name in self.names])
-        cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, need_conversion=True, convertor=cv)
+        return rtypes.TypeAttr(self.detector.hasMissing(), subtypes, fieldnames)
 
     def scan(self, seq):
         if self.bad_cls.issubset(self.detector.objectclss):
             return False
 
         for cls in self.detector.objectclss:
-            if cls is None.__class__ or cls is MissingType:
+            if cls is MissingType:
                 continue
             if not(issubclass(cls, tuple) and hasattr(cls, '_fields')):
                 return False
@@ -561,8 +551,7 @@ class NamedTupleScanner(TypeScanner):
 registerTypeScanner(NamedTupleScanner)
 
 class DictScanner(TypeScanner):
-    good_cls = set([dict, None.__class__, MissingType])
-    convertor=convertors.DictConvertor
+    good_cls = set([dict, MissingType])
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -571,16 +560,18 @@ class DictScanner(TypeScanner):
     def getType(self):
         fieldnames = [name for name in self.names]
         subtypes = tuple([self.getSubDetector(name).getType() for name in self.names])
-        cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames, need_conversion=True, convertor=cv)
+        return rtypes.TypeFieldDict(self.detector.hasMissing(), subtypes, fieldnames)
 
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
             return False
 
         for elem in seq:
-            if not (elem is Missing or elem is None):
+            if not (elem is Missing):
                 self.names.update(elem.keys())
+
+        if(len(self.names) > 100):
+            return False
 
         for name in self.names:
             d = self.getSubDetector(name)
@@ -597,9 +588,8 @@ registerTypeScanner(DictScanner)
 
 
 class ContainerScanner(TypeScanner):
-    good_cls = set([set, frozenset, None.__class__, MissingType, list, array.array, numpy.ndarray, sparse_arrays.FullSparse, sparse_arrays.PosSparse])
+    good_cls = set([set, frozenset, MissingType, list, array.array, numpy.ndarray])
     bad_cls = set([tuple, str, numpy.string_])
-    convertor=convertors.ArrayConvertor
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -607,10 +597,8 @@ class ContainerScanner(TypeScanner):
 
     def getType(self):
         subtype = self.getSubDetector().getType()
-        
         dims = dimpaths.DimPath(*[self.getDimRep(i).dim for i in xrange(self.min_dim)])
-        cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeArray(self.detector.hasMissing(), dims, (subtype,), need_conversion=True, convertor=cv)
+        return rtypes.TypeArray(self.detector.hasMissing(), dims, (subtype,))
 
     def scan(self, seq):
         has_missing = self.detector.hasMissing()
@@ -623,8 +611,9 @@ class ContainerScanner(TypeScanner):
                     return False
 
             l = seq.map(operator.isSequenceType, otype=bool, out_empty=True, has_missing=has_missing)
-            if not l.all():
+            if not l.all(has_missing=False):
                 return False
+        
         if(self.min_dim == 1):
             dr = self.getDimRep(0)
             nelems = seq.map(getnelem, otype=object, out_empty=Missing, has_missing=has_missing)
@@ -635,30 +624,36 @@ class ContainerScanner(TypeScanner):
             min_dim = shapelens.min(has_missing=has_missing)
             max_dim = shapelens.max(has_missing=has_missing)
 
-            if self.min_dim is None:
-                self.min_dim = min_dim
+            if(min_dim is Missing or max_dim is Missing):
+                if(self.min_dim):
+                    for i in xrange(self.min_dim):
+                        dr = self.getDimRep(i)
+                        dr.processLengths(shapelens, has_missing=has_missing)
             else:
-                if min_dim < self.min_dim:
-                    self.reduceDimReps(min_dim)
-
-            for i in xrange(self.min_dim):
-                dr = self.getDimRep(i)
-                if i == self.min_dim and self.min_dim < max_dim:
-                    red = numpy.multiply.reduce
-                    def reduceshape(shape):
-                        return red(shape[i:])
-                    f = reduceshape
+                if self.min_dim is None:
+                    self.min_dim = min_dim
                 else:
-                    f = operator.itemgetter(i)
-                nelems = shapes.map(f, otype=object, out_empty=Missing, has_missing=has_missing)
-                dr.processLengths(nelems.ravel(), has_missing=has_missing)
+                    if min_dim < self.min_dim:
+                        self.reduceDimReps(min_dim)
+
+                for i in xrange(self.min_dim):
+                    dr = self.getDimRep(i)
+                    if i == self.min_dim and self.min_dim < max_dim:
+                        red = numpy.multiply.reduce
+                        def reduceshape(shape):
+                            return red(shape[i:])
+                        f = reduceshape
+                    else:
+                        f = operator.itemgetter(i)
+                    nelems = shapes.map(f, otype=object, out_empty=Missing, has_missing=has_missing)
+                    dr.processLengths(nelems.ravel(), has_missing=has_missing)
         
         d = self.getSubDetector()
         if(self.min_dim == 1 and not has_missing):
             d.processSeq(list(chain(*seq.ravel())))
         else: 
             for subseq in seq.ravel():
-                if not (subseq is Missing or subseq is None):
+                if not (subseq is Missing):
                     d.processSeq(subseq)
         return True
 
@@ -694,15 +689,13 @@ class OuterContainerScanner(ContainerScanner):
 
 class SetScanner(ContainerScanner):
     parentcls = ContainerScanner
-    good_cls = set([set, frozenset, None.__class__, MissingType])
-    convertor=convertors.SetConvertor
+    good_cls = set([set, frozenset, MissingType])
 
     def getType(self):
         subtype = self.getSubDetector().getType()
         dim = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
         dims = dimpaths.DimPath(dim)
-        cv = self.convertor(self.detector.objectclss.copy()) 
-        return rtypes.TypeSet(self.detector.hasMissing(), dims, (subtype,), need_conversion=False, convertor=cv)
+        return rtypes.TypeSet(self.detector.hasMissing(), dims, (subtype,))
 
     def unregister(self, create_parent=False):
         parent = ContainerScanner.unregister(self, create_parent)
@@ -718,16 +711,15 @@ class SetScanner(ContainerScanner):
         
         d = self.getSubDetector()
         for subseq in seq.ravel():
-            if not (subseq is Missing or subseq is None):
+            if not (subseq is Missing):
                 d.processSeq(subseq)
         return True
 registerTypeScanner(SetScanner)
 
 
 class StringScanner(TypeScanner):
-    good_cls = set([str, unicode, None.__class__, MissingType, numpy.string_, numpy.unicode_])
+    good_cls = set([str, unicode, MissingType, numpy.string_, numpy.unicode_])
     unicode_cls = set([unicode, numpy.unicode_])
-    convertor=convertors.StringConvertor
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -745,22 +737,22 @@ class StringScanner(TypeScanner):
             d = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
 
         dims = dimpaths.DimPath(d)
-        cv = self.convertor(self.detector.objectclss.copy()) 
-        return ntype(self.detector.hasMissing(), dims, need_conversion=True, convertor=cv)
+        return ntype(self.detector.hasMissing(), dims)
 
     def scan(self, seq):
         has_missing = self.detector.hasMissing()
         if not self.detector.objectclss.issubset(self.good_cls):
             return False
-        max_nchars = seq.map(len, otype=int, out_empty=-1, has_missing=has_missing).max(has_missing=has_missing)
-        self.max_nchars = max(self.max_nchars, max_nchars)
+        if(self.max_nchars < 32):
+            max_nchars = seq.map(len, otype=int, out_empty=-1, has_missing=has_missing).max(has_missing=False)
+            self.max_nchars = max(self.max_nchars, max_nchars)
         return True
 registerTypeScanner(StringScanner)
 
 class SliceScanner(TypeScanner):
     __doc__ = 'Slice scanner'
     typecls = rtypes.TypeSlice
-    good_cls = set((slice, None.__class__, MissingType))
+    good_cls = set((slice, MissingType))
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -769,9 +761,7 @@ class SliceScanner(TypeScanner):
         if not self.detector.hasMissing():
             pass
         has_missing = self.detector.hasMissing()
-        cv = self.convertor(self.detector.objectclss.copy()) 
-
-        return self.typecls(has_missing, need_conversion=True, convertor=cv)
+        return self.typecls(has_missing)
 
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
@@ -782,20 +772,17 @@ registerTypeScanner(SliceScanner)
 class NumberScanner(TypeScanner):
     __doc__ = 'Number scanner, accepts all number objects.'
     typecls = rtypes.TypeNumber
-    good_cls = set((bool, float, complex, long, int, None.__class__, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.float32, numpy.float64, numpy.complex64, numpy.complex128, numpy.bool_, MissingType))
+    good_cls = set((bool, float, complex, long, int, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.float32, numpy.float64, numpy.complex64, numpy.complex128, numpy.bool_, MissingType))
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
         self.has_nan = False
-        self.has_missing = False
 
     def getType(self):
         if not self.detector.hasMissing():
             pass
-        has_missing = self.detector.hasMissing() or self.has_missing
-        cv = self.convertor(self.detector.objectclss.copy()) 
-
-        return self.typecls(has_missing, need_conversion=True, convertor=cv)
+        has_missing = self.detector.hasMissing() or self.has_nan
+        return self.typecls(has_missing)
 
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
@@ -810,7 +797,7 @@ class RealScanner(NumberScanner):
     __doc__ = 'Real scanner, accepts all real and integer objects.'
     parentcls = NumberScanner
     typecls = rtypes.TypeReal64
-    good_cls = set((float, bool, None.__class__, numpy.float32, numpy.float64, MissingType, long, int, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.bool_))
+    good_cls = set((float, bool, numpy.float32, numpy.float64, MissingType, long, int, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.bool_))
 registerTypeScanner(RealScanner)
 
 
@@ -821,7 +808,7 @@ class IntegerScanner(TypeScanner):
     istepvals = [128, 32768, 2147483648L, 9223372036854775808L]
     inttypes = [rtypes.TypeInt8, rtypes.TypeInt16, rtypes.TypeInt32, rtypes.TypeInt64]
     
-    good_cls = set((bool, long, int, None.__class__, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.bool_, MissingType))
+    good_cls = set((bool, long, int, numpy.int8, numpy.int16, numpy.int32, numpy.int64, numpy.uint8, numpy.uint16, numpy.uint32, numpy.uint64, numpy.bool_, MissingType))
     
     numpy_minmax = {numpy.dtype('bool'): (0, 1), numpy.dtype('int8'): (-128, 127), numpy.dtype('uint8'): (0, 255), numpy.dtype('int16'): (-32768, 32767), numpy.dtype('uint16'): (0, 65535), numpy.dtype('int32'): (-2147483648, 2147483647), numpy.dtype('uint32'): (0, 4294967295L), numpy.dtype('int64'): (-9223372036854775808L, 9223372036854775807L), numpy.dtype('uint64'): (0, 18446744073709551615L)}
     array_minmax = {'b': (-128, 127), 'B': (0, 255), 'h': (-32768, 32767), 'H': (0, 65535), 'i': (-2147483648, 2147483647), 'I': (0, 4294967295L), 'l': (-2147483648, 2147483647), 'L': (0, 4294967295L)}
@@ -830,28 +817,20 @@ class IntegerScanner(TypeScanner):
         TypeScanner.__init__(self, detector)
         self.max_val = 0
         self.min_val = 0
-        self.has_missing = False
 
     def getType(self):
         out_type = rtypes.TypeInteger
-        bits = platform.architecture()[0]
-        if(bits == "32bit" and self.max_val < 2147483648L and self.min_val > -2147483648L):
-            out_type = rtypes.TypeInt32
-        elif(bits == "64bit" and self.max_val < 9223372036854775808L and self.min_val > -9223372036854775808L):
-            out_type = rtypes.TypeInt64
+        if self.min_val >= 0:
+            for stepval, rtype in zip(self.ustepvals, self.uinttypes):
+                if self.max_val < stepval:
+                    out_type = rtype
+                    break
         else:
-            if self.min_val >= 0:
-                for stepval, rtype in zip(self.ustepvals, self.uinttypes):
-                    if self.max_val < stepval:
-                        out_type = rtype
-                        break
-            else:
-                for stepval, rtype in zip(self.istepvals, self.inttypes):
-                    if -self.min_val <= stepval and self.max_val < stepval:
-                        out_type = rtype
-                        break
-        cv = self.convertor(self.detector.objectclss.copy()) 
-        return out_type(self.detector.hasMissing() or self.has_missing, need_conversion=True, convertor=cv)
+            for stepval, rtype in zip(self.istepvals, self.inttypes):
+                if -self.min_val <= stepval and self.max_val < stepval:
+                    out_type = rtype
+                    break
+        return out_type(self.detector.hasMissing())
 
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
@@ -864,54 +843,20 @@ class IntegerScanner(TypeScanner):
         elif len(seq) == 0:
             minmax = (0, 0)
         else:
-            minmax = (seq.min(out_empty=0), seq.max(out_empty=0))
+            minmax = (0,0)
+            for cls in self.detector.objectclss:
+                if cls is MissingType:
+                    continue
+                tminmax = self.numpy_minmax[numpy.dtype(int)]
+                minmax = (min(tminmax[0],minmax[0]),max(tminmax[1],minmax[1]))
 
         self.min_val = min(minmax[0], self.min_val)
         self.max_val = max(minmax[1], self.max_val)
         return True
 registerTypeScanner(IntegerScanner)
 
-
 class BoolScanner(TypeScanner):
     parentcls = IntegerScanner
     typecls = rtypes.TypeBool
-    good_cls = set((numpy.bool_, bool, None.__class__, MissingType))
+    good_cls = set((numpy.bool_, bool, MissingType))
 registerTypeScanner(BoolScanner)
-
-
-class StringRealScanner(RealScanner):
-    good_cls = set([str, unicode, None.__class__, MissingType, numpy.string_, numpy.unicode_])
-    parentcls = StringScanner
-    convertor=convertors.FloatConvertor
-
-    def scan(self, seq):
-        has_missing = self.detector.hasMissing()
-        if not self.detector.objectclss.issubset(self.good_cls):
-            return False
-        try:
-            float_vals = [float(elem) for elem in seq if elem != "" and not elem is Missing]
-            if(len(float_vals) < len(seq)):
-                self.has_missing = True
-        except ValueError:
-            return False
-        return RealScanner.scan(self, float_vals)
-registerTypeScanner(StringRealScanner)
-
-class StringIntegerScanner(IntegerScanner):
-    good_cls = set([str, unicode, None.__class__, MissingType, numpy.string_, numpy.unicode_])
-    parentcls = StringRealScanner
-    convertor=convertors.IntegerConvertor
-
-    def scan(self, seq):
-        has_missing = self.detector.hasMissing()
-        if not self.detector.objectclss.issubset(self.good_cls):
-            return False
-        try:
-            int_vals = [int(elem) for elem in seq if elem]
-            if(len(int_vals) < len(seq)):
-                self.has_missing = True
-            int_vals = sparse_arrays.FullSparse(cutils.darray(int_vals))
-        except ValueError:
-            return False
-        return IntegerScanner.scan(self, int_vals)
-registerTypeScanner(StringIntegerScanner)

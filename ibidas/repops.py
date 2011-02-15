@@ -129,6 +129,3 @@ def apply_slice(slices, slicecls, dim_selector, *params, **kwds):
 def frozen(slices):
     return apply_slice(slices, ops.ensure_frozen, None)
 
-def converted(slices):
-    return apply_slice(slices, ops.ensure_converted, None)
-

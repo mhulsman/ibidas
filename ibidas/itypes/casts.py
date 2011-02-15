@@ -100,3 +100,5 @@ def simDefault(intype, outtypecls):
 
 addCasts(rtypes.TypeNumbers, rtypes.TypeNumbers, checkDefault, simDefault,"numbers_numbers")
 addCasts(rtypes.TypeAll, rtypes.TypeAny, checkDefault, simDefault,"to_any")
+addCasts(rtypes.TypeStrings, rtypes.TypeIntegers, checkDefault, simDefault,"string_to_int")
+addCasts(rtypes.TypeStrings, rtypes.TypeReals, checkDefault, simDefault,"string_to_real")

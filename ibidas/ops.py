@@ -458,28 +458,13 @@ class PackListOp(PackArrayOp):#{{{
 
     def __init__(self, pslice):
         PackArrayOp.__init__(self, pslice, 1)
-        self.type._setNeedConversion(True)
         #}}}
-
-class ConvertOp(UnaryUnaryOp):#{{{
-    __slots__ = ["convertor"]
-
-    def __init__(self, slice):
-        if(slice.type == rtypes.unknown):
-            ntype = rtypes.TypeAny(True)
-        else:
-            assert slice.type._needConversion(), "Op does not need conversion"
-            ntype = slice.type._setNeedConversion(False)
-
-        self.convertor = slice.type._getConvertor()
-        UnaryUnaryOp.__init__(self, slice, rtype=ntype)#}}}
 
 class ToPythonOp(UnaryUnaryOp):
     __slots__ = []
 
     def __init__(self, pslice):
         ntype = pslice.type.copy()
-        ntype._setNeedConversion(True)
         UnaryUnaryOp.__init__(self, pslice, rtype=ntype)#}}}
         
 
@@ -491,12 +476,6 @@ class FreezeOp(UnaryUnaryOp):#{{{
 def ensure_frozen(slice):#{{{
     if(freeze_protocol.needFreeze(slice.type)):
         return FreezeOp(slice)
-    else:
-        return slice#}}}
-
-def ensure_converted(slice):#{{{
-    if(slice.type._needConversion()):
-        return ConvertOp(slice)
     else:
         return slice#}}}
 

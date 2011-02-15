@@ -7,12 +7,14 @@ predefined_sources = Pre()
 
 
 def yeast_orfs():
-    rtype = "[orfs:*]<(sgdid=bytes, feat_type=bytes, feat_qual=bytes, feat_name=bytes, gene_name=bytes, gene_aliases=bytes, feat_parent_name=bytes, sgdid_alias=bytes, chromosome=bytes, start=int32$, stop=int32$, strand=bytes[1], genetic_pos=real64$, coordinate_version=bytes[10], sequence_version=bytes, description=bytes)"
+    rtype = "[orfs:*]<(sgdid=bytes, feat_type=bytes, feat_qual=bytes, feat_name=bytes, gene_name=bytes, gene_aliases=bytes, feat_parent_name=bytes, sgdid_alias=bytes, chromosome=bytes, start=bytes, stop=bytes, strand=bytes[1], genetic_pos=bytes, coordinate_version=bytes[10], sequence_version=bytes, description=bytes)"
     res = read(download.get("http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab"),dtype=rtype)
 
     splitfunc = lambda x: x.split("|")
     outtype = "[aliases:~]<bytes"
-    res = res.to(_.gene_aliases, do=_.each(splitfunc, dtype=outtype).elements())
+    res = res.to(_.gene_aliases,  do=_.each(splitfunc, dtype=outtype).elements()[_ != ""])
+    res = res.to(_.start, _.stop, do=_.cast("int$"))
+    res = res.to(_.genetic_pos,   do=_.cast("real64$"))
     return res.copy()
 predefined_sources.register(yeast_orfs)  
 

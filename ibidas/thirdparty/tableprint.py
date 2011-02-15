@@ -2,6 +2,7 @@
 
 import cStringIO,operator
 import numpy
+from ..utils import util
 
 def calc_width(rows):
     width = numpy.zeros((len(rows),len(rows[0])),dtype=int)
@@ -20,7 +21,17 @@ def advise_splits(console_width, rows_width, border_width, mincol_width=40):
 def optimize_width(console_width, rows_width, border_width):
     nrows_width = rows_width.copy()
     while (nrows_width.sum() + border_width * (len(nrows_width) - 1)) > console_width:
-        nrows_width[nrows_width == nrows_width.max()] -= 1
+        maxval = nrows_width.max()
+        nmax = (nrows_width == maxval).sum()
+        rem_lengths = nrows_width[nrows_width != nrows_width.max()]
+        tomuch = nrows_width.sum() + border_width * (len(nrows_width) - 1) - console_width
+        perrow = numpy.ceil(tomuch / float(nmax))
+
+        if(len(rem_lengths) == 0):
+            nrows_width -= perrow
+        else:
+            next_maxval = rem_lengths.max()
+            nrows_width[nrows_width == maxval] -= min(perrow, maxval - next_maxval)
     return nrows_width
 
 def perform_split(rows_width, border_width, consolewidth):
