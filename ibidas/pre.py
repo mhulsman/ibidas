@@ -67,12 +67,14 @@ def string_interactions(dburl, species="Saccharomyces cerevisiae"):
 
     """
     z = connect(dburl)
-    inter = z.items.species.match(z.network.protein_protein_links)
-    inter = inter[_.official_name == species]
     pyeast = z.items.proteins 
-    inter = inter.match(pyeast//"left",_.protein_id_a, _.protein_id)
-    inter = inter.match(pyeast//"right",_.protein_id_b, _.protein_id)
-    return inter.get(_.Bleft.preferred_name/"left", _.Bright.preferred_name/"right", _.combined_score)%"interactions"
+    inter  = z.items.species.match(z.network.protein_protein_links)
+    inter  = inter[_.official_name == species]
+    inter  = inter.match(pyeast//"left", _.protein_id_a, _.protein_id)
+    inter  = inter.match(pyeast//"right",_.protein_id_b, _.protein_id)
+    return inter.get(_.Bleft.preferred_name/"left", 
+                     _.Bright.preferred_name/"right", 
+                     _.combined_score) % "interactions"
 predefined_sources.register(string_interactions)
 
 
@@ -87,10 +89,11 @@ def omim_genemap():
     res = res.to(_.gene_symbol,  do=_.each(splitfunc, dtype=outtype).elements()[_ != ""])
     
     outtype = "[methods:~]<bytes"
-    res = res.to(_.method,  do=_.each(splitfunc, dtype=outtype).elements()[_ != ""])
+    res = res.to(_.method,       do=_.each(splitfunc, dtype=outtype).elements()[_ != ""])
     
     res = res.get( _.get(_.disease1, _.disease2, _.disease3).harray("diseases").elements()[_ != " "]/"disease", "~")
-    return res.without(_.f8, _.f12, _.disease1, _.disease2, _.disease3).copy()
+    res = res.without(_.f8, _.f12, _.disease1, _.disease2, _.disease3)
+    return res.copy()
 predefined_sources.register(omim_genemap)
 
 
