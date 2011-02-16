@@ -25,20 +25,13 @@ setup(
 		    extra_compile_args=["-Wall"]
 	    ),
         Extension(
-            'ibidas.utils.base_container', 
-            ['src/base_container.c'],
+            'ibidas.utils.cutils', 
+            ['src/cutils.c'], 
             include_dirs=[include_dir],
             extra_compile_args=["-Wall"]
         ),
-        Extension(
-            'ibidas.utils.cutils', 
-            ['src/SFMT.c','src/cutils.c'], 
-            include_dirs=[include_dir],
-            extra_compile_args=["-Wall", "-ggdb3", "-O3", "-msse2", "-DHAVE_SSE2","-DMEXP=19937"]
-#            extra_compile_args=["-Wall", "-O3", "-msse2","-msse4.2", "-DHAVE_SSE2","-DMEXP=19937"]
-        ),
      ],
-     install_requires=['numpy','sqlalchemy','ipython'],
+     install_requires=['numpy>=1.5.1','sqlalchemy>=0.6.4','ipython>=0.10.1','sphinx>=1.0.5'],
 
 
 )

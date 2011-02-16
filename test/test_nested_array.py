@@ -74,7 +74,7 @@ class TestMatrix(TestArray):
        f1 = rep(self.data)
        #backward
        while(f1.Idepth >= 2):
-            f1 = f1.flat()
+            f1 = f1.flat(None)
        #forward
        f2 = rep(self.data)
        while(f2.Idepth >= 2):

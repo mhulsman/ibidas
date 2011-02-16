@@ -481,19 +481,7 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
 
     #SQL VALUE
     def eatValue(self, node):#{{{
-        targets = [edge.target for edge in self.graph.edge_source[node]]
-        if(len(targets) == 1 and isinstance(targets[0], ops.ConvertOp)):
-            target = targets[0]
-            edge = self.graph.getEdge(node, target)
-            self.graph.dropEdge(edge)
-
-            etargets = list(self.graph.edge_source[target])
-            for edge in etargets:
-                self.graph.addEdge(SQLResultEdge(node, edge.target, edge, 0))
-            
-            self.next_round.add(node)
-        else:
-            return self.expressionEat(node)#}}}
+        return self.expressionEat(node)#}}}
 
     #EXPRESSIONS
     def expressionEatElement(self, node):#{{{
