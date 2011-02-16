@@ -4,8 +4,15 @@ ez_setup.use_setuptools()
 
 from setuptools import setup,find_packages,Extension
 import distutils.sysconfig
+import os.path
 
-include_dir = distutils.sysconfig.get_python_lib() + "/numpy/core/include"
+include_dir = distutils.sysconfig.get_python_lib() + "/numpy/core/include/"
+if(not os.path.isfile(os.path.join(include_dir, "numpy/arrayobject.h"))):
+    #print os.path.join(include_dir, "numpy/arrayobject.h")
+    include_dir = include_dir.replace('lib', 'lib64')
+    if(not os.path.isfile(os.path.join(include_dir, "numpy/arrayobject.h"))):
+        #print os.path.join(include_dir, "numpy/arrayobject.h")
+        raise RuntimeError, 'numpy array headers not found'
 
 setup(
     name="Ibidas",
