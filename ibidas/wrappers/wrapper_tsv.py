@@ -12,8 +12,8 @@ _delay_import_(globals(),"..utils","nested_array","util")
 
 class TSVRepresentor(wrapper.SourceRepresentor):
     def __init__(self, filename, dialect=False, skiprows=-1, dtype=rtypes.unknown, fieldnames=None):
-        file = open(filename)
-
+        file = util.open_file(filename)
+   
         #determine dialect, create csv parser
         if(dialect is False):
             lines = []
@@ -118,7 +118,7 @@ class TSVOp(ops.ExtendOp):
         ops.ExtendOp.__init__(self,name=name,rtype=rtype)
 
     def py_exec(self):
-        file = open(self.filename)
+        file = util.open_file(self.filename)
         file.seek(self.startpos)
 
         if(issubclass(self.dialect, csv.Dialect)):

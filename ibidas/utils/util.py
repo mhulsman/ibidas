@@ -277,4 +277,10 @@ class farray(numpy.ndarray):
         return res
 
 
-
+def open_file(filename):
+    if(filename.endswith("gz")):
+        import gzip
+        file = gzip.open(filename)
+    else:
+        file = open(filename)
+    return file

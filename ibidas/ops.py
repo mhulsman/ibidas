@@ -107,10 +107,16 @@ class ChangeNameOp(UnaryUnaryOp):#{{{
     def __init__(self,source, new_name):
         UnaryUnaryOp.__init__(self, source, name=new_name)#}}}
 
+class ChangeDimOp(UnaryUnaryOp):#{{{
+    __slots__ = []
+    def __init__(self,source, pos, ndim):
+        ndims,ntype = source.dims.updateDim(pos, ndim, source.type)
+        UnaryUnaryOp.__init__(self, source, rtype=ntype,dims=ndims)#}}}
+
 class ChangeDimPathOp(UnaryUnaryOp):#{{{
     __slots__ = []
-    def __init__(self,source, new_dims):
-        UnaryUnaryOp.__init__(self, source, dims=new_dims)#}}}
+    def __init__(self,source, ndims):
+        UnaryUnaryOp.__init__(self, source, dims=ndims)#}}}
 
 class CastOp(UnaryUnaryOp):#{{{
     __slots__ = ["cast_name"]

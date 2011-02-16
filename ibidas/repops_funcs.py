@@ -213,32 +213,39 @@ class BinaryFuncElemOp(BinaryFuncOp):
             mode = "pos"
         else:
             mode = "dim"
-
+        
         nslices = []
         nslice = max(len(lsource._slices), len(rsource._slices))
         for pos, binslices in enumerate(util.zip_broadcast(lsource._slices, rsource._slices)):
-            binslices = self._prepareSlices(*binslices)
-            (lslice,rslice),plans = ops.broadcast(binslices,mode)
-            sig, nkwargs, outparam = self._findSignature(left=lslice,right=rslice,**kwargs)
-            if(isinstance(outparam, rtypes.TypeUnknown)):
-                if(binslices[0].name == binslices[1].name):
-                    name = binslices[0].name
-                elif(binslices[0].name == "data"):
-                    name = binslices[1].name
-                elif(binslices[1].name == "data"):
-                    name = binslices[0].name
-                else:
-                    name = "result"
-                outparam = Param(name, outparam)
-            state &= outparam.state_mask
-            if(nslice > 1):
-                outparam = outparam.withNumber(pos)
-            s = ops.BinFuncElemOp(self.__class__.__name__, sig,\
-                         outparam, allow_partial_bc=self._allow_partial_bc, **nkwargs)
-            nslices.append(s)
-        return self._initialize(tuple(nslices),state)
+            if(nslice <= 1):
+                pos = None
+            nslices.append(self._apply(binslices, mode, pos, **kwargs))
 
-    def _prepareSlices(self, lslice, rslice):
+        return self._initialize(tuple(nslices),RS_CHECK)
+
+    @classmethod
+    def _apply(cls, binslices, mode, pos=None, **kwargs):
+        binslices = cls._prepareSlices(*binslices)
+        (lslice,rslice),plans = ops.broadcast(binslices,mode)
+        sig, nkwargs, outparam = cls._findSignature(left=lslice,right=rslice,**kwargs)
+        if(isinstance(outparam, rtypes.TypeUnknown)):
+            if(binslices[0].name == binslices[1].name):
+                name = binslices[0].name
+            elif(binslices[0].name == "data"):
+                name = binslices[1].name
+            elif(binslices[1].name == "data"):
+                name = binslices[0].name
+            else:
+                name = "result"
+            outparam = Param(name, outparam)
+        if(not pos is None):
+            outparam = outparam.withNumber(pos)
+        s = ops.BinFuncElemOp(cls.__name__, sig,\
+                        outparam, allow_partial_bc=cls._allow_partial_bc, **nkwargs)
+        return s
+
+    @classmethod
+    def _prepareSlices(cls, lslice, rslice):
         return (lslice,rslice)
 
 
@@ -256,6 +263,7 @@ within_sig = WithinSignature("within")
 
 class Within(BinaryFuncElemOp):
     _sigs = [within_sig]
+    @classmethod
     def _prepareSlices(self,lslice,rslice):
         return (lslice, ops.PackArrayOp(rslice,1))
 

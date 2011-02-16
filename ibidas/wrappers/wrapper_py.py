@@ -202,6 +202,9 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def visitChangeBookmarkOp(self,node,slice):
         return slice.modify(bookmarks=node.bookmarks)
+    
+    def visitChangeDimOp(self,node,slice):
+        return slice.modify(rtype=node.type,dims=node.dims)
 
     def visitDetectTypeOp(self,node,slice):
         if(slice.type == rtypes.unknown):

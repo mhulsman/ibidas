@@ -353,3 +353,49 @@ class Match(repops.MultiOpRep):
         return self._initialize(tuple(nslices),lsource._state & rsource._state)
 
 
+class Stack(repops.MultiOpRep):
+    def __init__(self, *sources, **kwargs):
+        repops.MultiOpRep.__init__(self,sources, **kwargs)
+
+    def _process(self, sources, dim=None):
+        state = reduce(operator.__and__,[source._state for source in sources])
+        if not state & RS_SLICES_KNOWN:
+            return
+
+        slicelens = set([len(source._slices) for source in sources])
+        assert len(slicelens) == 1, "Sources of stack should have same number of slices"
+        nslice = slicelens.pop()
+
+        seldimpaths = [] 
+        for source in sources:
+            seldimpaths.append(dimpaths.identifyUniqueDimPathSource(source, dim))
+
+        nslices = []
+        dimdepth = []
+        ndim = None
+        slicelists = [source._slices for source in sources]
+        for slicecol in zip(*slicelists):
+            packdepths = []
+            ncol = []
+            for slice,dpath in zip(slicecol, seldimpaths):
+                lastpos = slice.dims.matchDimPath(dpath)
+                packdepths.append(len(slice.dims) - lastpos[-1])
+                ncol.append(ops.PackArrayOp(slice,packdepths[-1]))
+            
+            res = ncol[0]
+            for slice in ncol[1:]:
+                res = repops_funcs.Add._apply((res,slice),"pos")
+            dimdepth = min(packdepths)
+            res = ops.UnpackArrayOp(res,dimdepth)
+            
+            if(len(nslices) == 0):
+                ndim = res.dims[-dimdepth]
+            else:
+                res = ops.ChangeDimOp(res, len(res.dims) - dimdepth, ndim)
+            nslices.append(res)
+
+        return self._initialize(tuple(nslices),RS_CHECK)
+
+
+
+        
