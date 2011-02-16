@@ -87,27 +87,31 @@ class FilterExpression(Expression):
 
 
 class MatchExpression(Expression):
-    def getDims(self, graph):
+    def getUsedSources(self):
         sops = self.getNodesByClass(ops.SelectOp)
-        assert len(sops) == 2, "Unexpected number of select operations"
-        lsop,rsop = sops
-        if(lsop.index == 1):
-            lsop,rsop = rsop,lsop
-        
-        lfilters = [edge.target for edge in graph.edge_source[lsop]]
-        rfilters = [edge.target for edge in graph.edge_source[rsop]]
-
-        assert all([isinstance(lfilter,ops.FilterOp) for lfilter in lfilters]), "Non-filter target of select in match"
-        assert all([isinstance(rfilter,ops.FilterOp) for rfilter in rfilters]), "Non-filter target of select in match"
-
-        ldims = set([lfilter.dims for lfilter in lfilters])
-        rdims = set([rfilter.dims for rfilter in rfilters])
-        return ldims, rdims
+        res = [False,False]
+        for sop in sops:
+            res[sop.index] = True
+        return res
+       
+    def getSop(self, index):
+        sops = self.getNodesByClass(ops.SelectOp)
+        for sop in sops:
+            if sop.index == index:
+                return sop
+        else:
+            raise RuntimeError, "Could not find sop"
+    
+    def getDim(self,index, graph):
+        sop = self.getSop(index)
+        filters = [edge.target for edge in graph.edge_source[sop]]
+        assert all([isinstance(filter,ops.FilterOp) for filter in filters]), "Non-filter target of select in match"
+        dims = set([filter.dims for filter in filters])
+        return dims
 
     def getType(self):
         sops = self.getNodeByClass(ops.EquiJoinIndexOp)
         return sops.jointype
-        
     
     def getComparisonEdges(self,graph):
         jindex = self.getNodeByClass(ops.EquiJoinIndexOp)
@@ -115,21 +119,13 @@ class MatchExpression(Expression):
         redge = self.sourceDataEdge(graph.getDataEdge(jindex,pos=1),graph)
         return (ledge,redge)
 
-    def getInfo(self,graph):
-        sops = self.getNodesByClass(ops.SelectOp)
-        assert len(sops) == 2, "Unexpected number of select operations"
-        lsop,rsop = sops
-        if(lsop.index == 1):
-            lsop,rsop = rsop,lsop
-        
-        lfilters = [edge.target for edge in graph.edge_source[lsop]]
-        rfilters = [edge.target for edge in graph.edge_source[rsop]]
-        ledges = [self.sourceDataEdge(graph.getDataEdge(lfilter,0),graph) for lfilter in lfilters]
-        redges = [self.sourceDataEdge(graph.getDataEdge(rfilter,0),graph) for rfilter in rfilters]
 
-        olnodes = [self.targetDataNode(lfilter,graph) for lfilter in lfilters]
-        ornodes = [self.targetDataNode(rfilter,graph) for rfilter in rfilters]
+    def getInfo(self, index, graph):
+        sop = self.getSop(index)
+        filters = [edge.target for edge in graph.edge_source[sop]]
+        edges = [self.sourceDataEdge(graph.getDataEdge(filter,0),graph) for filter in filters]
+        onodes = [self.targetDataNode(filter,graph) for filter in filters]
 
-        return (ledges,redges,olnodes,ornodes)
+        return (edges,onodes)
 
        

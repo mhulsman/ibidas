@@ -40,3 +40,15 @@ def yeastract(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Do
     res = read(download.get(url),dtype=rtype)
     return res.copy()
 predefined_sources.register(yeastract)
+
+
+def string_interactions(dburl, species="Saccharomyces cerevisiae"):
+    z = connect(dburl)
+    inter = z.items.species.match(z.network.protein_protein_links)
+    inter = inter[_.official_name == species]
+    pyeast = z.items.proteins 
+    inter = inter.match(pyeast//"left",_.protein_id_a, _.protein_id)
+    inter = inter.match(pyeast//"right",_.protein_id_b, _.protein_id)
+    return inter.get(_.Bleft.preferred_name/"left", _.Bright.preferred_name/"right", _.combined_score)%"interactions"
+predefined_sources.register(string_interactions)
+

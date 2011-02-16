@@ -499,29 +499,52 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         pass#}}}
         
     def expressionEatMatchExpression(self, expression):
-        ldimpathset, rdimpathset = expression.getDims(self.graph)
-        if(len(ldimpathset) > 1 or len(rdimpathset) > 1):
-            return
-        if(len(ldimpathset.pop()) > 1 or len(rdimpathset.pop()) > 1):
-            return
-
+        used_sources = expression.getUsedSources()
+        
         cledge,credge = expression.getComparisonEdges(self.graph)
-        ledges,redges,olnodes,ornodes = expression.getInfo(self.graph)
-
         scledge = self.getSQLEdge(cledge)
         scredge = self.getSQLEdge(credge)
-        sledges = [self.getSQLEdge(ledge) for ledge in ledges]
-        sredges = [self.getSQLEdge(redge) for redge in redges]
-
-        lsources = list(set([sledge.source for sledge in sledges]))
-        rsources = list(set([sredge.source for sredge in sredges]))
         clsource = scledge.source
         crsource = scredge.source
 
-        if(len(lsources) > 1 or len(rsources) > 1):
-            return
-        lsource = lsources[0]
-        rsource = rsources[0]
+        if used_sources[0]:
+            dimpathset = expression.getDim(0, self.graph)
+            if(len(dimpathset) > 1 or len(dimpathset.pop()) > 1):
+                return
+        
+            ledges,olnodes = expression.getInfo(0, self.graph)
+            sledges = [self.getSQLEdge(ledge) for ledge in ledges]
+            lsources = list(set([sledge.source for sledge in sledges]))
+            if(len(lsources) > 1):
+                return
+            lsource = lsources[0]
+        else:
+            if isinstance(clsource, Query):
+                lsource = clsource
+            elif(isnstance(clsource, Column) and clsource.ref_query):
+                lsource = clsource.ref_query
+            else:
+                return
+                
+
+        if used_sources[1]:
+            dimpathset = expression.getDim(1, self.graph)
+            if(len(dimpathset) > 1 or len(dimpathset.pop()) > 1):
+                return
+            redges,ornodes = expression.getInfo(1, self.graph)
+            sredges = [self.getSQLEdge(redge) for redge in redges]
+            rsources = list(set([sredge.source for sredge in sredges]))
+            if(len(rsources) > 1):
+                return
+            rsource = rsources[0]
+        else:
+            if isinstance(crsource, Query):
+                rsource = crsource
+            elif(isnstance(crsource, Column) and crsource.ref_query):
+                rsource = crsource.ref_query
+            else:
+                return
+
         if(not lsource.conn == rsource.conn):
             return
         
@@ -532,18 +555,19 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         lcol = clsource.getColumn(scledge.pos)
         rcol = crsource.getColumn(scredge.pos)
         cond = Term(lambda x,y: x == y,lcol,rcol)
-        nqueryobj = lsources[0].join(rsources[0], cond, jointype)
+        nqueryobj = lsource.join(rsource, cond, jointype)
 
         nlcolumns = len(lsource.columns)
         self.graph.addNode(nqueryobj)
 
-        for onode, ledge in zip(olnodes,sledges):
-            for edge in self.graph.edge_source[onode]:
-                self.graph.addEdge(SQLResultEdge(nqueryobj,edge.target,edge, ledge.pos))
-        
-        for onode, redge in zip(ornodes,sredges):
-            for edge in self.graph.edge_source[onode]:
-                self.graph.addEdge(SQLResultEdge(nqueryobj,edge.target,edge, nlcolumns + redge.pos))
+        if used_sources[0]:
+            for onode, ledge in zip(olnodes,sledges):
+                for edge in self.graph.edge_source[onode]:
+                    self.graph.addEdge(SQLResultEdge(nqueryobj,edge.target,edge, ledge.pos))
+        if used_sources[1]: 
+            for onode, redge in zip(ornodes,sredges):
+                for edge in self.graph.edge_source[onode]:
+                    self.graph.addEdge(SQLResultEdge(nqueryobj,edge.target,edge, nlcolumns + redge.pos))
 
         self.next_round.add(nqueryobj)
         self.sql_obj.add(nqueryobj)
@@ -744,6 +768,7 @@ class Column(Element):#{{{
         self.table = table
         self.name = name
         self.id = id
+        self.ref_query = None
 
     def getColumn(self, pos):
         assert pos == 0, "Cannot request column past position 0 for Column object"
@@ -771,6 +796,7 @@ class Column(Element):#{{{
 class Value(Column):#{{{
     def __init__(self, data):
         self.data = data
+        self.ref_query = None
 
     def compile(self):
         return self.data
@@ -790,6 +816,11 @@ class Value(Column):#{{{
 class Term(Column):#{{{
     def __init__(self, func, *sources):
         self.sources = sources
+        rquery = set([source.ref_query for source in sources])
+        if(len(rquery) == 1):
+            self.ref_query = rquery.pop()
+        else:
+            self.ref_query = None
         self.func = func
 
     def realias(self, realias_dict):
@@ -911,7 +942,10 @@ class Query(Element):#{{{
         self.columns = cols
 
     def getColumn(self, pos):
-        return self.columns[pos]
+        c = copy.copy(self.columns[pos])
+        c.ref_query = self
+        return c
+
 
     def getColumns(self):
         return self.columns
