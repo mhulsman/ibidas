@@ -133,6 +133,18 @@ class Project(repops.UnaryOpRep):
         return self._initialize(tuple(nslices),state) 
     
 
+class Unproject(Project):
+    def _process(self, source, *args, **kwds):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+
+        selslices = Project(source, *args, **kwds)._slices
+        nslices = [slice for slice in source._slices if not slice in selslices]
+        return self._initialize(tuple(nslices),source._state) 
+
+
+
+
 class UnpackTuple(repops.UnaryOpRep):
     def _process(self,source,name="",unpack=True):
         """
@@ -280,7 +292,7 @@ class RTuple(repops.UnaryOpRep):
 
 @repops.delayable()
 class HArray(repops.UnaryOpRep):
-    def _process(self, source):
+    def _process(self, source, name=None):
         if not source._state & RS_TYPES_KNOWN:
             return
         
@@ -301,7 +313,7 @@ class HArray(repops.UnaryOpRep):
                 slice = ops.CastOp(slice,ntype)
             nnslices.append(slice)
     
-        nslice = ops.HArrayOp(nnslices)
+        nslice = ops.HArrayOp(nnslices,name=name)
 
         #initialize object attributes
         return self._initialize((nslice,),RS_ALL_KNOWN)

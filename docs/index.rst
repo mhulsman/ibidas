@@ -17,6 +17,7 @@ Contents:
    ibidas_module
    ibidas_rep
    ibidas_type
+   get_module
 
 Indices and tables
 ==================

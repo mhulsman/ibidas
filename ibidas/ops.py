@@ -590,18 +590,20 @@ class GroupIndexOp(MultiUnaryOp):#{{{
 class HArrayOp(MultiUnaryOp):#{{{
     __slots__ = []
 
-    def __init__(self, slices, field="data"):
+    def __init__(self, slices, name=None):
         cdim = set([slice.dims for slice in slices])
         assert len(cdim) == 1, "Packing tuple on slices with different dims"
         
         subtypes = [slice.type for slice in slices]
         assert len(set(subtypes)) == 1, "HArray can only be applied if types are equal"
 
-        ndim = dimensions.Dim(len(slices))
+        ndim = dimensions.Dim(len(slices), name=name)
         ntype = rtypes.TypeArray(False, dimpaths.DimPath(ndim), (subtypes[0],))
 
         nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
-        MultiUnaryOp.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)#}}}
+
+        slicename = "_".join([slice.name for slice in slices])
+        MultiUnaryOp.__init__(self, slices, name=slicename, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)#}}}
 
 class FixateOp(MultiUnaryOp):
     __slots__ = []

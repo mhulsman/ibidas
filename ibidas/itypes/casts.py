@@ -1,6 +1,6 @@
 import operator
 from collections import defaultdict, Iterable
-
+from ..constants import *
 import rtypes
 
 in_type_casts = defaultdict(list)
@@ -98,7 +98,19 @@ def simDefault(intype, outtypecls):
     return outtypecls(intype.has_missing)
 
 
+def checkString(intype, outtype):#{{{
+    if(intype.has_missing and not outtype.has_missing):
+        return False
+
+    if not intype.dims[0].shape == UNDEFINED and not outtype.dims[0].shape == UNDEFINED:
+        return False
+    return True
+
+def simString(intype, outtypecls):
+    return intype
+
 addCasts(rtypes.TypeNumbers, rtypes.TypeNumbers, checkDefault, simDefault,"numbers_numbers")
 addCasts(rtypes.TypeAll, rtypes.TypeAny, checkDefault, simDefault,"to_any")
 addCasts(rtypes.TypeStrings, rtypes.TypeIntegers, checkDefault, simDefault,"string_to_int")
 addCasts(rtypes.TypeStrings, rtypes.TypeReals, checkDefault, simDefault,"string_to_real")
+addCasts(rtypes.TypeBytes, rtypes.TypeBytes, checkString, simString,"string_to_string")

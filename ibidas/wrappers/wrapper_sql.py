@@ -244,7 +244,7 @@ class Connection(object):
         tabledict = {}
         for table in tables.values():
             t = TableRepresentor(self.engine, table).elements().attributes()
-            tabledict[table.name] = t
+            tabledict[table.name] = t//str(table.name)
         self.tabledict = tabledict 
 
         if(not schemaname):

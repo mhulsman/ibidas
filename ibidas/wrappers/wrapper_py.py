@@ -128,6 +128,7 @@ class ResultOp(ops.DataOp):
     def setSource(self,source):
         self.source = source
         self.bookmarks = source.bookmarks
+        self.name = source.name
 
     def __repr__(self):
         return  "\nName: " + str(self.name) + ", Type:   " + str(self.type) + ", Dims: " + str(self.dims) + \
@@ -439,6 +440,9 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
         return slice.data.mapseq(lambda x: func(x,dtype),res_type=node.type)
     
+    def caststring_to_string(self, castname, node, slice):
+        return slice.data
+   
     def caststring_to_real(self, castname, node, slice):
         if(node.type.has_missing):
             func = string_to_real_missing

@@ -574,10 +574,10 @@ class Representor(Node):
         """
         return repops_dim.SplitDim(self,lshape,rshape,lname,rname,dimsel)
 
-    def harray(self):
+    def harray(self, name=None):
         """Combines slices into array.
         """
-        return repops_slice.HArray(self)
+        return repops_slice.HArray(self, name=name)
 
     def getShape(self):
         """Returns shape of all dimensions as slices in a representor object"""
@@ -813,6 +813,9 @@ class Representor(Node):
 
         """
         return repops_slice.Project(self,*slices,**kwds)
+
+    def without(self, *slices):
+        return repops_slice.Unproject(self,*slices)
 
     def elements(self, name=None):
         """Unpacks array type into dimension"""
