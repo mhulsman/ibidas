@@ -59,6 +59,10 @@ class LocalRequestHandler(object):
 
         return True
 
+    def set(self, name, value, sessionid=-1):
+        session = getSession(self, sessionid)
+        session[name] = value
+
 
 def getGlobals():
     if '__IPYTHON__active' in globals()['__builtins__']:
