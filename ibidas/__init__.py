@@ -15,7 +15,8 @@ __all__ = ["rep","read","connect","_",
            "bcast","createType",
            "newdim","Missing",
            "corr","within","contains",
-           "download","get"
+           "download","get",
+           "startServer"
            ]
 
 from utils import delay_import
@@ -36,12 +37,11 @@ from repops_funcs import argsort, pos, Any as rany, All as rall,\
                          Corr as corr
 from download_cache import DownloadCache
 from pre import predefined_sources as get
+from server import startServer
 
 download = DownloadCache()
 within = Infix(repops_funcs.Within)
 contains = RevInfix(repops_funcs.Within)
-
-
 
 def read(url, **kwargs):
     format = kwargs.pop('format','tsv')

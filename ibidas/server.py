@@ -4,6 +4,38 @@ from representor import Representor
 import thread
 
 def startServer(portnumber=9889):
+    """Starts xml-rpc server on the supplied port number. Can be used to contact ibidas
+       from other applications.
+       
+       XML-RPC interface:
+
+       * startSession() (optional): create session namespace, returns sessionid
+
+       * closeSession(sessionid): closes specified session
+
+       * query(query, sessionid=-1): executes query string in session, returns result.
+       
+       * execute(query, sessionid=-1): exexutes query string in session
+
+       * set(name, val, sessionid=-1): sets variable in session
+        
+       The default session id of -1 gives direct contact with the ibidas command line session
+
+       Starting the server::
+           
+           $ ibidas
+           >>> s = startServer()
+           >>> z = rep([1,2,3,4])
+      
+       Connecting to ibidas (python, but can be any other application supporting xml-rpc)::
+           $ipython
+           >>> import xmlrpclib
+           >>> s = xmlrpclib.ServerProxy("http://localhost:9889")
+           >>> s.query("z + 4")
+           [4,5,6,7]
+
+       """
+
     s = SimpleXMLRPCServer.SimpleXMLRPCServer(("localhost",portnumber),allow_none=True,bind_and_activate=False, logRequests=False)
     s.allow_reuse_adress = True
     s.server_bind()
