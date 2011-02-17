@@ -479,8 +479,8 @@ class TypeTuple(TypeAny):#{{{
         return res
 addType(TypeTuple)#}}}
 
-class TypeFieldDict(TypeTuple):#{{{
-    name = "dict"
+class TypeRecordDict(TypeTuple):#{{{
+    name = "record_dict"
 
     def __repr__(self):
         res = '{' 
@@ -495,7 +495,7 @@ class TypeFieldDict(TypeTuple):#{{{
             res += "$"
         return res
 
-addType(TypeFieldDict)#}}}
+addType(TypeRecordDict)#}}}
 
 #pylint: disable-msg=E1101
 class TypeArray(TypeAny):#{{{
@@ -818,10 +818,9 @@ class TypeBytes(TypeString):#{{{
     _defval = b""
 addType(TypeBytes)#}}}
 
-
-class TypePickle(TypeBytes):
+class TypePickle(TypeBytes):#{{{
     name = "pickle"
-addType(TypePickle)
+addType(TypePickle)#}}}
 
 class TypeScalar(TypeAny):#{{{
     """Type representing atom-like values"""
@@ -1091,7 +1090,6 @@ def createType(name, dimpos=0):#{{{
 
     return _createType(name, dimpos)#}}}
 
-
 class Token(object):#{{{
     def __init__(self, type, attr=None):
         self.type = type
@@ -1196,6 +1194,11 @@ class TypeStringParser(GenericParser):#{{{
         ' type ::= ( typelist ) '
         return AST(type="subtypes",kids=(
             AST(type="createtype", kids=(Token(type="name",attr="tuple"),)), args[1]))
+    
+    def p_type_9b(self,args):
+        ' type ::= { typelist } '
+        return AST(type="subtypes",kids=(
+            AST(type="createtype", kids=(Token(type="name",attr="record_dict"),)), args[1]))
 
     def p_type_10(self,args):
         ' type ::= type [ ] '
@@ -1207,7 +1210,10 @@ class TypeStringParser(GenericParser):#{{{
         
 
     def p_typenest_2(self,args):
-        ' typenest ::= typenest < type '
+        """
+        typenest ::= typenest < type 
+        typenest ::= typenest : type 
+        """
         return AST(type="typenest",kids=(args[0],args[2]))
 
     def p_var_1(self,args):

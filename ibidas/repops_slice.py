@@ -2,10 +2,10 @@ import operator
 from itertools import chain
 from constants import *
 import repops
+import ops
 
 
 _delay_import_(globals(),"representor")
-_delay_import_(globals(),"ops")
 _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"itypes","rtypes","dimpaths","casts")
 
@@ -93,7 +93,8 @@ class Project(repops.UnaryOpRep):
                         nelem = cur_slices
                     else:
                         nelem = [slice for slice in cur_slices if slice.name == elem]
-                        if(not nelem and len(cur_slices) == 1 and isinstance(cur_slices[0].type,rtypes.TypeTuple)):
+                        if(not nelem and len(cur_slices) == 1 and isinstance(cur_slices[0].type,rtypes.TypeTuple) 
+                            and (elem in cur_slices[0].type.fieldnames or (isinstance(elem,int) and elem >= 0 and elem < len(cur_slices[0].type.fieldnames)))):
                             nelem = unpack_tuple(cur_slices[0],elem)
                         assert len(nelem) ==1, "Could not find (unique) matching slice for name: " + elem
                     elem = nelem
@@ -264,6 +265,7 @@ class SliceCast(repops.UnaryOpRep):
 
 
 class RTuple(repops.UnaryOpRep):
+    _ocls = ops.PackTupleOp
     def _process(self, source):
         if not source._state & RS_SLICES_KNOWN:
             return
@@ -286,9 +288,10 @@ class RTuple(repops.UnaryOpRep):
                     slice = ops.PackArrayOp(slice, ndim=len(slice.dims) - len(cdimpath))
             nslices.append(slice)
     
-        return ops.PackTupleOp(nslices, to_python=to_python)
+        return cls._ocls(nslices)
        
-
+class RDict(RTuple):
+    _ocls = ops.PackDictOp
 
 @repops.delayable()
 class HArray(repops.UnaryOpRep):

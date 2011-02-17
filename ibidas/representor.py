@@ -713,6 +713,10 @@ class Representor(Node):
     def tuple(self):
         """Combines slices into a tuple type"""
         return repops_slice.RTuple(self)
+    
+    def dict(self):
+        """Combines slices into a tuple type"""
+        return repops_slice.RDict(self)
 
     def to_python(self):
         """Converts data into python data structure"""

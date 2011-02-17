@@ -33,8 +33,7 @@ class FullSparse(numpy.ndarray):
     classes=property(fget=_getClasses)
 
     def map(self, func, **kwargs):
-        if('out_empty' in kwargs):
-            out_empty = kwargs.get('out_empty',Missing)
+        out_empty = kwargs.get('out_empty',Missing)
         
         if(kwargs.get('has_missing',True)):
             func = elem_empty_filter(func,out_empty)

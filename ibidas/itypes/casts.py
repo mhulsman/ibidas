@@ -113,7 +113,7 @@ def checkString(intype, outtype):#{{{
 def simString(intype, outtypecls, dimdepth):
     return intype
 
-addCasts(rtypes.TypeBytes, rtypes.TypeBytes, checkString, simString,"string_to_string")
+addCasts([rtypes.TypeBytes,rtypes.TypePickle], [rtypes.TypeBytes,rtypes.TypePickle], checkString, simString,"string_to_string")#}}}
 
 def checkPickle(intype, outtype):#{{{
     if(intype.has_missing and not outtype.has_missing):

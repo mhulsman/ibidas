@@ -245,6 +245,12 @@ class RPCConvertor(VisitorFactory(prefixes=("execConvert","fconvert"),flags=NF_E
 
     def fconvertslice(self, obj):
         return slicetuple(obj)
+    
+    def fconvertdict(self, obj):
+        res = {}
+        for key, value in obj.iteritems():
+            res[self.fconvert(key)] = self.fconvert(value)
+        return res
 
     def map(self, func, parent_type, seq):
         if(parent_type.has_missing):
@@ -264,7 +270,21 @@ class RPCConvertor(VisitorFactory(prefixes=("execConvert","fconvert"),flags=NF_E
     def execConvertTypeUnknown(self, ptype, seq):
         seq = self.map(self.fconvert, ptype, seq)
         return seq
-   
+    
+    def execConvertTypeDict(self, ptype, seq):
+        if(ptype.has_missing):
+            seqres = []
+            for elem in seq:
+                if elem is Missing:
+                    r = Missing
+                else:
+                    r = dict([(key,self.fconvert(value)) for key,value in elem.iteritems()])
+                seqres.append(r)
+        else:
+            seqres = [dict([(key, self.fconvert(value)) for key,value in elem.iteritems()]) for elem in seq]
+        seqres = cutils.darray(seqres,seq.dtype)
+        return seqres
+  
     def execConvertTypeSlice(self, ptype, seq):
         return self.map(self.fconvertslice, ptype, seq)
 

@@ -520,37 +520,36 @@ class NamedTupleScanner(TypeScanner):
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
-        self.names = set()
+        self.tuple_cls = None
 
     def getType(self):
-        fieldnames = [name for name in self.names]
-        subtypes = tuple([self.getSubDetector(name).getType() for name in self.names])
-        return rtypes.TypeAttr(self.detector.hasMissing(), subtypes, fieldnames)
+        fieldnames = [util.valid_name(name) for name in self.tuple_cls._fields]
+        subtypes = tuple([self.getSubDetector(pos).getType() for pos in range(len(fieldnames))])
+        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames)
 
     def scan(self, seq):
         if self.bad_cls.issubset(self.detector.objectclss):
             return False
-
         for cls in self.detector.objectclss:
             if cls is MissingType:
                 continue
-            if not(issubclass(cls, tuple) and hasattr(cls, '_fields')):
+            if not self.tuple_cls:
+                if not(issubclass(cls, tuple) and hasattr(cls, '_fields')):
+                    return False
+                self.tuple_cls = cls
+            elif not self.tuple_cls is cls:
                 return False
-            self.names.update(cls._fields)
 
-        for name in self.names:
-            d = self.getSubDetector(name)
-            def getname(elem):
-                try:
-                    return getattr(elem,name)
-                except AttributeError:
-                    return Missing
-            subseq = seq.map(getname, otype=object)
+        fieldlen = len(self.tuple_cls._fields)
+        for i in xrange(fieldlen):
+            d = self.getSubDetector(i)
+            f = operator.itemgetter(i)
+            subseq = seq.map(f, has_missing=self.detector.hasMissing())
             d.processSeq(subseq)
         return True
 registerTypeScanner(NamedTupleScanner)
 
-class DictScanner(TypeScanner):
+class RecordDictScanner(TypeScanner):
     good_cls = set([dict, MissingType])
 
     def __init__(self, detector):
@@ -560,15 +559,22 @@ class DictScanner(TypeScanner):
     def getType(self):
         fieldnames = [name for name in self.names]
         subtypes = tuple([self.getSubDetector(name).getType() for name in self.names])
-        return rtypes.TypeFieldDict(self.detector.hasMissing(), subtypes, fieldnames)
+        return rtypes.TypeRecordDict(self.detector.hasMissing(), subtypes, fieldnames)
 
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
             return False
-
+        
+        names = self.names.copy()
         for elem in seq:
             if not (elem is Missing):
-                self.names.update(elem.keys())
+                names.update(elem.keys())
+
+        newnames = names - self.names
+        for name in newnames:
+            if not isinstance(name, str) or util.valid_name(name) != name:
+                return False
+        self.names = names
 
         if(len(self.names) > 100):
             return False
@@ -584,7 +590,7 @@ class DictScanner(TypeScanner):
             subseq = seq.map(getname, otype=object)
             d.processSeq(subseq)
         return True
-registerTypeScanner(DictScanner)
+registerTypeScanner(RecordDictScanner)
 
 
 class ContainerScanner(TypeScanner):

@@ -249,7 +249,14 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(data=ndata, rtype=node.type)
 
     def visitUnpackTupleOp(self,node,slice):
-        func = operator.itemgetter(node.tuple_idx)
+        if(isinstance(slice.type,rtypes.TypeRecordDict)):
+            didx = slice.type.fieldnames[node.tuple_idx]
+            if(slice.type.has_missing):
+                func = lambda x: x.get(didx,Missing)
+            else:
+                func = operator.itemgetter(didx)
+        else:
+            func = operator.itemgetter(node.tuple_idx)
         ndata = slice.data.map(func,res_type=node.type)
         return slice.modify(data=ndata,rtype=node.type,name=node.name)
  
@@ -257,6 +264,37 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         ndata = nested_array.co_mapseq(speedtuplify,[slice.data for slice in slices],res_type=node.type)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
     
+    def visitPackDictOp(self,node, slices):
+        names = node.type.fieldnames
+        if not any([slice.type.has_missing for slice in slices]):
+            def speeddictify(x):
+                return cutils.darray([dict(zip(names,row)) for row in zip(*x)])
+        else:
+            def speeddictify(x):
+                non_hasmissing = []
+                for pos, slice in enumerate(slices):
+                    if not slice.type.has_missing:
+                        non_hasmissing.append(pos)
+                if(non_hasmissing):
+                    nx = cutils.darray(x)[non_hasmissing] 
+                    snames = cutils.darray(names)[non_hasmissing]
+                    d = [dict(zip(snames,row)) for row in zip(*nx)]
+                else:
+                    d = [{} for i in xrange(len(x[0]))]
+                for pos, slice in enumerate(slices):
+                    if(pos in non_hasmissing):
+                        continue
+                    name = names[pos]
+                    val = x[pos]
+                    for rowpos in xrange(len(val)):
+                        elem = val[rowpos]
+                        if not elem is Missing:
+                            d[rowpos][name] =elem
+                return cutils.darray(d)
+
+        ndata = nested_array.co_mapseq(speeddictify,[slice.data for slice in slices],res_type=node.type)
+        return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
+   
     def visitHArrayOp(self,node, slices):
         ndata = nested_array.co_mapseq(speedarrayify,[slice.data for slice in slices],dtype=node.type.subtypes[0].toNumpy(), res_type=node.type)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
@@ -689,6 +727,7 @@ reverse_op = {'__eq__':'__eq__',
 def speedtuplify(seqs):
     nseq = cutils.darray(zip(*seqs))
     return nseq
+
 
 def speedarrayify(seqs,dtype):
     nseq = numpy.array(seqs,dtype).T

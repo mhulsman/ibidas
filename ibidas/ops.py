@@ -555,19 +555,21 @@ class BinFuncElemOp(BinFuncOp):#{{{
         BinFuncOp.__init__(self, left, right, funcname, sig, outparam, dims)#}}}
 
 class PackTupleOp(MultiUnaryOp):#{{{
-    __slots__ = ["to_python"]
+    __slots__ = []
 
-    def __init__(self, slices, field="data", to_python=False):
+    def __init__(self, slices, field="data"):
         cdim = set([slice.dims for slice in slices])
         assert len(cdim) == 1, "Packing tuple on slices with different dims"
         
-        self.to_python=to_python
-
         fieldnames = [slice.name for slice in slices]
         subtypes = [slice.type for slice in slices]
         ntype = rtypes.TypeTuple(False, tuple(subtypes), tuple(fieldnames))
         nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
         MultiUnaryOp.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)#}}}
+
+class PackDictOp(PackTupleOp):
+    __slots__ = []
+
 
 class GroupIndexOp(MultiUnaryOp):#{{{
     def __init__(self, slices):
