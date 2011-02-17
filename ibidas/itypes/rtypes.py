@@ -818,6 +818,11 @@ class TypeBytes(TypeString):#{{{
     _defval = b""
 addType(TypeBytes)#}}}
 
+
+class TypePickle(TypeBytes):
+    name = "pickle"
+addType(TypePickle)
+
 class TypeScalar(TypeAny):#{{{
     """Type representing atom-like values"""
     name = "scalar"
@@ -1561,7 +1566,7 @@ def mostSpecializedTypes(typeobjs):
 ### sets ###
 TypeAll = set(TypeAny.getDescendantTypes())
 TypeNumbers = set(TypeNumber.getDescendantTypes())
-TypeStrings = set(TypeString.getDescendantTypes())
+TypeStrings = set(TypeString.getDescendantTypes()) - set([TypePickle])
 TypeArrays = set(TypeArray.getDescendantTypes())
 TypeIntegers = set(TypeInteger.getDescendantTypes())
 TypeReals = set(TypeReal64.getDescendantTypes()) - TypeIntegers

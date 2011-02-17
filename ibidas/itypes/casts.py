@@ -42,7 +42,7 @@ def findImplicitCastTypes(in_type_cls):
     res.add(in_type_cls)
     return res 
 
-def canCast(intype, outtype):
+def canCast(intype, outtype, dimdepth):
     if(not intype.__class__ in in_type_casts):
         return False
     
@@ -56,7 +56,7 @@ def canCast(intype, outtype):
     else:
         for pos_cast in pos_casts:        
             if(outtype.__class__ in pos_cast.out_type_cls):
-                otype = pos_cast.simtypefunc(intype, outtype)
+                otype = pos_cast.simtypefunc(intype, outtype, dimdepth)
                 return (otype, pos_cast.name)
     return False
 
@@ -94,8 +94,12 @@ def checkDefault(intype, outtype):#{{{
         return False
     return True
 
-def simDefault(intype, outtypecls):
+def simDefault(intype, outtypecls, dimdepth):
     return outtypecls(intype.has_missing)
+addCasts(rtypes.TypeNumbers, rtypes.TypeNumbers, checkDefault, simDefault,"numbers_numbers")
+addCasts(rtypes.TypeAll, rtypes.TypeAny, checkDefault, simDefault,"to_any")
+addCasts(rtypes.TypeStrings, rtypes.TypeIntegers, checkDefault, simDefault,"string_to_int")
+addCasts(rtypes.TypeStrings, rtypes.TypeReals, checkDefault, simDefault,"string_to_real")
 
 
 def checkString(intype, outtype):#{{{
@@ -106,11 +110,28 @@ def checkString(intype, outtype):#{{{
         return False
     return True
 
-def simString(intype, outtypecls):
+def simString(intype, outtypecls, dimdepth):
     return intype
 
-addCasts(rtypes.TypeNumbers, rtypes.TypeNumbers, checkDefault, simDefault,"numbers_numbers")
-addCasts(rtypes.TypeAll, rtypes.TypeAny, checkDefault, simDefault,"to_any")
-addCasts(rtypes.TypeStrings, rtypes.TypeIntegers, checkDefault, simDefault,"string_to_int")
-addCasts(rtypes.TypeStrings, rtypes.TypeReals, checkDefault, simDefault,"string_to_real")
 addCasts(rtypes.TypeBytes, rtypes.TypeBytes, checkString, simString,"string_to_string")
+
+def checkPickle(intype, outtype):#{{{
+    if(intype.has_missing and not outtype.has_missing):
+        return False
+
+    if not outtype.dims[0].shape == UNDEFINED:
+        return False
+    return True
+
+def simPickle(intype, outtypecls, dimdepth):
+    ndim = dimensions.Dim(UNDEFINED, (True,) * dimdepth, intype.has_missing)
+    return rtypes.TypePickle(dims=dimpaths.DimPath(ndim))
+
+addCasts(rtypes.TypeAll, rtypes.TypePickle, checkPickle, simPickle,"to_pickle")
+
+def simDePickle(intype, outtypecls, dimdepth):
+    return rtypes.unknown
+
+addCasts(rtypes.TypePickle, rtypes.TypeAll, checkDefault, simDePickle,"from_pickle")
+
+

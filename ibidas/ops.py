@@ -121,7 +121,7 @@ class ChangeDimPathOp(UnaryUnaryOp):#{{{
 class CastOp(UnaryUnaryOp):#{{{
     __slots__ = ["cast_name"]
     def __init__(self, source, new_type):
-        cast_name = casts.canCast(source.type,new_type)
+        cast_name = casts.canCast(source.type,new_type, len(source.dims))
         assert not cast_name is False, "Cannot cast " + str(source.type) + " to " + str(new_type)
         self.cast_name = cast_name
         UnaryUnaryOp.__init__(self, source, rtype=new_type)#}}}

@@ -3,6 +3,7 @@ from itertools import chain
 from collections import defaultdict
 import numpy
 import sys
+import cPickle
 
 import wrapper
 from ..constants import *
@@ -426,6 +427,14 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def castto_any(self,castname,node,slice):
         dtype = node.type.toNumpy()
         return slice.data.mapseq(lambda x:numpy.cast[dtype](x),res_type=node.type)
+    
+    def castto_pickle(self,castname,node,slice):
+        dtype = node.type.toNumpy()
+        return slice.data.map(lambda x:cPickle.dumps(x,2),res_type=node.type)
+    
+    def castfrom_pickle(self,castname,node,slice):
+        dtype = node.type.toNumpy()
+        return slice.data.map(lambda x:cPickle.loads(x),res_type=node.type)
 
     def castnumbers_numbers(self,castname,node,slice):
         dtype = node.type.toNumpy()
