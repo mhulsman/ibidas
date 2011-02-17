@@ -466,14 +466,13 @@ class PackListOp(PackArrayOp):#{{{
         PackArrayOp.__init__(self, pslice, 1)
         #}}}
 
-class ToPythonOp(UnaryUnaryOp):
+class ToPythonOp(UnaryUnaryOp):#{{{
     __slots__ = []
 
     def __init__(self, pslice):
         ntype = pslice.type.copy()
         UnaryUnaryOp.__init__(self, pslice, rtype=ntype)#}}}
         
-
 
 class FreezeOp(UnaryUnaryOp):#{{{
     __slots__ = []
@@ -556,6 +555,7 @@ class BinFuncElemOp(BinFuncOp):#{{{
 
 class PackTupleOp(MultiUnaryOp):#{{{
     __slots__ = []
+    ocls = rtypes.TypeTuple
 
     def __init__(self, slices, field="data"):
         cdim = set([slice.dims for slice in slices])
@@ -563,12 +563,13 @@ class PackTupleOp(MultiUnaryOp):#{{{
         
         fieldnames = [slice.name for slice in slices]
         subtypes = [slice.type for slice in slices]
-        ntype = rtypes.TypeTuple(False, tuple(subtypes), tuple(fieldnames))
+        ntype = self.ocls(False, tuple(subtypes), tuple(fieldnames))
         nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
         MultiUnaryOp.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)#}}}
 
 class PackDictOp(PackTupleOp):
     __slots__ = []
+    ocls = rtypes.TypeRecordDict
 
 
 class GroupIndexOp(MultiUnaryOp):#{{{

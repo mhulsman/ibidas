@@ -14,8 +14,10 @@ from ..passes import manager, create_graph, annotate_replinks, serialize_exec
 from .. import query_graph
 
 _delay_import_(globals(),"..utils","nested_array")
+_delay_import_(globals(),"..utils.missing","Missing")
 _delay_import_(globals(),"..itypes","rtypes","dimensions","dimpaths")
 _delay_import_(globals(),"wrapper_py")
+_delay_import_(globals(),"..repops_slice")
 
 class TypeMapperToSQLAlchemy(VisitorFactory(prefixes=("convert",), #{{{
                                       flags=NF_ELSE)):
@@ -244,7 +246,7 @@ class Connection(object):
 
         tabledict = {}
         for table in tables.values():
-            t = TableRepresentor(self.engine, table).elements().attributes()
+            t = TableRepresentor(self.engine, table)
             tabledict[table.name] = t//str(table.name)
         self.tabledict = tabledict 
 
@@ -265,7 +267,7 @@ class Connection(object):
    
     
     def query(self, query):
-        return QueryRepresentor(self.engine, query).elements().attributes()
+        return QueryRepresentor(self.engine, query)
 
     def __repr__(self):
         res = "Database: " + str(self.engine.url) + "\n"
@@ -280,7 +282,7 @@ class Connection(object):
             rowinfo = []
             for pos, slice in enumerate(rep._slices):
                 if(len(slice.dims) > 1):
-                    slice = PackArrayOp(slice,len(slice.dims) - 1)
+                    slice = ops.PackArrayOp(slice,len(slice.dims) - 1)
                 
                 if(slice.dims):
                     stype = tosa_typemapper.convert(slice.type) 
@@ -291,9 +293,9 @@ class Connection(object):
                         pickled = False
                     nullable = slice.type.has_missing
                     columns[slice.dims[0]].append(sqlalchemy.Column(slice.name, stype, nullable = nullable))
-                    rowinfo.append({'pos':pos, 'name':slice.name, 'pickle':pickled, 'type':str(slice.type), 'dimname':str(slice.dims[0].name), 'val':None})
+                    rowinfo.append({'spos':pos, 'name':slice.name, 'pickle':pickled, 'type':str(slice.type), 'dimname':str(slice.dims[0].name)})
                 else:
-                    rowinfo.append({'pos':pos, 'name':slice.name, 'pickle':True,    'type':str(slice.type), 'dimname':None, 'val':None})
+                    rowinfo.append({'spos':pos, 'name':slice.name, 'pickle':True,    'type':str(slice.type), 'dimname':None})
             
             tables = {}
             for key, value in columns.iteritems():
@@ -301,51 +303,61 @@ class Connection(object):
                    tablename = name + "_DIM_" + key.name
                 else:
                    tablename = name
-                newtable = sqlalchemy.Table(name, self.meta, *value) 
+                newtable = sqlalchemy.Table(tablename, self.meta, *value) 
                 newtable.create(bind=self.engine, checkfirst=True)
                 tables[key] = newtable
             
             if(len(columns) > 1 or any([row['pickle'] or row['dimname'] is None for row in rowinfo])):
-                self.store(name + "_INFO_",rep(rowinfo, dtype="[info:*]<{pos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes$,val=bytes$}"))
+                self.store(name + "_INFO_",wrapper_py.rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes$,val=bytes$}"))
                
                 tablelist = []
                 for t in tables.values():
                     self.sa_tables[t.name] = t
-                    tablelist.append(self.meta.tables[name])
-                infotable = self.sa_tables[name + "_INFO_"]
+                    table = self.meta.tables[t.name]
+                    t = TableRepresentor(self.engine, table)
+                    tablelist.append(t)
+                infotable = self.meta.tables[name + "_INFO_"]
                 del self.tabledict[name + "_INFO_"]
-                t = CombineRepresentor(self.engine, infotable, tablelist)
+                info = TableRepresentor(self.engine, infotable)
+                t = CombineRepresentor(self.engine, info, tablelist)
                 self.tabledict[name] = t
             else:
                 self.sa_tables[name] = tables.values()[0]
                 table = self.meta.tables[name]
-                t = TableRepresentor(self.engine, table).elements().attributes()
+                t = TableRepresentor(self.engine, table)
                 self.tabledict[name] = t
         
         self._append(name, rep)
         return self.tabledict[name]#}}}
     
     def _append(self, name, rep):#{{{
-        if(isinstance(self.tabledict[name],CombineRepresentor)):
-            pass
+        tbl = self.tabledict[name]
+        if(isinstance(tbl,CombineRepresentor)):
+            for table in tbl._tablelist:
+                self._append_to_table(table,rep.copy())
+        elif(isinstance(tbl,TableRepresentor)):
+            self._append_to_table(tbl, rep)
         else:
-            w = dict([(s.name,s) for s in rep._slices])
-            cols = [slice for slice in self.tabledict[name]._slices if slice.name in w]
-            assert len(cols) == len(w), "Slices not in table: " + set(w) - set(colnames)
+            raise RuntimeError, "Cannot add data to a query"
             
-            for s in cols:
-                if not s.type >=w[s.name].type:
-                    raise RuntimeError, "Incompatible types: " + str(s.type) + " " + str(w[s.name].type)
-            rep = rep.get(*[slice.name for slice in cols])
-            
-            trep = rep.tuple()
-            tbdims = set([slice.dims for slice in trep._slices])
-            assert len(tbdims) == 1 and len(tbdims.pop()) == 1, \
-                    "Only a representor object with one common parent dimension can be \
-                        stored as a table"
 
-            values = rep.dict().to_python()
-            self.engine.execute(self.sa_tables[name].insert(), values)#}}}
+    def _append_to_table(self, table, rep):
+        w = dict([(s.name,s) for s in rep._slices])
+        cols = [slice for slice in table._slices if slice.name in w]
+        
+        for s in cols:
+            if not s.type >=w[s.name].type:
+                raise RuntimeError, "Incompatible types: " + str(s.type) + " " + str(w[s.name].type)
+        rep = rep.get(*[slice.name for slice in cols])
+        
+        trep = rep.tuple()
+        tbdims = set([slice.dims for slice in trep._slices])
+        assert len(tbdims) == 1 and len(tbdims.pop()) == 1, \
+                "Only a representor object with one common parent dimension can be \
+                    stored as a table"
+
+        values = rep.dict().to_python()
+        self.engine.execute(self.sa_tables[table._tablename].insert(), values)#}}}
 
     def drop(self, name):#{{{
         self.sa_tables[name].drop(bind=self.engine, checkfirst=True)
@@ -353,14 +365,51 @@ class Connection(object):
         del self.tabledict[name]#}}}
 
 class CombineRepresentor(wrapper.SourceRepresentor):
-    def __init__(self, engine, infotable, tablelist):
-        pass
+    def __init__(self, engine, info, tablelist):
+        self._tablelist = tablelist
+        dims = set()
+        nslicelist = []
+        tablepos = {}
+        for pos, table in enumerate(tablelist):
+            nslicelist.append(dict([(slice.name,slice) for slice in table._slices]))
+            if('_DIM_' in table._tablename):
+                tablepos[table._tablename.split('_DIM_')[1]] = pos
+            else:
+                tablepos[table._tablename] = pos
+        
+        nslices = []
+        for row in info.sort(info.spos).dict()():
+            if row['dimname'] is Missing:
+                dimpos = 0
+            else:
+                dimpos = 1
+
+            if row['pickle']:
+                rtype = rtypes.createType("pickle", dimpos)
+                ctype = rtypes.createType(row['type'])
+            else:
+                rtype = rtypes.createType(row['type'])
+
+            if row['dimname'] is Missing:
+                res_slice = ops.DataOp(row.get('val',Missing), name=row['name'], rtype=rtype)
+            else:
+                assert row['dimname'] in tablepos, "Cannot find table for dim : " + row['dimname']
+                tslices = nslicelist[tablepos[row['dimname']]]
+                res_slice = tslices[row['name']]
+            if not res_slice.type == rtype:
+                res_slice = ops.CastOp(res_slice,rtype)
+
+            if row['pickle']:
+                res_slice = ops.CastOp(res_slice,ctype)
+            nslices.append(res_slice)
+        self._initialize(tuple(nslices),RS_ALL_KNOWN)
 
 class TableRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, table):
+        self._tablename = table.name
         table_type = convert(table.columns,'sqlalchemy',engine, table.name)
-        nslices = (SQLOp(engine, table, table_type, table.name),)
-        self._initialize(nslices,RS_ALL_KNOWN)#}}}
+        nslices = repops_slice.unpack_tuple(ops.UnpackArrayOp(SQLOp(engine, table, table_type, util.valid_name(table.name))))
+        self._initialize(tuple(nslices),RS_ALL_KNOWN)#}}}
 
 class QueryRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, query):
@@ -371,8 +420,8 @@ class QueryRepresentor(wrapper.SourceRepresentor):#{{{
             query_type = convert(res.cursor.description, res.dialect.name, self.engine)
         res.close() 
         
-        nslices = (SQLOp(engine, query, query_type),)
-        self._initialize(nslices,RS_ALL_KNOWN)#}}}
+        nslices = repops_slice.unpack_tuple(ops.UnpackArrayOp(SQLOp(engine, table, table_type, table.name)))
+        self._initialize(tuple(nslices),RS_ALL_KNOWN)#}}}
 
 class SQLResultEdge(query_graph.Edge):#{{{
     __slots__ = ["realedge","pos"]

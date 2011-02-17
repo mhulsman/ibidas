@@ -251,7 +251,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def visitUnpackTupleOp(self,node,slice):
         if(isinstance(slice.type,rtypes.TypeRecordDict)):
             didx = slice.type.fieldnames[node.tuple_idx]
-            if(slice.type.has_missing):
+            if(node.type.has_missing):
                 func = lambda x: x.get(didx,Missing)
             else:
                 func = operator.itemgetter(didx)

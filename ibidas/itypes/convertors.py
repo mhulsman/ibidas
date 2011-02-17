@@ -224,10 +224,31 @@ class RPCConvertor(VisitorFactory(prefixes=("execConvert","fconvert"),flags=NF_E
 
     def _fnoconvert(self,obj):
         return obj
-    fconvertint=_fnoconvert
-    fconvertfloat=_fnoconvert
-    fconvertstr=_fnoconvert
-    fconvertunicode=_fnoconvert
+    fconvertbool = _fnoconvert
+    fconvertint = _fnoconvert
+    fconvertfloat = _fnoconvert
+    fconvertstr = _fnoconvert
+
+    def fconvertinteger(self, obj):
+        return int(obj)
+
+    def fconvertfloating(self,obj):
+        return float(obj)
+    
+    def fconvertMissingType(self,obj):
+        return None
+
+    def fconvertstring_(self,obj):
+        return str(obj)
+    
+    def fconvertunicode(self,obj):
+        return unicode(obj)
+
+    def fconvertbool_(self,obj):
+        return bool(obj)
+
+    def fconvertNone(self,obj):
+        return None
 
     def fconverttuple(self, obj):
         return tuple([self.fconvert(elem) for elem in obj])
@@ -271,7 +292,7 @@ class RPCConvertor(VisitorFactory(prefixes=("execConvert","fconvert"),flags=NF_E
         seq = self.map(self.fconvert, ptype, seq)
         return seq
     
-    def execConvertTypeDict(self, ptype, seq):
+    def execConvertTypeRecordDict(self, ptype, seq):
         if(ptype.has_missing):
             seqres = []
             for elem in seq:
