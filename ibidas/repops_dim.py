@@ -127,12 +127,23 @@ class PermuteDims(repops.UnaryOpRep):
 
 
 @repops.delayable()
-def rarray(source, dim=None, ndim=1):
-    return repops.ApplyFuncRep(source, repops.apply_slice, ops.PackArrayOp, dim, ndim=1)
+class RArray(repops.UnaryOpRep):
+    def _process(self, source, tolevel=None):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+    
+        if tolevel is None:
+            nslices = [ops.PackArrayOp(slice) for slice in source._slices]
+        else:
+            nslices = []
+            for slice in source._slices:
+                if(len(slice.dims) > tolevel):
+                    nslices.append(ops.PackArrayOp(slice, len(slice.dims) - tolevel))
+                else:
+                    nslices.append(slice)
 
-@repops.delayable()
-def rlist(source, dim=None):
-    return repops.ApplyFuncRep(source, repops.apply_slice, ops.PackListOp, dim)
+        return self._initialize(tuple(nslices),source._state)
+
 
 class FlatAll(repops.UnaryOpRep):
     def _process(self,source,name=None):

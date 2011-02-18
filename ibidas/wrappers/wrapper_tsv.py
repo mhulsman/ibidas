@@ -89,7 +89,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                 assert isinstance(dtype.subtypes[0],rtypes.TypeTuple),"Error while determining type"
                 dtype.subtypes[0].fieldnames = tuple(fieldnames)
         else:
-            if(isinstance(dtype,str)):
+            if(isinstance(dtype,basestring)):
                 dtype = rtypes.createType(dtype)
 
         slice = TSVOp(filename, dialect, startpos, dtype, "data")

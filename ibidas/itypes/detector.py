@@ -572,7 +572,7 @@ class RecordDictScanner(TypeScanner):
 
         newnames = names - self.names
         for name in newnames:
-            if not isinstance(name, str) or util.valid_name(name) != name:
+            if not isinstance(name, basestring) or util.valid_name(name) != name:
                 return False
         self.names = names
 

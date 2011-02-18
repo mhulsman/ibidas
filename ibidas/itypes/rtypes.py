@@ -151,7 +151,7 @@ class Type(object):#{{{
     
     #comparison
     def __eq__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         return other.__class__ is self.__class__
     
@@ -243,7 +243,7 @@ class TypeAny(TypeUnknown):#{{{
         raise TypeError, "Expected subtypeable type, but found " + str(self)
 
     def __eq__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         return (self.__class__ is other.__class__ and 
                 self.has_missing is other.has_missing)
@@ -252,7 +252,7 @@ class TypeAny(TypeUnknown):#{{{
         return not self.__eq__(other)
 
     def __le__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             if(self.has_missing):
@@ -263,7 +263,7 @@ class TypeAny(TypeUnknown):#{{{
         return False
     
     def __ge__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             if(other.has_missing):
@@ -274,7 +274,7 @@ class TypeAny(TypeUnknown):#{{{
         return False
 
     def __gt__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             return self.has_missing and not other.has_missing
@@ -283,7 +283,7 @@ class TypeAny(TypeUnknown):#{{{
         return False
     
     def __lt__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             return not self.has_missing and other.has_missing
@@ -323,7 +323,7 @@ class TypeTuple(TypeAny):#{{{
         assert isinstance(subtypes, tuple), \
                 "The subtypes argument should be a tuple"
 
-        assert all(isinstance(fieldname, str) for fieldname in fieldnames), \
+        assert all(isinstance(fieldname, basestring) for fieldname in fieldnames), \
                 "Fieldnames should be strings"
 
         assert not fieldnames or len(fieldnames) == len(subtypes), \
@@ -371,7 +371,7 @@ class TypeTuple(TypeAny):#{{{
 
     
     def __eq__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         return (self.__class__ is other.__class__ and 
                 self.has_missing is other.has_missing and 
@@ -382,7 +382,7 @@ class TypeTuple(TypeAny):#{{{
         return not self.__eq__(other)
 
     def __le__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             if(self.has_missing and not other.has_missing):
@@ -399,7 +399,7 @@ class TypeTuple(TypeAny):#{{{
         return False
     
     def __ge__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             if(other.has_missing and not self.has_missing):
@@ -416,7 +416,7 @@ class TypeTuple(TypeAny):#{{{
         return False
 
     def __gt__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             if(other.has_missing and not self.has_missing):
@@ -433,7 +433,7 @@ class TypeTuple(TypeAny):#{{{
         return False
     
     def __lt__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             if(self.has_missing and not other.has_missing):
@@ -586,7 +586,7 @@ class TypeArray(TypeAny):#{{{
             return unknown
     
     def __eq__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         return (self.__class__ is other.__class__ and 
                 self.has_missing is other.has_missing and 
@@ -597,7 +597,7 @@ class TypeArray(TypeAny):#{{{
         return not self.__eq__(other)
 
     def __le__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             if(self.has_missing and not other.has_missing):
@@ -615,7 +615,7 @@ class TypeArray(TypeAny):#{{{
         return False
     
     def __ge__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             if(other.has_missing and not self.has_missing):
@@ -633,7 +633,7 @@ class TypeArray(TypeAny):#{{{
         return False
 
     def __gt__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             if(other.has_missing and not self.has_missing):
@@ -651,7 +651,7 @@ class TypeArray(TypeAny):#{{{
         return False
     
     def __lt__(self, other):
-        if(isinstance(other, str)):
+        if(isinstance(other, basestring)):
             other = createType(other)
         if(other.__class__ == self.__class__):
             if(self.has_missing and not other.has_missing):
@@ -795,12 +795,12 @@ class TypeString(TypeArray):#{{{
     def __eq__(self, other):
         return (self.__class__ is other.__class__ and 
                 self.has_missing is other.has_missing and \
-                self.dims == other.dims)
+                self.dims[0].shape == other.dims[0].shape)
 
     def __hash__(self):
         return (hash(self.__class__) ^ 
                 hash(self.has_missing) ^ 
-                hash(self.dims))
+                hash(self.dims[0].shape))
     
     def __repr__(self):
         res =  self.name
@@ -1069,7 +1069,7 @@ def createType(name, dimpos=0):#{{{
 
     """
 
-    if(not isinstance(name, str)):
+    if(not isinstance(name, basestring)):
         if(not isinstance(name, numpy.dtype)):
             name = numpy.dtype(name)
         

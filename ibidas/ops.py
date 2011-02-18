@@ -36,12 +36,12 @@ class UnaryOp(Op):#{{{
         :param type: type of slice, optional, default = unknown
         :param dims: tuple of Dim objects, optional, default = ()
         """
-        assert isinstance(name, (str,unicode)), "Name of slice should be a string"
+        assert isinstance(name, basestring), "Name of slice should be a string"
         assert (name.lower() == name), "Name should be in lowercase"
         assert isinstance(rtype, rtypes.TypeUnknown), "Invalid type given"
         assert isinstance(dims, dimpaths.DimPath), "Dimensions of a slice should be a DimPath"
         assert isinstance(bookmarks,set), "Bookmarks should be a set"
-        assert all([isinstance(bm,(str,unicode)) for bm in bookmarks]),"Bookmarks should be a string"
+        assert all([isinstance(bm, basestring) for bm in bookmarks]),"Bookmarks should be a string"
 
         self.name = name
         self.type = rtype
@@ -473,6 +473,12 @@ class ToPythonOp(UnaryUnaryOp):#{{{
         ntype = pslice.type.copy()
         UnaryUnaryOp.__init__(self, pslice, rtype=ntype)#}}}
         
+class NoneToMissingOp(UnaryUnaryOp):#{{{
+    __slots__ = []
+    def __init__(self, slice):
+        assert slice.type.has_missing, "Cannot apply none to missing on type without has_missing"
+        UnaryUnaryOp.__init__(self, slice)#}}}
+    
 
 class FreezeOp(UnaryUnaryOp):#{{{
     __slots__ = []
@@ -568,9 +574,12 @@ class PackTupleOp(MultiUnaryOp):#{{{
         MultiUnaryOp.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)#}}}
 
 class PackDictOp(PackTupleOp):
-    __slots__ = []
+    __slots__ = ["with_missing"]
     ocls = rtypes.TypeRecordDict
 
+    def __init__(self, slices, field="data", with_missing=False):
+        self.with_missing = with_missing
+        PackTupleOp.__init__(self, slices, field)
 
 class GroupIndexOp(MultiUnaryOp):#{{{
     def __init__(self, slices):

@@ -73,7 +73,7 @@ def rep(data=None, dtype=None, unpack=True, name=None):
 
     """
     if(not dtype is None):
-        if(isinstance(dtype,str)):
+        if(isinstance(dtype,basestring)):
             dtype = rtypes.createType(dtype)
     else:
         det = detector.Detector()
@@ -266,7 +266,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     
     def visitPackDictOp(self,node, slices):
         names = node.type.fieldnames
-        if not any([slice.type.has_missing for slice in slices]):
+        if node.with_missing or not any([slice.type.has_missing for slice in slices]):
             def speeddictify(x):
                 return cutils.darray([dict(zip(names,row)) for row in zip(*x)])
         else:
@@ -373,6 +373,10 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         ndata = slice.data.mapseq(func,type_in=slice.type,type_out=node.type,
                                   res_type=node.type,op=node.funcname, **node.kwargs)
         return slice.modify(data=ndata,rtype=node.type)
+    
+    def visitNoneToMissingOp(self, node, slice):
+        ndata = slice.data.mapseq(none_to_missing,res_type=node.type)
+        return slice.modify(data=ndata)
 
     def visitUnaryFuncSeqOp(self,node, slice):
         try:
@@ -472,9 +476,9 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     
     def castfrom_pickle(self,castname,node,slice):
         dtype = node.type.toNumpy()
-        return slice.data.map(lambda x:cPickle.loads(x),res_type=node.type)
+        return slice.data.map(lambda x:cPickle.loads(str(x)),res_type=node.type)
 
-    def castnumbers_numbers(self,castname,node,slice):
+    def castto_numbers(self,castname,node,slice):
         dtype = node.type.toNumpy()
         return slice.data.mapseq(lambda x:numpy.cast[dtype](x),res_type=node.type)
 
@@ -922,3 +926,11 @@ def string_to_real_missing(seq, dtype):
 
 def string_to_real(seq, dtype):
     return cutils.darray([float(elem) for elem in seq],dtype)
+
+
+def none_to_missing(seq):
+    seq = seq.copy()
+    seq[numpy.equal(seq,None)] = Missing
+    return seq
+   
+

@@ -3,7 +3,7 @@ The ibidas module contains all main functions for working with ibidas objects.
 """
 
 __all__ = ["rep","read","connect","_",
-           "rarray","rlist","rtuple","combine","harray",
+           "rarray","rtuple","combine","harray",
            "stack",
            "pos","argsort",
            "rany","rall",
@@ -28,7 +28,7 @@ from wrappers.wrapper_py import rep
 from wrappers.wrapper_tsv import TSVRepresentor
 from wrappers.wrapper_sql import open_db
 from representor import newdim
-from repops_dim import rlist, rarray
+from repops_dim import RArray as rarray
 from repops_multi import Broadcast as bcast, Combine as combine, Sort as sort, Stack as stack
 from repops_slice import RTuple as rtuple, HArray as harray
 from repops_funcs import argsort, pos, Any as rany, All as rall,\

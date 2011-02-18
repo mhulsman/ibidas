@@ -552,7 +552,7 @@ def identifyUniqueDimPathSource(source,dim_selector):#{{{
 def identifyDimPathSource(source,dim_selector):#{{{
     if(isinstance(dim_selector, context.Context)):
         dim_selector = context._apply(dim_selector, source)
-    elif(isinstance(dim_selector, str)):
+    elif(isinstance(dim_selector, basestring)):
         if(dim_selector in [s.name for s in source._slices] or dim_selector[0].isupper()):
             dim_selector = get(source,dim_selector)
 
@@ -592,7 +592,7 @@ def identifyDimPath(sourcepaths, dim_selector):#{{{
         return set([DimPath(dim_selector)])
     elif(dim_selector is None):
         return set([commonDimPath(sourcepaths)])
-    elif(isinstance(dim_selector, str)):
+    elif(isinstance(dim_selector, basestring)):
         return identifyDimPathParse(sourcepaths, dim_selector)
     elif(isinstance(dim_selector, DimPath)):
         #fixme: root/end

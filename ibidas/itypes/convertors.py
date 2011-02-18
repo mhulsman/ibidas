@@ -228,6 +228,7 @@ class RPCConvertor(VisitorFactory(prefixes=("execConvert","fconvert"),flags=NF_E
     fconvertint = _fnoconvert
     fconvertfloat = _fnoconvert
     fconvertstr = _fnoconvert
+    fconvertbuffer = _fnoconvert
 
     def fconvertinteger(self, obj):
         return int(obj)

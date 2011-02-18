@@ -96,7 +96,7 @@ def checkDefault(intype, outtype):#{{{
 
 def simDefault(intype, outtypecls, dimdepth):
     return outtypecls(intype.has_missing)
-addCasts(rtypes.TypeNumbers, rtypes.TypeNumbers, checkDefault, simDefault,"numbers_numbers")
+addCasts(rtypes.TypeNumbers | set([rtypes.TypeAny]), rtypes.TypeNumbers, checkDefault, simDefault,"to_numbers")
 addCasts(rtypes.TypeAll, rtypes.TypeAny, checkDefault, simDefault,"to_any")
 addCasts(rtypes.TypeStrings, rtypes.TypeIntegers, checkDefault, simDefault,"string_to_int")
 addCasts(rtypes.TypeStrings, rtypes.TypeReals, checkDefault, simDefault,"string_to_real")

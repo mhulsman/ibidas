@@ -17,7 +17,7 @@ class FuncSignature(object):
 class Param(object):
     __slots__ = ["name", "type","default"]
     def __init__(self,name, type=None, default=NOVAL):
-        assert isinstance(name, str), "Param name should be a string"
+        assert isinstance(name, basestring), "Param name should be a string"
         assert type is None or isinstance(type,rtypes.TypeUnknown), "Type should be None or a type from module rtypes"
 
         self.name = name
@@ -452,6 +452,7 @@ eachsig = EachSignature("each")
 class Each(UnaryFuncElemOp):
     _sigs = [eachsig]
 
+
 class UnaryArithSignature(FuncSignature):
     def check(self, slice):#{{{
         in_type = slice.type
@@ -508,7 +509,6 @@ class UnaryTypeToTypeSignature(UnaryFixShapeSignature):
         return Param(slice.name, nstype)#}}}
 
 any_nodepsig = UnaryTypeToTypeSignature("any_nodep", rtypes.TypeAny, rtypes.TypePlatformInt, check_dependent=False)
-sortablesig = UnaryTypeToTypeSignature("sortable", (rtypes.TypeScalar, rtypes.TypeString, rtypes.TypeTuple), rtypes.TypePlatformInt)
 
 boolsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeBool, rtypes.TypeBool)
 numbersig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber)
@@ -517,6 +517,22 @@ float_tofloatsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeReal64,rtypes.T
 number_tofloatsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber,rtypes.TypeReal64)
 number_tointsig = UnaryTypeToTypeSignature("fixdim", rtypes.TypeNumber,rtypes.TypePlatformInt)
 
+class UnarySortableSignature(UnaryFixShapeSignature):
+    def __init__(self, name, check_dependent=True):
+        UnaryFixShapeSignature.__init__(self, name, check_dependent)
+
+    def check(self, slice, packdepth, **kwargs):#{{{
+        if not UnaryFixShapeSignature.check(self,slice,packdepth):
+            return False
+
+        in_type = slice.type
+        if(isinstance(in_type, rtypes.TypeArray)):
+            return False
+
+        nstype = rtypes.TypePlatformInt(in_type.has_missing)
+        return Param(slice.name, nstype)#}}}
+
+sortablesig = UnarySortableSignature("sortable")
 class ArgSort(UnaryFuncDimOp):
     _sigs = [sortablesig]
 argsort = repops.delayable()(ArgSort)

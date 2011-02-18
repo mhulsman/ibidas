@@ -80,7 +80,7 @@ class Project(repops.UnaryOpRep):
             for name, elem in chain(zip([None] * len(args),args),kwds.iteritems()):
                 if(isinstance(elem, context.Context)):
                     elem = context._apply(elem, self._source)
-                elif(isinstance(elem,str)):
+                elif(isinstance(elem, basestring)):
                     if(elem == "~"):
                         used_slices = set([slice.name for slice in self._getUsedSourceSlicesSet(project_sources)])
                         nelem = [slice for slice in cur_slices if slice.name not in used_slices]
@@ -177,7 +177,7 @@ def unpack_tuple(slice,name="",unpack=True):
         try:
             idx = int(name)
         except ValueError:
-            assert isinstance(name, str), \
+            assert isinstance(name, basestring), \
                         "Tuple slice name should be a string"
             idx = slice.type.fieldnames.index(name)
         nslices = [ops.UnpackTupleOp(slice, idx)]
@@ -266,16 +266,16 @@ class SliceCast(repops.UnaryOpRep):
 
 class RTuple(repops.UnaryOpRep):
     _ocls = ops.PackTupleOp
-    def _process(self, source):
+    def _process(self, source, **kwargs):
         if not source._state & RS_SLICES_KNOWN:
             return
         
-        nslice = self._apply(source._slices)
+        nslice = self._apply(source._slices, **kwargs)
         #initialize object attributes
         return self._initialize((nslice,),RS_ALL_KNOWN)
 
     @classmethod
-    def _apply(cls, slices, to_python=False):
+    def _apply(cls, slices, to_python=False, **kwargs):
         cdimpath = dimpaths.commonDimPath([slice.dims for slice in slices])
         nslices = []
         for slice in slices:
@@ -288,7 +288,7 @@ class RTuple(repops.UnaryOpRep):
                     slice = ops.PackArrayOp(slice, ndim=len(slice.dims) - len(cdimpath))
             nslices.append(slice)
     
-        return cls._ocls(nslices)
+        return cls._ocls(nslices, **kwargs)
        
 class RDict(RTuple):
     _ocls = ops.PackDictOp

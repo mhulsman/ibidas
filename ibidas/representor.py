@@ -95,24 +95,27 @@ class Representor(Node):
                 data = (data,)
 
             cols = [[""] * (table_length + 1)]
-            minlen = table_length + 1
+            maxlen = 0
             
             maxwidth = [0]
             for dcol,s in zip(data, self._slices):
                 if(len(s.dims) >= 1):
-                    col = [str(row).replace('\n','; ') for row in dcol]
-                    if(len(col) > table_length):
-                        col[-1] = "..."
-                    minlen = min(len(col),minlen)
+                    col = [str(row).replace('\n','; ') for row in dcol[:table_length]]
+                    maxlen = max(len(col),maxlen)
+                    if(len(dcol) > table_length):
+                        col[table_length-1] = "..."
+                    elif(len(col) < table_length):
+                        col.extend([""] * (table_length - len(col)))
+                        
                 else:
                     col = [""] * (table_length + 1)
                     col[0] = str(dcol)
-                    minlen = min(1,minlen)
+                    maxlen = max(1,maxlen)
                 cols.append(col)
             
             rows.append([""] * len(rows[0]))
             rows[-1][0] = "Data:"
-            for i in range(minlen):
+            for i in range(maxlen):
                 row = [col[i] for col in cols]
                 rows.append(row)
         
@@ -376,7 +379,7 @@ class Representor(Node):
     def __mod__(self, other):
         if(isinstance(other, context.Context)):
             return other.__rmod__(self)
-        elif(isinstance(other, str)):
+        elif(isinstance(other, basestring)):
             return repops_dim.DimRename(self, other)
         elif(isinstance(other, tuple)):
             return repops_dim.DimRename(self, *other)
@@ -391,7 +394,7 @@ class Representor(Node):
     def __div__(self, other):
         if(isinstance(other, context.Context)):
             return other.__rdiv__(self)
-        elif(isinstance(other, str)):
+        elif(isinstance(other, basestring)):
             return repops_slice.SliceRename(self, other)
         elif(isinstance(other, tuple)):
             return repops_slice.SliceRename(self, *other)
@@ -405,7 +408,7 @@ class Representor(Node):
     def __floordiv__(self, other):
         if(isinstance(other, context.Context)):
             return other.__rfloordiv__(self)
-        elif(isinstance(other, str)):
+        elif(isinstance(other, basestring)):
             return repops_slice.Bookmark(self, other)
         elif(isinstance(other, tuple)):
             return repops_slice.Bookmark(self, *other)
@@ -706,17 +709,17 @@ class Representor(Node):
     def contains(self, elems):
         return repops_funcs.Within(elems,self)
 
-    def array(self):
+    def array(self, tolevel=None):
         """Packages dimension into array type"""
-        return repops_dim.rarray(self)
+        return repops_dim.RArray(self, tolevel = tolevel)
 
     def tuple(self):
         """Combines slices into a tuple type"""
         return repops_slice.RTuple(self)
     
-    def dict(self):
+    def dict(self, with_missing=False):
         """Combines slices into a tuple type"""
-        return repops_slice.RDict(self)
+        return repops_slice.RDict(self, with_missing=with_missing)
 
     def to_python(self):
         """Converts data into python data structure"""
