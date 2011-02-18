@@ -407,7 +407,7 @@ class Connection(object):
             del self.sa_tables[name]
         del self.tabledict[name]#}}}
 
-class CombineRepresentor(wrapper.SourceRepresentor):
+class CombineRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, info, tablelist):
         self._tablelist = tablelist
         self._info = info
@@ -454,7 +454,7 @@ class CombineRepresentor(wrapper.SourceRepresentor):
             if row['packdepth']:
                 res_slice = ops.UnpackArrayOp(res_slice, row['packdepth'])
             nslices.append(res_slice)
-        self._initialize(tuple(nslices),RS_ALL_KNOWN)
+        self._initialize(tuple(nslices),RS_ALL_KNOWN)#}}}
 
 class TableRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, table):
@@ -619,6 +619,16 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
     #SQL QUERY
     def eatElement(self, node):#{{{
         self.expressionEat(node)#}}}
+
+
+    def eatQuery(self, node):#{{{
+        for edge in self.graph.edge_source[node]:
+            if(isinstance(edge.target, ops.NoneToMissingOp)):
+                self.graph.dropEdge(edge)
+                for tedge in self.graph.edge_source[edge.target]:
+                    self.graph.addEdge(SQLResultEdge(node, tedge.target, tedge, edge.pos))
+        self.expressionEat(node)#}}}
+                
 
     #SQL VALUE
     def eatValue(self, node):#{{{
@@ -844,6 +854,11 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
             if(r.bookmarks):
                 r2 = ops.ChangeBookmarkOp(r)
                 r2.bookmarks = oslice.bookmarks
+                self.addPairToGraph(r,r2)
+                r= r2
+
+            if(r.type.has_missing):
+                r2 = ops.NoneToMissingOp(r)
                 self.addPairToGraph(r,r2)
                 r= r2
 

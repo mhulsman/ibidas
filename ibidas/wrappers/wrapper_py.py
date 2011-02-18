@@ -132,8 +132,7 @@ class ResultOp(ops.DataOp):
         self.name = source.name
 
     def __repr__(self):
-        return  "\nName: " + str(self.name) + ", Type:   " + str(self.type) + ", Dims: " + str(self.dims) + \
-                "\n" + str(self.data) 
+        return  "\nName: " + str(self.name) + ", Type:   " + str(self.type) + ", Dims: " + str(self.dims) 
 
 
 class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), 
@@ -172,7 +171,12 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                         pass
                 raise exc_info[1], None, exc_info[2]
             if(debug_mode):
-                self.graph.na["output"][command] = str(res)
+                r = str(res)
+                try:
+                    r.decode('utf-8')
+                    self.graph.na["output"][command] = r
+                except UnicodeDecodeError:
+                    pass
 
             arguments[command_id] = res
             use_counters[command_id] = param_usecount[command]

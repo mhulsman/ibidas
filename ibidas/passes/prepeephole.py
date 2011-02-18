@@ -21,7 +21,7 @@ class PrePeepHole(VisitorFactory(prefixes=("visit",), flags=NF_ERROR), manager.P
     def visitNode(self, node):
         pass
 
-    def visitChangeBookmarkOp(self, node):
+    def remove_unaryop(self, node):
         source = self.graph.getDataEdge(node).source
         target_edges = list(self.graph.edge_source[node])
         self.graph.dropNode(node)
@@ -29,7 +29,57 @@ class PrePeepHole(VisitorFactory(prefixes=("visit",), flags=NF_ERROR), manager.P
             assert isinstance(target_edge,query_graph.ParamEdge), "Unknown edge type encountered"
             target_edge.source = source
             self.graph.addEdge(target_edge)
-    visitChangeNameOp=visitChangeBookmarkOp
-    visitChangeDimPathOp=visitChangeBookmarkOp
+    visitChangeBookmarkOp=remove_unaryop
+    visitChangeNameOp=remove_unaryop
+    visitChangeDimPathOp=remove_unaryop
 
+    def visitPackArrayOp(self,node):
+        target_edges = list(self.graph.edge_source[node])
+        if(len(target_edges) != 1): 
+            return
 
+        target = target_edges[0].target
+        if(not isinstance(target, ops.PackArrayOp)):
+            return
+        
+        pack_depth = len(node.type.dims)
+        unpack_depth = len(target.unpack_dims)
+        return self.combine_pack_unpack(pack_depth, unpack_depth, node, target)
+
+    def visitUnpackArrayOp(self,node):
+        target_edges = list(self.graph.edge_source[node])
+        if(len(target_edges) != 1): 
+            return
+
+        target = target_edges[0].target
+        if(not isinstance(target, ops.PackArrayOp)):
+            return
+        
+        unpack_depth = len(node.unpack_dims)
+        pack_depth = len(target.type.dims)
+        return self.combine_pack_unpack(pack_depth, unpack_depth, node, target)
+
+    def combine_pack_unpack(self, pack_depth, unpack_depth, node, target):
+        sourceedge = self.graph.getDataEdge(node)
+        self.graph.dropEdge(sourceedge)
+        if(pack_depth != unpack_depth): 
+            if(pack_depth > unpack_depth):
+                nsource = ops.PackArrayOp(sourceedge.source,pack_depth - unpack_depth)
+            else:
+                nsource = ops.UnpackArrayOp(sourceedge.source,unpack_depth - pack_depth)
+            self.graph.addNode(nsource)
+            self.graph.addEdge(query_graph.ParamEdge(sourceedge.source,nsource,"slice"))
+        else:
+            nsource = sourceedge.source
+        
+        ttarget_edges = list(self.graph.edge_source[target])
+        for edge in ttarget_edges:
+            self.graph.dropEdge(edge)
+            edge.source = nsource
+            self.graph.addEdge(edge)
+
+        self.graph.dropNode(node)
+        self.graph.dropNode(target)
+           
+
+        

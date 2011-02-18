@@ -526,7 +526,7 @@ class UnarySortableSignature(UnaryFixShapeSignature):
             return False
 
         in_type = slice.type
-        if(isinstance(in_type, rtypes.TypeArray)):
+        if(in_type.__class__ == rtypes.TypeArray):
             return False
 
         nstype = rtypes.TypePlatformInt(in_type.has_missing)
