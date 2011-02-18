@@ -368,9 +368,10 @@ class NestedArray(object):
                 nself.idxs[matchpoint] = nridx
             else:     #var-var
                 nlidx = numpy.zeros(lidx.shape,dtype=lidx.dtype)
-                nlidx[...,0] = ridx[lidx[...,0],0]
-                nlidx[...,-1] = numpy.roll(nlidx[...,0],-1)
-                nlidx.ravel()[-1] = ridx.ravel()[-1]
+                if(len(ridx) > 0):
+                    nlidx[...,0] = ridx[lidx[...,0],0]
+                    nlidx[...,-1] = numpy.roll(nlidx[...,0],-1)
+                    nlidx.ravel()[-1] = ridx.ravel()[-1]
                 nself.idxs[matchpoint] = nlidx
         del nself.idxs[matchpoint+1]
         return nself
@@ -534,36 +535,7 @@ class NestedArray(object):
 
         return nself
 
-    def _normalize(self, curpos):
-        if(curpos >= len(self.idxs)):
-            return self
-
-        nself = self
-        curpos,curobj = self._get_next_obj(curpos-1)
-        nextpos,nextobj = self._get_next_obj(curpos)
-        while curpos < len(self.idxs):
-            respos = 0
-            res = []
-            oshape = curobj.shape 
-            curobj = dimpaths.flatFirstDims(curobj, len(curobj.shape) - 2)
-            nidx = numpy.zeros(curobj.shape,dtype=curobj.dtype)
-            for rowpos in xrange(len(curobj)):
-                start = curobj[rowpos,0]
-                stop = curobj[rowpos,-1]
-                res.append(nextobj[start:stop])
-                nidx[rowpos,0] = respos
-                respos += stop - start
-                nidx[rowpos,1] = respos
-            nextobj = numpy.concatenate(res)
-            nidx.shape  = oshape
-            nself._set_obj(curpos, nidx)
-            nself._set_obj(nextpos, nextobj)
-
-            curpos,curobj = self._get_next_obj(curpos)
-            nextpos,nextobj = self._get_next_obj(nextpos)
-        return nself
-
-            
+           
     def broadcast(self, repeat_dict):
         if not repeat_dict:
             return self
@@ -688,12 +660,47 @@ class NestedArray(object):
             res.append(nextobj[start:stop])
             nidx[rowpos,:] += lastpos - start
             lastpos += stop - start
-        nextobj = numpy.concatenate(res)
+        if not res:
+            nextobj = cutils.darray(res)
+        else:
+            nextobj = numpy.concatenate(res)
         nidx.shape  = oshape
         self._set_obj(nextpos,nextobj)
         self.idxs[pos] = nidx
         
+    def _normalize(self, curpos):
+        if(curpos >= len(self.idxs)):
+            return self
 
+        nself = self
+        curpos,curobj = self._get_next_obj(curpos-1)
+        nextpos,nextobj = self._get_next_obj(curpos)
+        while curpos < len(self.idxs):
+            respos = 0
+            res = []
+            oshape = curobj.shape 
+            curobj = dimpaths.flatFirstDims(curobj, len(curobj.shape) - 2)
+            nidx = numpy.zeros(curobj.shape,dtype=curobj.dtype)
+            for rowpos in xrange(len(curobj)):
+                start = curobj[rowpos,0]
+                stop = curobj[rowpos,-1]
+                res.append(nextobj[start:stop])
+                nidx[rowpos,0] = respos
+                respos += stop - start
+                nidx[rowpos,1] = respos
+            if not res:
+                nextobj = cutils.darray(res)
+            else:
+                nextobj = numpy.concatenate(res)
+            nidx.shape  = oshape
+            nself._set_obj(curpos, nidx)
+            nself._set_obj(nextpos, nextobj)
+
+            curpos,curobj = self._get_next_obj(curpos)
+            nextpos,nextobj = self._get_next_obj(nextpos)
+        return nself
+
+ 
 
 
     def __repr__(self):
@@ -816,8 +823,12 @@ def validate_array(seq, cdepth, dtype):
     if(len(seq.shape) < cdepth):
         oshape = seq.shape
         rem_ndims = cdepth - len(seq.shape) + 1
-        seq = cutils.darray(list(seq.ravel()),dtype,rem_ndims,rem_ndims)
-        seq.shape = oshape + seq.shape[1:]
+        if len(seq) == 0:
+            seq = cutils.darray([],dtype)
+            seq.shape = (0,) * rem_ndims
+        else:
+            seq = cutils.darray(list(seq.ravel()),dtype,rem_ndims,rem_ndims)
+            seq.shape = oshape + seq.shape[1:]
         assert len(seq.shape) == cdepth, "Non array values encountered for dims " + str(dims[len(seq.shape):])
     elif(len(seq.shape) > cdepth):
         oshape = seq.shape

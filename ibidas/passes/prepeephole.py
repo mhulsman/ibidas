@@ -39,7 +39,7 @@ class PrePeepHole(VisitorFactory(prefixes=("visit",), flags=NF_ERROR), manager.P
             return
 
         target = target_edges[0].target
-        if(not isinstance(target, ops.PackArrayOp)):
+        if(not isinstance(target, ops.UnpackArrayOp)):
             return
         
         pack_depth = len(node.type.dims)
