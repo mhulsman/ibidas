@@ -49,14 +49,14 @@ class Representor(Node):
         
     def _checkState(self,filter=RS_SLICES_KNOWN):
         if(not ((self._state & filter) == filter)):
-            slices = self._getResultSlices()
+            slices = self._getResultSlices(endpoint=False)
             self._initialize(slices,state=RS_ALL_KNOWN | RS_INFERRED)
 
-    def show(self,table_length=100):
+    def Show(self,table_length=100):
         print self.__str__(table_length=table_length)
 
     def __str__(self, print_data=True, table_length=15):
-        self._checkState(filter=RS_ALL_KNOWN)
+        self._checkState(filter=RS_SLICES_KNOWN)
         
         names = ["Slices:"] + [s.name for s in self._slices]
         types = ["Type:"] + [str(s.type) for s in self._slices]
@@ -87,7 +87,7 @@ class Representor(Node):
             first_dims = set([s.dims[0] for s in self._slices if s.dims])
             if(first_dims):
                 for dim in first_dims:
-                    self = self.filter(slice(None,table_length + 1),dim=dim)
+                    self = self.Filter(slice(None,table_length + 1),dim=dim)
                 data = self()
             else:
                 data = self()
@@ -147,6 +147,7 @@ class Representor(Node):
         k.info = self.__str__(False)
         return k
     I=property(fget=_getInfo)
+    Info=I
 
     #def __repr__(self):
     #    return str(self.__class__)
@@ -225,7 +226,7 @@ class Representor(Node):
             print self.__str__(False)
             return [slice.name for slice in self._slices]
 
-    def copy(self):
+    def Copy(self):
         res = wrapper.SourceRepresentor()
         res._initialize(tuple(self._getResultSlices(endpoint=False)),state=RS_CHECK)
         return res
@@ -250,19 +251,19 @@ class Representor(Node):
             return rtypes.TypeTuple(False, 
                     tuple([slice.type for slice in self._slices]), 
                     tuple([slice.name for slice in self._slices]))
-    Itype=property(fget=getType)
+    Type=property(fget=getType)
 
     def getDepth(self):
         """Returns max dimension depth (number of dimensins) of
            slices in this representor. 
         """
         return max([len(slice.dims) for slice in self._slices])
-    Idepth=property(fget=getDepth)
+    Depth=property(fget=getDepth)
     
 
     def getNames(self):
         return [slice.name for slice in self._slices]
-    Inames=property(fget=getNames)
+    Names=property(fget=getNames)
 
     def __getitem__(self, condition):
         if(not isinstance(condition, tuple)):
@@ -305,7 +306,7 @@ class Representor(Node):
                 self = repops_multi.Filter(self, cond, ncond - pos)
         return self
            
-    def filter(self, condition, dim=None):
+    def Filter(self, condition, dim=None):
         """Performs filtering on this dataset using ``condition``.
            
            :param condition: condition to filter on
@@ -520,27 +521,27 @@ class Representor(Node):
         res = nself()
         return bool(res)
 
-    def cast(self, *newtypes, **kwds):
+    def Cast(self, *newtypes, **kwds):
         """Cast data to new type. 
 
         Allowed formats:
 
         * single type for all slices
 
-          >>> x.cast("int32")
+          >>> x.Cast("int32")
 
         * type for each slice
 
-          >>> x.cast(("int64","int8"))
+          >>> x.Cast(("int64","int8"))
 
         * type for named slices
 
-          >>> x.cast(your_slice="int8")
+          >>> x.Cast(your_slice="int8")
 
         """
         return repops_slice.SliceCast(self, *newtypes, **kwds)
 
-    def transpose(self,permute_idxs=(1,0)):
+    def Transpose(self,permute_idxs=(1,0)):
         """Transposes the dimensions of slices.
            Can only be applied to the common dimensions of slices.
 
@@ -551,7 +552,7 @@ class Representor(Node):
         """
         return repops_dim.PermuteDims(self,permute_idxs)
 
-    def flat(self, dim=-1,name=None):
+    def Flat(self, dim=-1,name=None):
         """Flattens (merges) a dimension with previous(parent) dim. 
 
         :param dim: Dim to flatten. By default, last dim.
@@ -559,14 +560,14 @@ class Representor(Node):
         """
         return repops_dim.Flat(self, name=name,dim=dim)
 
-    def flatall(self, name=None):
+    def FlatAll(self, name=None):
         """Flattens all dimensions into one dimension.
 
         :param name: name of new merged dimension. By default, merged names of all dimensions.
         """
         return repops_dim.FlatAll(self,name=name)
 
-    def splitDim(self,lshape,rshape,lname=None,rname=None,dimsel=None):
+    def SplitDim(self,lshape,rshape,lname=None,rname=None,dimsel=None):
         """Splits dim into two dimensions.
 
         :param lshape: Left shape (integer or array of lengths)
@@ -577,7 +578,7 @@ class Representor(Node):
         """
         return repops_dim.SplitDim(self,lshape,rshape,lname,rname,dimsel)
 
-    def harray(self, name=None):
+    def Harray(self, name=None):
         """Combines slices into array.
         """
         return repops_slice.HArray(self, name=name)
@@ -586,9 +587,9 @@ class Representor(Node):
         """Returns shape of all dimensions as slices in a representor object"""
         return repops_dim.Shape(self)
 
-    def group_by(self, *args, **kwargs):
+    def GroupBy(self, *args, **kwargs):
         flat = kwargs.pop("flat", {})
-        group_source = self.get(*args, **kwargs)
+        group_source = self.Get(*args, **kwargs)
         
         if(isinstance(flat,dict)):
             pass
@@ -599,16 +600,13 @@ class Representor(Node):
             
         return repops_multi.Group(self, group_source, flat)
    
-    def match(self, other, condleft, condright, group=False):
-        return repops_multi.match(self, other, condleft, condright, group=group)
-    
-    def join(self, other, cond):
+    def Join(self, other, cond):
         return repops_multi.Join(self, other, cond)
     
-    def match(self, other, lslice=None,rslice=None, jointype="inner"):
+    def Match(self, other, lslice=None,rslice=None, jointype="inner"):
         return repops_multi.Match(self, other, lslice, rslice, jointype)
 
-    def rename(self, *names, **kwds):
+    def Rename(self, *names, **kwds):
         """Rename slices.
 
         :param names: names without keywords. Number of names should match number of slices.
@@ -616,8 +614,8 @@ class Representor(Node):
 
         Examples::
             
-            >>> na = a.rename("genes","scores")
-            >>> na = a.rename(f0 = "genes", f1 = "scores")
+            >>> na = a.Rename("genes","scores")
+            >>> na = a.Rename(f0 = "genes", f1 = "scores")
         
         Shortcut:
             One can use the division operation to rename slices.
@@ -639,108 +637,112 @@ class Representor(Node):
         """ 
         return repops_slice.SliceRename(self, *names, **kwds)
     
-    def dim_rename(self, *names, **kwds):
-        """Rename dimensions. Similar to ``rename`` for slices.
+    def DimRename(self, *names, **kwds):
+        """Rename dimensions. Similar to ``Rename`` for slices.
 
         Shortcut: use % operator
         """
         return repops_dim.DimRename(self, *names, **kwds)
   
-    def bookmark(self, *names, **kwds):
+    def Bookmark(self, *names, **kwds):
         """Bookmarks slices with a name. 
         Slices can later be accessed using attribute access, 
         with axis indicator "B". 
 
         Example:
-            >>> x = x.bookmark("myslices")
-            >>> x.Bmyslices
+            >>> x = x.Bookmark("myslices")
+            >>> x.myslices  
+            >>> x.Bmyslices   #in case of possible conflicts with slice names
         """
         return repops_slice.Bookmark(self, *names, **kwds)
 
-    def each(self, eachfunc, dtype=rtypes.unknown):
+    def Each(self, eachfunc, dtype=rtypes.unknown):
         return repops_funcs.Each(self, eachfunc=eachfunc, dtype=dtype)
     
     
-    def pos(self, dim=None):
+    def Pos(self, dim=None):
         return repops_funcs.Pos(self, dim)
     
-    def argsort(self, dim=None, descend=False):
-        return repops_funcs.ArgSort(self, dim, descend=descend)
+    def Argsort(self, dim=None, descend=False):
+        return repops_funcs.Argsort(self, dim, descend=descend)
+    
+    def Argunique(self, dim=None):
+        return repops_funcs.Argunique(self, dim)
 
-    def sum(self, dim=None):
+    def Sum(self, dim=None):
         return repops_funcs.Sum(self, dim)
 
-    def max(self, dim=None):
+    def Max(self, dim=None):
         return repops_funcs.Max(self, dim)
 
-    def min(self, dim=None):
+    def Min(self, dim=None):
         return repops_funcs.Min(self, dim)
     
-    def argmax(self, dim=None):
-        return repops_funcs.ArgMax(self, dim)
+    def Argmax(self, dim=None):
+        return repops_funcs.Argmax(self, dim)
 
-    def argmin(self, dim=None):
-        return repops_funcs.ArgMin(self, dim)
+    def Argmin(self, dim=None):
+        return repops_funcs.Argmin(self, dim)
 
-    def mean(self, dim=None):
+    def Mean(self, dim=None):
         return repops_funcs.Mean(self, dim)
     
-    def median(self, dim=None):
+    def Median(self, dim=None):
         return repops_funcs.Median(self, dim)
       
-    def any(self,dim=None):
+    def Any(self,dim=None):
         return repops_funcs.Any(self,dim)
 
-    def all(self,dim=None):
+    def All(self,dim=None):
         return repops_funcs.All(self,dim)
 
-    def count(self):
+    def Count(self):
         return repops_funcs.Count(self)
 
-    def set(self, dim=None):
+    def Set(self, dim=None):
         return repops_funcs.Set(self,dim)
     
-    def unique(self, dim=None):
+    def Unique(self, dim=None):
         return repops_funcs.Unique(self,dim)
 
-    def within(self, arrays):
+    def Within(self, arrays):
         return repops_funcs.Within(self,arrays)
 
-    def contains(self, elems):
-        return repops_funcs.Within(elems,self)
+    def Contains(self, elems):
+        return repops_funcs.Contains(self,elems)
 
-    def array(self, tolevel=None):
+    def Array(self, tolevel=None):
         """Packages dimension into array type"""
-        return repops_dim.RArray(self, tolevel = tolevel)
+        return repops_dim.Array(self, tolevel = tolevel)
 
-    def tuple(self):
+    def Tuple(self):
         """Combines slices into a tuple type"""
-        return repops_slice.RTuple(self)
+        return repops_slice.Tuple(self)
     
-    def dict(self, with_missing=False):
+    def Dict(self, with_missing=False):
         """Combines slices into a tuple type"""
-        return repops_slice.RDict(self, with_missing=with_missing)
+        return repops_slice.Dict(self, with_missing=with_missing)
 
-    def to_python(self):
+    def ToPython(self):
         """Converts data into python data structure"""
         return repops_slice.ToPythonRep(self)()
 
-    def sort(self, *slices, **kwargs):
+    def Sort(self, *slices, **kwargs):
         """Performs sort on data.
         
         Example:
 
         *  Sort slices in x on all slices. If multiple slices, combines into tuple, then sort it.
 
-           >>> x.sort()
+           >>> x.Sort()
 
         *  Sort x on slice f1
 
-           >>> x.sort(_.f1)
+           >>> x.Sort(_.f1)
 
         * Sort x on slice f1, f3. 
 
-          >>> x.sort(_.f1, _.f3) 
+          >>> x.Sort(_.f1, _.f3) 
         
         For other possible sort slice selection formats, see ``get`` function. 
 
@@ -748,19 +750,26 @@ class Representor(Node):
         descend = kwargs.pop("descend",False)
 
         if(slices or kwargs):
-            sortsource = self.get(*slices,**kwargs)
+            sortsource = self.Get(*slices,**kwargs)
             return repops_multi.Sort(self, sortsource, descend=descend)
         else:
             return repops_multi.Sort(self, descend=descend)
 
-    def to(self, *slices, **kwargs):
+    def Unique(self, *slices, **kwargs):
+        if(slices or kwargs):
+            sortsource = self.Get(*slices,**kwargs)
+            return repops_multi.Unique(self, sortsource)
+        else:
+            return repops_multi.Unique(self)
+
+    def To(self, *slices, **kwargs):
         return repops_slice.To(self, *slices, **kwargs)
               
               
 
 
 
-    def get(self, *slices, **kwds):
+    def Get(self, *slices, **kwds):
         """Select slices in a new representor, combine with other slices.
 
         :param slices: Can be various formats:
@@ -792,43 +801,43 @@ class Representor(Node):
             
             * str
 
-              >>> a.get("f0","f3")
+              >>> a.Get("f0","f3")
 
             * int
     
-              >>> a.get(0, 3)
+              >>> a.Get(0, 3)
 
             * slice
 
-              >>> a.get(slice(0,3))
+              >>> a.Get(slice(0,3))
             
             * representor
 
-              >>> a.get(a.f0 + 3, a.f3 == "gene3",  rep(3))
+              >>> a.Get(a.f0 + 3, a.f3 == "gene3",  Rep(3))
 
             * context
 
-              >>> a.perform_some_operation().get(_.f0 + 3, _.f3 == "gene3")
+              >>> a.perform_some_operation().Get(_.f0 + 3, _.f3 == "gene3")
             
             * tuple
 
-              >>> a.get((_.f0, _.f1), _.f3)
+              >>> a.Get((_.f0, _.f1), _.f3)
 
             * list
 
-              >>> a.get([_.f0])
+              >>> a.Get([_.f0])
 
         """
         return repops_slice.Project(self,*slices,**kwds)
 
-    def without(self, *slices):
+    def Without(self, *slices):
         return repops_slice.Unproject(self,*slices)
 
-    def elements(self, name=None):
+    def Elements(self, name=None):
         """Unpacks array type into dimension"""
         return repops_dim.UnpackArray(self, name)
 
-    def attributes(self, name=None):
+    def Attributes(self, name=None):
         """Unpacks tuple type into slices"""
         return repops_slice.UnpackTuple(self, name)
 

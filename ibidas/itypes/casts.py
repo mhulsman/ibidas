@@ -55,7 +55,7 @@ def canCast(intype, outtype, dimdepth):
                 return pos_cast.name
     else:
         for pos_cast in pos_casts:        
-            if(outtype.__class__ in pos_cast.out_type_cls):
+            if(outtype in pos_cast.out_type_cls):
                 otype = pos_cast.simtypefunc(intype, outtype, dimdepth)
                 return (otype, pos_cast.name)
     return False
@@ -135,3 +135,21 @@ def simDePickle(intype, outtypecls, dimdepth):
 addCasts(rtypes.TypePickle, rtypes.TypeAll, checkDefault, simDePickle,"from_pickle")
 
 
+def checkArray(intype, outtype):#{{{
+    if(intype.has_missing and not outtype.has_missing):
+        return False
+    
+    if len(outtype.dims) != 1:
+        return False
+
+    if not intype.dims[0].shape == outtype.dims[0].shape or not intype.dims[0].dependent == outtype.dims[0].dependent:
+        return False
+
+    if not intype.subtypes == outtype.subtypes:
+        return False
+    return True
+
+def simArray(intype, outtypecls, dimdepth):
+    return rtypes.TypeArray(has_missing=intype.has_missing, dims=intype.dims, subtypes=intype.subtypes)
+
+addCasts(rtypes.TypeStrings | set([rtypes.TypeSet]), rtypes.TypeArray, checkArray, simArray,"to_array")

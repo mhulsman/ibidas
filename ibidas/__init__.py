@@ -2,48 +2,59 @@
 The ibidas module contains all main functions for working with ibidas objects.
 """
 
-__all__ = ["rep","read","connect","_",
-           "rarray","rtuple","combine","harray",
-           "stack",
-           "pos","argsort",
-           "rany","rall",
-           "rmax","rmin",
-           "argmin","argmax",
-           "mean","median",
-           "rsum",
-           "count",
-           "bcast","createType",
+__all__ = ["Rep","Read","Connect","_",
+           "Array","Tuple","Combine","HArray",
+           "Stack",
+           "Pos","Argsort",
+           "Any","All",
+           "Max","Min",
+           "Argmin","Argmax",
+           "Mean","Median",
+           "Sum",
+           "Count",
+           "Broadcast","CreateType",
            "newdim","Missing",
-           "corr","within","contains",
-           "download","get",
-           "startServer"
+           "Corr","Within","Contains",
+           "Fetch","Serve","Get",
+           "Load","Save",
            ]
 
 from utils import delay_import
+from utils.util import save_rep as Save, load_rep as Load
 from utils.context import _
 from utils.missing import Missing
 from utils.infix import Infix,RevInfix
-from itypes import *
-from wrappers.wrapper_py import rep
+from itypes import createType as CreateType
+from wrappers.wrapper_py import Rep
 from wrappers.wrapper_tsv import TSVRepresentor
 from wrappers.wrapper_sql import open_db
 from representor import newdim
-from repops_dim import RArray as rarray
-from repops_multi import Broadcast as bcast, Combine as combine, Sort as sort, Stack as stack
-from repops_slice import RTuple as rtuple, HArray as harray
-from repops_funcs import argsort, pos, Any as rany, All as rall,\
-                         Max as rmax, Min as rmin, ArgMax as argmax, ArgMin as argmin,\
-                         rsum, Mean as mean, Median as median, Count as count,\
-                         Corr as corr
+from repops_dim import Array
+from repops_multi import Broadcast, Combine, Sort, Stack
+from repops_slice import Tuple, HArray
+from repops_funcs import Corr
 from download_cache import DownloadCache
-from pre import predefined_sources as get
-from server import startServer
+from pre import predefined_sources as Get
+from server import Serve
 
-download = DownloadCache()
-within = Infix(repops_funcs.Within)
-contains = RevInfix(repops_funcs.Within)
+Fetch = DownloadCache()
+Within = Infix(repops_funcs.Within)
+Contains = Infix(repops_funcs.Contains)
 
-def read(url, **kwargs):
+Pos = repops.delayable(default_slice="#")(repops_funcs.Pos)
+Argsort = repops.delayable()(repops_funcs.Argsort)
+Argmax = repops.delayable()(repops_funcs.Argmin)
+Argmin = repops.delayable()(repops_funcs.Argmax)
+Sum = repops.delayable()(repops_funcs.Sum)
+Any = repops.delayable()(repops_funcs.Any)
+All = repops.delayable()(repops_funcs.All)
+Max = repops.delayable()(repops_funcs.Max)
+Min = repops.delayable()(repops_funcs.Min)
+Mean = repops.delayable()(repops_funcs.Mean)
+Median = repops.delayable()(repops_funcs.Median)
+Count = repops.delayable()(repops_funcs.Count)
+
+def Read(url, **kwargs):
     format = kwargs.pop('format','tsv')
 
     if(format == 'tsv'):
@@ -51,7 +62,7 @@ def read(url, **kwargs):
     else:
         raise RuntimeError("Unknown format specified")
 
-def connect(url, **kwargs):
+def Connect(url, **kwargs):
     format = kwargs.pop('format','db')
     if(format == "db"):
         return open_db(url, **kwargs)

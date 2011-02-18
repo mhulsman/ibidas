@@ -16,4 +16,4 @@ def read_phospho(path):
             r = row.split('\t')
             data.append((str(elem), r[0], float(r[1])))
 
-    return rep(data,dtype)
+    return Rep(data,dtype)

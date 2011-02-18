@@ -33,12 +33,12 @@ class To(repops.UnaryOpRep):
         if not source._state & RS_SLICES_KNOWN:
            return
         
-        do = kwargs.pop("do")
+        do = kwargs.pop("Do")
         assert not kwargs, "Unknown parameters: " + str(kwargs)
 
         nslices = list(source._slices)
         for ssel in slicesel:
-            r = source.get(ssel) 
+            r = source.Get(ssel) 
             assert len(r._slices) == 1, "To action can only be applied to single slices"
             slice = r._slices[0]
             assert slice in source._slices, "Selected slice in to should not be operated upon"
@@ -93,20 +93,25 @@ class Project(repops.UnaryOpRep):
                         nelem = cur_slices
                     else:
                         nelem = [slice for slice in cur_slices if slice.name == elem]
-                        if(not nelem and len(cur_slices) == 1 and isinstance(cur_slices[0].type,rtypes.TypeTuple) 
-                            and (elem in cur_slices[0].type.fieldnames or (isinstance(elem,int) and elem >= 0 and elem < len(cur_slices[0].type.fieldnames)))):
-                            nelem = unpack_tuple(cur_slices[0],elem)
-                        assert len(nelem) ==1, "Could not find (unique) matching slice for name: " + elem
+                        if(not nelem):
+                            if len(cur_slices) == 1 and isinstance(cur_slices[0].type,rtypes.TypeTuple) \
+                               and (elem in cur_slices[0].type.fieldnames or (isinstance(elem,int) and elem >= 0 and elem < len(cur_slices[0].type.fieldnames))):
+                               nelem = unpack_tuple(cur_slices[0],elem)
+                            else:
+                               nelem = [slice for slice in cur_slices if elem in slice.bookmarks]
+                               assert len(nelem) > 0, "Could not find (unique) matching slice/bookmark for name: " + elem
+                        else:
+                            assert len(nelem) ==1, "Could not find (unique) matching slice for name: " + elem
                     elem = nelem
                 elif(isinstance(elem, representor.Representor)):
                     pass
                 elif(isinstance(elem, tuple)):
-                    elem = RTuple(self._source.get(*elem))
+                    elem = Tuple(self._source.Get(*elem))
                 elif(isinstance(elem, list)):
                     if(len(elem) == 1):
-                        elem = self._source.get(*elem).array()
+                        elem = self._source.Get(*elem).Array()
                     else:
-                        elem = self._source.get(*elem).array()
+                        elem = self._source.Get(*elem).Array()
                 else:
                     elem = util.select(cur_slices, elem)
 
@@ -264,7 +269,7 @@ class SliceCast(repops.UnaryOpRep):
         #}}}
 
 
-class RTuple(repops.UnaryOpRep):
+class Tuple(repops.UnaryOpRep):
     _ocls = ops.PackTupleOp
     def _process(self, source, **kwargs):
         if not source._state & RS_SLICES_KNOWN:
@@ -290,7 +295,7 @@ class RTuple(repops.UnaryOpRep):
     
         return cls._ocls(nslices, **kwargs)
        
-class RDict(RTuple):
+class Dict(Tuple):
     _ocls = ops.PackDictOp
 
 @repops.delayable()
@@ -335,7 +340,7 @@ class ToPythonRep(repops.UnaryOpRep):
             nslices.append(slice)
        
         if(len(nslices) > 1):
-            nslice = RTuple._apply(nslices,to_python=True)
+            nslice = Tuple._apply(nslices,to_python=True)
         else:
             nslice = nslices[0]
 

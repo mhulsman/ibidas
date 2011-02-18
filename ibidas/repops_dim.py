@@ -127,7 +127,7 @@ class PermuteDims(repops.UnaryOpRep):
 
 
 @repops.delayable()
-class RArray(repops.UnaryOpRep):
+class Array(repops.UnaryOpRep):
     def _process(self, source, tolevel=None):
         if not source._state & RS_SLICES_KNOWN:
             return

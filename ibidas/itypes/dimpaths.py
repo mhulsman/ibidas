@@ -554,7 +554,7 @@ def identifyDimPathSource(source,dim_selector):#{{{
         dim_selector = context._apply(dim_selector, source)
     elif(isinstance(dim_selector, basestring)):
         if(dim_selector in [s.name for s in source._slices] or dim_selector[0].isupper()):
-            dim_selector = get(source,dim_selector)
+            dim_selector = getattr(source,dim_selector)
 
     if(isinstance(dim_selector, representor.Representor)):
         return set([s.dims for s in dim_selector._slices])
@@ -600,7 +600,7 @@ def identifyDimPath(sourcepaths, dim_selector):#{{{
     elif(isinstance(dim_selector, set)):
         res = set()
         for elem in dim_selector:
-            res.add(identifyDimPath(sourcepaths, dim_selector))
+            res.update(identifyDimPath(sourcepaths, elem))
         return res 
     else:
         raise RuntimeError, "Unexpected dim selector: " + str(dim_selector)

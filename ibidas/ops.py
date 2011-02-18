@@ -121,7 +121,10 @@ class ChangeDimPathOp(UnaryUnaryOp):#{{{
 class CastOp(UnaryUnaryOp):#{{{
     __slots__ = ["cast_name"]
     def __init__(self, source, new_type):
-        cast_name = casts.canCast(source.type,new_type, len(source.dims))
+        if(isinstance(new_type, rtypes.TypeUnknown)):
+            cast_name = casts.canCast(source.type,new_type, len(source.dims))
+        else:
+            new_type,cast_name = casts.canCast(source.type,new_type, len(source.dims))
         assert not cast_name is False, "Cannot cast " + str(source.type) + " to " + str(new_type)
         self.cast_name = cast_name
         UnaryUnaryOp.__init__(self, source, rtype=new_type)#}}}
@@ -138,6 +141,10 @@ class UnpackArrayOp(UnaryUnaryOp):#{{{
 
         :param slice: Source slice to be unpacked"""
         stype = slice.type
+        if(isinstance(stype, (rtypes.TypeSet, rtypes.TypeString))):
+            slice = CastOp(slice,rtypes.TypeArray)
+            stype = slice.type
+            
 
         if(ndim is None):
             if(not stype.dims):
@@ -161,6 +168,12 @@ class UnpackArrayOp(UnaryUnaryOp):#{{{
             stype = stype.subtypes[0]
             ndim -= len(nudims)
             unpack_dims.extend(nudims)
+            if(ndim and isinstance(stype, (rtypes.TypeSet, rtypes.TypeString))):
+                slice = UnpackArrayOp(slice,len(unpack_dims))
+                slice = CastOp(slice, rtypes.TypeArray)
+                unpack_dims = []
+                stype = slice.type
+                res_dims = []
         
         if(rest_dims):
             ntype = rtypes.TypeArray(last_type.has_missing, dimpaths.DimPath(*rest_dims), last_type.subtypes)

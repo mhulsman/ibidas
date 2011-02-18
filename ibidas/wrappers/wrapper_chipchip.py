@@ -17,7 +17,7 @@ def read_chipchip(path):
         for con in cons:
             filename = path + "orfs_by_factor_%s_cons%s.txt" % (pval_name, str(con))
             res = ChipChipRepresentor(filename)
-            res = res.E.A.join(rep([(mpval, con)])/("max_pval", "conservation"))
+            res = res.E.A.join(Rep([(mpval, con)])/("max_pval", "conservation"))
             res = res.flat().tuple().array()
             loaded_files.append(res)
 

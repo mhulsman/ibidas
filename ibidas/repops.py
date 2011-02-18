@@ -23,7 +23,7 @@ def delayable(default_slice="*"):
     Other parameters of the function can still be given, either by 
     param order or keyword.
     Examples:
-    data = rep(data) (f1, f2, f3 slices)
+    data = Rep(data) (f1, f2, f3 slices)
 
     data[pos(data.f0) < 10] == data[pos(_.f0) < 10] == \
         data[pos("#") < 10] == data[pos() < 10]
@@ -36,12 +36,12 @@ def delayable(default_slice="*"):
                     params = (kwds['source'],)
                     del kwds['source']
                 else:
-                    return _.get(default_slice)._call(func, **kwds)
+                    return _.Get(default_slice)._call(func, **kwds)
             if(not isinstance(params[0], representor.Representor)):
                 if(isinstance(params[0], context.Context)):
                     return params[0]._call(func, *params[1:], **kwds)
                 else:
-                    return _.get(params[0])._call(func, *params[1:], **kwds)
+                    return _.Get(params[0])._call(func, *params[1:], **kwds)
             return func(*params, **kwds)
         return delayable_function
     return new
@@ -89,7 +89,7 @@ class Gather(Fixate):#{{{
         if not source._state & RS_SLICES_KNOWN:
             return
         nslice = ops.GatherOp(source._slices)
-        self._initialize((nslice,), RS_SLICES_KNOWN)
+        self._initialize((nslice,), RS_SLICES_KNOWN)#}}}
 
 class PlusPrefix(UnaryOpRep):#{{{
     pass

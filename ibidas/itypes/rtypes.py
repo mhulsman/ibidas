@@ -1075,14 +1075,19 @@ def createType(name, dimpos=0):#{{{
         
         if(name.char == 'S'):
             if(name.itemsize == 0):
-                return TypeBytes(False)
+                dim = dimensions.Dim(UNDEFINED, (True,) * dimpos, False) 
+                return TypeBytes(dims=dimpaths.DimPath(dim))
             else:
-                return TypeBytes(False, name.itemsize)
+                dim = dimensions.Dim(name.itemsize, (True,) * dimpos, False) 
+                return TypeBytes(dims=dimpaths.DimPath(dim))
         elif(name.char == 'U'):
             if(name.itemsize == 0):
-                return TypeString(False)
+                dim = dimensions.Dim(UNDEFINED, (True,) * dimpos, False) 
+                return TypeString(dims=dimpaths.DimPath(dim))
             else:
-                return TypeString(False, name.itemsize / 4)
+                usize = numpy.array("test").dtype.itemsize / 4
+                dim = dimensions.Dim(name.itemsize / usize, (True,) * dimpos, False) 
+                return TypeString(dims = dimpaths.DimPath(dim))
         elif(name in __objtype_map__):
             return __objtype_map__[name](False)
         else:

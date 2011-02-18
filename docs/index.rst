@@ -12,6 +12,7 @@ Contents:
    :maxdepth: 2
 
    installation
+   examples
    tutorial
 
    ibidas_module

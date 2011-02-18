@@ -13,7 +13,7 @@ class DownloadCache(object):
     def url_to_file(self, url):
         return url.split('/')[-1]
 
-    def get(self, url, dbname=None, filename=None):
+    def __call__(self, url, dbname=None, filename=None):
         if(filename is None):
             filename = self.url_to_file(url)
         if(dbname is None):

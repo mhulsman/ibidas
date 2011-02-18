@@ -12,23 +12,23 @@ class TestData(unittest.TestCase):
         self.data = None
 
     def test_init(self):
-        k = rep(self.data)()
+        k = Rep(self.data)()
 
     def test_same(self):
-        orig = rep(self.data) 
-        reload = rep(orig()) 
+        orig = Rep(self.data) 
+        reload = Rep(orig()) 
         self.assertTrue(orig ==+ reload)
     
     def getRep(self):
         if(hasattr(self,'dtype')):
-            return rep(self.data,dtype=self.dtype[0])
+            return Rep(self.data,dtype=self.dtype[0])
         else:
-            return rep(self.data)
+            return Rep(self.data)
     
     def test_type(self):
         if(hasattr(self,'dtype')):
             for elem in self.dtype:
-                self.assertTrue(rep(self.data,dtype=elem) ==+ rep(self.data))
+                self.assertTrue(rep(self.data,dtype=elem) ==+ Rep(self.data))
 
 class TestScalar(TestData):
     def setUp(self):
@@ -40,16 +40,16 @@ class TestArray(TestData):
         self.fres0 = 1
     
     def test_type(self):
-        k = rep(self.data)()
+        k = Rep(self.data)()
         self.assertTrue(k.dtype == self.data.dtype)
 
     def test_filter(self):
-        k = rep(self.data)
+        k = Rep(self.data)
         self.assertTrue(k[k == 3]==3)
         self.assertFalse(k[k == 3] == 4)
 
     def test_filter2(self):
-        k = rep(self.data)
+        k = Rep(self.data)
         self.assertTrue(k[0] == self.fres0)
 
 
@@ -62,38 +62,38 @@ class TestMatrix(TestArray):
 
     def test_tranpose(self):
         r = self.getRep()
-        pidx = range(r.Idepth)
-        self.assertTrue(r.transpose(pidx) ==+ r)
+        pidx = range(r.Depth)
+        self.assertTrue(r.Transpose(pidx) ==+ r)
        
         if(hasattr(self,'transpose_couples')):
            for i in range(len(self.transpose_couples)):
                t1,t2 = self.transpose_couples[i]
-               self.assertTrue(r.transpose(t1).transpose(t2) ==+ r)
+               self.assertTrue(r.Transpose(t1).Transpose(t2) ==+ r)
         
     def test_flat(self):
-       f1 = rep(self.data)
+       f1 = Rep(self.data)
        #backward
-       while(f1.Idepth >= 2):
-            f1 = f1.flat(None)
+       while(f1.Depth >= 2):
+            f1 = f1.Flat(None)
        #forward
-       f2 = rep(self.data)
-       while(f2.Idepth >= 2):
-            f2 = f2.flat(f2._slices[0].dims[1].name)
+       f2 = Rep(self.data)
+       while(f2.Depth >= 2):
+            f2 = f2.Flat(f2._slices[0].dims[1].name)
        #all
-       f3 = rep(self.data).flatall()
+       f3 = Rep(self.data).FlatAll()
        #compare
        self.assertTrue(f1 ==+ f2)
        self.assertTrue(f2 ==+ f3)
-       self.assertFalse(f2 ==+ (f3.sort()))
+       self.assertFalse(f2 ==+ (f3.Sort()))
 
 
     def test_filter3(self):
-        k = rep(self.data)
-        self.assertTrue(k[:1].flat() ==+ k[0])
+        k = Rep(self.data)
+        self.assertTrue(k[:1].Flat() ==+ k[0])
 
     def test_filter4(self):
-        k = rep(self.data)
-        self.assertTrue(k[rep([0],unpack=False)].flat() ==+ k[0])
+        k = Rep(self.data)
+        self.assertTrue(k[Rep([0],unpack=False)].Flat() ==+ k[0])
        
 
 class TestNestedArray(TestMatrix):
@@ -114,7 +114,7 @@ class TestNestedMatrixString(TestMatrix):
         self.transpose_couples = [((0,2,1),(0,2,1)),((2,0,1),(1,2,0))]
     
     def test_filter(self):
-        k = rep(self.data)
+        k = Rep(self.data)
         self.assertTrue(k[k == "def"]=="def")
         self.assertFalse(k[k == "def"] == "defg")
 
@@ -124,7 +124,7 @@ class TestNestedNestedArray(TestMatrix):
         self.fres0 = cutils.darray([[1,2,[]],[1,2],[1]])
 
     def test_filter2(self):
-        k = rep(self.data)
+        k = Rep(self.data)
         self.assertRaises(Exception,k[0])
 
     def test_filter3(self):
@@ -139,7 +139,7 @@ class TestNestedNestedMatrix(TestMatrix):
         self.transpose_couples = [((0,1,3,2),(0,1,3,2)),((0,3,1,2),(0,2,3,1)),((3,0,1,2),(1,2,3,0))]
 
     def test_filter2(self):
-        k = rep(self.data)
+        k = Rep(self.data)
         self.assertRaises(Exception,k[3])
 
 class TestArrayNestedNestedMatrix(TestMatrix):
@@ -149,7 +149,7 @@ class TestArrayNestedNestedMatrix(TestMatrix):
         self.transpose_couples = [((1,2,3,4,0),(4,0,1,2,3)),((1,0,2,3,4),(1,0,2,3,4)),((1,2,0,3,4),(2,0,1,3,4)),((1,2,3,0,4),(3,0,1,2,4))]
 
     def test_filter2(self):
-        k = rep(self.data)
+        k = Rep(self.data)
         self.assertRaises(Exception,k[3])
 
 class TestNestedVarMatrix(TestMatrix):

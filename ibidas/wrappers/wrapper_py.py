@@ -4,6 +4,7 @@ from collections import defaultdict
 import numpy
 import sys
 import cPickle
+import time
 
 import wrapper
 from ..constants import *
@@ -25,7 +26,7 @@ _delay_import_(globals(),"..utils.missing","Missing")
 class PyRepresentor(wrapper.SourceRepresentor):
     pass
 
-def rep(data=None, dtype=None, unpack=True, name=None):
+def Rep(data=None, dtype=None, unpack=True, name=None):
     """Packs python data structures into a :py:class:`ibidas.representor.Representor` object.
         
        :param data: any python object
@@ -45,28 +46,28 @@ def rep(data=None, dtype=None, unpack=True, name=None):
 
             The, to load using type autodetection, use:
 
-            >>> r = rep(data)
+            >>> r = Rep(data)
             Slices: f0       f1     
             Types:  bytes[7] real64 
             Dims:   d1:3     .   
             
             Specifying type directly:
 
-            >>> r = rep(data,"[genes]<(name:string, value:real64)")
+            >>> r = Rep(data,"[genes]<(name:string, value:real64)")
             Slices: name    value
             Types:  string  real64
             Dims:   genes:* .
 
             Effect of setting unpack to False:
 
-            >>> r = rep(data,"[genes]<(name:string, value:real64)", unpack=False)
+            >>> r = Rep(data,"[genes]<(name:string, value:real64)", unpack=False)
             Slices: data                                  
             Types:  [genes:*]:(name=string, value=real64) 
             Dims: 
             
             Specifying root slice name:
 
-            >>> r = rep(data,"[genes]<(name:string, value:real64)", unpack=False, name="gene_table")
+            >>> r = Rep(data,"[genes]<(name:string, value:real64)", unpack=False, name="gene_table")
             Slices: gene_table                                  
             Types:  [genes:*]:(name=string, value=real64) 
             Dims: 
@@ -132,8 +133,14 @@ class ResultOp(ops.DataOp):
         self.name = source.name
 
     def __repr__(self):
-        return  "\nName: " + str(self.name) + ", Type:   " + str(self.type) + ", Dims: " + str(self.dims) 
-
+        res = "\nName: " + str(self.name) + ", Type:   " + str(self.type) + ", Dims: " + str(self.dims) 
+        try:
+            r = str(self.data)
+            r.decode('utf-8')
+        except UnicodeDecodeError:
+            return res
+        res += '\n' + r
+        return res
 
 class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), 
              DirectVisitorFactory(prefixes=("cast",),flags=NF_ERROR), manager.Pass):
@@ -159,6 +166,8 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 param_kwds[name] = arguments[param_ids]
                 use_counters[param_ids] -= 1
                 
+            if(debug_mode):
+                start = time.time()
             try:
                 res = self.visit(command, **param_kwds)
             except Exception, e:
@@ -171,12 +180,10 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                         pass
                 raise exc_info[1], None, exc_info[2]
             if(debug_mode):
-                r = str(res)
-                try:
-                    r.decode('utf-8')
-                    self.graph.na["output"][command] = r
-                except UnicodeDecodeError:
-                    pass
+                rtime = time.time() - start
+                self.graph.na["output"][command] = str(res)
+                self.graph.na["time"][command] = rtime
+                self.graph.na["time_readable"][command] = util.format_runtime(rtime)
 
             arguments[command_id] = res
             use_counters[command_id] = param_usecount[command]
@@ -497,7 +504,12 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     
     def caststring_to_string(self, castname, node, slice):
         return slice.data
-   
+
+    def castto_array(self, castname, node, slice):
+        func = stringset_to_array
+        dtype = node.type.toNumpy()
+        return slice.data.mapseq(func, dtype=dtype, res_type=node.type)
+
     def caststring_to_real(self, castname, node, slice):
         if(node.type.has_missing):
             func = string_to_real_missing
@@ -513,6 +525,10 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         res = [elem in arr for elem,arr in zip(data1,data2)]
         return cutils.darray(res,bool)
 
+    def withinContains(self, data, type1, type2, typeo, op):
+        data2,data1 = data
+        res = [elem in arr for elem,arr in zip(data1,data2)]
+        return cutils.darray(res,bool)
 
     def simple_arithGeneral(self, data, type1, type2, typeo, op):
         data1,data2 = data
@@ -572,7 +588,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         else:
             return cutils.darray([eachfunc(elem) for elem in data],type_out.toNumpy())
 
-    def sortableArgSort(self, data, type_in, type_out, op, packdepth, descend=False):
+    def sortableArgsort(self, data, type_in, type_out, op, packdepth, descend=False):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(len(data.shape) < 2):
             if(descend):
@@ -632,13 +648,28 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         else:
            return cutils.darray([set(row) for row in data],dtype)
     
+    def uniqueGeneral(self, data, type_in, type_out, op, packdepth):
+        data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
+        dtype = type_out.toNumpy()
+        if(packdepth > 1):
+           return cutils.darray([[numpy.unique(subrow,return_index=True)[1] for subrow in row.transpose()] for row in data],dtype,2,2)
+        else:
+           return cutils.darray([numpy.unique(row, return_index=True)[1] for row in data],dtype)
+   
     def arrayarraySum(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(packdepth > 1):
             return cutils.darray([[numpy.concatenate(list(subrow),axis=0) for subrow in row.transpose()] for row in data],object,2,2)
         else:
             return cutils.darray([numpy.concatenate(list(row),axis=0) for row in data],object)
- 
+    
+    def stringstringSum(self, data, type_in, type_out, op, packdepth):
+        data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
+        if(packdepth > 1):
+            return cutils.darray([[''.join(list(subrow)) for subrow in row.transpose()] for row in data],object,2,2)
+        else:
+            return cutils.darray([''.join(list(row)) for row in data],object)
+
     def fixdimGeneral(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         func = numpy_dimfuncs[op]
@@ -676,8 +707,8 @@ numpy_dimfuncs = {
     'All':numpy.all,
     'Sum':numpy.sum,
     'Median':numpy.median,
-    'ArgMin':numpy.argmin,
-    'ArgMax':numpy.argmax
+    'Argmin':numpy.argmin,
+    'Argmax':numpy.argmax
     }
 
 python_op = {'Equal':'__eq__',
@@ -752,7 +783,7 @@ def speedfilter(seqs,has_missing, ctype):
                 for pos, elem in enumerate(constraint.ravel()):
                     if(elem is Missing):
                         res.append(Missing)
-                    elif(elem is True):
+                    elif(elem == True):
                         res.append(data[pos])
                 res = cutils.darray(res,object)
             else:#indices
@@ -898,6 +929,16 @@ def add_independent(data,dim):
             wx.insert(pos,1)
     data = numpy.reshape(data,wx[::-1])
     return data
+
+
+def stringset_to_array(seq, dtype):
+    res = []
+    for elem in seq:
+        if elem is Missing:
+            res.append(Missing)
+        else:
+            res.append(cutils.darray(list(elem),dtype))
+    return cutils.darray(res)
 
 
 def string_to_int_missing(seq, dtype):

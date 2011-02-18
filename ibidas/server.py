@@ -3,7 +3,7 @@ from utils import util
 from representor import Representor
 import thread
 
-def startServer(portnumber=9889):
+def Serve(portnumber=9889):
     """Starts xml-rpc server on the supplied port number. Can be used to contact ibidas
        from other applications.
        
@@ -24,8 +24,8 @@ def startServer(portnumber=9889):
        Starting the server::
            
            $ ibidas
-           >>> s = startServer()
-           >>> z = rep([1,2,3,4])
+           >>> s = Serve()
+           >>> z = Rep([1,2,3,4])
       
        Connecting to ibidas (python, but can be any other application supporting xml-rpc)::
            $ipython
@@ -77,7 +77,7 @@ class LocalRequestHandler(object):
 
         res = eval(query,getGlobals(), session)
         if(isinstance(res,Representor)):
-            res = res.to_python()
+            res = res.ToPython()
         
         return res
 

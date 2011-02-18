@@ -100,15 +100,15 @@ class Group(repops.MultiOpRep):
         #specified slices
         for key,values in flat.iteritems():
             if(isinstance(key,tuple)):
-                keyslices = gsource.get(*key)
+                keyslices = gsource.Get(*key)
             else:
-                keyslices = gsource.get(key)
+                keyslices = gsource.Get(key)
             nkey = tuple([gsource._slices.index(keyslice) for keyslice in keyslices._slices])
              
             if(isinstance(values,tuple)):
-                vslices = source.get(*values)
+                vslices = source.Get(*values)
             else:
-                vslices = source.get(values)
+                vslices = source.Get(values)
             
             pos = []
             for slice in vslices._slices:
@@ -139,7 +139,7 @@ class Group(repops.MultiOpRep):
         #filter flattened slices 
         gidx = range(len(gsource._slices))
         gdims = gslice.dims[-len(gsource._slices):]
-        firstelem = wrapper_py.rep(0)._slices[0]
+        firstelem = wrapper_py.Rep(0)._slices[0]
         for key, pos in xflat.iteritems():
             tslice = gslice
             for elem in gidx:
@@ -161,7 +161,7 @@ class Group(repops.MultiOpRep):
 class Filter(repops.MultiOpRep):
     def __init__(self,source,constraint,dim=None):
         if(not isinstance(constraint,representor.Representor)):
-            constraint = repops.PlusPrefix(wrapper_py.rep(constraint,name="filter"))
+            constraint = repops.PlusPrefix(wrapper_py.Rep(constraint,name="filter"))
         repops.MultiOpRep.__init__(self,(source,constraint),dim=dim)
 
     def _process(self,sources,dim):
@@ -223,7 +223,7 @@ class Sort(repops.MultiOpRep):
             repops.MultiOpRep.__init__(self,(source,),descend=descend)
         else:
             if(not isinstance(constraint,representor.Representor)):
-                constraint = repops.PlusPrefix(wrapper_py.rep(constraint,name="filter"))
+                constraint = repops.PlusPrefix(wrapper_py.Rep(constraint,name="filter"))
             repops.MultiOpRep.__init__(self,(source,constraint),descend=descend)
 
     def _process(self, sources, descend):
@@ -233,19 +233,52 @@ class Sort(repops.MultiOpRep):
         if(len(sources) == 1): #no explicit constraint, use data itself
             source = sources[0]
             if len(source._slices) > 1:
-                constraint = source.tuple()
+                constraint = source.Tuple()
             else:
                 constraint = source
         else:
             source,constraint = sources 
 
         if len(constraint._slices) > 1:
-            constraint = constraint.tuple()
+            constraint = constraint.Tuple()
         
         #fixme: make it slice-only (remove rep)
-        constraint = repops_funcs.ArgSort(constraint, descend=descend)
+        constraint = repops_funcs.Argsort(constraint, descend=descend)
         cslice = ops.PackArrayOp(constraint._slices[0])
         nslices = Filter._apply(source._slices, cslice, cslice.type.dims[:1],"dim")
+        return self._initialize(tuple(nslices),source._state & constraint._state)
+
+
+class Unique(repops.MultiOpRep):
+    def __init__(self,source,constraint=None,descend=False):
+        if(constraint is None):
+            repops.MultiOpRep.__init__(self,(source,),descend=descend)
+        else:
+            if(not isinstance(constraint,representor.Representor)):
+                constraint = repops.PlusPrefix(wrapper_py.Rep(constraint,name="filter"))
+            repops.MultiOpRep.__init__(self,(source,constraint),descend=descend)
+
+    def _process(self, sources, descend):
+        if not any([s._state & RS_SLICES_KNOWN for s in sources]):
+            return
+
+        if(len(sources) == 1): #no explicit constraint, use data itself
+            source = sources[0]
+            if len(source._slices) > 1:
+                constraint = source.Tuple()
+            else:
+                constraint = source
+        else:
+            source,constraint = sources 
+
+        if len(constraint._slices) > 1:
+            constraint = constraint.Tuple()
+        
+        #fixme: make it slice-only (remove rep)
+        dpath = dimpaths.identifyUniqueDimPathSource(constraint,None)
+        uconstraint = repops_funcs.Argunique(constraint)
+        cslice = uconstraint._slices[0]
+        nslices = Filter._apply(source._slices, cslice, dpath[-1:],"dim")
         return self._initialize(tuple(nslices),source._state & constraint._state)
 
 
@@ -318,16 +351,16 @@ class Match(repops.MultiOpRep):
          
         if(lslice is None):
             if(rslice is None):
-                common_names = set(lsource.Inames) & set(rsource.Inames)
+                common_names = set(lsource.Names) & set(rsource.Names)
                 if(len(common_names) != 1):
                     raise RuntimeError, "Cannot find a unique common named slice"
                 name = common_names.pop()
                 lslice = getattr(lsource,name)
                 rslice = getattr(rsource,name)
             else:
-                lslice = getattr(lsource,rslice.Inames[0])
+                lslice = getattr(lsource,rslice.Names[0])
         elif(rslice is None):
-            rslice = getattr(rsource,lslice.Inames[0])
+            rslice = getattr(rsource,lslice.Names[0])
         assert len(rslice._slices) == 1, "rslice parameter in match should have only one slice"
         assert len(lslice._slices) == 1, "lslice parameter in match should have only one slice"
 

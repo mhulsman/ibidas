@@ -13,14 +13,14 @@ def yeast_feats():
 
     rtype = "[feats:*]<(sgdid=bytes, feat_type=bytes, feat_qual=bytes, feat_name=bytes, gene_name=bytes, gene_aliases=bytes, feat_parent_name=bytes, sgdid_alias=bytes, chromosome=bytes, start=bytes, stop=bytes, strand=bytes[1], genetic_pos=bytes, coordinate_version=bytes[10], sequence_version=bytes, description=bytes)"
     
-    res = read(download.get("http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab"),dtype=rtype)
+    res = Read(Fetch("http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab"),dtype=rtype)
 
     splitfunc = lambda x: x.split("|")
     outtype = "[aliases:~]<bytes"
-    res = res.to(_.gene_aliases,  do=_.each(splitfunc, dtype=outtype).elements()[_ != ""])
-    res = res.to(_.start, _.stop, do=_.cast("int$"))
-    res = res.to(_.genetic_pos,   do=_.cast("real64$"))
-    return res.copy()
+    res = res.To(_.gene_aliases,  Do=_.Each(splitfunc, dtype=outtype).Elements()[_ != ""])
+    res = res.To(_.start, _.stop, Do=_.Cast("int$"))
+    res = res.To(_.genetic_pos,   Do=_.Cast("real64$"))
+    return res.Copy()
 predefined_sources.register(yeast_feats)  
 
 
@@ -30,26 +30,26 @@ def yeast_aliases(feats):
 
        Can be used to map names to official names (with match)"""
 
-    res = stack(feats.get(_.feat_name, _.gene_aliases).flat(), 
-                feats.get(_.feat_name, _.gene_name), 
-                feats.get(_.feat_name, _.feat_name))
-    res = res[_.alias != ""]
-    res = res%"feat_aliases"
+    res = Stack(feats.Get(_.feat_name, _.gene_aliases).Flat(), 
+                feats.Get(_.feat_name, _.gene_name), 
+                feats.Get(_.feat_name, _.feat_name))
     res = res/("feat_name", "alias")
-    return res.tuple().unique().attributes().copy()
+    res = res%"feat_aliases"
+    res = res[_.alias != ""]
+    return res.Tuple().Unique().Attributes().Copy()
 predefined_sources.register(yeast_aliases)  
 
 def in_memory_db():
     """Returns an empty in memory database"""
-    return connect("sqlite:///:memory:");
+    return Connect("sqlite:///:memory:");
 predefined_sources.register(in_memory_db)
 
 
 def yeastract(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"):
     """Downloads documented transcription factor regulation interactions from yeastract"""
     rtype = "[tfs:*]<(tf=bytes, target=bytes)"
-    res = read(download.get(url),dtype=rtype)
-    return res.copy()
+    res = Read(Fetch(url),dtype=rtype)
+    return res.Copy()
 predefined_sources.register(yeastract)
 
 
@@ -66,35 +66,41 @@ def string_interactions(dburl, species="Saccharomyces cerevisiae"):
        >>> connect(dburl).items.species.offical_name
 
     """
-    z = connect(dburl)
+    z = Connect(dburl)
     pyeast = z.items.proteins 
-    inter  = z.items.species.match(z.network.protein_protein_links)
+    inter  = z.items.species.Match(z.network.protein_protein_links)
     inter  = inter[_.official_name == species]
-    inter  = inter.match(pyeast//"left", _.protein_id_a, _.protein_id)
-    inter  = inter.match(pyeast//"right",_.protein_id_b, _.protein_id)
-    return inter.get(_.Bleft.preferred_name/"left", 
-                     _.Bright.preferred_name/"right", 
-                     _.combined_score) % "interactions"
+    inter  = inter.Match(pyeast//"left", _.protein_id_a, _.protein_id)
+    inter  = inter.Match(pyeast//"right",_.protein_id_b, _.protein_id)
+    return   inter.Get(_.left.preferred_name/"left", 
+                       _.right.preferred_name/"right", 
+                       _.combined_score) % "interactions"
 predefined_sources.register(string_interactions)
 
 
 def omim_genemap():
     """The omim genemap data"""
-    rtype = "[omim:*]<(chr_map_entry_nr=bytes, month=bytes, day=bytes, year=bytes, location=bytes, gene_symbol=bytes, gene_status=bytes[1], title=bytes, f8=bytes, mim=bytes, method=bytes, comments=bytes, f12=bytes, disease1=bytes, disease2=bytes, disease3=bytes, mouse=bytes, reference=bytes)"
-    res = read(download.get("ftp://ftp.ncbi.nih.gov/repository/OMIM/genemap"),dtype=rtype)
-    res = res.to(_.day, _.month, _.year, do=_.cast("int$"))
+    rtype = "[omim:*]<(chr_map_entry_nr=bytes, month=bytes, day=bytes, year=bytes, location=bytes, gene_names=bytes, gene_status=bytes[1], title=bytes, f8=bytes, mim=bytes, method=bytes, comments=bytes, f12=bytes, disease1=bytes, disease2=bytes, disease3=bytes, mouse=bytes, reference=bytes)"
+    res = Read(Fetch("ftp://ftp.ncbi.nih.gov/repository/OMIM/genemap"),dtype=rtype)
+    res = res.To(_.day, _.month, _.year, Do=_.Cast("int$"))
     
     splitfunc = lambda x: x.split(", ")
     outtype = "[symbols:~]<bytes"
-    res = res.to(_.gene_symbol,  do=_.each(splitfunc, dtype=outtype).elements()[_ != ""])
+    res = res.To(_.gene_names,  Do=_.Each(splitfunc, dtype=outtype).Elements()[_ != ""])
     
     outtype = "[methods:~]<bytes"
-    res = res.to(_.method,       do=_.each(splitfunc, dtype=outtype).elements()[_ != ""])
+    res = res.To(_.method,      Do=_.Each(splitfunc, dtype=outtype).Elements()[_ != ""])
     
-    res = res.get( _.get(_.disease1, _.disease2, _.disease3).harray("diseases").elements()[_ != " "]/"disease", "~")
-    res = res.without(_.f8, _.f12, _.disease1, _.disease2, _.disease3)
-    return res.copy()
+    res = res.Get( _.Get(_.disease1, _.disease2, _.disease3).Harray().Elements()[_ != " "]/"disease", "~")
+    res = res.Without(_.f8, _.f12, _.disease1, _.disease2, _.disease3)
+    res = res.To(_.disease, Do=_.Sum().Each(omim_disease_parse,"[diseases:~]<bytes").Elements()[_ != ""])
+    return res.Copy()
 predefined_sources.register(omim_genemap)
+
+def omim_disease_parse(x):
+    x = x.replace('{','').replace('}','')
+    elems =  x.split('; ')
+    return [elem.split(', ')[0] for elem in elems]
 
 
 def go_annotations(dburl, genus="Saccharomyces", species="cerevisiae"):
@@ -104,14 +110,14 @@ def go_annotations(dburl, genus="Saccharomyces", species="cerevisiae"):
 
        example url: "mysql://username:password@hostname:port/go
     """
-    go = connect(dburl)
+    go = Connect(dburl)
     g = go.species
-    g = g.match(go.gene_product, _.id,                   _.species_id)
-    g = g.match(go.association,  _.Bgene_product.id,     _.gene_product_id)
-    g = g.match(go.graph_path,   _.Bassociation.term_id, _.term2_id)
-    g = g.match(go.term,         _.term1_id,             _.id)
+    g = g.Match(go.gene_product, _.id,                   _.species_id)
+    g = g.Match(go.association,  _.gene_product.id,      _.gene_product_id)
+    g = g.Match(go.graph_path,   _.association.term_id,  _.term2_id)
+    g = g.Match(go.term,         _.term1_id,             _.id)
     g = g[(_.genus==genus) & (_.species == species)]
-    return g.get(_.symbol, _.Bterm.name, _.relationship_type_id, _.distance)
+    return g.Get(_.symbol, _.term.name, _.relationship_type_id, _.distance)
 predefined_sources.register(go_annotations)
 
     

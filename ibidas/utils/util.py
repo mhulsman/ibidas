@@ -5,6 +5,7 @@ import operator
 import collections
 from IPython.Debugger import Tracer; debug_here = Tracer()
 import cPickle, zlib
+import math
 
 _delay_import_(globals(),"missing","Missing")
 def save_rep(r, filename):
@@ -284,3 +285,19 @@ def open_file(filename):
     else:
         file = open(filename)
     return file
+
+
+#after IPython implementation
+units = [u"s", u"ms",u'us',"ns"]
+scaling = [1, 1e3, 1e6, 1e9]
+
+def format_runtime(rtime):
+    if rtime > 0.0 and rtime < 1000.0:
+        order = min(-int(math.floor(math.log10(rtime)) // 3), 3)
+    elif rtime >= 1000.0:
+        order = 0
+    else:
+        order = 3
+    return u"%.*g %s" % (3, rtime * scaling[order],units[order])
+
+

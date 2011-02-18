@@ -57,18 +57,29 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
 
         for attribute,attribute_dict in self.graph.node_attributes.iteritems():
             attribute_name_dict = {}
+            if(isinstance(attribute_dict.values()[0], float)):
+                xtype = "FLOATING"
+                cls = float
+            elif(isinstance(attribute_dict.values()[0], int)):
+                xtype = "INTEGER"
+                cls = int
+            else:
+                xtype = "STRING"
+                cls = str
             for node, node_name in self.names.iteritems():
                 r = attribute_dict.get(node,"")
                 if(isinstance(r, representor.Representor)):
                     r = str(r.__class__.__name__)
                 else:
-                    r = str(r)
+                    r = cls(r)
                 attribute_name_dict[node_name] = r
-            self.server.addNodeAttributes(attribute,"STRING",attribute_name_dict,False)
+            self.server.addNodeAttributes(attribute,xtype,attribute_name_dict,False)
             if(attribute == 'links'):
                 import matplotlib.cm
                 cm = discrete_color_map(attribute_name_dict.values(), matplotlib.cm.gist_rainbow)
                 self.server.createDiscreteMapper('default','links', 'Node Color','#444444',cm)
+            if(attribute == "time"):
+                self.server.createContinuousMapper('default','time', 'Node Size',[0.0, max(attribute_dict.values())],[20.0, 20.0, 100.0, 100.0])
     
             
 

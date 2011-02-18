@@ -47,17 +47,6 @@ class PassManager(object):
 
         return PassManagerRun(self, query, self.log).run()
 
-units = [u"s", u"ms",u'us',"ns"]
-scaling = [1, 1e3, 1e6, 1e9]
-
-def format_runtime(rtime):
-    if rtime > 0.0 and rtime < 1000.0:
-        order = min(-int(math.floor(math.log10(rtime)) // 3), 3)
-    elif rtime >= 1000.0:
-        order = 0
-    else:
-        order = 3
-    return u"%.*g %s" % (3, rtime * scaling[order],units[order])
 
 class PassManagerRun(object):
     def __init__(self,manager, query, log):
@@ -99,9 +88,9 @@ class PassManagerRun(object):
             totaltime = time.time() - totalstart
             restable = []
             for name, rtime in logtable:
-                restable.append((name, format_runtime(rtime), u"(%.2f%%)" % (100 * (rtime/totaltime)),))
+                restable.append((name, util.format_runtime(rtime), u"(%.2f%%)" % (100 * (rtime/totaltime)),))
             print util.create_strtable(util.transpose_table(restable))
             print "-------------"
-            print u"Total : %s" % (format_runtime(totaltime))
+            print u"Total : %s" % (util.format_runtime(totaltime))
 
         return result

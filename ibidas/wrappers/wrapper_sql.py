@@ -318,7 +318,7 @@ class Connection(object):
                 else:
                     dimname = Missing
                     pickled = True
-                    val = rep.get(slice.name).cast("pickle").each(buffer,dtype="pickle").to_python()
+                    val = rep.Get(slice.name).Cast("pickle").Each(buffer,dtype="pickle").ToPython()
                     rowinfo.append({'spos':pos, 'name':slice.name, 'pickle':pickled, 'type':str(slice.type), 'packdepth': packdepth, 'dimname':dimname, 'val':val})
             
             tables = {}
@@ -332,7 +332,7 @@ class Connection(object):
                 tables[key] = newtable
             
             if(len(columns) > 1 or any([row['pickle'] or row['dimname'] is None for row in rowinfo])):
-                self.store(name + "__info__",wrapper_py.rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes$,packdepth=int,val=bytes}"))
+                self.store(name + "__info__",wrapper_py.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes$,packdepth=int,val=bytes}"))
                
                 tablelist = []
                 for t in tables.values():
@@ -356,14 +356,14 @@ class Connection(object):
     def _append(self, name, rep):#{{{
         tbl = self.tabledict[name]
         if(isinstance(tbl,CombineRepresentor)):
-            rep = rep.array(tolevel=1) 
+            rep = rep.Array(tolevel=1) 
             pickle = tbl._info[tbl._info.pickle == True].name()
-            rep = rep.to(*pickle, do=_.cast("pickle").each(buffer,dtype="pickle"))
-            rep = rep.copy()
-            for col in tbl._info.dict().to_python():
+            rep = rep.To(*pickle, Do=_.Cast("pickle").Each(buffer,dtype="pickle"))
+            rep = rep.Copy()
+            for col in tbl._info.dict().ToPython():
                 if 'dimname' in col:
                     continue
-                val = rep.get(col['name']).to_python()
+                val = rep.Get(col['name']).ToPython()
                 assert col['val'] == val, "Scalar value field: " + col['name']  + " does not match."
             for table in tbl._tablelist:
                 self._append_to_table(table,rep)
@@ -380,15 +380,15 @@ class Connection(object):
         for s in cols:
             if not s.type >=w[s.name].type:
                 raise RuntimeError, "Incompatible types: " + str(s.type) + " " + str(w[s.name].type)
-        rep = rep.get(*[slice.name for slice in cols])
+        rep = rep.Get(*[slice.name for slice in cols])
         
-        trep = rep.tuple()
+        trep = rep.Tuple()
         tbdims = set([slice.dims for slice in trep._slices])
         assert len(tbdims) == 1 and len(tbdims.pop()) == 1, \
                 "Only a representor object with one common parent dimension can be \
                     stored as a table"
 
-        values = rep.dict(with_missing=True).to_python()
+        values = rep.Dict(with_missing=True).ToPython()
         self.engine.execute(self.sa_tables[table._tablename].insert(), values)#}}}
 
     def drop(self, name):#{{{

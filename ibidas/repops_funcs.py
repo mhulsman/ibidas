@@ -119,7 +119,7 @@ class Func(object):
 class UnaryFuncOp(repops.UnaryOpRep, Func):
     def __init__(self, source, *params, **kwargs):
         if(not isinstance(source, representor.Representor)):
-            source = wrapper_py.rep(source)
+            source = wrapper_py.Rep(source)
         repops.UnaryOpRep.__init__(self,source, *params,**kwargs)
 
 class UnaryFuncElemOp(UnaryFuncOp):
@@ -195,9 +195,9 @@ class UnaryFuncAggregateOp(UnaryFuncDimOp):
 class BinaryFuncOp(repops.MultiOpRep, Func):
     def __init__(self, lsource, rsource, **kwargs):
         if(not isinstance(lsource, representor.Representor)):
-            lsource = repops.PlusPrefix(wrapper_py.rep(lsource))
+            lsource = repops.PlusPrefix(wrapper_py.Rep(lsource))
         if(not isinstance(rsource, representor.Representor)):
-            rsource = repops.PlusPrefix(wrapper_py.rep(rsource))
+            rsource = repops.PlusPrefix(wrapper_py.Rep(rsource))
         repops.MultiOpRep.__init__(self,(lsource,rsource), **kwargs)
 
         
@@ -266,6 +266,12 @@ class Within(BinaryFuncElemOp):
     @classmethod
     def _prepareSlices(self,lslice,rslice):
         return (lslice, ops.PackArrayOp(rslice,1))
+
+class Contains(BinaryFuncElemOp):
+    _sigs = [within_sig]
+    @classmethod
+    def _prepareSlices(self,lslice,rslice):
+        return (ops.PackArrayOp(lslice,1), rslice)
 
 class BinArithSignature(FuncSignature):
     def check(self, left, right):
@@ -533,28 +539,22 @@ class UnarySortableSignature(UnaryFixShapeSignature):
         return Param(slice.name, nstype)#}}}
 
 sortablesig = UnarySortableSignature("sortable")
-class ArgSort(UnaryFuncDimOp):
+class Argsort(UnaryFuncDimOp):
     _sigs = [sortablesig]
-argsort = repops.delayable()(ArgSort)
 
 class Pos(UnaryFuncDimOp):
     _sigs = [any_nodepsig]
-pos = repops.delayable(default_slice="#")(Pos)
 
 
-@repops.delayable()
 class Any(UnaryFuncAggregateOp):
     _sigs = [boolsig]
 
-@repops.delayable()
 class All(UnaryFuncAggregateOp):
     _sigs = [boolsig]
 
-@repops.delayable()
 class Max(UnaryFuncAggregateOp):
     _sigs = [numbersig]
 
-@repops.delayable()
 class Min(UnaryFuncAggregateOp):
     _sigs = [numbersig]
 
@@ -585,23 +585,44 @@ class UnaryConcatenateSignature(UnaryFixShapeSignature):
 
 concatenate_sig = UnaryConcatenateSignature("arrayarray")
 
-class Sum(UnaryFuncAggregateOp):
-    _sigs = [int_tointsig, float_tofloatsig,concatenate_sig]
-rsum = repops.delayable()(Sum)
+class UnaryStringConcatenateSignature(UnaryFixShapeSignature):
+    def check(self, slice, packdepth, **kwargs):#{{{
+        if not UnaryFixShapeSignature.check(self,slice,packdepth):
+            return False
+        in_type = slice.type
+        if(not isinstance(in_type,rtypes.TypeString)):
+            return False
+        if(not in_type.dims):
+            return False
 
-@repops.delayable()
+        curdim = in_type.dims[0]
+        adim = slice.dims[-packdepth]
+        
+        if(not curdim.shape is UNDEFINED and not adim.shape is UNDEFINED):
+            nshape = curdim.shape * adim.shape
+        else:
+            nshape = UNDEFINED
+        nname = "s" + curdim.name
+
+        #note: in_type.dims[0].dependent will be updated by aggregate slice
+        ndim = dimensions.Dim(nshape, in_type.dims[0].dependent, has_missing=in_type.dims[0].has_missing, name = nname)
+        nin_type = in_type._updateDepDim(0,ndim)
+
+        return Param(slice.name, nin_type)#}}}
+strconcatenate_sig = UnaryStringConcatenateSignature("stringstring")
+
+class Sum(UnaryFuncAggregateOp):
+    _sigs = [int_tointsig, float_tofloatsig, concatenate_sig, strconcatenate_sig]
+
 class Mean(UnaryFuncAggregateOp):
     _sigs = [number_tofloatsig]
 
-@repops.delayable()
-class ArgMax(UnaryFuncAggregateOp):
+class Argmax(UnaryFuncAggregateOp):
     _sigs = [number_tointsig]
 
-@repops.delayable()
-class ArgMin(UnaryFuncAggregateOp):
+class Argmin(UnaryFuncAggregateOp):
     _sigs = [number_tointsig]
 
-@repops.delayable()
 class Median(UnaryFuncAggregateOp):
     _sigs = [number_tofloatsig]
 
@@ -615,7 +636,6 @@ class CountSignature(FuncSignature):
         return Param(slice.name, nstype)#}}}
 countsig = CountSignature("count")
 
-@repops.delayable()
 class Count(UnaryFuncAggregateOp):
     _sigs = [countsig]
 
@@ -644,22 +664,18 @@ class UniqueSignature(UnaryFixShapeSignature):
             return False
         
         has_missing = slice.dims[-1].has_missing
-        subtypes = (slice.type,)
+        subtypes = (rtypes.TypePlatformInt(),)
         dim = dimensions.Dim(UNDEFINED,(True,) * len(slice.dims), slice.type.has_missing, name="s" + slice.dims[-packdepth].name)
         nstype = rtypes.TypeArray(has_missing,dimpaths.DimPath(dim),subtypes)
         return Param(slice.name, nstype)#}}}
-uniquesig = UniqueSignature("set")
+uniquesig = UniqueSignature("unique")
 
-class Unique(UnaryFuncAggregateOp):
+class Argunique(UnaryFuncAggregateOp):
     _sigs = [uniquesig]
 
     @classmethod
     def _prepareSlice(self,slice):
         return ops.ensure_frozen(slice)
-
-    @classmethod
-    def _finishSlice(self,slice):
-        return ops.UnpackArrayOp(slice)
 
 class CorrSignature(FuncSignature):
     def check(self, slice):

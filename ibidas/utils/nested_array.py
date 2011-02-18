@@ -110,7 +110,10 @@ class NestedArray(object):
                         elem = validate_array(elem,cdepth,dtype)
                         assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
                     res.append(elem)
-                ndata = numpy.concatenate(res)
+                if not res:
+                    ndata = cutils.darray([])
+                else:
+                    ndata = numpy.concatenate(res)
             else:
                 if(cdepth == 1):
                     r = []
@@ -126,7 +129,10 @@ class NestedArray(object):
                         else:
                             elem = validate_array(elem,cdepth,dtype)
                         res.append(elem)
-                    ndata = numpy.concatenate(res)
+                    if not res:
+                        ndata = cutils.darray([])
+                    else:
+                        ndata = numpy.concatenate(res)
 
 
             if(variable):
@@ -582,7 +588,7 @@ class NestedArray(object):
                     ntr = len(tilerepeats)
                     assert nextobj.shape[ntr] == 1, "Varbroadcast on full dimension not possible"
                     bcshape = list(nextobj.shape[:(ntr - len(repeat.shape))])
-                    for l,d in zip(repeat.shape,nextobj.shape[len(repeat.shape):ntr]):
+                    for l,d in zip(repeat.shape,nextobj.shape[(ntr-len(repeat.shape)):ntr]):
                         if(l != d):
                             assert l == 1, "Problem in broadcasting repeat shape"
                             bcshape.append(d)
