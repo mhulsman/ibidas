@@ -177,7 +177,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                         from ..passes.cytoscape_vis import DebugVisualizer
                         DebugVisualizer.run(query,run_manager)
                     except Exception:
-                        pass
+                        raise
                 raise exc_info[1], None, exc_info[2]
             if(debug_mode):
                 rtime = time.time() - start

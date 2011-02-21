@@ -67,12 +67,15 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
                 xtype = "STRING"
                 cls = str
             for node, node_name in self.names.iteritems():
-                r = attribute_dict.get(node,"")
-                if(isinstance(r, representor.Representor)):
-                    r = str(r.__class__.__name__)
-                else:
-                    r = cls(r)
-                attribute_name_dict[node_name] = r
+                try:
+                    r = attribute_dict.get(node,"")
+                    if(isinstance(r, representor.Representor)):
+                        r = str(r.__class__.__name__)
+                    else:
+                        r = cls(r)
+                    attribute_name_dict[node_name] = r
+                except:
+                    pass
             self.server.addNodeAttributes(attribute,xtype,attribute_name_dict,False)
             if(attribute == 'links'):
                 import matplotlib.cm

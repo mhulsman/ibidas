@@ -298,7 +298,7 @@ class Connection(object):
         if(not name in self.tabledict):
             columns = defaultdict(list)
             rowinfo = []
-            rep = rep.copy()
+            rep = rep.Copy()
             for pos, slice in enumerate(rep._slices):
                 packdepth = max(len(slice.dims) - 1,0)
                 if(packdepth):

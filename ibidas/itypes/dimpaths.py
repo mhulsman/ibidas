@@ -129,7 +129,7 @@ class DimPath(tuple):
         
         ndims = []
         for p in xrange(max(pos + 1,0), len(self)):
-            ndims.append(self[p].updateDepDim(p - pos, ndim))
+            ndims.append(self[p].updateDepDim(p - pos - 1, ndim))
       
         if pos >=0:
             res = self[:max(pos,0)] + ndim + DimPath(*ndims)
@@ -145,7 +145,7 @@ class DimPath(tuple):
     def insertDim(self, pos, ndim, subtype=None):#{{{
         ndims = []
         for p in xrange(max(pos,0), len(self)):
-            ndims.append(self[p].insertDepDim(p - pos, ndim))
+            ndims.append(self[p].insertDepDim(p - pos - 1, ndim))
         if pos >= 0:
             res = self[:pos] + (ndim,) + DimPath(*ndims)
         else:

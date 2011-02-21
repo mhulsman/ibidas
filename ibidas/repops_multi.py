@@ -175,7 +175,7 @@ class Filter(repops.MultiOpRep):
         assert len(constraint._slices) == 1, "Filter constraint should have 1 slice"
         cslice = constraint._slices[0]
         seldimpath = dimpaths.identifyUniqueDimPathSource(source, dim)
-        if(not seldimpath):
+        if(not seldimpath and not isinstance(cslice.type, rtypes.TypeBool)):
             raise RuntimeError, "Attempting to perform filter on non-existing dimension"
         
         if(isinstance(constraint, repops.PlusPrefix)):

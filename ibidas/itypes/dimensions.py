@@ -156,4 +156,22 @@ class Dim(object):
         if(self.has_missing):
             res += "$"
         return res
+
+
+    def merge(self, other):
+        if(self.shape == UNDEFINED or other.shape == UNDEFINED):
+            rshape = UNDEFINED
+        else:
+            rshape = max(self.shape, other.shape)
+
+        ndep = tuple([ldep or rdep for ldep, rdep in itertoos.izip_longest(self.dependent, other.dependent,fillvalue=False)])
+
+        if(self.name == other.name):
+            nname = self.name
+        else:
+            nname = self.name + "_" + other.name
+        return Dimension(rshape, ndep, self.has_missing or other.has_missing, name=nname)
+
             
+
+

@@ -532,15 +532,18 @@ class TypeArray(TypeAny):#{{{
     @classmethod
     def commonType(cls, type1, type2):
         if(not type1.dims or not type2.dims or
-            len(type1.dims) != len(type2.dims)
-            or type1.dims != type2.dims):
-            return cls(type1.has_missing or type2.has_missing)
+            len(type1.dims) != len(type2.dims)):
+            return TypeAny(type1.has_missing or type2.has_missins)
         else:
             subtypes = [casts.castImplicitCommonType(lstype, rstype)
                         for lstype, rstype in zip(type1.subtypes, type2.subtypes)]
             if(False in subtypes):
                 return False
-            dims = type1.dims 
+            ndims = []
+            for ldim, rdim in zip(type1.dims, type2.dims):
+                ndims.append(ldim.merge(rdim))
+
+            dims = dimpaths.DimPath(*ndims)
             res = cls(has_missing=type1.has_missing or type2.has_missing, dims=dims, subtypes=tuple(subtypes)) 
         return res
 

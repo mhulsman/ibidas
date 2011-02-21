@@ -1,6 +1,9 @@
 Basic concepts
 ==============
 
+.. warning::
+   This section is a bit outdated, please use the tutorial.
+
 In this section we describe some of the basic underlying concepts of Ibidas.
 
 Representation
