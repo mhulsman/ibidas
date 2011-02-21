@@ -839,6 +839,14 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         fnode.setColumns(columns)
 
         #compile, create unpack slices
+        packdepth = [0] * len(results)
+        for i in range(len(results)):
+            packdepth[i] = len(results[i].dims) - 1
+            if(len(results[i].dims) < 1):
+                results[i] = ops.UnpackArrayOp(results[i])
+            elif(len(results[i].dims) > 1):
+                results[i] = ops.PackArrayOp(results[i], len(results[i].dims) - 1)
+
         tslice = ops.PackTupleOp(results)
         aslice = ops.PackArrayOp(tslice)
         
@@ -859,6 +867,15 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
 
             if(r.type.has_missing):
                 r2 = ops.NoneToMissingOp(r)
+                self.addPairToGraph(r,r2)
+                r= r2
+
+            if(packdepth[i] > 0):
+                r2 = ops.UnpackArrayOp(r, packdepth[i])
+                self.addPairToGraph(r,r2)
+                r= r2
+            elif(packdepth[i] < 0): 
+                r2 = ops.PackArrayOp(r)
                 self.addPairToGraph(r,r2)
                 r= r2
 

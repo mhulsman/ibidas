@@ -151,15 +151,15 @@ class UnaryFuncDimOp(UnaryFuncOp):
         state = source._state
         if not state & RS_TYPES_KNOWN:
             return
-        selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
-        nslices,state = self._apply(source._slices, selpath, source._state, **kwargs)
+        nslices,state = self._apply(source._slices, dim, source._state, **kwargs)
         return self._initialize(tuple(nslices),state)
 
     @classmethod
-    def _apply(cls, xslices, selpath, state=None, **kwargs):
+    def _apply(cls, xslices, dim, state=None, **kwargs):
         nslices = []
         found = False
         for slice in xslices:
+            selpath = dimpaths.identifyUniqueDimPath([slice.dims],dim)
             lastposs = slice.dims.matchDimPath(selpath)
             if(lastposs):
                 slice = cls._prepareSlice(slice)
@@ -175,7 +175,7 @@ class UnaryFuncDimOp(UnaryFuncOp):
             nslices.append(slice)
 
         if(not found):
-            raise RuntimeError, "No slice with dims to apply " + self.__class__.__name__
+            raise RuntimeError, "No slice with dims to apply " + cls.__name__
         
         if state:
             return nslices, state      
@@ -469,15 +469,12 @@ class UnaryArithSignature(FuncSignature):
 
 unary_arithsig = UnaryArithSignature("number")
 
-@repops.delayable()
 class Invert(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 
-@repops.delayable()
 class Abs(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 
-@repops.delayable()
 class Negative(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 

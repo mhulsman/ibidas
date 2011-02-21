@@ -9,7 +9,7 @@ from itypes import rtypes
 from constants import *
 from thirdparty import tableprint, console
 
-_delay_import_(globals(),"utils","util","context")
+_delay_import_(globals(),"utils","util","context","infix")
 _delay_import_(globals(),"itypes", "dimensions","dimpaths")
 _delay_import_(globals(),"wrappers","wrapper_py","wrapper")
 _delay_import_(globals(),"query_context")
@@ -440,7 +440,7 @@ class Representor(Node):
     
     # or operator ( | )
     def __or__(self, other):
-        if(isinstance(other, context.Context)):
+        if(isinstance(other, (context.Context, infix.Infix, infix.RevInfix))):
             return other.__ror__(self)
         return repops_funcs.Or(self, other)
 
@@ -705,7 +705,7 @@ class Representor(Node):
     def Unique(self, dim=None):
         return repops_funcs.Unique(self,dim)
 
-    def Within(self, arrays):
+    def In(self, arrays):
         return repops_funcs.Within(self,arrays)
 
     def Contains(self, elems):
@@ -833,11 +833,11 @@ class Representor(Node):
     def Without(self, *slices):
         return repops_slice.Unproject(self,*slices)
 
-    def Elements(self, name=None):
+    def Elem(self, name=None):
         """Unpacks array type into dimension"""
         return repops_dim.UnpackArray(self, name)
 
-    def Attributes(self, name=None):
+    def Fields(self, name=None):
         """Unpacks tuple type into slices"""
         return repops_slice.UnpackTuple(self, name)
 

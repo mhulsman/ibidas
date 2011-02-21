@@ -21,12 +21,10 @@ def rep_completer(self,event):
     #FIXME: build parser that is representor, and context object  aware
     raise TryNext
 
-
 if(__name__ == '__main__'):
     #config = config.loadConfig('~/.ibidas_rc', _ConfigDefault)
     #sys.argv = sys.argv[0] # remove commandline arguments so ipython doesn't see them
-    
-    ipshell = IPShellEmbed(banner='Welcome to the IBIDAS system',exit_msg='IBIDAS shutting down ...',rc_override={'cache_size':0})
+    ipshell = IPShellEmbed(argv=sys.argv[1:],banner='Welcome to the IBIDAS system',exit_msg='IBIDAS shutting down ...',rc_override={'cache_size':0, 'readline_omit__names':2})
     del ipshell.IP.user_ns['_']
     ipshell.IP.set_hook('complete_command', rep_completer, re_key = '.*')
     ipshell()

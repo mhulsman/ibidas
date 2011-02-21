@@ -14,9 +14,10 @@ __all__ = ["Rep","Read","Connect","_",
            "Count",
            "Broadcast","CreateType",
            "newdim","Missing",
-           "Corr","Within","Contains",
+           "Corr","In","Contains",
            "Fetch","Serve","Get",
-           "Load","Save",
+           "Load","Save",'newdim',
+           "Invert","Abs", "Negative",
            ]
 
 from utils import delay_import
@@ -29,19 +30,20 @@ from wrappers.wrapper_py import Rep
 from wrappers.wrapper_tsv import TSVRepresentor
 from wrappers.wrapper_sql import open_db
 from representor import newdim
-from repops_dim import Array
+import repops_dim 
 from repops_multi import Broadcast, Combine, Sort, Stack
-from repops_slice import Tuple, HArray
-from repops_funcs import Corr
+import repops_slice 
+import repops_funcs
 from download_cache import DownloadCache
 from pre import predefined_sources as Get
 from server import Serve
+from constants import *
 
 Fetch = DownloadCache()
-Within = Infix(repops_funcs.Within)
+In = Infix(repops_funcs.Within)
 Contains = Infix(repops_funcs.Contains)
 
-Pos = repops.delayable(default_slice="#")(repops_funcs.Pos)
+Pos = repops.delayable(default_params="#")(repops_funcs.Pos)
 Argsort = repops.delayable()(repops_funcs.Argsort)
 Argmax = repops.delayable()(repops_funcs.Argmin)
 Argmin = repops.delayable()(repops_funcs.Argmax)
@@ -53,6 +55,15 @@ Min = repops.delayable()(repops_funcs.Min)
 Mean = repops.delayable()(repops_funcs.Mean)
 Median = repops.delayable()(repops_funcs.Median)
 Count = repops.delayable()(repops_funcs.Count)
+Corr = repops.delayable()(repops_funcs.Corr)
+Invert = repops.delayable()(repops_funcs.Invert)
+Abs = repops.delayable()(repops_funcs.Abs)
+Negative = repops.delayable()(repops_funcs.Negative)
+
+
+HArray = repops.delayable(nsources=UNDEFINED)(repops_slice.HArray)
+Tuple = repops.delayable(nsources=UNDEFINED)(repops_slice.Tuple)
+Array = repops.delayable()(repops_dim.Array)
 
 def Read(url, **kwargs):
     format = kwargs.pop('format','tsv')

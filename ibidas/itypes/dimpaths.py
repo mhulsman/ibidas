@@ -220,7 +220,7 @@ class DimPath(tuple):
         elif(dimpath and dimpath[-1] is end):
             if(self[-(len(dimpath)-1):] == dimpath[:-1]):
                 lastpos.append(len(self) - 1)
-        else:
+        elif(dimpath):
             pos = 0
             ndims = len(self)
             while(pos < ndims and (ndims - pos) >= nseldims):

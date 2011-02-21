@@ -126,7 +126,6 @@ class PermuteDims(repops.UnaryOpRep):
         return self._initialize(tuple(nslices),source._state)
 
 
-@repops.delayable()
 class Array(repops.UnaryOpRep):
     def _process(self, source, tolevel=None):
         if not source._state & RS_SLICES_KNOWN:

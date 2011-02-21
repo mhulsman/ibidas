@@ -60,6 +60,8 @@ class Nest(repops.MultiOpRep):
         return self._initialize(tuple(nslices), state)
 
 class Combine(repops.MultiOpRep):
+    def __init__(self, *sources):
+        repops.MultiOpRep.__init__(self, sources)
     def _process(self,sources):
         state = reduce(operator.__and__,[source._state for source in sources])
         if not state & RS_SLICES_KNOWN:
@@ -285,7 +287,7 @@ class Unique(repops.MultiOpRep):
 class Join(repops.MultiOpRep):
     def __init__(self, lsource, rsource, constraint):
         if(isinstance(constraint,context.Context)):
-            c = Combine((lsource,rsource))
+            c = Combine(lsource,rsource)
             constraint = context._apply(constraint,c)
         repops.MultiOpRep.__init__(self,(lsource,rsource, constraint))
 

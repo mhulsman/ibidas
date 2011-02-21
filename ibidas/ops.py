@@ -92,7 +92,7 @@ class ChangeBookmarkOp(UnaryUnaryOp):#{{{
         nbookmarks = source.bookmarks.copy()
 
         if(not update_auto_bookmarks is None):
-            for bm in nbookmarks:
+            for bm in list(nbookmarks):
                 if(bm.startswith('!')):
                     nbookmarks.discard(bm)
                     nbookmarks.add("!" + update_auto_bookmarks + bm[1:])

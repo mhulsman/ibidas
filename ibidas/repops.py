@@ -4,12 +4,12 @@ import representor
 _delay_import_(globals(),"ops")
 _delay_import_(globals(),"itypes","dimpaths")
 _delay_import_(globals(),"utils","context")
+_delay_import_(globals(),"repops_multi")
 
-
-def delayable(default_slice="*"):
+def delayable(default_params=["*"], nsources=1):
     """Function to enable the delay of single source operations.
 
-    default_slice: slice to apply the function to if no parameter is
+    default_params: slice to apply the function to if no parameter is
                    given.
 
     Delayable functions should have as first param a source field. 
@@ -32,17 +32,25 @@ def delayable(default_slice="*"):
     def new(func):
         def delayable_function(*params, **kwds):
             if(not params):
-                if('source' in kwds):
-                    params = (kwds['source'],)
-                    del kwds['source']
+                return _.Get(*default_params)._call(func, **kwds)
+            
+            if(nsources == UNDEFINED):
+                xnsources = len(params)
+            else:
+                xnsources = nsources
+
+            need_get = False
+
+            for i in xrange(xnsources):
+                if(not isinstance(params[i], representor.Representor)):
+                    need_get = True
+            if(need_get):
+                return _.Get(*params[:xnsources])._call(func, *params[xnsources:], **kwds)
+            else:
+                if(xnsources > 1):
+                    return func(repops_multi.Combine(*params[:xnsources]), *params[xnsources:], **kwds)
                 else:
-                    return _.Get(default_slice)._call(func, **kwds)
-            if(not isinstance(params[0], representor.Representor)):
-                if(isinstance(params[0], context.Context)):
-                    return params[0]._call(func, *params[1:], **kwds)
-                else:
-                    return _.Get(params[0])._call(func, *params[1:], **kwds)
-            return func(*params, **kwds)
+                    return func(*params, **kwds)
         return delayable_function
     return new
 
@@ -126,6 +134,4 @@ def apply_slice(slices, slicecls, dim_selector, *params, **kwds):
         nslices = [slicecls(slice,*params,**kwds) for slice in slices]
     return tuple(nslices)
 
-def frozen(slices):
-    return apply_slice(slices, ops.ensure_frozen, None)
 

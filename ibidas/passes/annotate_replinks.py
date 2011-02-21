@@ -4,13 +4,11 @@ import create_graph
 from ..utils import util
 from ..utils.multi_visitor import VisitorFactory, NF_ERROR, F_CACHE
 from ..constants import *
-from annot_objs import *
 _delay_import_(globals(),"..representor")
-_delay_import_(globals(),"..ops")
 
 
 
-class AnnotateRepLinks(VisitorFactory(prefixes=("link","distribute","createExp"), 
+class AnnotateRepLinks(VisitorFactory(prefixes=("link","distribute"), 
                                       flags=NF_ERROR | F_CACHE), manager.Pass):
     after=set([ensure_info.EnsureInfo,create_graph.CreateGraph])
 
@@ -21,11 +19,8 @@ class AnnotateRepLinks(VisitorFactory(prefixes=("link","distribute","createExp")
         self.graph = run_manager.pass_results[create_graph.CreateGraph]
         self.links = self.graph.na['links']
         self.link(query_root)
-
-        self.expressions = {}
         self.distribute(self.graph.root)
-        self.graph.checkGraph()
-        return self.expressions
+        return self.links
 
     def linkRepresentor(self,node):
         for slice in node._slices:
@@ -54,34 +49,10 @@ class AnnotateRepLinks(VisitorFactory(prefixes=("link","distribute","createExp")
             selflink = self.links[node]
         else:
             selflink = lastlink
-        
-        if(not id(selflink) in self.expressions):
-            e = self.createExp(selflink)
-            self.expressions[id(selflink)] = e
-        else:
-            e = self.expressions[id(selflink)]
 
-        e.addAllSlice(node)
-        if(not selflink is lastlink):
-            e.addOutSlice(node)
-      
         for edge in self.graph.edge_target[node]:
             sourcelink = self.distribute(edge.source, selflink)
-            if not sourcelink is selflink:
-                e.addInSlice(edge.target)
                 
-        self.links[node] = e
+        self.links[node] = selflink
         return selflink
-        
 
-    def createExpRepresentor(self, rep):
-       return Expression(rep.__class__.__name__, rep)
-
-    def createExpFilter(self, rep):
-       return FilterExpression(rep.__class__.__name__, rep)
-
-    def createExpBinaryFuncElemOp(self, rep):
-        return BinFuncElemExpression(rep.__class__.__name__, rep)
-    
-    def createExpMatch(self, rep):
-        return MatchExpression(rep.__class__.__name__, rep)

@@ -11,13 +11,15 @@ def yeast_feats():
        from:  http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab
     """
 
-    rtype = "[feats:*]<(sgdid=bytes, feat_type=bytes, feat_qual=bytes, feat_name=bytes, gene_name=bytes, gene_aliases=bytes, feat_parent_name=bytes, sgdid_alias=bytes, chromosome=bytes, start=bytes, stop=bytes, strand=bytes[1], genetic_pos=bytes, coordinate_version=bytes[10], sequence_version=bytes, description=bytes)"
+    rtype = """[feats:*]<(sgdid=bytes, feat_type=bytes, feat_qual=bytes, feat_name=bytes, gene_name=bytes, 
+                          gene_aliases=bytes, feat_parent_name=bytes, sgdid_alias=bytes, chromosome=bytes, 
+                          start=bytes, stop=bytes, strand=bytes[1], genetic_pos=bytes, coordinate_version=bytes[10], 
+                          sequence_version=bytes, description=bytes)"""
     
     res = Read(Fetch("http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab"),dtype=rtype)
 
     splitfunc = lambda x: x.split("|")
-    outtype = "[aliases:~]<bytes"
-    res = res.To(_.gene_aliases,  Do=_.Each(splitfunc, dtype=outtype).Elements()[_ != ""])
+    res = res.To(_.gene_aliases,  Do=_.Each(splitfunc, dtype="[aliases:~]<bytes").Elem()[_ != ""])
     res = res.To(_.start, _.stop, Do=_.Cast("int$"))
     res = res.To(_.genetic_pos,   Do=_.Cast("real64$"))
     return res.Copy()
@@ -36,7 +38,7 @@ def yeast_aliases(feats):
     res = res/("feat_name", "alias")
     res = res%"feat_aliases"
     res = res[_.alias != ""]
-    return res.Tuple().Unique().Attributes().Copy()
+    return res.Unique().Copy()
 predefined_sources.register(yeast_aliases)  
 
 def in_memory_db():
@@ -47,7 +49,7 @@ predefined_sources.register(in_memory_db)
 
 def yeastract(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"):
     """Downloads documented transcription factor regulation interactions from yeastract"""
-    rtype = "[tfs:*]<(tf=bytes, target=bytes)"
+    rtype = "[tftargets:*]<(trans_factor=bytes, target=bytes)"
     res = Read(Fetch(url),dtype=rtype)
     return res.Copy()
 predefined_sources.register(yeastract)
@@ -80,21 +82,21 @@ predefined_sources.register(string_interactions)
 
 def omim_genemap():
     """The omim genemap data"""
-    rtype = "[omim:*]<(chr_map_entry_nr=bytes, month=bytes, day=bytes, year=bytes, location=bytes, gene_names=bytes, gene_status=bytes[1], title=bytes, f8=bytes, mim=bytes, method=bytes, comments=bytes, f12=bytes, disease1=bytes, disease2=bytes, disease3=bytes, mouse=bytes, reference=bytes)"
+    rtype = """[omim:*]<(chr_map_entry_nr=bytes, month=bytes, day=bytes, year=bytes, location=bytes, gene_names=bytes, 
+                       gene_status=bytes[1], title=bytes, f8=bytes, mim=bytes, method=bytes, comments=bytes, f12=bytes, 
+                       disease1=bytes, disease2=bytes, disease3=bytes, mouse=bytes, reference=bytes)"""
+    
     res = Read(Fetch("ftp://ftp.ncbi.nih.gov/repository/OMIM/genemap"),dtype=rtype)
-    res = res.To(_.day, _.month, _.year, Do=_.Cast("int$"))
     
+    res = res.Get(HArray(_.disease1, _.disease2, _.disease3)[_ != " "]/"disease", "~")
     splitfunc = lambda x: x.split(", ")
-    outtype = "[symbols:~]<bytes"
-    res = res.To(_.gene_names,  Do=_.Each(splitfunc, dtype=outtype).Elements()[_ != ""])
-    
-    outtype = "[methods:~]<bytes"
-    res = res.To(_.method,      Do=_.Each(splitfunc, dtype=outtype).Elements()[_ != ""])
-    
-    res = res.Get( _.Get(_.disease1, _.disease2, _.disease3).Harray().Elements()[_ != " "]/"disease", "~")
-    res = res.Without(_.f8, _.f12, _.disease1, _.disease2, _.disease3)
-    res = res.To(_.disease, Do=_.Sum().Each(omim_disease_parse,"[diseases:~]<bytes").Elements()[_ != ""])
-    return res.Copy()
+    res = res.To(_.gene_names,  Do=_.Each(splitfunc, dtype="[symbols:~]<string").Elem()[_ != ""])
+    res = res.To(_.method,      Do=_.Each(splitfunc, dtype="[methods:~]<string").Elem()[_ != ""])
+    res = res.To(_.disease,     Do=_.Sum().Each(omim_disease_parse,"[diseases:~]<string").Elem()[_ != ""])
+    res = res.To(_.day, _.month, _.year, Do=_.Cast("int$"))
+    res = res.To(_.mim, Do=_.Cast("int"))
+
+    return res.Without(_.f8, _.f12, _.disease1, _.disease2, _.disease3).Copy()
 predefined_sources.register(omim_genemap)
 
 def omim_disease_parse(x):
@@ -112,12 +114,13 @@ def go_annotations(dburl, genus="Saccharomyces", species="cerevisiae"):
     """
     go = Connect(dburl)
     g = go.species
-    g = g.Match(go.gene_product, _.id,                   _.species_id)
-    g = g.Match(go.association,  _.gene_product.id,      _.gene_product_id)
-    g = g.Match(go.graph_path,   _.association.term_id,  _.term2_id)
-    g = g.Match(go.term,         _.term1_id,             _.id)
+    g = g.Match(go.gene_product,     _.id,                   _.species_id)
+    g = g.Match(go.association,      _.gene_product.id,      _.gene_product_id)
+    g = g.Match(go.graph_path,       _.association.term_id,  _.term2_id)
+    g = g.Match(go.term//"annot",_.term1_id,             _.id)
+    g = g.Match(go.term//"rel",  _.relationship_type_id, _.id)
     g = g[(_.genus==genus) & (_.species == species)]
-    return g.Get(_.symbol, _.term.name, _.relationship_type_id, _.distance)
+    return g.Get(_.symbol, _.annot.name/"annotation", _.rel.name/"relation_type", _.distance)%"annotations"
 predefined_sources.register(go_annotations)
 
     

@@ -19,7 +19,7 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
                 self = cls()
                 self.copied_nodes = dict()
                 first_known_nodes = self.findFirstKnown(query_root)
-                temp_root = repops_multi.Combine(first_known_nodes)
+                temp_root = repops_multi.Combine(*first_known_nodes)
                 temp_root = repops.ApplyFuncRep(temp_root,repops.apply_slice,ops.DetectTypeOp,None)
                 known_slices = temp_root._getResultSlices(endpoint=False)
 

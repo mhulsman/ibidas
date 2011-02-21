@@ -37,6 +37,9 @@ class Graph(object):
                 self.dropEdge(edge)
             del self.edge_target[node]
         self.nodes.discard(node)
+        for key, value in self.node_attributes.iteritems():
+            if node in value:
+                del value[node]
 
     def dropEdge(self, edge):
         self.edge_source[edge.source].discard(edge)

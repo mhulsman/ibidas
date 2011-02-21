@@ -12,8 +12,8 @@ Contents:
    :maxdepth: 2
 
    installation
-   examples
    tutorial
+   basic_concepts
 
    ibidas_module
    ibidas_rep

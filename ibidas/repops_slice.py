@@ -298,7 +298,6 @@ class Tuple(repops.UnaryOpRep):
 class Dict(Tuple):
     _ocls = ops.PackDictOp
 
-@repops.delayable()
 class HArray(repops.UnaryOpRep):
     def _process(self, source, name=None):
         if not source._state & RS_TYPES_KNOWN:
@@ -322,6 +321,7 @@ class HArray(repops.UnaryOpRep):
             nnslices.append(slice)
     
         nslice = ops.HArrayOp(nnslices,name=name)
+        nslice = ops.UnpackArrayOp(nslice)
 
         #initialize object attributes
         return self._initialize((nslice,),RS_ALL_KNOWN)

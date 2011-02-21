@@ -1,372 +1,377 @@
-Basic concepts
-==============
+Tutorial
+========
 
-In this section we describe some of the basic underlying concepts of Ibidas.
+In/out-degree distribution of a transcriptional network
+--------------------------------------------------------------------------
 
-Representation
---------------
+In the first example, we will look at the network properties of the yeast transcriptional network.
+For that purpose, we obtain regulations from www.yeastract.com > Flat Files > RegulationTwoColumnTable
 
-In Ibidas one works with data sources by packaging them within a 'representation object'.
+Loading the data
+~~~~~~~~~~~~~~~~
+To get the data into Ibidas we perform the following operations::
 
-Such data sources can be python objects, files, databases, and so on. 
-Once they are wihtin a representation object they are all handled similarly.
+    >>> url = "http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"
+    >>> yeastract = Read(Fetch(url))
 
-We start with a simple example, in which we package an integer object::
+``Fetch`` is an operation that takes a url, downloads the file to the data directory (default ~/.ibidas/data/),
+assigns it a file name, and returns this filename. Executing ``Fetch`` on this url again will just return the filename of the
+cached local copy. 
 
-    >>> rep(3)
-    Slices: data  
-    Types:  int64
-    Dims:         
+Subsequently, ``Read`` takes this filename, and imports the data. By
+default is assumes a comma/tab/other symbol separated value file. It will attempt to detect the column delimiter, 
+availability of fieldnames and existence of comment lines automatically. 
+
+After these two operations, the contents of yeastract look like this::    
+    >>> yeastract
+    Slices: | f0       | f1      
+    -----------------------------
+    Type:   | bytes[7] | bytes[9]
+    Dims:   | d1:48082 | d1:48082
+    Data:   |          |         
+            | Abf1     | YKL112w 
+            | Abf1     | YAL054c 
+            | Abf1     | YGL234w 
+            | ...      | ...
+
+
+Note that this file did not have fieldnames, so slice names as well as slice types and slice dimensions (will be explained later) where 
+determined automatically. The left column (slice ``f0``) contains transcription factors, while the right column (slice ``f1``) 
+contains the targets. Note that transcription factor `Abf` is repeated multiple times in this file, as it has multiple targets. 
+
+
+Looking at the types of both slices, we see that this has been detected as the ``bytes`` type. 
+Furthermore, the ``bytes`` type has an extra specifier ``[7]``, indicating that this is the max length of the entries in the corresponding slice.
+
+.. tip:: the ``bytes`` type corresponds to the default ``str`` type in Python 2.x. In Python 3.0 the default string type has become
+   unicode, and ``str`` has been renamed to ``bytes``. In Ibidas we use the same naming scheme: ``bytes`` for the old str type, and
+   ``string`` for unicode strings. 
+
+
+
+The third attribute, Dims, describes the structure of the data in a slice. We see that both slices have a single dimension.
+This means that the data is structured in a way similar to a `vector`. A slice without dimensions would correspond to a `scalar` value, 
+while a slice with two fixed dimensions would correspond to a `matrix` structure. In this case, both slices share the same dimension ``d1``, indicating that
+the shape and ordering of elements in both slices are shared. The ``:48082`` describes the shape of the dimension, indicating
+that there are 48082 rows.
+
+Of course, using meaningless names, such as ``f0``, is not very handy, so we first assign more suitable names::
     
-    Data: 3
+    >>> yeastract = yeastract/('trans_factor','target')
 
-.. tip::
-    The concepts ``slices``, ``types`` and ``dims`` will be explained in the next sections
+While we are at it, we also assing a more suitable dimension name::
+
+    >>> yeastract = yeastract%'tftargets'
+
+Note that we reuse the division operator and the modulo operator to assing these names. The reason for this is that 
+naming slices is an relatively often recurring action. It is however also possible to use instead a regular function, e.g::
+
+    >>> yeastract = yeastract.Rename('trans_factor','target')
+
+Renaming slices and dimensions is not always necessary, many data sources already assign names of the various data elements. E.g. databases have a table name which
+can be used as dimension name, while the column names can be used as a slice names.
+
+.. tip:: You may have noted that operations in Ibidas start with an uppercase letter. The reaseon for this is to separate them from
+   slice names and dimension names, which have to be always in lower case. I.e. data.count would refer to the slice count, while
+   data.Count refers to the operation ``Count``.
 
 
-One can perform all kind of operations with data that is in a representation object, e.g::
+After renaming, our data now looks like::
+    >>> yeastract
+    Slices: | trans_factor    | target
+    -------------------------------------------
+    Type:   | bytes[7]        | bytes[9]
+    Dims:   | tftargets:48082 | tftargets:48082
+    Data:   |                 |
+            | Abf1            | YKL112w
+            | Abf1            | YAL054c
+            | Abf1            | YGL234w
+            | ...             | ...
 
-    >>> rep([1,2,3]) + 3
-    Slices: data  
-    Types:  int64 
-    Dims:   d1:3  
+You might have found that there is a very small delay before the contents are printed. The reason for this is the lazy nature of 
+Ibidas. That is, Read and all subsequent operations are not executed immediatly, but only when asked for results. The reason
+for this is that it allows for improved optimizations. For example, in case the data sources is a database, it allows us to translate operations
+into SQL. 
 
-    Data: [4 5 6]
+In this case however, we would like to perform all operations and store their result. For that purpose, their is the operation ``Copy``::
 
-Summary:
-    * A representor object encapsulates a data source. 
+    >>> yeastract = yeastract.Copy()
 
-    * Data sources can be python objects, but also files or databases.
+Now our data source is ready for use. 
 
-Lazy execution
---------------
+Predefined data sources
+~~~~~~~~~~~~~~~~~~~~~~~
 
-You might have noted that executing the previous commands resulted immediatly in a printout 
-of the contents of the representation object. This is due to the IPython interpreter, 
-which will print a representation of the result of all non-assignment operations. 
-So, if we instead would have executed::
+Before actually using the transcription factor data, we make a sidestep. Performing the actions we just did each time you want to load
+the yeastract data source is a bit cumbersome. For this reason, Ibidas allows the defenition of predefined data source loading functions.
+
+For yeastract we have added just such a function which performs the actions we have just gone through. So instead of performing those
+operations, we could also just execute::
     
-    >>> r = rep([1,2,3]) + 3
+    >>> yeastract = Get.yeastract()
 
-no output would have been printed. More importantly however, Ibidas would also not have performed the
-requested addition operation. I.e. ``r`` would have only been a representation of the requested operations 
-and data sources, and thus not the result of those operations.
+The data source functions are found in ibidas/pre.py. One can easily add new data sources. For example, 
+adding the yeastract data resource yourself, would have required the following code::
 
-.. important::
-    Operations are executed lazily. I.e. only when output is requested by the user.
+    from ibidas import *
 
-The reason for this behaviour is that it allows optimizations which are otherwise not possible. For example, it 
-enables the system to translate queries against a database (partially) into the query language SQL. This way, 
-instead of moving unnecessary data to Ibidas, operations can be moved to the database.
+    def yeastract(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"):
+        """Downloads documented transcription factor regulation interactions from yeastract"""
+
+        res = Read(Fetch(url),dtype="[tftargets:*]<(trans_factor=bytes, target=bytes)")
+        return res.Copy()
+
+    Get.register(yeastract)
+
+This can be simply put into a file which can then be imported when needed. These functions can also be shared with others.
+In fact, if it is a public data resource, one is encouraged to submit it for inclusion into Ibidas itself. 
 
 .. note::
-   For brevity, we will sometimes print output in this tutorial after assignments (e.g. ``r = rep(3)``.
-   In reality this does not happen. One can still get the output after such statements, by simply execting ``r``
+   In the implementation as shown, we took a slightly different approach to specifiying slice names and dimension names then used
+   in the previous section. Here, we specify it through the data type. Specifically, it reads as having an array ``[tftargets:*]`` 
+   of unspecified size,  with as elements ``(trans_factor=bytes, target=bytes)`` tuples of ``trans_factor`` and ``target`` fields, 
+   both with type ``bytes``. This array of tuples is automatically unpacked into the structure we encountered in the previous section.
+   By specifying the whole type at forehand, no automatic type detection is needed when loading the file. 
 
-Often, one wants to just see a description of the contents of a representation object, not the actual data result itself.
-This can be done using the information attribute ``I``::
+Calculating in/out degree
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    >>> r = rep(["geneA","geneB"])
-    >>> r.I
-    Slices: data     
-    Types:  bytes[5] 
-    Dims:   d1:2 
+Now that we have access to the data sources, we will determine the in/out-degree. This is done by calculating
+respectively the number of transcription factors per common target and the number of targets per transcription factor.
 
-Note that the data is not printed. Especially in case of slow operations or data sources this can be useful.
+For this, we will use the GroupBy operation. First, to show what the GroupBy operation does, we will Group the data on the 
+transcription factors::
 
-
-Getting data out of a representor object is simple, one simply appends ``()`` to a query to let it return the 
-results as normal ``numpy`` or python objects::
-
-    >>> r()
-    array(['geneA', 'geneB'], dtype='|S5')
-
-As you can see, Ibidas has packaged the data in a numpy array. 
-
-Summary:
-    * Operations are only executed when needed, to allow for optimizations
-
-    * One can ask for a description of the representor contents using the ``I`` attribute.
-
-    * One can get the data results by transforming the query into a function call by appending ``()``
-
-Types
------
-When one executes ``rep`` without specifying a type, the type is detected automatically.
-For example, in the first example, the detect type was ``int64``. 
+    >>> gyeastract = yeastract.GroupBy(_.trans_factor)
 
 .. note::
-    Depending on the platform you use, the type can also be ``int32``.
+    Note that we could also have written the command as::
 
-The type determines how operations on the representor are handled.
-For example, with an integer type, one can perform standard integer operations on the representor::
+        >>> gyeastract = yeastract.GroupBy(yeastract.trans_factor)
+
+    Attribute access is used to obtain single slices. However, this quickly becomes cumbersome in large expressions with multiple operations. Therefore,
+    we use what we call a `context` operator _.  This operator functions as replacement for the enclosing data object. We will show more uses of this operator
+    further on. 
+
+Now, lets look at what this operation does::
+    >>> gyeastract
+    Slices: | trans_factor    | target                                                                        
+    ----------------------------------------------------------------------------------------------------------
+    Type:   | bytes           | bytes                                                                         
+    Dims:   | gtrans_factor:* | gtrans_factor:*<gtftargets:~                                                  
+    Data:   |                 |                                                                               
+            | Hir2            | [YDR101c YKL109w YBR009c YNL030w YBR010w YNL031c YKL110c YGR233c YDR103w;  YG~
+            | Zap1            | [YMR120c YGL256w YOR134w YNL336w YBR302c YML132w YFL062w YGR295c YHL048w;  YD~
+            | Pip2            | [YPR128c YML042w YNR001c YOR100c YOR180c YLR284c YER015w YKR009c YLR174w;  YO~
+            | ...             | ... 
+
+After grouping on transcription factors, there is for each transcription factor now a single row. All
+targets corresponding to the transcription factor have been gathered in a nested array. This is reflected 
+in the metadata. Although the types of the slices are still the same, the dimensions have changed. 
+
+Slice ``trans_factor`` now has a new dimension, called `gtrans_factor:*`. This name is made from concatenating `g` (from group) with the
+name of the slice on which we performed the grouping. We see that the shape ``*`` is undefined. This is because
+at forehand, it was not known how many rows this operation would return. 
+
+Slice ``target`` now similarly has the `gtrans_factor:*` dimension, but it has also gained an extra dimension, called `gtftargets:~`. This is due to the grouping,
+which did put targets into nested arrays, corresponding to each transcription factor. Note that the shape paremeter here is `~`, 
+unlike the `*` in the `gtrans_factor` dimension. This indicates that the shape of this dimension is not fixed, but variable. 
+So, although previously we said that having two fixed dimensions would lead to a matrix, one can thus also have variable dimensions. This allows us to handle
+nested data and multi-dimensional data in a similar way. 
+
+
+Now, to obtain the out-degree of the transcription factors, we simply have to count the size of the nested arrays::
+    >>> gyeastract = gyeastract.Get(_.trans_factor, _.target.Count()/"out_degree")
+    Slices: | trans_factor    | out_degree
+    -------------------------------------------
+    Type:   | bytes           | int64
+    Dims:   | gtrans_factor:* | gtrans_factor:*
+    Data:   |                 |
+            | Hir2            | 68
+            | Zap1            | 185
+            | Pip2            | 150
+            | ...             | ...
+
+Here, we introduce two new operations, ``Get`` and ``Count``. Starting with the last one, ``Count`` is an aggregation operator which takes
+the last dimension, and counts the number of elements in it. We subsequently call the resulting slice ``out_degree``. 
+Note that its second dimension has been collapsed into the count. 
+
+The ``Get`` function is similar to the SELECT phrase in SQL. It allows one to select some slices from a dataset, perform on some of them operations, 
+and then returns the combined object. As is shown, it accepts (among other things) context operators to specifiy which slices should be selected and 
+which actions performed. 
+
+
+Now, if we want to plot this distribution we can make use of ``matplotlib``. For that, we have to get the data out of the data object. This
+can be very simply done by making the query a call by adding ``()`` to it::
     
-    >>> r = rep(3)
-    >>> (r + 3) * r
-    Slices: data 
-    Types:  int32 
-    Dims:         
+    >>> from matplotlib.pylab import *
+    >>> hist(gyeastract.out_degree())
+    >>> show()
 
-    Data: 18
+Now, to plot the in-degree distribution we can do something similar. The total script becomes::
 
-Similarly, in case of the string type, the addition operation becomes concatenation::
+    >>> from matplotlib.pylab import *
+    >>> yeastract = Get.yeastract()
 
-    >>> rep(["geneA", "geneB"])  + "_geneC"
-    Slices: data      
-    Types:  bytes[11] 
-    Dims:   d1:2      
+    >>> subplot(211)
+    >>> hist(yeastract.GroupBy(_.trans_factor).target.Count()(), bins=50)
+    >>> title('Out degree')
 
-    Data: ['geneA_geneC' 'geneB_geneC']
+    >>> subplot(212)
+    >>> hist(yeastract.GroupBy(_.target).trans_factor.Count()(), bins=50)
+    >>> title('In degree')
 
-One might have noted that, although we now represent a list of thins, the type still represents the
-type of the list elements. 
+    >>> show()
 
-This is because ``rep`` (by default) **unpacks** the data. By unpacking, operations
-will not be performed at the *list* level, but instead at the *list elements* level. Unpacking/packing will be explained
-further in one of the next sections.
+Resulting in the following image:
 
-Summary:
-    * A type is assigned automatically when packaging data using ``rep``
-
-    * The type indicates at which data nesting level operations are executed. 
+.. image:: inout_dist.png
 
 
-Slices
-------
+Chromosome locations
+--------------------
 
-Whereas lists in Ibidas are used to denote collections of data with the same type,
-tuples are used to describe data compositions of different types. 
+Next, suppose we want to analyze the genomic locations of the targets. For that purpose, we need for all genes the location on the chromosomes.
 
-You might have know such compositions as *records*, or simply as table rows.
 
-So, lets load a simple table::
+Loading the data
+~~~~~~~~~~~~~~~~
+This can be found in the ``SGD_features.tab``, which can be obtained from yeastgenome.org. We use the same strategy to load this file. Unfortunately, 
+also this file comes without fieldnames, so we specify those through the type::
+
+    rtype = """[feats:*]<(sgdid=bytes, feat_type=bytes, feat_qual=bytes, feat_name=bytes, gene_name=bytes, 
+                          gene_aliases=bytes, feat_parent_name=bytes, sgdid_alias=bytes, chromosome=bytes, 
+                          start=bytes, stop=bytes, strand=bytes[1], genetic_pos=bytes, coordinate_version=bytes[10], 
+                          sequence_version=bytes, description=bytes)"""
+
+    res = Read(Fetch("http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab"),dtype=rtype)
+
+Note that one could also just have named the fields that were needed, for example using::
+
+    res = res/{'f3': 'feat_name', 'f8':chromosome, 'f9':start}
+
+When reading a file like this one, all input data is in string(bytes) format. First, we cast the necessary fields
+to other types::
+
+    res = res.To(_.start, _.stop, Do=_.Cast("int$"))
+    res = res.To(_.genetic_pos,   Do=_.Cast("real64$"))
+
+Here we introduce two new operations. To is a utility function, which allow one to apply other operations to a subselection 
+of the slices in a data set. In this case, we cast the ``start`` and ``stop`` slice each to integer, and the ``genetic_pos``
+slice to a double floating point type. This is what the ``Cast`` operation does. Note that we do specify ``int$``, i.e. with a
+dollar sign. The dollar sign here means that missing values (empty fields) are allowed. 
+
+Next, we take a look at the ``gene_aliases`` field, which contains multiple gene aliases separated by the '|' symbol.
+To split this into a nested array, we use the split function::
+
+    res = res.To(_.gene_aliases,  Do=_.Each(_.split('|')).Elem()[_ != ""])
+
+Here, we introduce three new functions. The ``Each`` function applies a regular python function or a context object to each
+element in a slice. In this case, we split each string into a list of strings using the _.split('|') operation. The slice returning
+from this has arrays as the operative type. As we want to operate on the individual gene names, we use the Elem() function, which
+`unpacks` this array, such that subsequent operations will be performed on the elements instead of the arrays of elements. 
+Lastly, we apply a filter operation, removing all empty gene names from the gene names lists. 
+
+Note that Ibidas does not know what type will result from the function used in the ``Each`` operation. For that reason it will automatically
+perform type detection when necessary for subsequent operations. It is possible to prevent this by specifying the type at forehand. Also, instead
+of the context operation one can use functions, which are slightly faster than context oeprations::
     
-    >>> data = [('gene1',0.5), ('gene2', 0.3), ('gene3', 0.8)]
+    splitfunc = lambda x: x.split('|')
+    res = res.To(_.gene_aliases,  Do=_.Each(splitfunc, dtype="[aliases:~]<bytes").Elem()[_ != ""])
+
+As last step, we execute all operations, and store the result in memory::
+    yeast_feats = res.Copy()
+
+
+Note that this dataset is also predefined in Ibidas, and can be obtained using::
+
+    yeast_feats = Get.yeast_feats()
+
+
+Linking the datasets
+~~~~~~~~~~~~~~~~~~~~
+
+Now, we have to match both datasets. This is done on the ``targets`` in the Yeastract dataset, and on the ``feat_name`` field in the SGD_features dataset.
+However, both fields use different strategies for uppercase/lowercase, so first we have to change both to use always upper case.
+The total operation now becomes::
     
-    >>> r = rep(data)
-    Slices: f0       f1     
-    Types:  bytes[5] real64 
-    Dims:   d1:3     .      
-
-    Data: (array(['gene1', 'gene2', 'gene3'], 
-        dtype='|S5'), array([ 0.5,  0.3,  0.8]))
-
-
-If we compare this to earlier output, we now see that there are more than one columns in the data description.
-
-These columns represented *slices*. Slices are one of the main concepts in Ibidas. They can be compared to columns/fields in a table, but are more general.
-
-Selecting a slice can be done using simple attribute lookup::
-
-    >>> r.f0
-    Slices: f0       
-    Types:  bytes[5] 
-    Dims:   d1:3     
-
-    Data: ['gene1' 'gene2' 'gene3']
-
-
-Each slice has a name (the first row), a type (second row) and a dimension (third row). Dimensions will be explained later. For now, it is important that each
-slice has a common type. This means that all data elements adressed by it can be handled in the same way. Slices could thus also be seen as a kind of cursor in your data structure.
-Performing operations on this cursor will perform the operations on a subset of your data. For example::
-
-    >>> r.f0 == "gene2"
-    Slices: f0
-    Types:  bool
-    Dims:   d1:3
-
-    Data: [False  True False]
-
-To select multiple slices, one can use the :py:meth:`ibidas.representor.Representor.get` function::
-
-    >>> r.get("f1", "f0")
-    Slices: f1     f0       
-    Types:  real64 bytes[5] 
-    Dims:   d1:3   . 
-
-    >>> r.get(1, 0)
-    Slices: f1     f0       
-    Types:  real64 bytes[5] 
-    Dims:   d1:3   . 
-
-    >>> r.get(r.f1, r.f0)
-    Slices: f1     f0       
-    Types:  real64 bytes[5] 
-    Dims:   d1:3   . 
-
-As you can see, there are multiple options to address slices.  The third option is useful, as this can also be combined with other operations::
-
-    >>> r.get(r.f1 + 3, r.f0)
-    Slices: f1     f0       
-    Types:  real64 bytes[5] 
-    Dims:   d1:3   .        
-
-    Data: (array([ 3.5,  3.3,  3.8]), array(['gene1', 'gene2', 'gene3'], 
-        dtype='|S5'))
-
-One can also use this function to combine slices, e.g::
-
-    >>> r.get(r.f0, rep("cancer_genes"))
-    Slices: f0       data
-    Types:  bytes[5] bytes[12]
-    Dims:   d1:3
-
-    Data: (array(['gene1', 'gene2', 'gene3'],
-        dtype='|S5'), 'cancer_genes')
-
-
-When loading data from databases or files, often slice names are assigned as given in the data source. In case of loading from Python data,
-slice names are however autoassigned, and thus not very informative. To rename slices, one can use the :py:meth:`ibidas.representor.Representor.rename` function::
-
-    >>> r.rename("genes","scores")
-    Slices: genes    scores 
+    >>> tftargetdat = yeastract.Match(yeast_feats, _.target.Each(str.upper), _.feat_name.Each(str.upper))
     
-    >>> r.rename(f1="scores")
-    Slices: f0    scores 
+    >>> tftargetdat  #only showing the first few slices...
+    Slices: | trans_factor     | target           | sgdid            | feat_type        | feat_qual       
+    ------------------------------------------------------------------------------------------------------
+    Type:   | bytes            | bytes            | bytes            | bytes            | bytes           
+    Dims:   | tftargets_feats~ | tftargets_feats~ | tftargets_feats~ | tftargets_feats~ | tftargets_feats~
+    Data:   |                  |                  |                  |                  |                 
+            | Gcr2             | YAL008w          | S000000006       | ORF              | Verified        
+            | Met4             | YAL008w          | S000000006       | ORF              | Verified        
+            | Otu1             | YAL008w          | S000000006       | ORF              | Verified        
+            | ...              | ...              | ...              | ...              | ...             
 
-As this functionality is used often, a shorter version is available::
 
-    >>> r/("genes","scores")
-    Slices: genes    scores 
+This operation will links rows in yeastract with rows in yeast_feats, based on equality in the ``target`` and ``feat_name`` column. Any ``target`` row for which
+no entry can be found in ``feat_name`` will be left out. We do a quick check to determine how many of the rows could not be matched::
     
-    >>> r/{f1:"scores"}
-    Slices: f0    scores 
+    >>> yeastract.target.Count() - tftargetdat.target.Count()
+    Slices: | target
+    ----------------
+    Type:   | int64 
+    Dims:   |       
+    Data:   |       
+            | 72
+
+This means that 72 transcription factor-target pairs could not be matched. On 48010 pairs this is negligible. However, as this is a tutorial, we will look into this
+a bit more thoroughly. First, we determine which targets where not matched::
+
+
+    >>> non_matched = (yeastract.target.Each(str.upper).Set() - tftargetdat.target.Each(str.upper).Set()).Elem()
+    >>> non_matched
+    Slices: | target
+    ---------------------------------------
+    Type:   | bytes[9]
+    Dims:   | stftargets_stftargets_feats:*
+    Data:   |
+            | YLR157W-C
+            | YAR044W
+            | YBL101W-C
+            | YBL101W-A
+            | YJL017W
+            | A1
+            | YJL012C-A
+            | MALT
+            | MALS
+            | SNR20
+            | A2
+            | RDN5
+            | ALD1
+            | YDR474C
+            | YBR075W
+            | TER1
+            | SUC6
+            | YDR524W-A
+            | YGR272C
+            | YDL038C
+            | YBL101W-B
+            | DEX2
+
+
+
+This introduces the ``Set`` command. Using the set command, the elements of the (by default last) dimension are packed into a set. A set is a collection of objects
+in which each element is unique. That is, adding the string "YLR157W-C"  multiple times to a set will result in a set with just one occurence of "YLR157W-C".
+Sets have some special operations defined on them. One of them is set substraction, which was used here. It removes all elements in the set of the first operand that
+also occur in the set of the second operand, leaving only the elements that do not occur in the second operand. In this case thus the elements that were not matched. 
+
+Next, we use the ``Elem`` operation to unpack the resulting set, and ``Show`` to see the whole result. 
+
+The names in the list suggest that we might find matching rows by looking either at the ``gene_name`` or ``gene_aliases`` column. The ``gene_name`` column gives no match however::
     
-    >>> r.get(r.f0/"genes", 
-              rep("cancer_genes")/"listname")
-    Slices: genes       listname
-
-Summary:
-    * Slices can be compared to columns/fields in a table, or to data cursors which indicate on which data elements operations will be applied. 
-
-    * A representor object is a collection of slices
-
-    * Attribute lookup can be used to select a single slice.
-
-    * More advanced selection can be performed using the ``get`` function, allowing multiple slice selection, slice modifications and slice combination. 
+    >>> non_matched.In(feats.gene_name.Each(str.upper))
 
 
-Dimensions
-----------
-Up to now, our data model was very similar to ones used in other software. *Dimensions* allow Ibidas to handle more complex data structures. 
 
-Lets replace the first field of the table with a nested, variable length list::
-    >>> data = [([1,2],0.5), ([3,4,5], 0.3), ([6,7,8,9], 0.8)]
-    
-    >>> r = rep(data)
-    Slices: f0        f1     
-    Types:  int32     real64 
-    Dims:   d1:3<d2:~ .      
-
-    Data: (array([[1 2], [3 4 5], [6 7 8 9]], dtype=object), array([ 0.5,  0.3,  0.8]))
-
-Compare this to dims in the previous sections. Dimensions indicate which nesting arrays have been **unpacked**. So, in case of slice ``f0``, 
-we are working at the level of ``int32`` (the type). These ``int32`` elements are nested two levels deep in arrays, which are indicated by 
-dimension ``d1`` and ``d2``.  
-
-The dim names are accompanied by a shape attribute. The ``3`` means that the dimension has a fixed size of 3, while the ``~`` means that the
-dimension has a variable size. One might also encounter ``*``, which means that the dimension has a fixed, but unspecified, size. 
-
-So what does the ``.`` mean in the dimension of slice ``f1``? In case of large tables with many slices and long dimension names, it can be a bit
-unwieldy to repeat the same dimensions for every slice. Therefore, we use a shorthand. The ``.`` here means that it has the same first dimension as the 
-previous slice.  If it would be ``.<.``, it would mean that it shares the first two dimensions, and so on. 
-
-Dimensions are used in operations to determine how data is mapped w.r.t to each other::
-
-    >>> r.f0 + r.f1
-    Slices: result    
-    Types:  real64    
-    Dims:   d1:3<d2:~ 
-
-    Data: [[ 1.5  2.5] [ 3.3  4.3  5.3] [ 6.8  7.8  8.8  9.8]]
-
-To perform an addition, both operands would need the same dimension normally. As this is not the case, 
-we perform **broadcasting**. As you can see, elements from slice ``f1``  are broadcasted along dimension ``d2`` to enable 
-the addition of the two slices. 
+Next we look at the gene_aliases column. 
 
 
-In case of type autodetection, dimension names are also assigned automatically (Starting from ``d1``). Dimension can however
-be renamed in a similar way as slices, using :py:meth:`ibidas.representor.Representor.dim_rename`::
 
-    >>> r.dim_rename("pathways","genes")
-    Slices: f0                 f1
-    Types:  int32              real64
-    Dims:   pathways:3<genes:~ .
-    
-    >>> r.dim_renmae(d1="pathways")
-    Dims:   pathways:3<d2:~ .      
-
-When performed without keywords, new dim names are mapped to dimensions by ordering dimensions on their nesting depth. If there are multiple
-choices possible, an error will be returned. Similar to slice renaming, a shorthand is available using the ``%`` symbol.
-
-
-Summary:
-    
-    * The use of dimensions allow one to have slices with different dimensions within the same representor object
-
-    * The use of broadcasting allows these slices to still interact (e.g. to perform a comparison or other operation)
-
-    * Dimensions have a name and a shape
-
-    * The printout of a representor uses ``.`` to indicate a common dimension w.r.t to the previous slice.
-
-    * Dimensions are separated by the ``<`` symbol
-
-    * Dimensions can be renamed using the dim_rename function or the ``%`` shorthand operation. 
-
-
-Packing/unpacking
------------------
-Navigating accross dimensions and slices can be performed with ``pack`` and ``unpack`` operations. 
-There are two types of these operations:
-
-    * pack/unpack from tuple type to slices and vice versa
-    * pack/unpack from array type to dimensions and vice versa
-
-
-Packing
-~~~~~~~
-
-The two most basic ``pack`` operations are respectively ``tuple`` and ``array``.
-
-An example of the ``array`` function::
-
-    >>> data = [([1,2],0.5), ([3,4,5], 0.3), ([6,7,8,9], 0.8)]
-    >>> r = rep(data)
-
-    >>> r.array()
-    Slices: f0           f1            
-    Types:  [d2:~]:int32 [d1:3]:real64 
-    Dims:   d1:3                       
-
-    Data: (array([[1 2], [3 4 5], [6 7 8 9]], dtype=object), array([ 0.5,  0.3,  0.8]))
-
-
-The influence of the array operation is that the dimensions are moved into the type. So subsequent operations
-are performed at the level of the arrays. 
-
-Arrays can also be packed with other aggregate operations. For example, the ``set`` function:
-
-    >>> r.f0.set()
-
-
-Performing the ``tuple`` operation gives::
-
-    >>> r.tuple()
-    Slices: data                         
-    Types:  (f0=[d2:~]:int32, f1=real64) 
-    Dims:   d1:3                         
-
-    Data: [(array([1, 2]), 0.5) (array([3, 4, 5]), 0.29999999999999999)
-    (array([6, 7, 8, 9]), 0.80000000000000004)]
-
-As you can see, slice types are combined into a single slice tuple type. 
-
-Unpacking
-~~~~~~~~~
-
-The reverse operations for ``array`` and ``tuple`` are respectively ``elements`` and ``attributes``.
-
-These are used less commonly as by default dat is unpacked by representation. 
 
 
