@@ -1,0 +1,178 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Installation &mdash; Ibidas v0.1 documentation</title>
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="top" title="Ibidas v0.1 documentation" href="index.html" />
+    <link rel="next" title="Tutorial" href="tutorial.html" />
+    <link rel="prev" title="Welcome to Ibidas’s documentation!" href="index.html" /> 
+  </head>
+  <body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="tutorial.html" title="Tutorial"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to Ibidas’s documentation!"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">Ibidas v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
+  <div class="section" id="installation">
+<h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
+<p>If one has the <tt class="docutils literal"><span class="pre">setuptools</span></tt> package installed, one can simply perform:</p>
+<div class="highlight-python"><pre>easy_install ibidas</pre>
+</div>
+<p>This will download and install ibidas and its necessary dependencies.
+The <tt class="docutils literal"><span class="pre">setuptools</span></tt> package is available in nearly all Linux distributions.</p>
+<p>Ibidas has currently only been tested on the Linux platform, and probably will
+not work out of the box on Windows. We will look into this in the near future.</p>
+<div class="section" id="starting-ibidas">
+<h2>Starting ibidas<a class="headerlink" href="#starting-ibidas" title="Permalink to this headline">¶</a></h2>
+<p>To start ibidas, one can simply execute:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="n">ibidas</span>
+</pre></div>
+</div>
+<p>on the command line prompt. This will load the <tt class="docutils literal"><span class="pre">IPython</span></tt> interpreter, with
+Ibidas preloaded.</p>
+<p>If one instead wants to load ibidas within an script or interpreter process,
+one can simply use:</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="kn">from</span> <span class="nn">ibidas</span> <span class="kn">import</span> <span class="o">*</span>
+</pre></div>
+</div>
+<p>For the rest of this tutorial, we assume the standard Ibidas interpreter is used.</p>
+</div>
+<div class="section" id="manual-installation">
+<h2>Manual installation<a class="headerlink" href="#manual-installation" title="Permalink to this headline">¶</a></h2>
+<p>Alternatively, one can download the source package, and execute in the unpacked
+source directory:</p>
+<div class="highlight-python"><pre>python setup.py install</pre>
+</div>
+<p>One can also directly execute ibidas from the source package by performing:</p>
+<div class="highlight-python"><pre>python setup.py develop
+
+source set_env.sh
+
+ibidas</pre>
+</div>
+<p>Performing unit tests and building the documentation can be done manually using:</p>
+<div class="highlight-python"><pre>#unit tests
+python setup.py test
+
+#build documentation (available then under docs/_build/html)
+python setup.py build_sphinx</pre>
+</div>
+<p>Ibidas installation dependencies include:</p>
+<blockquote>
+<div><ul class="simple">
+<li>numpy &gt;= v1.5.1</li>
+<li>ipython &gt;= 0.10.1</li>
+<li>sqlalchemy &gt;= 0.6.4</li>
+<li>sphinx &gt;= 1.0.5</li>
+</ul>
+</div></blockquote>
+<p>Also, installing database client libraries such as <cite>sqlite</cite>, <cite>postgres</cite> and <cite>mysql</cite>,
+will alow one to use the sql wrapper to connect to these various databases.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Installation</a><ul>
+<li><a class="reference internal" href="#starting-ibidas">Starting ibidas</a></li>
+<li><a class="reference internal" href="#manual-installation">Manual installation</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">Welcome to Ibidas&#8217;s documentation!</a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="tutorial.html"
+                        title="next chapter">Tutorial</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/installation.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" size="18" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="tutorial.html" title="Tutorial"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to Ibidas’s documentation!"
+             >previous</a> |</li>
+        <li><a href="index.html">Ibidas v0.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>
+    <div class="footer">
+        &copy; Copyright 2011, Marc Hulsman &amp; Jan Bot.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+    </div>
+  </body>
+</html>
