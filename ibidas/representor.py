@@ -233,7 +233,11 @@ class Representor(Node):
 
    
     def __reduce__(self):
-        return (wrapper_py.PyRepresentor, (self._getResultSlices(),))
+        self = self.Copy()
+        slices = self._getResultSlices(endpoint=False)
+        for slice in slices:
+            slice.source = None
+        return (wrapper_py.PyRepresentor, (slices, self._state))
 
     def __copy__(self):
         nself = Representor()

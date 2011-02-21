@@ -24,7 +24,8 @@ _delay_import_(globals(),"..utils.missing","Missing")
 
 
 class PyRepresentor(wrapper.SourceRepresentor):
-    pass
+    def __init__(self, slices, state):
+        self._initialize(slices, state)
 
 def Rep(data=None, dtype=None, unpack=True, name=None):
     """Packs python data structures into a :py:class:`ibidas.representor.Representor` object.
@@ -267,7 +268,14 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             else:
                 func = operator.itemgetter(didx)
         else:
-            func = operator.itemgetter(node.tuple_idx)
+            if(node.type.has_missing):
+                def func(x):
+                    if node.tuple_idx >= len(x):
+                        return Missing
+                    else:
+                        return x[node.tuple_idx]
+            else:
+                func = operator.itemgetter(node.tuple_idx)
         ndata = slice.data.map(func,res_type=node.type)
         return slice.modify(data=ndata,rtype=node.type,name=node.name)
  

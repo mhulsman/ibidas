@@ -509,7 +509,7 @@ class TupleScanner(TypeScanner):
             if i < self.min_len:
                 subseq = seq.map(f, has_missing=self.detector.hasMissing())
             else:
-                subseq = seq.tomissing_filter(l > i).map(f, out_empty=Missing, otype=object, has_missing=True)
+                subseq = seq.filter_tomissing(l > i).map(f, out_empty=Missing, otype=object, has_missing=True)
             d.processSeq(subseq)
         return True
 registerTypeScanner(TupleScanner)

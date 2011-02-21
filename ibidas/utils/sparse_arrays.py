@@ -56,7 +56,7 @@ class FullSparse(numpy.ndarray):
         nval = self.copy()
         nval = numpy.cast[object](nval)
         nval[~filter] = Missing
-        return nval
+        return nval.view(FullSparse)
 
     def hasSparse(self):
         return numpy.equal(self,Missing).any()

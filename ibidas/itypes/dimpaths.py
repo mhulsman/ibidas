@@ -16,7 +16,10 @@ class DimPath(tuple):
     def __new__(cls, *dims):
         assert all([isinstance(dim, Dim) for dim in dims]),"DimPath should consist of dimensions"
         return tuple.__new__(cls, dims)
-    
+   
+    def __reduce__(self):
+        return (DimPath, tuple(self))
+
     def _getNames(self):
         return [dim.name for dim in self]
     names = property(fget=_getNames)

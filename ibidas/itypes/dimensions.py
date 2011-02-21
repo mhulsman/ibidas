@@ -14,7 +14,10 @@ def getNewDimid():
 class Dim(object):
     """Class representing a dimension."""
     __slots__ = ['id', 'name', 'shape', 'dependent', 'has_missing','redim_cache','__weakref__']
-    
+   
+    def __reduce__(self):
+        return (Dim, (self.shape, self.dependent, self.has_missing, self.id, self.name))
+
     def __init__(self, shape, dependent=tuple(), has_missing=False, did=None, name=None):
         """Creates dimension class.
 
