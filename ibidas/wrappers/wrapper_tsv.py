@@ -72,13 +72,18 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                 file.seek(startpos)
                 fieldnames = file.readline()
                 fieldnames = csv.reader([fieldnames],dialect=dialect).next()
+                util.debug_here()
                 if(not csv.Sniffer().has_header("\n".join(sample))):
                     file.seek(startpos)
                     fieldnames = None
-            elif(fieldnames == "auto"):
+            elif(fieldnames is True):
                 fieldnames = file.readline()
                 fieldnames = csv.reader([fieldnames],dialect=dialect).next()
-            fieldnames = [util.valid_name(fieldname) for fieldname in fieldnames]
+            else:
+                fieldnames = none
+            
+            if(fieldnames):
+                fieldnames = [util.valid_name(fieldname) for fieldname in fieldnames]
 
             startpos = file.tell()
             #parse data
