@@ -58,7 +58,6 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             file.readline()
         startpos = file.tell()
 
-        util.debug_here()
         #determine type
         if(dtype is None):
             dtype = rtypes.unknown
@@ -72,15 +71,12 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                 file.seek(startpos)
                 fieldnames = file.readline()
                 fieldnames = csv.reader([fieldnames],dialect=dialect).next()
-                util.debug_here()
                 if(not csv.Sniffer().has_header("\n".join(sample))):
                     file.seek(startpos)
                     fieldnames = None
             elif(fieldnames is True):
                 fieldnames = file.readline()
                 fieldnames = csv.reader([fieldnames],dialect=dialect).next()
-            else:
-                fieldnames = none
             
             if(fieldnames):
                 fieldnames = [util.valid_name(fieldname) for fieldname in fieldnames]
@@ -88,18 +84,20 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             startpos = file.tell()
             #parse data
             data = [tuple(row) for row in reader]
-            util.debug_here()
             file.seek(startpos)
 
             det = detector.Detector()
             det.process(data)
             dtype = det.getType()
-            if(not fieldnames is None and dtype != rtypes.unknown):
+            if(not fieldnames is None and not fieldnames is False and dtype != rtypes.unknown):
                 assert isinstance(dtype,rtypes.TypeArray),"Error while determining type"
                 assert isinstance(dtype.subtypes[0],rtypes.TypeTuple),"Error while determining type"
                 dtype.subtypes[0].fieldnames = tuple(fieldnames)
         elif(isinstance(dtype,basestring)):
-                dtype = rtypes.createType(dtype)
+            dtype = rtypes.createType(dtype)
+            if(fieldnames is True):
+                dummy = file.readline()
+                startpos = file.tell()
         else:
             raise RuntimeError, "Not a valid type specified"
 

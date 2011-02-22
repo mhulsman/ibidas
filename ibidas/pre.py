@@ -1,8 +1,15 @@
 _delay_import_(globals(),"ibidas","*")
 
 class Pre(object):
-    def register(self, func):
-        setattr(self,func.__name__, func)
+    def register(self, func, name=None, organism=None):
+        if organism:
+            if not organism in self.__dict__:
+                self.__dict__[organism] = Pre()
+            self.__dict__[organism].register(func, name)
+        else:
+            if(name is None):
+                name = func.__name__
+            setattr(self,name,func)
 predefined_sources = Pre()
 
 
@@ -23,7 +30,7 @@ def yeast_feats():
     res = res.To(_.start, _.stop, Do=_.Cast("int$"))
     res = res.To(_.genetic_pos,   Do=_.Cast("real64$"))
     return res.Copy()
-predefined_sources.register(yeast_feats)  
+predefined_sources.register(yeast_feats,name="genomic_feats",organism="yeast")  
 
 
 def yeast_aliases(feats):
@@ -39,7 +46,23 @@ def yeast_aliases(feats):
     res = res%"feat_aliases"
     res = res[_.alias != ""]
     return res.Unique().Copy()
-predefined_sources.register(yeast_aliases)  
+predefined_sources.register(yeast_aliases,name="name_aliases",organism="yeast")  
+
+
+def yeast_phosphosites():
+    url = "http://www.phosphogrid.org/downloads/phosphosites.txt"
+    rtype = """[phosphosites:*]<(orf_name=bytes, gene_name=bytes, phospho_site=bytes, site_evidence=bytes, 
+               site_evidence_pubmed=bytes, site_conditions=bytes, site_conditions_pubmed=bytes, site_functions=bytes, site_functions_pubmed=bytes, 
+               kinases_orfs=bytes, kinases_genes=bytes, kinases_evidence=bytes, kinases_evidence_pubmed=bytes, phosphatases_orfs=bytes, 
+               phosphatases_genes=bytes, phosphatases_evidence=bytes, phosphatases_evidence_pubmed=bytes, sequence=bytes, notes=bytes)"""
+    res = Read(Fetch(url),fieldnames=True,dtype=rtype)
+    splitfunc = lambda x: x.split("|")
+    res = res.To(_.site_evidence,  Do=_.Each(splitfunc, dtype="[site_evidences:~]<bytes").Elem()[_ != "-"])
+    res = res.To(_.site_evidence_pubmed,  Do=_.Each(splitfunc, dtype="[site_evidence_pubmeds:~]<bytes").Elem()[_ != "-"])
+    res = res.To(_.kinases_orfs,  Do=_.Each(splitfunc, dtype="[kinases:~]<bytes").Elem()[_ != "-"])
+    res = res.To(_.phosphatases_orfs,  Do=_.Each(splitfunc, dtype="[phosphatases:~]<bytes").Elem()[_ != "-"])
+    return res.Copy()
+predefined_sources.register(yeast_phosphosites,name="phosphosites",organism="yeast")  
 
 def in_memory_db():
     """Returns an empty in memory database"""
@@ -52,7 +75,7 @@ def yeastract(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Do
     rtype = "[tftargets:*]<(trans_factor=bytes, target=bytes)"
     res = Read(Fetch(url),dtype=rtype)
     return res.Copy()
-predefined_sources.register(yeastract)
+predefined_sources.register(yeastract,organism="yeast")
 
 
 def string_interactions(dburl, species="Saccharomyces cerevisiae"):
@@ -97,7 +120,7 @@ def omim_genemap():
     res = res.To(_.mim, Do=_.Cast("int"))
 
     return res.Without(_.f8, _.f12, _.disease1, _.disease2, _.disease3).Copy()
-predefined_sources.register(omim_genemap)
+predefined_sources.register(omim_genemap, organism="human")
 
 def omim_disease_parse(x):
     x = x.replace('{','').replace('}','')

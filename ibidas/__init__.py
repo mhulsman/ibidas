@@ -11,7 +11,7 @@ __all__ = ["Rep","Read","Connect","_",
            "Argmin","Argmax",
            "Mean","Median",
            "Sum",
-           "Count",
+           "Count","Match",
            "Broadcast","CreateType",
            "newdim","Missing",
            "Corr","In","Contains",
@@ -42,6 +42,7 @@ from constants import *
 Fetch = DownloadCache()
 In = Infix(repops_funcs.Within)
 Contains = Infix(repops_funcs.Contains)
+Match = Infix(repops_multi.Match)
 
 Pos = repops.delayable(default_params="#")(repops_funcs.Pos)
 Argsort = repops.delayable()(repops_funcs.Argsort)

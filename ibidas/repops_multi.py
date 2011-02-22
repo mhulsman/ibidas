@@ -339,6 +339,7 @@ class Join(repops.MultiOpRep):
 
 class Match(repops.MultiOpRep):
     def __init__(self, lsource, rsource, lslice=None, rslice=None, jointype="inner"):
+        util.debug_here()
         assert jointype in set(["inner","left","right","full"]), "Jointype should be inner, left, right or full"
         if(isinstance(lslice,context.Context)):
             lslice = context._apply(lslice,lsource)
