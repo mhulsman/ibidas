@@ -38,10 +38,10 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             splitsize = []
             for row in reader:
                 splitsize.append(len(row))
-                if(len(row[0]) == 0 or ((len(splitsize) == 1 or splitsize[-2] == 0) and (row[0][0] == '#' or row[0][0] == '%' or row[0][0] == "!"))):
+                if(not row or len(row[0]) == 0 or ((len(splitsize) == 1 or splitsize[-2] == 0) and (row[0][0] == '#' or row[0][0] == '%' or row[0][0] == "!"))):
                     splitsize[-1] = 0
-                elif(len(splitsize) > 25):
-                    x = set(splitsize[-10:])
+                elif(len(splitsize) > 75):
+                    x = set(splitsize[-20:])
                     if(len(x) == 1):
                         break
                 elif(len(splitsize) > 500):
@@ -58,6 +58,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             file.readline()
         startpos = file.tell()
 
+        util.debug_here()
         #determine type
         if(dtype is None):
             dtype = rtypes.unknown
@@ -69,16 +70,20 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                     if(len(sample) > 10):
                         break
                 file.seek(startpos)
-                fieldnames = reader.next()
+                fieldnames = file.readline()
+                fieldnames = csv.reader([fieldnames],dialect=dialect).next()
                 if(not csv.Sniffer().has_header("\n".join(sample))):
                     file.seek(startpos)
                     fieldnames = None
             elif(fieldnames == "auto"):
-                fieldnames = reader.next()
+                fieldnames = file.readline()
+                fieldnames = csv.reader([fieldnames],dialect=dialect).next()
+            fieldnames = [util.valid_name(fieldname) for fieldname in fieldnames]
 
             startpos = file.tell()
             #parse data
             data = [tuple(row) for row in reader]
+            util.debug_here()
             file.seek(startpos)
 
             det = detector.Detector()
@@ -88,9 +93,10 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                 assert isinstance(dtype,rtypes.TypeArray),"Error while determining type"
                 assert isinstance(dtype.subtypes[0],rtypes.TypeTuple),"Error while determining type"
                 dtype.subtypes[0].fieldnames = tuple(fieldnames)
-        else:
-            if(isinstance(dtype,basestring)):
+        elif(isinstance(dtype,basestring)):
                 dtype = rtypes.createType(dtype)
+        else:
+            raise RuntimeError, "Not a valid type specified"
 
         slice = TSVOp(filename, dialect, startpos, dtype, "data")
         if(slice.type.__class__ is rtypes.TypeArray):
