@@ -34,9 +34,6 @@
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
         <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
           <a href="ibidas_rep.html" title="Representor object"
              accesskey="N">next</a> |</li>
         <li class="right" >
@@ -54,254 +51,6 @@
   <div class="section" id="module-reference">
 <h1>Module reference<a class="headerlink" href="#module-reference" title="Permalink to this headline">¶</a></h1>
 <p>Reference of ibidas modules</p>
-<span class="target" id="module-ibidas"></span><p>The ibidas module contains all main functions for working with ibidas objects.</p>
-<dl class="function">
-<dt id="ibidas.Rep">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Rep</tt><big>(</big><em>data=None</em>, <em>dtype=None</em>, <em>unpack=True</em>, <em>name=None</em><big>)</big><a class="headerlink" href="#ibidas.Rep" title="Permalink to this definition">¶</a></dt>
-<dd><p>Packs python data structures into a <a class="reference internal" href="ibidas_rep.html#ibidas.representor.Representor" title="ibidas.representor.Representor"><tt class="xref py py-class docutils literal"><span class="pre">ibidas.representor.Representor</span></tt></a> object.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>data</strong> &#8211; any python object</li>
-<li><strong>dtype</strong> (<tt class="xref py py-class docutils literal"><span class="pre">str</span></tt> or <a class="reference internal" href="ibidas_type.html#ibidas.itypes.rtypes.Type" title="ibidas.itypes.rtypes.Type"><tt class="xref py py-class docutils literal"><span class="pre">ibidas.itypes.rtypes.Type</span></tt></a>) &#8211; type of <tt class="docutils literal"><span class="pre">data</span></tt>. See <tt class="xref py py-func docutils literal"><span class="pre">createType()</span></tt> for allowed string formats
-(default=autodetect).</li>
-<li><strong>unpack</strong> &#8211; determines if data object is unpacked. 
-For example, unpacking an array means that subsequent operations are performed 
-on the elements instead of on the array structure</li>
-<li><strong>name</strong> (<tt class="xref py py-class docutils literal"><span class="pre">str</span></tt>, lower case) &#8211; Name of the main slice, representing the data (default=&#8217;data&#8217;).</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-<dl class="docutils">
-<dt>Examples:</dt>
-<dd><p class="first">Let the python data that needs to be represented be a simple table (collection of tuples):</p>
-<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">data</span> <span class="o">=</span> <span class="p">[(</span><span class="s">&#39;gene1&#39;</span><span class="p">,</span><span class="mf">0.5</span><span class="p">),(</span><span class="s">&#39;gene2&#39;</span><span class="p">,</span><span class="mf">0.3</span><span class="p">),(</span><span class="s">&#39;gene100&#39;</span><span class="p">,</span><span class="mf">0.9</span><span class="p">)]</span>
-</pre></div>
-</div>
-<p>The, to load using type autodetection, use:</p>
-<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">r</span> <span class="o">=</span> <span class="n">Rep</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-<span class="go">Slices: f0       f1     </span>
-<span class="go">Types:  bytes[7] real64 </span>
-<span class="go">Dims:   d1:3     .   </span>
-</pre></div>
-</div>
-<p>Specifying type directly:</p>
-<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">r</span> <span class="o">=</span> <span class="n">Rep</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="s">&quot;[genes]&lt;(name:string, value:real64)&quot;</span><span class="p">)</span>
-<span class="go">Slices: name    value</span>
-<span class="go">Types:  string  real64</span>
-<span class="go">Dims:   genes:* .</span>
-</pre></div>
-</div>
-<p>Effect of setting unpack to False:</p>
-<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">r</span> <span class="o">=</span> <span class="n">Rep</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="s">&quot;[genes]&lt;(name:string, value:real64)&quot;</span><span class="p">,</span> <span class="n">unpack</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
-<span class="go">Slices: data                                  </span>
-<span class="go">Types:  [genes:*]:(name=string, value=real64) </span>
-<span class="go">Dims: </span>
-</pre></div>
-</div>
-<p>Specifying root slice name:</p>
-<div class="last highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">r</span> <span class="o">=</span> <span class="n">Rep</span><span class="p">(</span><span class="n">data</span><span class="p">,</span><span class="s">&quot;[genes]&lt;(name:string, value:real64)&quot;</span><span class="p">,</span> <span class="n">unpack</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s">&quot;gene_table&quot;</span><span class="p">)</span>
-<span class="go">Slices: gene_table                                  </span>
-<span class="go">Types:  [genes:*]:(name=string, value=real64) </span>
-<span class="go">Dims: </span>
-</pre></div>
-</div>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Read">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Read</tt><big>(</big><em>url</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#ibidas.Read" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Connect">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Connect</tt><big>(</big><em>url</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#ibidas.Connect" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Array">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Array</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Array" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Tuple">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Tuple</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Tuple" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="class">
-<dt id="ibidas.Combine">
-<em class="property">class </em><tt class="descclassname">ibidas.</tt><tt class="descname">Combine</tt><big>(</big><em>*sources</em><big>)</big><a class="headerlink" href="#ibidas.Combine" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.HArray">
-<tt class="descclassname">ibidas.</tt><tt class="descname">HArray</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.HArray" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="class">
-<dt id="ibidas.Stack">
-<em class="property">class </em><tt class="descclassname">ibidas.</tt><tt class="descname">Stack</tt><big>(</big><em>*sources</em>, <em>**kwargs</em><big>)</big><a class="headerlink" href="#ibidas.Stack" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Pos">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Pos</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Pos" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Argsort">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Argsort</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Argsort" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Any">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Any</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Any" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.All">
-<tt class="descclassname">ibidas.</tt><tt class="descname">All</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.All" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Max">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Max</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Max" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Min">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Min</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Min" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Argmin">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Argmin</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Argmin" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Argmax">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Argmax</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Argmax" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Mean">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Mean</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Mean" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Median">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Median</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Median" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Sum">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Sum</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Sum" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Count">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Count</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Count" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="class">
-<dt id="ibidas.Broadcast">
-<em class="property">class </em><tt class="descclassname">ibidas.</tt><tt class="descname">Broadcast</tt><big>(</big><em>sources</em>, <em>*args</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Broadcast" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.CreateType">
-<tt class="descclassname">ibidas.</tt><tt class="descname">CreateType</tt><big>(</big><em>name</em>, <em>dimpos=0</em><big>)</big><a class="headerlink" href="#ibidas.CreateType" title="Permalink to this definition">¶</a></dt>
-<dd><p>Creates a type object from string representation.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field"><th class="field-name">Parameters:</th><td class="field-body"><strong>name</strong> &#8211; str</td>
-</tr>
-</tbody>
-</table>
-<dl class="docutils">
-<dt>Format:</dt>
-<dd>Description of type formats</dd>
-<dt>Examples:</dt>
-<dd><div class="first highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">createType</span><span class="p">(</span><span class="s">&quot;unicode&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">createType</span><span class="p">(</span><span class="s">&quot;array(int64)[]&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-<div class="last highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">createType</span><span class="p">(</span><span class="s">&quot;tuple(int64,unicode)&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Corr">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Corr</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Corr" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Serve">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Serve</tt><big>(</big><em>portnumber=9889</em><big>)</big><a class="headerlink" href="#ibidas.Serve" title="Permalink to this definition">¶</a></dt>
-<dd><p>Starts xml-rpc server on the supplied port number. Can be used to contact ibidas
-from other applications.</p>
-<p>XML-RPC interface:</p>
-<ul class="simple">
-<li>startSession() (optional): create session namespace, returns sessionid</li>
-<li>closeSession(sessionid): closes specified session</li>
-<li>query(query, sessionid=-1): executes query string in session, returns result.</li>
-<li>execute(query, sessionid=-1): exexutes query string in session</li>
-<li>set(name, val, sessionid=-1): sets variable in session</li>
-</ul>
-<p>The default session id of -1 gives direct contact with the ibidas command line session</p>
-<p>Starting the server:</p>
-<div class="highlight-python"><pre>$ ibidas
-&gt;&gt;&gt; s = Serve()
-&gt;&gt;&gt; z = Rep([1,2,3,4])</pre>
-</div>
-<dl class="docutils">
-<dt>Connecting to ibidas (python, but can be any other application supporting xml-rpc)::</dt>
-<dd>$ipython
-&gt;&gt;&gt; import xmlrpclib
-&gt;&gt;&gt; s = xmlrpclib.ServerProxy(&#8220;<a class="reference external" href="http://localhost:9889">http://localhost:9889</a>&#8221;)
-&gt;&gt;&gt; s.query(&#8220;z + 4&#8221;)
-[4,5,6,7]</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Load">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Load</tt><big>(</big><em>filename</em><big>)</big><a class="headerlink" href="#ibidas.Load" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Save">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Save</tt><big>(</big><em>r</em>, <em>filename</em><big>)</big><a class="headerlink" href="#ibidas.Save" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Invert">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Invert</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Invert" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Abs">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Abs</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Abs" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.Negative">
-<tt class="descclassname">ibidas.</tt><tt class="descname">Negative</tt><big>(</big><em>*params</em>, <em>**kwds</em><big>)</big><a class="headerlink" href="#ibidas.Negative" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
 </div>
 
 
@@ -345,9 +94,6 @@ from other applications.</p>
           <a href="genindex.html" title="General Index"
              >index</a></li>
         <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
           <a href="ibidas_rep.html" title="Representor object"
              >next</a> |</li>
         <li class="right" >
@@ -358,7 +104,7 @@ from other applications.</p>
     </div>
     <div class="footer">
         &copy; Copyright 2011, Marc Hulsman &amp; Jan Bot.
-      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
     </div>
   </body>
 </html>

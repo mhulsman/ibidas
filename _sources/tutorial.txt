@@ -19,7 +19,7 @@ assigns it a file name, and returns this filename. Executing ``Fetch`` on this u
 cached local copy. 
 
 Subsequently, ``Read`` takes this filename, and imports the data. By
-default is assumes a comma/tab/other symbol separated value file. It will attempt to detect the column delimiter, 
+default it assumes a comma/tab/other symbol separated value file. It will attempt to detect the column delimiter, 
 availability of fieldnames and existence of comment lines automatically. 
 
 After these two operations, the contents of yeastract look like this::    
@@ -41,7 +41,7 @@ contains the targets. Note that transcription factor `Abf` is repeated multiple 
 
 
 Looking at the types of both slices, we see that this has been detected as the ``bytes`` type. 
-Furthermore, the ``bytes`` type has an extra specifier ``[7]``, indicating that this is the max length of the entries in the corresponding slice.
+Furthermore, the ``bytes`` type has an extra specifier ``[7]``, indicating that this is the maximum length of the entries in the corresponding slice.
 
 .. tip:: the ``bytes`` type corresponds to the default ``str`` type in Python 2.x. In Python 3.0 the default string type has become
    unicode, and ``str`` has been renamed to ``bytes``. In Ibidas we use the same naming scheme: ``bytes`` for the old str type, and
@@ -90,7 +90,7 @@ After renaming, our data now looks like::
 
 You might have found that there is a very small delay before the contents are printed. The reason for this is the lazy nature of 
 Ibidas. That is, Read and all subsequent operations are not executed immediatly, but only when asked for results. The reason
-for this is that it allows for improved optimizations. For example, in case the data sources is a database, it allows us to translate operations
+for this is that it allows for improved optimizations. For example, in case the data source is a database, it allows us to translate operations
 into SQL. 
 
 In this case however, we would like to perform all operations and store their result. For that purpose, their is the operation ``Copy``::
@@ -246,13 +246,15 @@ also this file comes without fieldnames, so we specify those through the type::
 
     res = Read(Fetch("http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab"),dtype=rtype)
 
-Note that one could also just have named the fields that were needed, for example using::
+Note that one could also just have named the slicees that were needed, for example using::
 
-    res = res/{'f3': 'feat_name', 'f8':chromosome, 'f9':start}
+    res = res/{'f3': 'feat_name', 'f8':'chromosome', 'f9':'start'}
 
-For the purpose of the tutorial however, we will attempt to prepare the whole dataset for use. 
-First, when reading a file like this one, all input data is in string(bytes) format. For slices this is not the ideal format.
-Therefore, we cast the necessary fields from bytes to int and real::
+However, although we will not use all slices further on, for the purpose of the tutorial we will attempt to prepare the whole dataset 
+for use. 
+
+First, when reading a file like this one, all input data is in string(bytes) format. For some slices this is not the ideal format.
+Therefore, we cast the necessary slices from ``bytes`` to ``int`` and ``real``::
 
     res = res.To(_.start, _.stop, Do=_.Cast("int$"))
     res = res.To(_.genetic_pos,   Do=_.Cast("real64$"))
@@ -304,16 +306,16 @@ Linking the datasets
 
 Now, we have to link both the yeastract dataset and the genomic features dataset. This is done by matching the ``targets`` in the Yeastract dataset 
 with the ``feat_name`` slice in the genomic features dataset.
-However, both fields use different approaches to uppercase/lowercase, so before matching we will change both to use always upper case.
+However, both fields use different approaches to uppercase/lowercase, so before matching we will change both to use always upper case::
 
-    >>> tftargetdat = tftargetdata.To(_.feat_name, Do=_.Each(str.upper))
+    >>> yeast_feats = yeast_feats.To(_.feat_name, Do=_.Each(str.upper))
     >>> yeastract = yeastract.To(_.target,         Do=_.Each(str.upper))
 
 The match operation is then performed as::
     
-    >>> tftargetdat = yeastract.Match(yeast_feats, _.target, _.feat_name)
+    >>> tf_feat = yeastract.Match(yeast_feats, _.target, _.feat_name)
     
-    >>> tftargetdat  #only showing the first few slices...
+    >>> tf_feat  #only showing the first few slices...
     Slices: | trans_factor     | target           | sgdid            | feat_type        | feat_qual       
     ------------------------------------------------------------------------------------------------------
     Type:   | bytes            | bytes            | bytes            | bytes            | bytes           
@@ -328,7 +330,7 @@ The match operation is then performed as::
 This operation will link rows in yeastract with rows in yeast_feats, based on equality in the ``target`` and ``feat_name`` column. Any ``target`` row for which
 no entry can be found in ``feat_name`` will be left out. We do a quick check to determine how many of the rows could not be matched::
     
-    >>> yeastract.target.Count() - tftargetdat.target.Count()
+    >>> yeastract.target.Count() - tf_feat.target.Count()
     Slices: | target
     ----------------
     Type:   | int64 
@@ -340,7 +342,7 @@ This means that 72 transcription factor-target pairs could not be matched. On 48
 a bit more thoroughly, to show the use of some other operations. First, we determine which targets where not matched::
 
 
-    >>> non_matched = (yeastract.target.Set() - tftargetdat.target.Set()).Elem()
+    >>> non_matched = (yeastract.target.Set() - tf_feat.target.Set()).Elem()
     >>> non_matched.Show()
     Slices: | target
     ---------------------------------------
@@ -381,7 +383,7 @@ Next, we use the ``Elem`` operation to unpack the resulting set, and ``Show`` to
 
 The names in the list suggest that we might find matching rows by looking either at the ``gene_name`` or ``gene_aliases`` column. The ``gene_name`` column gives no matches however::
     
-    >>> non_matched.In(feats.gene_name.Each(str.upper))
+    >>> non_matched.In(yeast_feats.gene_name.Each(str.upper))
     Slices: | result             
     -----------------------------
     Type:   | bool               
@@ -396,11 +398,11 @@ The names in the list suggest that we might find matching rows by looking either
 instead of the single boolean result which the python ``in`` operator returns, this returns a value for each element in the left operand. Unfortunately, design decisions
 within Python prevent us from reusing the ``in`` operator itself for this purpose. However, we have implemented support for the following syntax::
 
-    >>> nonmatched |In| feats.gene_name.Each(str.upper)
+    >>> nonmatched |In| yeast_feats.gene_name.Each(str.upper)
 
 Next we look at the gene_aliases column. As you might remember this slice does contain nested arrays of aliases. So what will ``|In|`` return here?::
 
-    >>> nonmatched |In| feats.gene_aliases.Each(str.upper)
+    >>> nonmatched |In| yeast_feats.gene_aliases.Each(str.upper)
     Slices: | result                                    
     ----------------------------------------------------
     Type:   | bool                                      
@@ -411,12 +413,12 @@ Next we look at the gene_aliases column. As you might remember this slice does c
             | [False False False ..., False False False]
             | ...      
 
-As you can see, ``|In|`` matches with the last dimensioni of gene_aliases as described before. This means that there are multiple aliases list to be matched, resulting
-now in a matrix of matched values. Of course, this is not what we want exactly. We can solve this in two different ways.
+As you can see, ``|In|`` matches with the last dimension of ``gene_aliases`` as described before. This means that there are multiple aliases list to be matched, which together with
+the multiple names to be tested results in a matrix of results. Of course, this is not what we exactly want. We can solve this in two different ways:
 
 The straightforward appraoch is to use Any::
 
-    >>> Any(nonmatched |In| feats.gene_aliases.Each(str.upper))
+    >>> Any(nonmatched |In| yeast_feats.gene_aliases.Each(str.upper))
     Slices: | result
     -----------------------------
     Type:   | bool
@@ -430,9 +432,9 @@ The straightforward appraoch is to use Any::
 This aggregates accross the ``feats`` dimension, to determine if any of the features had any alias that matched something in our list. As you can see, we indeed found
 matches for the targets.
 
-Another appraoch to get this result is the use of the ``Flat`` operation. This reduces the gene_aliases list to a flat list of entries. We can use it like::
+Another approach to get this result is the use of the ``Flat`` operation. This reduces the ``gene_aliases`` list to a flat list of entries. We can use it like::
 
-    >>> nonmatched |In| feats.gene_aliases.Flat().Each(str.upper)
+    >>> nonmatched |In| yeast_feats.gene_aliases.Flat().Each(str.upper)
     Slices: | result
     -----------------------------
     Type:   | bool
@@ -446,7 +448,7 @@ Another appraoch to get this result is the use of the ``Flat`` operation. This r
 
 Now that we have found this result, we will use the Match function to find which genes match to these non-matched targets::
 
-    >>> nonmatched_feats = nonmatched.Match(feats.Flat(), _.result, _.gene_aliases.Each(str.upper))
+    >>> nonmatched_feats = nonmatched.Match(yeast_feats.Flat(), _.result, _.gene_aliases.Each(str.upper))
     >>> nonmatched_feats
     Slices: | result                          | sgdid                           | feat_type                       | feat_qual                       | feat_name                      
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -473,7 +475,7 @@ However, we now see a possible reason for why some of these targets do not use a
 
 We do a quick check if this does not also happen in our matched data::
 
-    >>> tftargetdat.Unique(_.trans_factor, _.target).target.Count()
+    >>> tf_feat.Unique(_.trans_factor, _.target).target.Count()
     Slices: | target
     ----------------
     Type:   | int32
@@ -508,10 +510,10 @@ We decide to only use the targets that match uniquely to a ``gene_alias`` in our
             | YDR524W-A
             | ...
 
-This show the use of the filter operation, using the Count operation to determine the size of each group. We could have applied Count also on other slices then 
-``feat_name`` with the same result.
+This shows the use of the filter operation, in which we use the Count operation to determine the size of each group. As the most slices have the same dimension as ``feat_name``,
+we could have applied Count also on these other slices with the same result.
 
-Now we select from the yeastract dataset the pairs with these non matched targets::
+Now we select from the yeastract dataset the pairs with the non matched targets::
     
     >>> yt_nm = yeastract[_.target |In| nonmatched_unique]
 
@@ -538,13 +540,21 @@ We are now ready to perform the Match operation::
 
 Using the ``Without`` operation, we remove the ``gene_aliases2`` slice, and then stack both datasets to get our final result::
 
-    >>> tf_feat = Stack(tftargetdat, res).Copy()
+    >>> tf_feat = Stack(tf_feat, res).Copy()
 
 .. note:: 
    Of course, we could also just have removed the gene_aliases field from both datasets before stacking if we did not need it in further analyses ...
 
-Of course, this was a lot of extra work for just a few extra matched pairs. However, hopefully it has illustrated several operations that can be performed with Ibidas.
+This was a lot of extra work for just a few extra matched pairs. However, hopefully it has illustrated several operations that can be performed with Ibidas. 
+
 We are now ready to look at the chromosome distribution of transcription factor targets.
+However, maybe you first want to save the current dataset. This can be done using::
+
+    >>> Save(tf_feat, 'tf_feat.dat')
+
+The data can be loaded again using::
+
+    >>> tf_feat = Load('tf_feat.dat')
 
 Chromosome distribution
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -580,7 +590,7 @@ the number of results::
 Note that each slice has now a different dimension. Trans_factor and chromosome both have a single dimension, with all unique values. The count slice contains a matrix, 
 with counts for each transcription_factor/chromosome pair, and ``start`` contains for each transcription factor/chromosome pair a list of all gene start positions.
 
-Lets calculate a correlation between transcription factor, based on if they adress the same chromosomes::
+Lets calculate a correlation between transcription factors, based on if they target the same chromosomes::
 
     >>> Corr(res.count)
     Slices: | count
@@ -603,7 +613,7 @@ Lets calculate a correlation between transcription factor, based on if they adre
             | [ 0.96167766  0.96495962  0.51947723  0.94315804  0.9774676   0.88543987;   0.83216943  0.96955545  0.61859569  0.90002877  0.83908034  0.95625767;   1.          0.8936~
             | [ 0.87025948  0.85425937  0.51665702  0.86422832  0.87861445  0.73178756;   0.68711379  0.87684953  0.52561675  0.8095602   0.75619416  0.87330834;   0.89366098  1.    ~
 
-As you can see, it has calculated a square matrix with all correlation coefficients. What if we now want to calculate a correlation between chromosomes instead?::
+As you can see, a square matrix is calculated with all correlation coefficients. What if we now want to calculate a correlation between chromosomes instead?::
 
     >>> Corr(res.count.Transpose())
     Slices: | count                                                                                                                                                                    
@@ -626,8 +636,8 @@ As you can see, it has calculated a square matrix with all correlation coefficie
             | [ 0.0478764   0.09015854  0.07341518  0.07373773  0.05784699  0.09451878;   0.06729443  0.0483322   0.07403729  0.07162337  0.05994558  0.07112272;   1.          0.0832~
             | [ 0.85419801  0.91941182  0.91507757  0.89795194  0.89359741  0.89830133;   0.8927235   0.89203255  0.92109235  0.90301833  0.88589314  0.88703263;   0.08322617  1.    ~
 
-For this we use the transpose operation, which reorders the dimensions of the slices. Of course, from this is hard to identify which columns/rows correspond to which chromosome.
-So we like to order on chromosome number. As it is currently a bytes type it would do an alphabetic ordering which is not what we want. So, first we cast it to an integer type::
+For this we use the ``Transpose`` operation, which can be used to reorder the dimensions of slices. Of course, from this matrix it is hard to identify which columns/rows correspond to which chromosome.
+So we would like to order on chromosome number. As it is currently a bytes type, the ``Sort`` operation would perform an alphabetic ordering which is not what we want. So, first we cast it to an integer type::
     
     >>> res = res.To(_.chromosome, Do=_.Cast("int$"))
 
@@ -685,12 +695,11 @@ We see that chromosome number 17 has a relatively low correlation. Is this due t
             | 5             | 2672
             | 17            | 73
 
-Indeed it seems that the low number of targets is the cause. Note that we give Sum the dimension 
+Indeed it seems that the low number of targets is the cause. Note that we give ``Sum`` the dimension 
 accross which it has to sum the results, as normally it would take the last dimension, and calculate a 
 Sum for each transcription factor, which is not what we want. 
 
-As last step, we like to calculate the chromosome specificness distribution transcription factors. I.e.
-how much more often is one chromosome targeted over another?
+As last step, we like to calculate to what extent transcription factors target specific chromosomes. 
 
 Our first approach calculates this using::
 
@@ -716,15 +725,17 @@ Our first approach calculates this using::
             | 3813
             | ...
 
+That is, we sort the counts for each transcription factor, and then sum the most visited chromosome for each transcription factor,
+the second most visited, and so on. 
 
 However, this does not control for the fact that some chromosomes have much more targets than others. So, to control for that, 
-we will normalize our data first::
+we will normalize our data first by dividing by the total number of targets per chromosome::
     
     >>> normalized_counts = res.count.Cast("real64") / res.count.Sum("gtrans_factor")
 
 Note that we first cast to double, as integer division will only result in whole integers, which is not what we want. Also note that
-the division operator know on which dimension it should divide the vector that is res.count.Sum("gtrans_factor"). The reason for that is that
-it can map them according to dimension identity. Now we can finish::
+the division operator knows on which dimension it should divide. The reason for that is that it can map them according to dimension identity. 
+Now we can finish::
 
     >>> normalized_counts.Sort().Sum("gtrans_factor").Show()
     Slices: | count          
@@ -751,13 +762,16 @@ it can map them according to dimension identity. Now we can finish::
             | 1.47473492256  
             | 3.12810523972  
     
-It seems that indeed there is some chromosome specificness in the transcription factors. We plot this again using matplotlib::
+It seems that indeed there is some chromosome specificness for transcription factors
+(although making this a hard conclusion would probably require a permutation analysis). 
+
+We plot the results using matplotlib::
 
     >>> from matplotlib.pylab import *
     >>> plot(normalized_counts.Sort().Sum("gtrans_factor")())
     >>> title("Chromosome specificness of transcription factors")
-    >>> ylabel("Normalized counts")
-    >>> xlabel("less visited --> Most visited chromosome")
+    >>> ylabel("Normalized target counts")
+    >>> xlabel("Less visited --> Most visited chromosome")
     >>> show()
 
 

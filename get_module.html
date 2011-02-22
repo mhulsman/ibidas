@@ -33,9 +33,6 @@
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
         <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
           <a href="ibidas_type.html" title="Type object"
              accesskey="P">previous</a> |</li>
         <li><a href="index.html">Ibidas v0.1 documentation</a> &raquo;</li> 
@@ -54,74 +51,6 @@ They can be accessed through <cite>get</cite>, e.g.:</p>
 <div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">feats</span> <span class="o">=</span> <span class="n">get</span><span class="o">.</span><span class="n">yeast_orfs</span><span class="p">()</span>
 </pre></div>
 </div>
-<span class="target" id="module-ibidas.pre"></span><dl class="class">
-<dt id="ibidas.pre.Pre">
-<em class="property">class </em><tt class="descclassname">ibidas.pre.</tt><tt class="descname">Pre</tt><a class="headerlink" href="#ibidas.pre.Pre" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="method">
-<dt id="ibidas.pre.Pre.register">
-<tt class="descname">register</tt><big>(</big><em>func</em><big>)</big><a class="headerlink" href="#ibidas.pre.Pre.register" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="function">
-<dt id="ibidas.pre.go_annotations">
-<tt class="descclassname">ibidas.pre.</tt><tt class="descname">go_annotations</tt><big>(</big><em>dburl</em>, <em>genus='Saccharomyces'</em>, <em>species='cerevisiae'</em><big>)</big><a class="headerlink" href="#ibidas.pre.go_annotations" title="Permalink to this definition">¶</a></dt>
-<dd><p>Accesses GO annotations in a MySQL database.</p>
-<p>Database data can be obtained from the geneontology website.</p>
-<p>example url: &#8220;mysql://username:password&#64;hostname:port/go</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="ibidas.pre.in_memory_db">
-<tt class="descclassname">ibidas.pre.</tt><tt class="descname">in_memory_db</tt><big>(</big><big>)</big><a class="headerlink" href="#ibidas.pre.in_memory_db" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns an empty in memory database</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="ibidas.pre.omim_disease_parse">
-<tt class="descclassname">ibidas.pre.</tt><tt class="descname">omim_disease_parse</tt><big>(</big><em>x</em><big>)</big><a class="headerlink" href="#ibidas.pre.omim_disease_parse" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="function">
-<dt id="ibidas.pre.omim_genemap">
-<tt class="descclassname">ibidas.pre.</tt><tt class="descname">omim_genemap</tt><big>(</big><big>)</big><a class="headerlink" href="#ibidas.pre.omim_genemap" title="Permalink to this definition">¶</a></dt>
-<dd><p>The omim genemap data</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="ibidas.pre.string_interactions">
-<tt class="descclassname">ibidas.pre.</tt><tt class="descname">string_interactions</tt><big>(</big><em>dburl</em>, <em>species='Saccharomyces cerevisiae'</em><big>)</big><a class="headerlink" href="#ibidas.pre.string_interactions" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a Postgres db with String data, specified in dburl, and a species, returns all interactions and their score.</p>
-<p>The database data can be obtained from String.</p>
-<p>example url: &#8220;postgres://username:password&#64;hostname:port/string_dbname&#8221;</p>
-<p>Use <tt class="docutils literal"><span class="pre">connect</span></tt> to access the whole database:</p>
-<div class="highlight-python"><pre>#Get available species names: 
-&gt;&gt;&gt; connect(dburl).items.species.offical_name</pre>
-</div>
-</dd></dl>
-
-<dl class="function">
-<dt id="ibidas.pre.yeast_aliases">
-<tt class="descclassname">ibidas.pre.</tt><tt class="descname">yeast_aliases</tt><big>(</big><em>feats</em><big>)</big><a class="headerlink" href="#ibidas.pre.yeast_aliases" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a yeast feats table (see <tt class="docutils literal"><span class="pre">yeast_feats</span></tt>), returns a 
-two column table with the official feature names and a column with aliases.</p>
-<p>Can be used to map names to official names (with match)</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="ibidas.pre.yeast_feats">
-<tt class="descclassname">ibidas.pre.</tt><tt class="descname">yeast_feats</tt><big>(</big><big>)</big><a class="headerlink" href="#ibidas.pre.yeast_feats" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns table of yeast genome features,
-from:  <a class="reference external" href="http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab">http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab</a></p>
-</dd></dl>
-
-<dl class="function">
-<dt id="ibidas.pre.yeastract">
-<tt class="descclassname">ibidas.pre.</tt><tt class="descname">yeastract</tt><big>(</big><em>url='http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz'</em><big>)</big><a class="headerlink" href="#ibidas.pre.yeastract" title="Permalink to this definition">¶</a></dt>
-<dd><p>Downloads documented transcription factor regulation interactions from yeastract</p>
-</dd></dl>
-
 </div>
 
 
@@ -162,9 +91,6 @@ from:  <a class="reference external" href="http://downloads.yeastgenome.org/chro
           <a href="genindex.html" title="General Index"
              >index</a></li>
         <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
           <a href="ibidas_type.html" title="Type object"
              >previous</a> |</li>
         <li><a href="index.html">Ibidas v0.1 documentation</a> &raquo;</li> 
@@ -172,7 +98,7 @@ from:  <a class="reference external" href="http://downloads.yeastgenome.org/chro
     </div>
     <div class="footer">
         &copy; Copyright 2011, Marc Hulsman &amp; Jan Bot.
-      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.7.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.0.5.
     </div>
   </body>
 </html>
