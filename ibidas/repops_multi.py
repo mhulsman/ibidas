@@ -2,14 +2,15 @@ import operator
 
 from constants import *
 import repops
+import repops_funcs
 
 _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"ops")
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","wrapper_py")
 _delay_import_(globals(),"itypes","rtypes","dimensions","dimpaths")
-_delay_import_(globals(),"repops_funcs")
 _delay_import_(globals(),"repops_dim")
+_delay_import_(globals(),"repops_slice")
 
 class Broadcast(repops.MultiOpRep):
     def _process(self,sources, mode="dim"):
@@ -339,12 +340,14 @@ class Join(repops.MultiOpRep):
 
 class Match(repops.MultiOpRep):
     def __init__(self, lsource, rsource, lslice=None, rslice=None, jointype="inner"):
-        util.debug_here()
         assert jointype in set(["inner","left","right","full"]), "Jointype should be inner, left, right or full"
-        if(isinstance(lslice,context.Context)):
-            lslice = context._apply(lslice,lsource)
-        if(isinstance(rslice,context.Context)):
-            rslice = context._apply(rslice,rsource)
+        assert (not isinstance(lslice,representor.Representor)), "Representor objects not allowed as lslice. Use context, string or int to indicate slice in lsource"
+        assert (not isinstance(rslice,representor.Representor)), "Representor objects not allowed as rslice. Use context, string or int to indicate slice in rsource"
+
+        if not lslice is None:
+            lslice = lsource.Get(lslice)
+        if not rslice is None:
+            rslice = rsource.Get(rslice)
         repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice),jointype=jointype)
 
     def _process(self, sources, jointype):
@@ -407,17 +410,20 @@ class Stack(repops.MultiOpRep):
             seldimpaths.append(dimpaths.identifyUniqueDimPathSource(source, dim))
 
         nslices = []
-        dimdepth = []
-        ndim = None
         slicelists = [source._slices for source in sources]
         for slicecol in zip(*slicelists):
             packdepths = []
             ncol = []
             for slice,dpath in zip(slicecol, seldimpaths):
                 lastpos = slice.dims.matchDimPath(dpath)
-                packdepths.append(len(slice.dims) - lastpos[-1])
-                ncol.append(ops.PackArrayOp(slice,packdepths[-1]))
+                assert len(lastpos) == 1, "Cannot choose between or find dims in slice: " + str(slice)
+                packdepths.append(len(slice.dims) - lastpos[0])
+                if(packdepths[-1] > 0):
+                    slice = ops.PackArrayOp(slice, packdepths[-1])
+                ncol.append(slice)
             
+            assert len(set([len(s.dims) for s in ncol])) == 1, "Dim depth mismatch between slices"
+
             res = ncol[0]
             for slice in ncol[1:]:
                 res = repops_funcs.Add._apply((res,slice),"pos")
@@ -434,4 +440,72 @@ class Stack(repops.MultiOpRep):
 
 
 
+
+class Intersect(repops.MultiOpRep):
+    opercls = repops_funcs.And
+
+    def __init__(self, *sources, **kwargs):
+        repops.MultiOpRep.__init__(self,sources, **kwargs)
+
+    def _process(self, sources, dim=None):
+        state = reduce(operator.__and__,[source._state for source in sources])
+        if not state & RS_SLICES_KNOWN:
+            return
+
+        slicelens = set([len(source._slices) for source in sources])
+        assert len(slicelens) == 1, "Sources of stack should have same number of slices"
+        nslice = slicelens.pop()
+
+        seldimpaths = [] 
+        tupleslices = []
+        packdepthslist = []
+        for source in sources:
+            dpath = dimpaths.identifyUniqueDimPathSource(source, dim)
+            pslices = []
+            packdepths = []
+            for slice in source._slices:
+                lastpos = slice.dims.matchDimPath(dpath)
+                packdepths.append(len(slice.dims) - lastpos[0] - 1)
+                assert len(lastpos) == 1, "Cannot choose between or find dims in slice: " + str(slice)
+                if(packdepths[-1] > 0):
+                    slice = ops.PackArrayOp(slice, packdepths[-1])
+                pslices.append(slice)
+            assert len(set([len(s.dims) for s in pslices])) == 1, "Dim depth mismatch between slices in a source"
+            if(len(pslices) > 1):
+                pslice = repops_slice.Tuple._apply(pslices)
+            else:
+                pslice = pslices[0]
+            pslice = repops_funcs.Set._apply([pslice], None)[0]
+            tupleslices.append(pslice)
+            packdepthslist.append(packdepths)
         
+        res = tupleslices[0]
+        for slice in tupleslices[1:]:
+            res = self.opercls._apply((res,slice),"pos")
+
+        tslice = ops.UnpackArrayOp(res,1)
+        if(isinstance(tslice.type, rtypes.TypeTuple)):
+            pslices = [ops.UnpackTupleOp(tslice, idx) for idx in range(len(tslice.type.subtypes))]
+        else:
+            pslices = [tslice]
+       
+        nslices = []
+        for pos, pslice in enumerate(pslices):
+            mpd = min([pd[pos] for pd in packdepthslist])
+            if(mpd > 0):
+                pslice = ops.UnpackArrayOp(pslice, mpd)
+            nslices.append(pslice)
+
+        return self._initialize(tuple(nslices),RS_CHECK)
+
+class Union(Intersect):
+    opercls = repops_funcs.Or
+
+
+class Except(Intersect):
+    opercls = repops_funcs.Subtract
+
+
+class Difference(Intersect):
+    opercls = repops_funcs.Xor
+

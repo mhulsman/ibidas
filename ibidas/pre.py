@@ -92,11 +92,10 @@ def string_interactions(dburl, species="Saccharomyces cerevisiae"):
 
     """
     z = Connect(dburl)
-    pyeast = z.items.proteins 
-    inter  = z.items.species.Match(z.network.protein_protein_links)
+    inter  = z.items.species |Match| z.network.protein_protein_links
     inter  = inter[_.official_name == species]
-    inter  = inter.Match(pyeast//"left", _.protein_id_a, _.protein_id)
-    inter  = inter.Match(pyeast//"right",_.protein_id_b, _.protein_id)
+    inter  = inter |Match(_.protein_id_a, _.protein_id)| z.items.proteins//"left"
+    inter  = inter |Match(_.protein_id_b, _.protein_id)| z.items.proteins//"right"
     return   inter.Get(_.left.preferred_name/"left", 
                        _.right.preferred_name/"right", 
                        _.combined_score) % "interactions"
@@ -136,12 +135,11 @@ def go_annotations(dburl, genus="Saccharomyces", species="cerevisiae"):
        example url: "mysql://username:password@hostname:port/go
     """
     go = Connect(dburl)
-    g = go.species
-    g = g.Match(go.gene_product,     _.id,                   _.species_id)
-    g = g.Match(go.association,      _.gene_product.id,      _.gene_product_id)
-    g = g.Match(go.graph_path,       _.association.term_id,  _.term2_id)
-    g = g.Match(go.term//"annot",_.term1_id,             _.id)
-    g = g.Match(go.term//"rel",  _.relationship_type_id, _.id)
+    g = go.species |Match(_.id,                   _.species_id)|      go.gene_product
+    g = g          |Match(_.gene_product_id,      _.gene_product_id)| go.association
+    g = g          |Match(_.association.term_id,  _.term2_id)|        go.graph_path
+    g = g          |Match(_.term1_id,             _.id)|              go.term//"annot"
+    g = g          |Match(_.relationship_type_id, _.id)|              go.term//"rel"
     g = g[(_.genus==genus) & (_.species == species)]
     return g.Get(_.symbol, _.annot.name/"annotation", _.rel.name/"relation_type", _.distance)%"annotations"
 predefined_sources.register(go_annotations)

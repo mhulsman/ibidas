@@ -444,7 +444,7 @@ class Representor(Node):
     
     # or operator ( | )
     def __or__(self, other):
-        if(isinstance(other, (context.Context, infix.Infix, infix.RevInfix))):
+        if(isinstance(other, (context.Context, infix.Infix))):
             return other.__ror__(self)
         return repops_funcs.Or(self, other)
 

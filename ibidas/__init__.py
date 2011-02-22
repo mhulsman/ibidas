@@ -4,7 +4,7 @@ The ibidas module contains all main functions for working with ibidas objects.
 
 __all__ = ["Rep","Read","Connect","_",
            "Array","Tuple","Combine","HArray",
-           "Stack",
+           "Stack","Intersect","Union","Except","Difference",
            "Pos","Argsort",
            "Any","All",
            "Max","Min",
@@ -24,14 +24,14 @@ from utils import delay_import
 from utils.util import save_rep as Save, load_rep as Load
 from utils.context import _
 from utils.missing import Missing
-from utils.infix import Infix,RevInfix
+from utils.infix import Infix
 from itypes import createType as CreateType
 from wrappers.wrapper_py import Rep
 from wrappers.wrapper_tsv import TSVRepresentor
 from wrappers.wrapper_sql import open_db
 from representor import newdim
 import repops_dim 
-from repops_multi import Broadcast, Combine, Sort, Stack
+from repops_multi import Broadcast, Combine, Sort
 import repops_slice 
 import repops_funcs
 from download_cache import DownloadCache
@@ -43,6 +43,11 @@ Fetch = DownloadCache()
 In = Infix(repops_funcs.Within)
 Contains = Infix(repops_funcs.Contains)
 Match = Infix(repops_multi.Match)
+Stack = Infix(repops_multi.Stack)
+Intersect = Infix(repops_multi.Intersect)
+Union = Infix(repops_multi.Union)
+Except = Infix(repops_multi.Except)
+Difference = Infix(repops_multi.Difference)
 
 Pos = repops.delayable(default_params="#")(repops_funcs.Pos)
 Argsort = repops.delayable()(repops_funcs.Argsort)
