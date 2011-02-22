@@ -383,7 +383,7 @@ Next, we use the ``Elem`` operation to unpack the resulting set, and ``Show`` to
 
 The names in the list suggest that we might find matching rows by looking either at the ``gene_name`` or ``gene_aliases`` column. The ``gene_name`` column gives no matches however::
     
-    >>> non_matched.In(feats.gene_name.Each(str.upper))
+    >>> non_matched.In(yeast_feats.gene_name.Each(str.upper))
     Slices: | result             
     -----------------------------
     Type:   | bool               
@@ -398,11 +398,11 @@ The names in the list suggest that we might find matching rows by looking either
 instead of the single boolean result which the python ``in`` operator returns, this returns a value for each element in the left operand. Unfortunately, design decisions
 within Python prevent us from reusing the ``in`` operator itself for this purpose. However, we have implemented support for the following syntax::
 
-    >>> nonmatched |In| feats.gene_name.Each(str.upper)
+    >>> nonmatched |In| yeast_feats.gene_name.Each(str.upper)
 
 Next we look at the gene_aliases column. As you might remember this slice does contain nested arrays of aliases. So what will ``|In|`` return here?::
 
-    >>> nonmatched |In| feats.gene_aliases.Each(str.upper)
+    >>> nonmatched |In| yeast_feats.gene_aliases.Each(str.upper)
     Slices: | result                                    
     ----------------------------------------------------
     Type:   | bool                                      
@@ -418,7 +418,7 @@ the multiple names to be tested results in a matrix of results. Of course, this 
 
 The straightforward appraoch is to use Any::
 
-    >>> Any(nonmatched |In| feats.gene_aliases.Each(str.upper))
+    >>> Any(nonmatched |In| yeast_feats.gene_aliases.Each(str.upper))
     Slices: | result
     -----------------------------
     Type:   | bool
@@ -434,7 +434,7 @@ matches for the targets.
 
 Another approach to get this result is the use of the ``Flat`` operation. This reduces the ``gene_aliases`` list to a flat list of entries. We can use it like::
 
-    >>> nonmatched |In| feats.gene_aliases.Flat().Each(str.upper)
+    >>> nonmatched |In| yeast_feats.gene_aliases.Flat().Each(str.upper)
     Slices: | result
     -----------------------------
     Type:   | bool
@@ -448,7 +448,7 @@ Another approach to get this result is the use of the ``Flat`` operation. This r
 
 Now that we have found this result, we will use the Match function to find which genes match to these non-matched targets::
 
-    >>> nonmatched_feats = nonmatched.Match(feats.Flat(), _.result, _.gene_aliases.Each(str.upper))
+    >>> nonmatched_feats = nonmatched.Match(yeast_feats.Flat(), _.result, _.gene_aliases.Each(str.upper))
     >>> nonmatched_feats
     Slices: | result                          | sgdid                           | feat_type                       | feat_qual                       | feat_name                      
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
