@@ -27,8 +27,6 @@ from utils.missing import Missing
 from utils.infix import Infix,RevInfix
 from itypes import createType as CreateType
 from wrappers.wrapper_py import Rep
-from wrappers.wrapper_tsv import TSVRepresentor
-from wrappers.wrapper_sql import open_db
 from representor import newdim
 import repops_dim 
 from repops_multi import Broadcast, Combine, Sort, Stack
@@ -70,6 +68,7 @@ def Read(url, **kwargs):
     format = kwargs.pop('format','tsv')
 
     if(format == 'tsv'):
+        from wrappers.wrapper_tsv import TSVRepresentor
         return TSVRepresentor(url, **kwargs) 
     else:
         raise RuntimeError("Unknown format specified")
@@ -77,6 +76,7 @@ def Read(url, **kwargs):
 def Connect(url, **kwargs):
     format = kwargs.pop('format','db')
     if(format == "db"):
+        from wrappers.wrapper_sql import open_db
         return open_db(url, **kwargs)
     else:
         raise RuntimeError("Unknown format specified")

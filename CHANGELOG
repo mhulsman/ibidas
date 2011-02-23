@@ -1,0 +1,10 @@
+0.1.0: 
+- Initial release
+
+0.1.1:
+- Intersect/union/except added with Infix operators  (e.g. |Intersect|)
+- Organism division in predefined data sources
+- Infix operators for Match/Stack
+- Improvement in TSV detection of skipped rows and fieldnames handling
+- Load wrapper_sql and wrapper_tsv only when needed
+- Several bug fixes
