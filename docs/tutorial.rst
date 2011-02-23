@@ -313,7 +313,7 @@ However, both fields use different approaches to uppercase/lowercase, so before 
 
 The match operation is then performed as::
     
-    >>> tf_feat = yeastract.Match(yeast_feats, _.target, _.feat_name)
+    >>> tf_feat = yeastract |Match(_.target, _.feat_name)| yeast_feats
     
     >>> tf_feat  #only showing the first few slices...
     Slices: | trans_factor     | target           | sgdid            | feat_type        | feat_qual       
@@ -342,7 +342,7 @@ This means that 72 transcription factor-target pairs could not be matched. On 48
 a bit more thoroughly, to show the use of some other operations. First, we determine which targets where not matched::
 
 
-    >>> non_matched = (yeastract.target.Set() - tf_feat.target.Set()).Elem()
+    >>> non_matched = yeastract.target |Except| tf_feat.target
     >>> non_matched.Show()
     Slices: | target
     ---------------------------------------
@@ -372,14 +372,16 @@ a bit more thoroughly, to show the use of some other operations. First, we deter
             | YBL101W-B
             | DEX2
 
-
+This introduces the ``Except`` commands. Using it, we keep only the targets in yeastract that do not occur in ``tf_feat.target``. Another low level way to accomplish the same result
+would be::
+    
+    >>> non_matched = (yeastract.target.Set() - tf_feat.target.Set()).Elem()
 
 This introduces the ``Set`` command. Using the set command, the elements of the (by default last) dimension are packed into a set. A set is a collection of objects
 in which each element is unique. That is, adding the string "YLR157W-C"  multiple times to a set will result in a set with just one occurence of "YLR157W-C".
 Sets have some special operations defined on them. One of them is set substraction, which was used here. It removes all elements in the set of the first operand that
 also occur in the set of the second operand, leaving only the elements that do not occur in the second operand. In this case thus the elements that were not matched by the Match operation. 
-
-Next, we use the ``Elem`` operation to unpack the resulting set, and ``Show`` to see the whole result. 
+Next, we use the ``Elem`` operation to unpack the resulting set. 
 
 The names in the list suggest that we might find matching rows by looking either at the ``gene_name`` or ``gene_aliases`` column. The ``gene_name`` column gives no matches however::
     
@@ -448,7 +450,7 @@ Another approach to get this result is the use of the ``Flat`` operation. This r
 
 Now that we have found this result, we will use the Match function to find which genes match to these non-matched targets::
 
-    >>> nonmatched_feats = nonmatched.Match(yeast_feats.Flat(), _.result, _.gene_aliases.Each(str.upper))
+    >>> nonmatched_feats = nonmatched |Match(_.result, _.gene_aliases.Each(str.upper))| yeast_feats.Flat()
     >>> nonmatched_feats
     Slices: | result                          | sgdid                           | feat_type                       | feat_qual                       | feat_name                      
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
