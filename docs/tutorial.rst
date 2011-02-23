@@ -108,7 +108,7 @@ the yeastract data source is a bit cumbersome. For this reason, Ibidas allows th
 For yeastract we have added just such a function which performs the actions we have just gone through. So instead of performing those
 operations, we could also just execute::
     
-    >>> yeastract = Get.yeastract()
+    >>> yeastract = Get.yeast.yeastract()
 
 The data source functions are found in ibidas/pre.py. One can easily add new data sources. For example, 
 adding the yeastract data resource yourself, would have required the following code::
@@ -121,7 +121,7 @@ adding the yeastract data resource yourself, would have required the following c
         res = Read(Fetch(url),dtype="[tftargets:*]<(trans_factor=bytes, target=bytes)")
         return res.Copy()
 
-    Get.register(yeastract)
+    Get.register(yeastract, organism="yeast")
 
 This can be simply put into a file which can then be imported when needed. These functions can also be shared with others.
 In fact, if it is a public data resource, one is encouraged to submit it for inclusion into Ibidas itself. 
@@ -211,7 +211,7 @@ can be very simply done by making the query a call by adding ``()`` to it::
 Now, to plot the in-degree distribution we can do something similar. The total script becomes::
 
     >>> from matplotlib.pylab import *
-    >>> yeastract = Get.yeastract()
+    >>> yeastract = Get.yeast.yeastract()
 
     >>> subplot(211)
     >>> hist(yeastract.GroupBy(_.trans_factor).target.Count()(), bins=50)
@@ -298,7 +298,7 @@ As last step, we execute all operations, and store the result in memory::
 
 Note that this whole dataset is also predefined in Ibidas, and can be obtained using::
 
-    yeast_feats = Get.yeast_feats()
+    yeast_feats = Get.yeast.yeast_feats()
 
 
 Linking the datasets
@@ -783,7 +783,13 @@ We plot the results using matplotlib::
 Todo
 ~~~~
 
-* saving/loading results
+* saving/loading results (Save, Load)
 
-* using/storing data in  databases
+* using/storing data in  databases (Connect, db.Store)
+
+* using webservice functionality (Serve)
+
+* broadcasting
+
+* type formats
 
