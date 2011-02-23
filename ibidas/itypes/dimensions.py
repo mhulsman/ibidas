@@ -66,6 +66,7 @@ class Dim(object):
             
 
     def removeDepDim(self, pos, elem_specifier):
+        assert pos >= 0, "Position should not be smaller than 0"
         if(pos >= len(self.dependent)):
             return self
 
@@ -82,6 +83,7 @@ class Dim(object):
         return redim_cache[key]
     
     def updateDepDim(self, pos, ndim):
+        assert pos >= 0, "Position should not be smaller than 0"
         if(pos >= len(self.dependent)):
             return self
 
@@ -98,6 +100,7 @@ class Dim(object):
         return redim_cache[key]
     
     def insertDepDim(self, pos, ndim):
+        assert pos >= 0, "Position should not be smaller than 0"
         if(pos >= len(self.dependent)):
             return self
 

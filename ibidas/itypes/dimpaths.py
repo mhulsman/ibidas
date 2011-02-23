@@ -121,7 +121,7 @@ class DimPath(tuple):
 
         res = self[:max(pos,0)] + DimPath(*ndims)
         if(not subtype is None):
-            subtype = subtype._removeDepDim(dimdepth=len(self)-pos, elem_specifier=elem_specifier)
+            subtype = subtype._removeDepDim(pos=pos - len(self), elem_specifier=elem_specifier)
             return (res,subtype)
         else:
             return res#}}}
@@ -140,7 +140,7 @@ class DimPath(tuple):
             res = DimPath(*ndims)
 
         if(not subtype is None):     
-            subtype = subtype._updateDepDim(dimdepth=len(self)-pos, ndim=ndim)
+            subtype = subtype._updateDepDim(pos=pos - len(self), ndim=ndim)
             return (res,subtype)
         else:
             return res#}}}
@@ -148,13 +148,13 @@ class DimPath(tuple):
     def insertDim(self, pos, ndim, subtype=None):#{{{
         ndims = []
         for p in xrange(max(pos,0), len(self)):
-            ndims.append(self[p].insertDepDim(p - pos - 1, ndim))
+            ndims.append(self[p].insertDepDim(p - pos, ndim))
         if pos >= 0:
             res = self[:pos] + (ndim,) + DimPath(*ndims)
         else:
             res = DimPath(*ndims)
         if(not subtype is None):
-            subtype = subtype._insertDepDim(dimdepth=len(self) - pos + 1, ndim=ndim)
+            subtype = subtype._insertDepDim(pos=pos - len(self) - 1, ndim=ndim)
             return (res,subtype)
         else:
             return res#}}}
@@ -361,7 +361,7 @@ def planBroadcastMatchDim(paths):#{{{
             newnode = False
 
             #new wildcard dim?
-            if(dim.shape == 1 and dim.has_missing is False and not dimid in wildcard_links):
+            if(False and dim.shape == 1 and dim.has_missing is False and not dimid in wildcard_links):
                 odimid = dimid
                 dimids = graph.getParents(lastid)
                 if(dimids):

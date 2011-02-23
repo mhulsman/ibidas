@@ -124,14 +124,14 @@ class Type(object):#{{{
         return self
 
     #dim changes
-    def _removeDepDim(self, dimdepth, elem_specifier):
-        return self._callSubtypes("_removeDepDim",dimdepth, elem_specifier)
+    def _removeDepDim(self, pos, elem_specifier):
+        return self._callSubtypes("_removeDepDim",pos, elem_specifier)
 
-    def _updateDepDim(self, dimdepth, ndim):
-        return self._callSubtypes("_updateDepDim",dimdepth, ndim)
+    def _updateDepDim(self, pos, ndim):
+        return self._callSubtypes("_updateDepDim",pos, ndim)
 
-    def _insertDepDim(self, dimdepth, ndim):
-        return self._callSubtypes("_insertDepDim",dimdepth, ndim)
+    def _insertDepDim(self, pos, ndim):
+        return self._callSubtypes("_insertDepDim",pos, ndim)
 
     def _permuteDepDim(self, prevdims, permute_idxs):
         return self._callSubtypes("_permuteDepDim",prevdims, permute_idxs)
@@ -687,27 +687,27 @@ class TypeArray(TypeAny):#{{{
             nself.subtypes = nsubtypes
         return nself
    
-    def _removeDepDim(self, dimdepth, elem_specifier):
-        nself = self._callSubtypes("_removeDepDim", dimdepth + len(self.dims), elem_specifier)
-        ndims = self.dims.removeDim(-dimdepth,elem_specifier)
+    def _removeDepDim(self, pos, elem_specifier):
+        nself = self._callSubtypes("_removeDepDim",pos - len(self.dims), elem_specifier)
+        ndims = self.dims.removeDim(pos,elem_specifier)
         if(not ndims is self.dims):
             if(self is nself):
                 nself = self.copy()
             nself.dims = ndims
         return nself
      
-    def _updateDepDim(self, dimdepth, ndim):
-        nself = self._callSubtypes("_updateDepDim", dimdepth + len(self.dims), ndim)
-        ndims = self.dims.updateDim(-dimdepth,ndim)
+    def _updateDepDim(self, pos, ndim):
+        nself = self._callSubtypes("_updateDepDim", pos - len(self.dims), ndim)
+        ndims = self.dims.updateDim(pos,ndim)
         if(not ndims is self.dims):
             if(self is nself):
                 nself = self.copy()
             nself.dims = ndims
         return nself
 
-    def _insertDepDim(self, dimdepth, ndim):
-        nself = self._callSubtypes("_insertDepDim",dimdepth + len(self.dims), ndim)
-        ndims = self.dims.insertDim(-dimdepth, ndim)
+    def _insertDepDim(self, pos, ndim):
+        nself = self._callSubtypes("_insertDepDim",pos - len(self.dims), ndim)
+        ndims = self.dims.insertDim(pos, ndim)
         if(not ndims is self.dims):
             if(self is nself):
                 nself = self.copy()

@@ -98,13 +98,13 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
         
 
     def execFreezeTypeTuple(self, ptype, seq):
-        if(not rtype.subtypes):
+        if(not ptype.subtypes):
             return self.execFreezeTypeUnknown(ptype, seq)
         else:
             return self.map(self.ftypetuple, ptype, seq)
         
         columns = []
-        if(len(rtype.subtypes) > rtype.min_len):
+        if(len(ptype.subtypes) > ptype.min_len):
             l = self.map(len, otype=int, out_empty = 0, has_missing=self.detector.hasMissing())
 
         for pos, subtype in enumerate(rtype.subtypes):
