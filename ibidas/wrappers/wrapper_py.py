@@ -805,11 +805,17 @@ def speedfilter(seqs,has_missing, ctype):
                 res = cutils.darray(res,object)
         else:
             if(constraint is Missing):
-                return Missing
+                res = Missing
             else:
-                return data[constraint]
+                try:
+                    res = data[constraint]
+                except Exception:
+                    res = cutils.darray(data)[constraint]
     else:
-        res = data[constraint]
+        try:
+            res = data[constraint]
+        except Exception:
+            res = cutils.darray(data)[constraint]
     return res
 
 def ensure_fixeddims(seqs,packdepth,dtype):

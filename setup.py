@@ -6,6 +6,16 @@ from setuptools import setup,find_packages,Extension
 import distutils.sysconfig
 import os
 import os.path
+import sys
+
+req_version = (2,6)
+cur_version = sys.version_info
+
+if not  (cur_version[0] == req_version[0] and
+         cur_version[1] >= req_version[1]):
+    print "Your python interpreter is too old. Ibidas needs at least Python 2.6. Please consider upgrading."
+    sys.exit(-1)
+
 
 include_dir = distutils.sysconfig.get_python_lib() + "/numpy/core/include/"
 if(not os.path.isfile(os.path.join(include_dir, "numpy/arrayobject.h"))):

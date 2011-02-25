@@ -6,9 +6,9 @@ from ..itypes import rtypes
 from .. import ops
 from ..constants import *
 
-_delay_import_(globals(),"wrapper_py")
-_delay_import_(globals(),"..itypes","detector")
-_delay_import_(globals(),"..utils","nested_array","util")
+import wrapper_py
+from ..itypes import detector
+from ..utils import nested_array, util
 
 class TSVRepresentor(wrapper.SourceRepresentor):
     def __init__(self, filename, dialect=False, skiprows=-1, dtype=rtypes.unknown, fieldnames=None):
