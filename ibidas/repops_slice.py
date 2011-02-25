@@ -251,10 +251,14 @@ class SliceCast(repops.UnaryOpRep):
             return
             
         if(newtypes):
-            assert (len(newtypes) == len(source._slices)), \
-                "Number of new slice types does not match number of slices"
-            nslices = [ops.CastOp(slice,rtypes.createType(newtype)) 
-                    for slice, newtype in zip(source._slices, newtypes)]
+            if len(newtypes) > 1:
+                assert (len(newtypes) == len(source._slices)), \
+                    "Number of new slice types does not match number of slices"
+                nslices = [ops.CastOp(slice,rtypes.createType(newtype)) 
+                        for slice, newtype in zip(source._slices, newtypes)]
+            else:
+                nslices = [ops.CastOp(slice,rtypes.createType(newtypes[0])) 
+                        for slice in source._slices]
         else:
             nslices = []
             for slice in source._slices:

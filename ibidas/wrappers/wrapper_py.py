@@ -517,6 +517,14 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         func = stringset_to_array
         dtype = node.type.toNumpy()
         return slice.data.mapseq(func, dtype=dtype, res_type=node.type)
+    
+    
+    def castto_bytes(self, castname, node, slice):
+        if(node.type.has_missing):
+            func = any_tobytes_missing
+        else:
+            func = any_tobytes
+        return slice.data.mapseq(func, res_type=node.type)
 
     def caststring_to_real(self, castname, node, slice):
         if(node.type.has_missing):
@@ -952,6 +960,20 @@ def stringset_to_array(seq, dtype):
             res.append(Missing)
         else:
             res.append(cutils.darray(list(elem),dtype))
+    return cutils.darray(res)
+
+
+def any_tobytes_missing(seq):
+    res = []
+    for elem in seq:
+        if elem is Missing:
+            res.append(Missing)
+        else:
+            res.append(str(elem))
+    return cutils.darray(res)
+
+def any_tobytes(seq):
+    res = [str(elem) for elem in seq]
     return cutils.darray(res)
 
 

@@ -98,6 +98,8 @@ class TestTutorial(unittest.TestCase):
         yeast_feats = yeast_feats.Get("*", _.gene_aliases/"gene_aliases2")
         yeast_feats = yeast_feats.To(_.gene_aliases, Do=_.Array())
         res = yt_nm.Match(yeast_feats.Flat(), _.target, _.gene_aliases2).Without(_.gene_aliases2)
+        
+        str(res)
         tf_feat = Stack(tf_feat, res).Copy()
         Save(tf_feat, 'tf_feat.dat')
         tf_feat = Load('tf_feat.dat')

@@ -144,6 +144,26 @@ class Array(repops.UnaryOpRep):
         return self._initialize(tuple(nslices),source._state)
 
 
+class Level(repops.UnaryOpRep):
+    def _process(self, source, tolevel=1):
+        if not source._state & RS_SLICES_KNOWN:
+            return
+
+        nslices = []
+        for slice in source._slices:
+            if(len(slice.dims) > tolevel):
+                nslices.append(ops.PackArrayOp(slice, len(slice.dims) - tolevel))
+            else:
+                nslices.append(slice)
+
+        if nslices:
+            upaths = dimpaths.uniqueDimPath([s.dims for s in nslices],only_unique=True)
+            assert len(upaths) >= tolevel, "Level can only be executed on slices with similar root dimensions"
+        
+        nslices,plan = ops.broadcast(nslices, mode="dim")
+        return self._initialize(tuple(nslices),source._state)
+
+
 class FlatAll(repops.UnaryOpRep):
     def _process(self,source,name=None):
         if not source._state & RS_SLICES_KNOWN:

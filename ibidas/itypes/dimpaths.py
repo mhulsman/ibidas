@@ -147,14 +147,19 @@ class DimPath(tuple):
     
     def insertDim(self, pos, ndim, subtype=None):#{{{
         ndims = []
+        if(pos < 0):
+            refpos = pos;
+        else:
+            refpos = pos - 1;
+
         for p in xrange(max(pos,0), len(self)):
-            ndims.append(self[p].insertDepDim(p - pos, ndim))
+            ndims.append(self[p].insertDepDim(p - refpos - 1, ndim))
         if pos >= 0:
             res = self[:pos] + (ndim,) + DimPath(*ndims)
         else:
             res = DimPath(*ndims)
         if(not subtype is None):
-            subtype = subtype._insertDepDim(pos=pos - len(self) - 1, ndim=ndim)
+            subtype = subtype._insertDepDim(pos=refpos - len(self), ndim=ndim)
             return (res,subtype)
         else:
             return res#}}}
@@ -270,13 +275,15 @@ def commonDimPath(dimpaths):#{{{
         pos += 1
     return list(dimpaths)[0][:pos]#}}}
 
-def uniqueDimPath(dimpaths,only_complete=True):#{{{
+def uniqueDimPath(dimpaths,only_unique=True):#{{{
     """Returns unique dim path, i.e. at each nesting level determines
     if dim is unique and adds it to path. """
 
+    if not dimpaths:
+        return []
     fdims = set(dimpaths)
 
-    if(len(fdims) <= 1):
+    if(len(fdims) == 1):
         path = fdims.pop()
     else:
         path = []
@@ -284,6 +291,8 @@ def uniqueDimPath(dimpaths,only_complete=True):#{{{
             dimset = set([elem for elem in elems if not elem is None])
             if(len(dimset) == 1):
                 path.append(dimset.pop())
+            elif only_unique:
+                return path
             else:
                 path.append(dimset)
     return path#}}}

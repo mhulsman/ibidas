@@ -11,3 +11,4 @@
 - Load wrapper_sql and wrapper_tsv only when needed
 - Add Python version check
 - Several bug fixes
+- Cytoscape read/write support using CytoscapeRPC (access using CyNetwork) 

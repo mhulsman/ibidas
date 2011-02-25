@@ -2,6 +2,7 @@ import operator
 from collections import defaultdict, Iterable
 from ..constants import *
 import rtypes
+from ..utils import util
 
 in_type_casts = defaultdict(list)
 cast_exec = defaultdict(dict)
@@ -102,7 +103,7 @@ addCasts(rtypes.TypeStrings, rtypes.TypeIntegers, checkDefault, simDefault,"stri
 addCasts(rtypes.TypeStrings, rtypes.TypeReals, checkDefault, simDefault,"string_to_real")
 
 
-def checkString(intype, outtype):#{{{
+def checkStringString(intype, outtype):#{{{
     if(intype.has_missing and not outtype.has_missing):
         return False
 
@@ -110,10 +111,10 @@ def checkString(intype, outtype):#{{{
         return False
     return True
 
-def simString(intype, outtypecls, dimdepth):
+def simStringString(intype, outtypecls, dimdepth):
     return intype
 
-addCasts([rtypes.TypeBytes,rtypes.TypePickle], [rtypes.TypeBytes,rtypes.TypePickle], checkString, simString,"string_to_string")#}}}
+addCasts([rtypes.TypeBytes,rtypes.TypePickle], [rtypes.TypeBytes,rtypes.TypePickle], checkStringString, simStringString,"string_to_string")#}}}
 
 def checkPickle(intype, outtype):#{{{
     if(intype.has_missing and not outtype.has_missing):
@@ -153,3 +154,16 @@ def simArray(intype, outtypecls, dimdepth):
     return rtypes.TypeArray(has_missing=intype.has_missing, dims=intype.dims, subtypes=intype.subtypes)
 
 addCasts(rtypes.TypeStrings | set([rtypes.TypeSet]), rtypes.TypeArray, checkArray, simArray,"to_array")
+    
+
+def checkBytes(intype, outtype):
+    if(not isinstance(outtype,rtypes.TypeBytes)):
+        return False
+    return True
+
+def simBytes(intype, outtypecls, dimdepth):
+    ndim = dimensions.Dim(UNDEFINED, (True,) * dimdepth, intype.has_missing)
+    return types.TypeBytes(dims=dimpaths.DimPath(ndim),has_missing=intype.has_missing)
+
+addCasts(rtypes.TypeAll, rtypes.TypeBytes, checkBytes, simBytes,"to_bytes")
+

@@ -145,6 +145,8 @@ def go_annotations(dburl, genus="Saccharomyces", species="cerevisiae"):
     return g.Get(_.symbol, _.annot.name/"annotation", _.rel.name/"relation_type", _.distance)%"annotations"
 predefined_sources.register(go_annotations)
 
+
+########################### #KEGG ######################################
 @util.memoized
 def kegg():
     from SOAPpy import WSDL

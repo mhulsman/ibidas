@@ -50,7 +50,7 @@ from collections import defaultdict
 
 from ..constants import *
 from ..thirdparty.spark import GenericScanner, GenericParser
-
+from ..utils import util
 _delay_import_(globals(),"dimensions")
 _delay_import_(globals(),"dimpaths")
 _delay_import_(globals(),"casts")
@@ -1055,7 +1055,7 @@ OUT_DIM = 5
 IN_SUBTYPE_DIM = 6
 
 
-def createType(name, dimpos=0):#{{{
+def createType(name, dimpos=0, refdims=[]):#{{{
     """Creates a type object from string representation.
 
     :param name: str
@@ -1096,7 +1096,7 @@ def createType(name, dimpos=0):#{{{
         else:
             raise TypeError,"Unknown type description: " + str(name)
 
-    return _createType(name, dimpos)#}}}
+    return _createType(name, dimpos, refdims)#}}}
 
 class Token(object):#{{{
     def __init__(self, type, attr=None):
@@ -1458,9 +1458,9 @@ class TypeStringASTRewriterPass2(GenericASTRewriter):#{{{
         return node#}}}
 
 class TypeStringASTInterpreter(object):#{{{
-    def __init__(self, dim_annot):
+    def __init__(self, dim_annot, refdims):
         self.dim_annot = dim_annot
-        self.dims = {}
+        self.dims = dict([(dim.name,dim) for dim in refdims])
 
     def processCreateType(self, node, dimpos=0):
         assert node.type == "createtype", "Invalid AST!"
@@ -1541,7 +1541,7 @@ class TypeStringASTInterpreter(object):#{{{
         
         return dimensions.Dim(shape,dependent,has_missing, name=name) #}}}
 
-def _createType(name, dimpos=0):
+def _createType(name, dimpos=0, refdims=[]):
     scanner = TypeStringScanner()
     tokens = scanner.tokenize(name)
 
@@ -1555,7 +1555,7 @@ def _createType(name, dimpos=0):
     rewriter2 = TypeStringASTRewriterPass2()
     tree,dim_annotation = rewriter2.process(tree)
 
-    return TypeStringASTInterpreter(dim_annotation).processCreateType(tree, dimpos)
+    return TypeStringASTInterpreter(dim_annotation, refdims).processCreateType(tree, dimpos)
 
 
 #### HELPER functions #########

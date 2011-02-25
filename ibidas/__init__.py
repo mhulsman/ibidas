@@ -2,7 +2,7 @@
 The ibidas module contains all main functions for working with ibidas objects.
 """
 
-__all__ = ["Rep","Read","Connect","_",
+__all__ = ["Rep","Read","Connect","_","CyNetwork",
            "Array","Tuple","Combine","HArray",
            "Stack","Intersect","Union","Except","Difference",
            "Pos","Argsort",
@@ -34,6 +34,7 @@ import repops_slice
 import repops_funcs
 from download_cache import DownloadCache
 from pre import predefined_sources as Get
+from cytoscape import CyNetwork
 from server import Serve
 from constants import *
 

@@ -257,6 +257,10 @@ class Representor(Node):
                     tuple([slice.name for slice in self._slices]))
     Type=property(fget=getType)
 
+    def getSlices(self):
+        return list(self._slices)
+    Slices=property(fget=getSlices)
+
     def getDepth(self):
         """Returns max dimension depth (number of dimensins) of
            slices in this representor. 
@@ -720,6 +724,10 @@ class Representor(Node):
     def Array(self, tolevel=None):
         """Packages dimension into array type"""
         return repops_dim.Array(self, tolevel = tolevel)
+
+    def Level(self, tolevel):
+        """Bring all slices to same dimension height throug packing and broadcasting"""
+        return repops_dim.Level(self, tolevel)
 
     def Tuple(self):
         """Combines slices into a tuple type"""
