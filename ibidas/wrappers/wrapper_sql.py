@@ -13,11 +13,12 @@ from ..utils import util
 from ..passes import manager, create_graph, annotate_replinks, serialize_exec
 from .. import query_graph
 
-_delay_import_(globals(),"..utils","nested_array")
-_delay_import_(globals(),"..utils.missing","Missing")
-_delay_import_(globals(),"..itypes","rtypes","dimensions","dimpaths")
-_delay_import_(globals(),"wrapper_py")
-_delay_import_(globals(),"..repops_slice")
+
+from ..utils import nested_array
+from ..utils.missing import Missing
+from ..itypes import rtypes, dimensions, dimpaths
+import wrapper_py
+from .. import repops_slice
 
 class TypeMapperToSQLAlchemy(VisitorFactory(prefixes=("convert",), #{{{
                                       flags=NF_ELSE)):

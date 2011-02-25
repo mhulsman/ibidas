@@ -73,7 +73,7 @@ from itertools import chain
 
 import rtypes
 from ..constants import *
-from ..utils import sparse_arrays
+from ..utils import sparse_arrays, module_types
 from ..utils.missing import *
 
 _delay_import_(globals(),"dimensions")
@@ -534,7 +534,7 @@ class NamedTupleScanner(TypeScanner):
             if cls is MissingType:
                 continue
             if not self.tuple_cls:
-                if not(issubclass(cls, tuple) and hasattr(cls, '_fields')):
+                if not hasattr(cls, '_fields'):
                     return False
                 self.tuple_cls = cls
             elif not self.tuple_cls is cls:
@@ -550,7 +550,7 @@ class NamedTupleScanner(TypeScanner):
 registerTypeScanner(NamedTupleScanner)
 
 class RecordDictScanner(TypeScanner):
-    good_cls = set([dict, MissingType])
+    good_cls = set([dict, module_types.soap_struct, MissingType])
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
@@ -566,9 +566,16 @@ class RecordDictScanner(TypeScanner):
             return False
         
         names = self.names.copy()
-        for elem in seq:
-            if not (elem is Missing):
-                names.update(elem.keys())
+        if dict in self.detector.objectclss:
+            assert not module_types.soap_struct in self.detector.objectclss, "dict cannot be mixed with SOAPpy struct type"
+            for elem in seq:
+                if not (elem is Missing):
+                    names.update(elem.keys())
+        else:
+            assert not dict in self.detector.objectclss, "dict cannot be mixed with SOAPpy struct type"
+            for elem in seq:
+                if not (elem is Missing):
+                    names.update(elem._keys())
 
         newnames = names - self.names
         for name in newnames:
@@ -595,7 +602,7 @@ registerTypeScanner(RecordDictScanner)
 
 class ContainerScanner(TypeScanner):
     good_cls = set([set, frozenset, MissingType, list, array.array, numpy.ndarray])
-    bad_cls = set([tuple, str, numpy.string_])
+    bad_cls = set([tuple, str, numpy.string_, module_types.soap_struct])
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
