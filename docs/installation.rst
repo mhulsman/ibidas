@@ -54,6 +54,8 @@ Performing unit tests and building the documentation can be done manually using:
 
 Ibidas installation dependencies include:
 
+ * python >= 2.6
+
  * numpy >= v1.5.1
 
  * ipython >= 0.10.1

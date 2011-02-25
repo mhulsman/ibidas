@@ -3,6 +3,7 @@ import weakref
 
 from ..utils import util
 from ..constants import *
+import itertools
 
 _delay_import_(globals(),"dimpaths")
 
@@ -171,13 +172,13 @@ class Dim(object):
         else:
             rshape = max(self.shape, other.shape)
 
-        ndep = tuple([ldep or rdep for ldep, rdep in itertoos.izip_longest(self.dependent, other.dependent,fillvalue=False)])
+        ndep = tuple([ldep or rdep for ldep, rdep in itertools.izip_longest(self.dependent, other.dependent,fillvalue=False)])
 
         if(self.name == other.name):
             nname = self.name
         else:
             nname = self.name + "_" + other.name
-        return Dimension(rshape, ndep, self.has_missing or other.has_missing, name=nname)
+        return Dim(rshape, ndep, self.has_missing or other.has_missing, name=nname)
 
             
 

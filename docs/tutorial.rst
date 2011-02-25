@@ -342,8 +342,8 @@ This means that 72 transcription factor-target pairs could not be matched. On 48
 a bit more thoroughly, to show the use of some other operations. First, we determine which targets where not matched::
 
 
-    >>> non_matched = yeastract.target |Except| tf_feat.target
-    >>> non_matched.Show()
+    >>> nonmatched = yeastract.target |Except| tf_feat.target
+    >>> nonmatched.Show()
     Slices: | target
     ---------------------------------------
     Type:   | bytes[11]
@@ -385,7 +385,7 @@ Next, we use the ``Elem`` operation to unpack the resulting set.
 
 The names in the list suggest that we might find matching rows by looking either at the ``gene_name`` or ``gene_aliases`` column. The ``gene_name`` column gives no matches however::
     
-    >>> non_matched.In(yeast_feats.gene_name.Each(str.upper))
+    >>> nonmatched.In(yeast_feats.gene_name.Each(str.upper))
     Slices: | result             
     -----------------------------
     Type:   | bool               
@@ -450,9 +450,9 @@ Another approach to get this result is the use of the ``Flat`` operation. This r
 
 Now that we have found this result, we will use the Match function to find which genes match to these non-matched targets::
 
-    >>> nonmatched_feats = nonmatched |Match(_.result, _.gene_aliases.Each(str.upper))| yeast_feats.Flat()
+    >>> nonmatched_feats = nonmatched |Match(_.target, _.gene_aliases.Each(str.upper))| yeast_feats.Flat()
     >>> nonmatched_feats
-    Slices: | result                          | sgdid                           | feat_type                       | feat_qual                       | feat_name                      
+    Slices: | target                          | sgdid                           | feat_type                       | feat_qual                       | feat_name                      
     ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     Type:   | bytes[11]                       | bytes                           | bytes                           | bytes                           | bytes[11]                      
     Dims:   | stftargets_sfeats_feats_falias~ | stftargets_sfeats_feats_falias~ | stftargets_sfeats_feats_falias~ | stftargets_sfeats_feats_falias~ | stftargets_sfeats_feats_falias~
@@ -490,11 +490,11 @@ this means that each pair matched uniquely to one feature.
 
 We decide to only use the targets that match uniquely to a ``gene_alias`` in our final dataset. First we have to filter these from the ``nonmatched_feats``::
 
-    >>> nonmatched_unique = nonmatched_feats.GroupBy(_.result)[Count(_.feat_name) == 1].result
-    Slices: | result
+    >>> nonmatched_unique = nonmatched_feats.GroupBy(_.target)[Count(_.feat_name) == 1].target
+    Slices: | target
     --------------------
     Type:   | bytes[11]
-    Dims:   | fgresult:*
+    Dims:   | fgtarget:*
     Data:   |
             | YLR157W-C
             | YAR044W
@@ -565,8 +565,8 @@ We start with determining for each transcription factor the number of targets pe
 the number of results::
 
     >>> tf_feat = tf_feat.GroupBy(_.trans_factor, _.chromosome)
-    >>> tf_feat = tf_feat.Get(_.trans_factor, _.chromosome, _.sgdid.Count()/"count", _.start).Copy()
-    >>> tf_feat
+    >>> res = tf_feat.Get(_.trans_factor, _.chromosome, _.sgdid.Count()/"count", _.start).Copy()
+    >>> res
     Slices: | trans_factor    | chromosome    | count                                                             | start                                                              
     -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     Type:   | bytes           | bytes         | int32                                                             | int32$                                                             

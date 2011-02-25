@@ -510,6 +510,8 @@ class Representor(Node):
         return repops_funcs.Negative(self)
 
     def __nonzero__(self):
+        self._checkState(filter=RS_SLICES_KNOWN)
+
         if(len(self._slices) != 1):
             raise RuntimeError, "Cannot determine True/False status of a multi-slice representor"
 
