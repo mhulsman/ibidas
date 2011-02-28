@@ -558,7 +558,7 @@ class TypeArray(TypeAny):#{{{
                 if(sdim < 0):
                     shape[pos] = 0
             
-            res = numpy.empty(self.dims, dtype=subtype.toNumpy())
+            res = numpy.empty(shape, dtype=subtype.toNumpy())
             subdv = subtype.toDefval()
            
             #workaround numpy problem 

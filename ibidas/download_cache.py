@@ -4,6 +4,11 @@ import os
 from os import path
 from distutils.dir_util import mkpath
 
+import tarfile
+import zipfile
+import gzip
+import bz2
+
 class DownloadCache(object):
     def __init__(self, folder=None):
         if(folder is None):
@@ -63,3 +68,61 @@ class DownloadCache(object):
 
         f.close()
 
+def is_gzipfile(filename):
+    try:
+        gzip.open(filename,'r')
+        gzip.close()
+        return True
+    except Exception:
+        return False
+
+
+def Unpack(filename, subfiles=None, force=False):
+    p = path.dirname(filename)
+    unpackpath = path.join(p, '/' + filename + '_unpacked/')
+    if not path.isdir(unpackpath):
+        os.mkdir(unpackpath)
+    osubfiles = subfiles
+    if isinstance(subfiles, str):
+        subfiles = [subfiles]
+    res = []
+    statinfo = os.stat(filename)
+    if zipfile.is_zipfile(filename):
+        z = zipfile.ZipFile(filename,'r')
+        if(not subfiles):
+            subfiles = z.namelist()
+        for subfile in subfiles:
+            nspath = path.join(unpackpath, subfile)
+            if not path.exists(nspath):
+                z.extract(subfile, unpackpath)
+            elif statinfo.st_ctime > os.stat(nspath).st_ctime:
+                assert force, "Unpacking would overwrite older version. Delete the old data (in " + str(unpackpath) + ") or set force=True to proceed"
+                os.unlink(nspath)
+            res.append(nspath)
+
+    elif tarfile.is_tarfile(filename):
+        z = tarfile.open(filename, 'r')
+        if(not subfiles):
+            subfiles = z.getnames()
+        for subfile in subfiles:
+            nspath = path.join(unpackpath, subfile)
+            if not path.exists(nspath):
+                z.extract(subfile, unpackpath)
+            elif statinfo.st_ctime > os.stat(nspath).st_ctime:
+                assert force, "Unpacking would overwrite older version. Delete the old data (in " + str(unpackpath) + ") or set force=True to proceed"
+                os.unlink(nspath)
+                z.extract(subfile, unpackpath)
+            res.append(nspath)
+
+    if isinstance(osubfiles, str):
+        return res[0]
+    else:
+        return res        
+        
+            
+            
+
+    
+
+
+    

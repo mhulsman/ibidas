@@ -17,7 +17,7 @@ from .. import query_graph
 from ..utils import nested_array
 from ..utils.missing import Missing
 from ..itypes import rtypes, dimensions, dimpaths
-import wrapper_py
+import python
 from .. import repops_slice
 
 class TypeMapperToSQLAlchemy(VisitorFactory(prefixes=("convert",), #{{{
@@ -333,7 +333,7 @@ class Connection(object):
                 tables[key] = newtable
             
             if(len(columns) > 1 or any([row['pickle'] or row['dimname'] is None for row in rowinfo])):
-                self.store(name + "__info__",wrapper_py.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes$,packdepth=int,val=bytes}"))
+                self.store(name + "__info__",python.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes$,packdepth=int,val=bytes}"))
                
                 tablelist = []
                 for t in tables.values():
@@ -926,7 +926,7 @@ class SQLOp(ops.ExtendOp):#{{{
             res = self.conn.execute(sql.select([self.query]))
         result = res.fetchall()
         ndata = nested_array.NestedArray(result,self.type)
-        return wrapper_py.ResultOp.from_slice(ndata,self)
+        return python.ResultOp.from_slice(ndata,self)
 
     def __str__(self):
         if(isinstance(self.query, sqlalchemy.sql.expression.Executable)):

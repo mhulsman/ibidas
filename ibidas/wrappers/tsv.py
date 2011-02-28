@@ -6,7 +6,7 @@ from ..itypes import rtypes
 from .. import ops
 from ..constants import *
 
-import wrapper_py
+import python
 from ..itypes import detector
 from ..utils import nested_array, util
 
@@ -137,5 +137,5 @@ class TSVOp(ops.ExtendOp):
         data = [tuple(row) for row in reader]
         file.close()
         ndata = nested_array.NestedArray(data,self.type)
-        return wrapper_py.ResultOp.from_slice(ndata,self)
+        return python.ResultOp.from_slice(ndata,self)
 

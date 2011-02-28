@@ -5,7 +5,7 @@ from itypes import rtypes
 import ops
 _delay_import_(globals(),"utils","util")
 _delay_import_(globals(),"representor")
-_delay_import_(globals(),"wrappers","wrapper_py")
+_delay_import_(globals(),"wrappers","python")
 _delay_import_(globals(),"itypes", "casts","dimpaths","dimensions")
 
 class FuncSignature(object):
@@ -119,7 +119,7 @@ class Func(object):
 class UnaryFuncOp(repops.UnaryOpRep, Func):
     def __init__(self, source, *params, **kwargs):
         if(not isinstance(source, representor.Representor)):
-            source = wrapper_py.Rep(source)
+            source = python.Rep(source)
         repops.UnaryOpRep.__init__(self,source, *params,**kwargs)
 
 class UnaryFuncElemOp(UnaryFuncOp):
@@ -195,9 +195,9 @@ class UnaryFuncAggregateOp(UnaryFuncDimOp):
 class BinaryFuncOp(repops.MultiOpRep, Func):
     def __init__(self, lsource, rsource, **kwargs):
         if(not isinstance(lsource, representor.Representor)):
-            lsource = repops.PlusPrefix(wrapper_py.Rep(lsource))
+            lsource = repops.PlusPrefix(python.Rep(lsource))
         if(not isinstance(rsource, representor.Representor)):
-            rsource = repops.PlusPrefix(wrapper_py.Rep(rsource))
+            rsource = repops.PlusPrefix(python.Rep(rsource))
         repops.MultiOpRep.__init__(self,(lsource,rsource), **kwargs)
 
         

@@ -2,7 +2,7 @@
 The ibidas module contains all main functions for working with ibidas objects.
 """
 
-__all__ = ["Rep","Read","Connect","_","CyNetwork",
+__all__ = ["Rep","Read","Connect","_","CyNetwork",'Unpack',
            "Array","Tuple","Combine","HArray",
            "Stack","Intersect","Union","Except","Difference",
            "Pos","Argsort",
@@ -26,13 +26,13 @@ from utils.context import _
 from utils.missing import Missing
 from utils.infix import Infix
 from itypes import createType as CreateType
-from wrappers.wrapper_py import Rep
+from wrappers.python import Rep
 from representor import newdim
 import repops_dim 
 from repops_multi import Broadcast, Combine, Sort
 import repops_slice 
 import repops_funcs
-from download_cache import DownloadCache
+from download_cache import DownloadCache, Unpack
 from pre import predefined_sources as Get
 from wrappers.cytoscape import CyNetwork
 from server import Serve
@@ -74,7 +74,7 @@ def Read(url, **kwargs):
     format = kwargs.pop('format','tsv')
 
     if(format == 'tsv'):
-        from wrappers.wrapper_tsv import TSVRepresentor
+        from wrappers.tsv import TSVRepresentor
         return TSVRepresentor(url, **kwargs) 
     else:
         raise RuntimeError("Unknown format specified")
@@ -82,7 +82,7 @@ def Read(url, **kwargs):
 def Connect(url, **kwargs):
     format = kwargs.pop('format','db')
     if(format == "db"):
-        from wrappers.wrapper_sql import open_db
+        from wrappers.sql import open_db
         return open_db(url, **kwargs)
     else:
         raise RuntimeError("Unknown format specified")

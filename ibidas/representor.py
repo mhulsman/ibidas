@@ -11,7 +11,7 @@ from thirdparty import tableprint, console
 
 _delay_import_(globals(),"utils","util","context","infix")
 _delay_import_(globals(),"itypes", "dimensions","dimpaths")
-_delay_import_(globals(),"wrappers","wrapper_py","wrapper")
+_delay_import_(globals(),"wrappers","python","wrapper")
 _delay_import_(globals(),"query_context")
 _delay_import_(globals(),"engines")
 _delay_import_(globals(),"repops")
@@ -237,7 +237,7 @@ class Representor(Node):
         slices = self._getResultSlices(endpoint=False)
         for slice in slices:
             slice.source = None
-        return (wrapper_py.PyRepresentor, (slices, self._state))
+        return (python.PyRepresentor, (slices, self._state))
 
     def __copy__(self):
         nself = Representor()
@@ -603,7 +603,7 @@ class Representor(Node):
         
         if(isinstance(flat,dict)):
             pass
-        elif(isinstance(flat, list)):
+        elif(isinstance(flat, (list,tuple))):
             flat = {0:flat}
         else:
             flat = {0:[flat]}

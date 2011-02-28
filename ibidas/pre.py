@@ -1,4 +1,6 @@
 from ibidas.utils import util
+import os.path
+import os
 _delay_import_(globals(),"ibidas","*")
 
 class Pre(object):
@@ -50,7 +52,7 @@ def yeast_aliases(feats):
 predefined_sources.register(yeast_aliases,name="name_aliases",category="yeast")  
 
 
-def yeast_phosphosites():
+def yeast_phosphogrid():
     url = "http://www.phosphogrid.org/downloads/phosphosites.txt"
     rtype = """[phosphosites:*]<(orf_name=bytes, gene_name=bytes, phospho_site=bytes, site_evidence=bytes, 
                site_evidence_pubmed=bytes, site_conditions=bytes, site_conditions_pubmed=bytes, site_functions=bytes, site_functions_pubmed=bytes, 
@@ -63,7 +65,50 @@ def yeast_phosphosites():
     res = res.To(_.kinases_orfs,  Do=_.Each(splitfunc, dtype="[kinases:~]<bytes").Elem()[_ != "-"])
     res = res.To(_.phosphatases_orfs,  Do=_.Each(splitfunc, dtype="[phosphatases:~]<bytes").Elem()[_ != "-"])
     return res.Copy()
-predefined_sources.register(yeast_phosphosites,name="phosphosites",category="yeast")  
+predefined_sources.register(yeast_phosphogrid,name="phosphogrid",category="yeast")  
+
+
+def yeast_kinome():
+    url = "http://www.yeastkinome.org/files/supplementary/Website_Supplementary_Table_1_-_SAINT_Datasets.zip"
+    res = Unpack(Fetch(url),subfiles='RAW/RAW-UNIQUE.txt')
+
+    rtype = "[yeastkinome:*]<(bait_yorf=bytes, hit_yorf=bytes, bait_gene=bytes, hit_gene=bytes, saint=bytes)"
+    res = Read(res,dtype=rtype,fieldnames=True)    
+    res = res.To(_.saint, Do=_.Cast("real64"))
+    return res
+predefined_sources.register(yeast_kinome,name="yeast_kinome",category="yeast")  
+
+
+def yeast_chipchip():
+    url = "http://fraenkel.mit.edu/improved_map/orfs_by_factor.tar.gz"
+    res = Unpack(Fetch(url))
+    util.debug_here()
+    dirname = os.path.dirname(res[0])
+    pval_names = ['none', 'p0.005', 'p0.001']
+    max_pvals = [1.0, 0.005, 0.001]
+    cons = [0, 1, 2]
+
+    loaded_data = []
+    for mpval, pval_name in zip(max_pvals, pval_names):
+        for con in cons:
+            filename = os.path.join(dirname,"orfs_by_factor_%s_cons%s.txt" % (pval_name, str(con)))
+            f = open(filename)
+            results = []
+            for row in f:
+                res = row.split('\t')
+                results.append((res[0], res[1:-1]))
+            results = Rep(results)/("trans_name","target")
+            loaded_data.append(results.Flat().Get("*", Rep(mpval)/"pval", Rep(con)/"conservation").Level(1))
+    res = Stack(*loaded_data)%"chipchip"
+
+    #res.GroupBy((_.trans_name, _.target),flat=("trans_name","target"))
+    return res
+
+predefined_sources.register(yeast_chipchip,name="chipchip_macisaac",category="yeast")  
+        
+        
+        
+
 
 def in_memory_db():
     """Returns an empty in memory database"""

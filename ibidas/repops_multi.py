@@ -7,7 +7,7 @@ import repops_funcs
 _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"ops")
 _delay_import_(globals(),"representor")
-_delay_import_(globals(),"wrappers","wrapper_py")
+_delay_import_(globals(),"wrappers","python")
 _delay_import_(globals(),"itypes","rtypes","dimensions","dimpaths")
 _delay_import_(globals(),"repops_dim")
 _delay_import_(globals(),"repops_slice")
@@ -108,7 +108,7 @@ class Group(repops.MultiOpRep):
                 keyslices = gsource.Get(key)
             nkey = tuple([gsource._slices.index(keyslice) for keyslice in keyslices._slices])
              
-            if(isinstance(values,tuple)):
+            if(isinstance(values,(list,tuple))):
                 vslices = source.Get(*values)
             else:
                 vslices = source.Get(values)
@@ -123,7 +123,10 @@ class Group(repops.MultiOpRep):
 
         #group slices
         for pos, slice in enumerate(gsource._slices):
-            p = oslices.index(slice)
+            try:
+                p = oslices.index(slice)
+            except ValueError:
+                continue
             key = (pos,)
             if(key in xflat):
                 xflat[key].add(p)
@@ -142,7 +145,7 @@ class Group(repops.MultiOpRep):
         #filter flattened slices 
         gidx = range(len(gsource._slices))
         gdims = gslice.dims[-len(gsource._slices):]
-        firstelem = wrapper_py.Rep(0)._slices[0]
+        firstelem = python.Rep(0)._slices[0]
         for key, pos in xflat.iteritems():
             tslice = gslice
             for elem in gidx:
@@ -164,7 +167,7 @@ class Group(repops.MultiOpRep):
 class Filter(repops.MultiOpRep):
     def __init__(self,source,constraint,dim=None):
         if(not isinstance(constraint,representor.Representor)):
-            constraint = repops.PlusPrefix(wrapper_py.Rep(constraint,name="filter"))
+            constraint = repops.PlusPrefix(python.Rep(constraint,name="filter"))
         repops.MultiOpRep.__init__(self,(source,constraint),dim=dim)
 
     def _process(self,sources,dim):
@@ -226,7 +229,7 @@ class Sort(repops.MultiOpRep):
             repops.MultiOpRep.__init__(self,(source,),descend=descend)
         else:
             if(not isinstance(constraint,representor.Representor)):
-                constraint = repops.PlusPrefix(wrapper_py.Rep(constraint,name="filter"))
+                constraint = repops.PlusPrefix(python.Rep(constraint,name="filter"))
             repops.MultiOpRep.__init__(self,(source,constraint),descend=descend)
 
     def _process(self, sources, descend):
@@ -258,7 +261,7 @@ class Unique(repops.MultiOpRep):
             repops.MultiOpRep.__init__(self,(source,),descend=descend)
         else:
             if(not isinstance(constraint,representor.Representor)):
-                constraint = repops.PlusPrefix(wrapper_py.Rep(constraint,name="filter"))
+                constraint = repops.PlusPrefix(python.Rep(constraint,name="filter"))
             repops.MultiOpRep.__init__(self,(source,constraint),descend=descend)
 
     def _process(self, sources, descend):
