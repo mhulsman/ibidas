@@ -34,7 +34,7 @@ import repops_slice
 import repops_funcs
 from download_cache import DownloadCache
 from pre import predefined_sources as Get
-from cytoscape import CyNetwork
+from wrappers.cytoscape import CyNetwork
 from server import Serve
 from constants import *
 

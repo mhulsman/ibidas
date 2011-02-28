@@ -222,8 +222,8 @@ class Representor(Node):
         if not self._state & RS_SLICES_KNOWN:
             return []
         else:
-            print ""
-            print self.__str__(False)
+            #print ""
+            #print self.__str__(False)
             return [slice.name for slice in self._slices]
 
     def Copy(self):

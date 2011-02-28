@@ -49,8 +49,8 @@ import operator
 from collections import defaultdict
 
 from ..constants import *
-from ..thirdparty.spark import GenericScanner, GenericParser
 from ..utils import util
+from ..parser_objs import *
 _delay_import_(globals(),"dimensions")
 _delay_import_(globals(),"dimpaths")
 _delay_import_(globals(),"casts")
@@ -1098,40 +1098,6 @@ def createType(name, dimpos=0, refdims=[]):#{{{
 
     return _createType(name, dimpos, refdims)#}}}
 
-class Token(object):#{{{
-    def __init__(self, type, attr=None):
-        self.type = type
-        self.attr = attr
-
-    def __cmp__(self,o):
-        return cmp(self.type,o)
-    
-    def __getitem__(self,pos):
-        raise IndexError
-
-    def __len__(self):
-        return 0
-
-    def __repr__(self):
-        if(self.attr is None):
-            return str(self.type)
-        else:
-            return str(self.type) + ":" + str(self.attr)#}}}
-
-class AST(object):#{{{
-    def __init__(self, type, kids=tuple()):
-        self.type = type
-        self.kids = kids
-
-    def __getitem__(self,pos):
-        return self.kids[pos]
-
-    def __len__(self):
-        return len(self.kids)
-
-    def __repr__(self):
-        return str(self.type) + str(self.kids)#}}}
-
 class TypeStringScanner(GenericScanner):#{{{
     def tokenize(self, input):
         self.rv = []
@@ -1284,40 +1250,6 @@ class TypeStringParser(GenericParser):#{{{
     def p_typelist_2(self,args):
         ''' typelist ::= typelist , typenest '''
         return AST(type="typelist", kids=(args[0],args[2]))#}}}
-
-class GenericASTRewriter:#{{{
-    def typestring(self, node):
-        return node.type
-
-    def preorder(self, node=None):
-        name = 'n_' + self.typestring(node)
-        if hasattr(self, name):
-            func = getattr(self, name)
-            node = func(node)
-        else:
-            node = self.default(node)
-
-        node.kids = [self.preorder(kid) for kid in node]
-
-        name = name + '_exit'
-        if hasattr(self, name):
-            func = getattr(self, name)
-            node = func(node)
-        return node
-
-    def postorder(self, node=None):
-        node.kids = [self.postorder(kid) for kid in node]
-
-        name = 'n_' + self.typestring(node)
-        if hasattr(self, name):
-            func = getattr(self, name)
-            node = func(node)
-        else:
-            node = self.default(node)
-        return node
-
-    def default(self, node):
-        return node#}}}
 
 class TypeStringASTRewriterPass1(GenericASTRewriter):#{{{
     def process(self, tree):
