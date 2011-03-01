@@ -364,7 +364,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def visitFilterOp(self,node, slice, constraint):
         ndata = nested_array.co_map(speedfilter,[slice.data, constraint.data],
                                        has_missing = node.has_missing,ctype=constraint.type,
-                                       res_type=node.type, bc_allow=True)
+                                       res_type=node.type)
         return slice.modify(data=ndata,rtype=node.type)
 
     def visitFlatAllOp(self, node, slice):
@@ -378,7 +378,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def visitGroupIndexOp(self, node, slices):
         ndata = nested_array.co_map(groupindex,[slice.data for slice in slices],
-                                        res_type = node.type, bc_allow=False)
+                                        res_type = node.type)
         
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
@@ -455,15 +455,14 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
         ndata = nested_array.co_mapseq(func,[slice.data for slice in slices],
                                        type1=slices[0].type,type2=slices[1].type,
-                                       typeo=node.type,res_type=node.type,op=node.funcname,
-                                       bc_allow=node.allow_partial_bc)
+                                       typeo=node.type,res_type=node.type,op=node.funcname)
+
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
     def visitEquiJoinIndexOp(self, node, slices):
         ndatas = nested_array.co_map(joinindex,[slice.data for slice in slices],
                                        jointype=node.jointype,
-                                       res_type=(node.results[0].type,node.results[1].type),
-                                       bc_allow=False)
+                                       res_type=(node.results[0].type,node.results[1].type))
         return slices[0].modify(data=ndatas,name=None,rtype=None,dims=None, bookmarks=None)
 
     def visitSelectOp(self, node, slice):

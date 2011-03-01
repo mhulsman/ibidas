@@ -37,12 +37,13 @@ class NestedArray(object):
         data= cutils.darray([subelem for subelem in data],object,1,1)
         return data
 
-    def _flatData(self):
+    def _flatData(self,depth=-1):
         seq = self.data
-        if(isinstance(self.idxs[-1],int)):
-            rshape = seq.shape[:(self.idxs[-1]+1)]
-            seq = dimpaths.flatFirstDims(seq,self.idxs[-1])
+        if(isinstance(self.idxs[depth],int)):
+            rshape = seq.shape[:(self.idxs[depth]+1)]
+            seq = dimpaths.flatFirstDims(seq,self.idxs[depth])
         else:
+            assert depth == -1 or depth==(len(self.idxs)-1),"Cannot flat data on non-fixed dim"
             rshape = (len(seq),)
         return (seq,rshape)
 
@@ -713,44 +714,43 @@ class NestedArray(object):
 
 def co_mapseq(func, nested_arrays, *args, **kwargs):
     restype= kwargs.pop("res_type")
-    bc_allow=kwargs.pop("bc_allow",False)
+    
     idxlen = set([len(na.idxs) for na in nested_arrays])
-    data = []
-    if not len(idxlen) == 1:
-        if(not bc_allow is True):
-            raise RuntimeError, "Nested arrays should have same dimensions!"
-       
-        ndims = max(idxlen)
-        minlen = ndims
-        for na in nested_arrays:
-            if(len(na.idxs) == ndims):
-                na_ref = na
-            minlen = min(len(na.idxs),minlen)
-        while(minlen < ndims and not isinstance(na_ref.getDimShape(minlen-1),int)):
-            minlen += 1
+    assert len(idxlen) == 1, "Nested arrays should have same dimensions!"
+    idxlen = idxlen.pop()
+    na_ref = nested_arrays[0]
 
-        for pos,na in enumerate(nested_arrays):
-            rep_dict = dict()
-            while(len(na.idxs) < ndims):
-                extpos = len(na.idxs) - 1
-                na = na.insertDim(extpos)
-                idx = na_ref.getDimShape(extpos)
-                if(not isinstance(idx,int)):
-                    rep_dict[extpos] = idx
-            na = na.broadcast(rep_dict)
-            if(len(na.idxs) > minlen):
-                na = na.pack(rtypes.unknown,len(na.idxs) - minlen)
-            seq, flatshape = na._flatData()
-            data.append(seq)
-    else:
-        na_ref = nested_arrays[0]
-        #flatshape has tobe obtained from na_ref,
-        #as nested_arrays can have same dimensions but still have different
-        #flat shapes (nested dim of len 1, or fixed dim is same)
-        dummy,flatshape = na_ref._flatData()
-        for na in nested_arrays:
-            seq,dummy = na._flatData()
-            data.append(seq)
+    #determine if there is incomplete broadcasting going on
+    lastpos = len(na_ref.idxs)-1
+    xshape = []
+    for i in range(idxlen):
+        pos = idxlen -i - 1
+        if(not isinstance(na_ref.idxs[pos], int)):
+            break
+        
+        res = set([na.getDimShape(pos-1) for na in nested_arrays])
+        if len(res) > 1:
+            assert len(res) == 2 and 1 in res, "Unequal dims in co_mapseq"
+            lastpos = pos - 1
+            res.discard(1)
+            xshape.append(res.pop())
+    bcdepth = len(na_ref.idxs) - lastpos
+
+    dummy,flatshape = na_ref._flatData(depth=lastpos)
+    data = []
+    for na in nested_arrays:
+        seq,dummy = na._flatData(depth=lastpos)
+        if(bcdepth > 1 and len(seq.shape) > bcdepth): #if broadcasting, we want to explicitly pack data 
+            nseq = dimpaths.flatFirstDims(seq,bcdepth-1)
+            nseq = cutils.darray(list(nseq))
+            nseq.shape = seq.shape[:bcdepth]
+            seq = nseq
+        data.append(seq)
+    
+    if(bcdepth > 1):
+        kwargs["bcdepth"] = bcdepth
+        flatshape = flatshape + tuple(xshape[::-1])
+
     seq = func(data,*args, **kwargs)
     if(isinstance(restype,tuple)):
         nselfs = []
@@ -774,7 +774,12 @@ def co_map(func, narrays, *args, **kwargs):
     if(isinstance(restype,tuple)):
         dtypes = [rtype.toNumpy() for rtype in restype]
         def wrapfunc(seqs, *args, **kwargs):
-            res = [func(elems, *args, **kwargs) for elems in zip(*seqs)]
+            if 'bcdepth' in kwargs:
+                del kwargs['bcdepth']
+                zipdata = numpy.broadcast(*seqs)
+            else:
+                zipdata = zip(*seqs)
+            res = [func(elems, *args, **kwargs) for elems in zipdata]
             xres = []
             for pos,dtype in enumerate(dtypes):
                 nseq = cutils.darray([row[pos] for row in res],dtype)
@@ -783,7 +788,12 @@ def co_map(func, narrays, *args, **kwargs):
     else: 
         dtype=restype.toNumpy()
         def wrapfunc(seqs, *args, **kwargs):
-            res = [func(elems, *args, **kwargs) for elems in zip(*seqs)]
+            if 'bcdepth' in kwargs:
+                del kwargs['bcdepth']
+                zipdata = numpy.broadcast(*seqs)
+            else:
+                zipdata = zip(*seqs)
+            res = [func(elems, *args, **kwargs) for elems in zipdata]
             nseq = cutils.darray(res,dtype)
             return nseq
     return co_mapseq(wrapfunc, narrays, **kwargs)

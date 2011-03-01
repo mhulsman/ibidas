@@ -1,5 +1,6 @@
 from collections import defaultdict
 from ibidas.utils import util
+import copy
 
 class Graph(object):
     def __init__(self):
@@ -26,6 +27,28 @@ class Graph(object):
         assert edge.target in self.nodes, "Unknown edge target"
         self.edge_source[edge.source].add(edge)
         self.edge_target[edge.target].add(edge)
+
+    def copyNode(self, node):
+        nnode = copy.copy(node)
+        self.nodes.add(nnode)
+        if node in self.edge_source:
+            for edge in list(self.edge_source[node]):
+                self.dropEdge(edge)
+                edge.source = nnode
+                self.addEdge(edge)
+            del self.edge_source[node]
+        if node in self.edge_target:
+            for edge in list(self.edge_target[node]):
+                self.dropEdge(edge)
+                edge.target = nnode
+                self.addEdge(edge)
+            del self.edge_target[node]
+        self.nodes.discard(node)
+        for key, value in self.node_attributes.iteritems():
+            if node in value:
+                value[nnode] = value[node]
+                del value[node]
+        return nnode
 
     def dropNode(self, node):
         if node in self.edge_source:

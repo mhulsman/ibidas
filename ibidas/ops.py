@@ -203,12 +203,13 @@ class EnsureCommonDimOp(UnaryUnaryOp):#{{{
         UnaryUnaryOp.__init__(self, slice, rtype=ntype,dims=ndims)#}}}
 
 class BroadcastOp(UnaryUnaryOp):#{{{
-    __slots__ = ["refsliceslist","plan","bcdims"]
+    __slots__ = ["refsliceslist","plan","bcdims","partial"]
     
-    def __init__(self,slice,refslices,plan,bcdims):
+    def __init__(self,slice,refslices,plan,bcdims,partial=False):
         self.refsliceslist = refslices
         self.plan = plan
         self.bcdims = bcdims
+        self.partial=partial
 
         ndims = slice.dims
         ntype = slice.type
@@ -225,7 +226,7 @@ class BroadcastOp(UnaryUnaryOp):#{{{
             
         UnaryUnaryOp.__init__(self, slice, dims=ndims,rtype=ntype)#}}}
 
-def broadcast(slices,mode="pos"):#{{{
+def broadcast(slices,mode="pos", partial=False):#{{{
     slicedimpaths = [s.dims for s in slices]
     if(mode == "dim"):
         bcdims, bcplan = dimpaths.planBroadcastMatchDim(slicedimpaths)
@@ -256,10 +257,14 @@ def broadcast(slices,mode="pos"):#{{{
             elif(planelem == BCEXIST):
                 active_bcdims.append(bcdim)
                 nplan.append(planelem)
+            elif(planelem == BCINSERT):
+                ndim = dimensions.Dim(1)
+                slice = InsertDimOp(slice,dimpos,ndim)
+                nplan.append(BCCOPY)
             else:
                 nplan.append(planelem)
         if(active_bcdims):                
-            slice = BroadcastOp(slice,[references[bcdim] for bcdim in active_bcdims],nplan,bcdims)
+            slice = BroadcastOp(slice,[references[bcdim] for bcdim in active_bcdims],nplan,bcdims,partial)
         nslices.append(slice)
     return (nslices, bcplan)
     #}}}
@@ -379,7 +384,7 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
                 dep.insert(0,False)
 
         #broadcast to constraint
-        (slice,constraint),(splan,cplan) = broadcast([slice,constraint],mode=mode)
+        (slice,constraint),(splan,cplan) = broadcast([slice,constraint],mode=mode, partial=True)
 
         #adapt ndim to braodcast, apply filter
         if(not ndim is None):

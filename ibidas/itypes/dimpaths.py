@@ -335,6 +335,7 @@ def planBroadcastMatchPos(paths):#{{{
         curpos -=1 
     for pos in xrange(len(plans)):
         plans[pos] = plans[pos][::-1]
+    
     return (bcdims, plans)        #}}}
 
 def planBroadcastMatchDim(paths):#{{{
@@ -443,7 +444,21 @@ def planBroadcastMatchDim(paths):#{{{
                 plan.append(BCNEW)
 
         plans.append(plan[::-1])
+
     return (bcdims,plans)#}}}
+
+
+def processPartial(bcdims, plans):
+    nplans = list(plans)
+    for i in range(len(bcdims)):
+        pos = -(i+1)
+        if bcdims[pos].dependent:
+            break
+        if(plans[pos] == BCNEW):
+            nplans[pos] = BCINSERT
+        elif(plans[pos] == BCEXIST):
+            nplans[pos] = BCCOPY
+    return nplans
 
 def applyPlan(seq,plan,newvalue=None,copyvalue=NOVAL,existvalue=NOVAL,ensurevalue=NOVAL):#{{{
     elempos = 0
