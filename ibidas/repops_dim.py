@@ -31,9 +31,7 @@ class UnpackArray(repops.UnaryOpRep):
         return self._initialize(tuple(nslices))
 
 class DimRename(repops.UnaryOpRep):#{{{
-    def _process(self, source, *names, **kwds):
-        if not source._slicesKnown():
-            return
+    def _sprocess(self, source, *names, **kwds):
         if(names):
             unique_dimpath = util.unique(sum([slice.dims for slice in source._slices],dimpaths.DimPath())) 
             assert (len(names) <= len(unique_dimpath)),\
@@ -50,10 +48,7 @@ class DimRename(repops.UnaryOpRep):#{{{
 
 
 class Shape(repops.UnaryOpRep):
-    def _process(self,source):
-        if not source._slicesKnown():
-            return
-
+    def _sprocess(self,source):
         dimnames = set()
         nslices = []
         for slice in source._slices:
@@ -67,10 +62,7 @@ class Shape(repops.UnaryOpRep):
        
 
 class InsertDim(repops.UnaryOpRep):
-    def _process(self, source, insertpoint, name=None):
-        if not source._slicesKnown():
-            return
-        
+    def _sprocess(self, source, insertpoint, name=None):
         assert len(dimpaths.uniqueDimPath([s.dims for s in source._slices],only_complete=False)) >= insertpoint, "No unique dimpath covering dim insertion point"
         ndim = dimensions.Dim(1,name=name)
         nslices = []
@@ -80,10 +72,7 @@ class InsertDim(repops.UnaryOpRep):
         return self._initialize(tuple(nslices))
 
 class SplitDim(repops.UnaryOpRep):
-    def _process(self,source,lshape,rshape,lname=None,rname=None,dimsel=None):
-        if not source._slicesKnown():
-            return
-
+    def _sprocess(self,source,lshape,rshape,lname=None,rname=None,dimsel=None):
         selpath = dimpaths.identifyUniqueDimPathSource(source,dimsel)
         nslices = []
 
@@ -107,10 +96,7 @@ class SplitDim(repops.UnaryOpRep):
 
 
 class PermuteDims(repops.UnaryOpRep):
-    def _process(self, source, permute_idxs):
-        if not source._slicesKnown():
-            return
-        
+    def _sprocess(self, source, permute_idxs):
         cpath = dimpaths.commonDimPath([s.dims for s in source._slices])
         if len(permute_idxs) > len(cpath):
             raise RuntimeError, "Permute index length longer than common dimensions"
@@ -127,10 +113,7 @@ class PermuteDims(repops.UnaryOpRep):
 
 
 class Array(repops.UnaryOpRep):
-    def _process(self, source, tolevel=None):
-        if not source._slicesKnown():
-            return
-    
+    def _sprocess(self, source, tolevel=None):
         if tolevel is None:
             nslices = [ops.PackArrayOp(slice) for slice in source._slices]
         else:
@@ -145,10 +128,7 @@ class Array(repops.UnaryOpRep):
 
 
 class Level(repops.UnaryOpRep):
-    def _process(self, source, tolevel=1):
-        if not source._slicesKnown():
-            return
-
+    def _sprocess(self, source, tolevel=1):
         nslices = []
         for slice in source._slices:
             if(len(slice.dims) > tolevel):
@@ -165,9 +145,7 @@ class Level(repops.UnaryOpRep):
 
 
 class FlatAll(repops.UnaryOpRep):
-    def _process(self,source,name=None):
-        if not source._slicesKnown():
-            return
+    def _sprocess(self,source,name=None):
         nslices = ops.broadcast(source._slices,mode="dim")[0]
         dims = nslices[0].dims
         
@@ -190,10 +168,7 @@ class FlatAll(repops.UnaryOpRep):
         return self._initialize(tuple(nnslices))
 
 class Flat(repops.UnaryOpRep):
-    def _process(self,source,name=None,dim=-1):
-        if not source._slicesKnown():
-            return
-        
+    def _sprocess(self,source,name=None,dim=-1):
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
         nslices = self._apply(source._slices, selpath, name)
 
@@ -245,10 +220,7 @@ class Flat(repops.UnaryOpRep):
         return nslices
 
 class GroupIndex(repops.UnaryOpRep):
-    def _process(self, source):
-        if not source._slicesKnown():
-            return
-        
+    def _sprocess(self, source):
         nslices = [ops.ensure_frozen(slice) for slice in source._slices]
         nslices = ops.broadcast(nslices,mode="dim")[0]
         nslices = [ops.PackArrayOp(nslice,1) for nslice in nslices]

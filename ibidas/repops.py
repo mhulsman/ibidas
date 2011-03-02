@@ -61,11 +61,14 @@ class UnaryOpRep(representor.Representor):
         self._params = (args,kwds)
         self._process(source,*args, **kwds)
 
-    def _process(self, source):
+    def _process(self, source, *args, **kwds):
         if not source._slicesKnown():
             return
+        return self._sprocess(source, *args, **kwds)
+
+    def _sprocess(self, source, *args, **kwds):
         return self._initialize(source._slices)
-    
+
 class MultiOpRep(representor.Representor):
     def __init__(self, sources, *args,**kwds):
         assert isinstance(sources,tuple), "Sources should be a tuple"
@@ -73,7 +76,12 @@ class MultiOpRep(representor.Representor):
         self._params = (args,kwds)
         self._process(sources,*args, **kwds)
     
-    def _process(self, sources):
+    def _process(self, sources, *args, **kwds):
+        if not all([source._slicesKnown() for source in sources]):
+            return
+        return self._sprocess(sources, *args, **kwds)      
+    
+    def _sprocess(self, sources,*args, **kwds):
         raise RuntimeError, "Process function should be overloaded for " + str(type(self))
     
 
@@ -82,9 +90,7 @@ class Fixate(UnaryOpRep):#{{{
     such that there are no exception situations, and slice retrieval
     is handled correctly."""
 
-    def _process(self, source):
-        if not source._slicesKnown():
-            return
+    def _sprocess(self, source):
         nslice = ops.FixateOp(source._slices)
         self._initialize((nslice,))
     #}}}
@@ -93,9 +99,7 @@ class Gather(Fixate):#{{{
     """Operation used by optimizer to fixate end of tree,
     such that there are no exception situations, and slice retrieval
     is handled correctly."""
-    def _process(self, source):
-        if not source._slicesKnown():
-            return
+    def _sprocess(self, source):
         nslice = ops.GatherOp(source._slices)
         self._initialize((nslice,))#}}}
 
@@ -109,9 +113,7 @@ class ApplyFuncRep(UnaryOpRep):
     :param dim_selector: select dimensions on which to apply the slicecls
     """
 
-    def _process(self,source,func,*params,**kwds):
-        if not source._slicesKnown():
-            return
+    def _sprocess(self,source,func,*params,**kwds):
         nslices = func(source._slices, *params, **kwds)
         return self._initialize(nslices)
 

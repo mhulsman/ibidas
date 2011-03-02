@@ -13,10 +13,7 @@ _delay_import_(globals(),"repops_dim")
 _delay_import_(globals(),"repops_slice")
 
 class Broadcast(repops.MultiOpRep):
-    def _process(self,sources, mode="dim"):
-        if not all([source._slicesKnown() for source in sources]):
-            return
-
+    def _sprocess(self,sources, mode="dim"):
         nslices = []
         for bcslices in util.zip_broadcast(*[source._slices for source in sources]):
             nslices.extend(ops.broadcast(bcslices,mode)[0])
@@ -26,10 +23,8 @@ class Broadcast(repops.MultiOpRep):
 class Nest(repops.MultiOpRep):
     def __init__(self, lsource, rsource, dim=None):
         repops.MultiOpRep.__init__(self,(lsource,rsource),dim=dim)
-    def _process(self, sources, dim=None):
+    def _sprocess(self, sources, dim=None):
         assert len(sources) == 2, "Nest expects two representor objects"
-        if not all([source._slicesKnown() for source in sources]):
-            return
         lsource,rsource = sources
         
         joinpath = dimpaths.identifyUniqueDimPathSource(lsource, dim)
@@ -61,9 +56,7 @@ class Nest(repops.MultiOpRep):
 class Combine(repops.MultiOpRep):
     def __init__(self, *sources):
         repops.MultiOpRep.__init__(self, sources)
-    def _process(self,sources):
-        if not all([source._slicesKnown() for source in sources]):
-            return
+    def _sprocess(self,sources):
         nslices = self._apply(*[source._slices for source in sources])
         return self._initialize(nslices)
 
@@ -227,10 +220,7 @@ class Sort(repops.MultiOpRep):
                 constraint = repops.PlusPrefix(python.Rep(constraint,name="filter"))
             repops.MultiOpRep.__init__(self,(source,constraint),descend=descend)
 
-    def _process(self, sources, descend):
-        if not all([s._slicesKnown() for s in sources]):
-            return
-
+    def _sprocess(self, sources, descend):
         if(len(sources) == 1): #no explicit constraint, use data itself
             source = sources[0]
             if len(source._slices) > 1:
@@ -259,10 +249,7 @@ class Unique(repops.MultiOpRep):
                 constraint = repops.PlusPrefix(python.Rep(constraint,name="filter"))
             repops.MultiOpRep.__init__(self,(source,constraint),descend=descend)
 
-    def _process(self, sources, descend):
-        if not all([s._slicesKnown() for s in sources]):
-            return
-
+    def _sprocess(self, sources, descend):
         if(len(sources) == 1): #no explicit constraint, use data itself
             source = sources[0]
             if len(source._slices) > 1:
@@ -392,10 +379,7 @@ class Stack(repops.MultiOpRep):
     def __init__(self, *sources, **kwargs):
         repops.MultiOpRep.__init__(self,sources, **kwargs)
 
-    def _process(self, sources, dim=None):
-        if not all([s._slicesKnown() for s in sources]):
-            return
-
+    def _sprocess(self, sources, dim=None):
         slicelens = set([len(source._slices) for source in sources])
         assert len(slicelens) == 1, "Sources of stack should have same number of slices"
         nslice = slicelens.pop()
@@ -442,10 +426,7 @@ class Intersect(repops.MultiOpRep):
     def __init__(self, *sources, **kwargs):
         repops.MultiOpRep.__init__(self,sources, **kwargs)
 
-    def _process(self, sources, dim=None):
-        if not all([s._slicesKnown() for s in sources]):
-            return
-
+    def _sprocess(self, sources, dim=None):
         slicelens = set([len(source._slices) for source in sources])
         assert len(slicelens) == 1, "Sources of stack should have same number of slices"
         nslice = slicelens.pop()

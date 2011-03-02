@@ -10,29 +10,20 @@ _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"itypes","rtypes","dimpaths","casts")
 
 class ProjectDim(repops.UnaryOpRep):
-    def _process(self, source, name):
-        if not source._slicesKnown():
-            return
-        
+    def _sprocess(self, source, name):
         nslices = [slice for slice in source._slices if slice.dims.hasName(name)]
         assert nslices,  "Cannot find matching slices for dimension: " + str(name)
         self._initialize(tuple(nslices))
 
 class ProjectBookmark(repops.UnaryOpRep):
-    def _process(self, source, name):
-        if not source._slicesKnown():
-            return
-       
+    def _sprocess(self, source, name):
         nslices = [slice for slice in source._slices if name in slice.bookmarks]
         assert nslices,  "Cannot find matching slices for bookmark: " + str(name)
         self._initialize(tuple(nslices))
 
 
 class To(repops.UnaryOpRep):
-    def _process(self, source, *slicesel, **kwargs):
-        if not source._slicesKnown():
-           return
-        
+    def _sprocess(self, source, *slicesel, **kwargs):
         do = kwargs.pop("Do")
         assert not kwargs, "Unknown parameters: " + str(kwargs)
 
@@ -68,10 +59,7 @@ class Project(repops.UnaryOpRep):
                 nslices.extend(elem)
         return nslices
 
-    def _process(self, source, *args, **kwds):
-        if not source._slicesKnown():
-            return
-
+    def _sprocess(self, source, *args, **kwds):
         cur_slices = self._source._slices
         
         nslices = []
@@ -136,10 +124,7 @@ class Project(repops.UnaryOpRep):
     
 
 class Unproject(Project):
-    def _process(self, source, *args, **kwds):
-        if not source._slicesKnown():
-            return
-
+    def _sprocess(self, source, *args, **kwds):
         selslices = Project(source, *args, **kwds)._slices
         nslices = [slice for slice in source._slices if not slice in selslices]
         return self._initialize(tuple(nslices)) 
@@ -191,10 +176,7 @@ def unpack_tuple(slice,name="",unpack=True):
     return nslices
 
 class Bookmark(repops.UnaryOpRep):
-    def _process(self, source, *names, **kwds): #{{{
-        if not source._slicesKnown():
-            return
-        
+    def _sprocess(self, source, *names, **kwds): #{{{
         nslices = source._slices
         if(len(names) == 1):
             nslices = [ops.ChangeBookmarkOp(slice,names[0]) for slice in nslices]
@@ -220,10 +202,7 @@ class Bookmark(repops.UnaryOpRep):
 
 
 class SliceRename(repops.UnaryOpRep):
-    def _process(self, source, *names, **kwds): #{{{
-        if not source._slicesKnown():
-            return
-            
+    def _sprocess(self, source, *names, **kwds): #{{{
         if(names):
             assert (len(names) == len(source._slices)), \
                 "Number of new slice names does not match number of slices"
@@ -271,10 +250,7 @@ class SliceCast(repops.UnaryOpRep):
 
 class Tuple(repops.UnaryOpRep):
     _ocls = ops.PackTupleOp
-    def _process(self, source, **kwargs):
-        if not source._slicesKnown():
-            return
-        
+    def _sprocess(self, source, **kwargs):
         nslice = self._apply(source._slices, **kwargs)
         #initialize object attributes
         return self._initialize((nslice,))
