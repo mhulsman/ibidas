@@ -11,26 +11,26 @@ _delay_import_(globals(),"itypes","rtypes","dimpaths","casts")
 
 class ProjectDim(repops.UnaryOpRep):
     def _process(self, source, name):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         
         nslices = [slice for slice in source._slices if slice.dims.hasName(name)]
         assert nslices,  "Cannot find matching slices for dimension: " + str(name)
-        self._initialize(tuple(nslices),RS_CHECK)
+        self._initialize(tuple(nslices))
 
 class ProjectBookmark(repops.UnaryOpRep):
     def _process(self, source, name):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
        
         nslices = [slice for slice in source._slices if name in slice.bookmarks]
         assert nslices,  "Cannot find matching slices for bookmark: " + str(name)
-        self._initialize(tuple(nslices),RS_CHECK)
+        self._initialize(tuple(nslices))
 
 
 class To(repops.UnaryOpRep):
     def _process(self, source, *slicesel, **kwargs):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
            return
         
         do = kwargs.pop("Do")
@@ -51,7 +51,7 @@ class To(repops.UnaryOpRep):
 
             nslices = nslices[:pos] + list(r._slices) + nslices[(pos+1):]
 
-        self._initialize(tuple(nslices),RS_CHECK)
+        self._initialize(tuple(nslices))
        
 
 class Project(repops.UnaryOpRep):
@@ -69,7 +69,7 @@ class Project(repops.UnaryOpRep):
         return nslices
 
     def _process(self, source, *args, **kwds):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
 
         cur_slices = self._source._slices
@@ -121,7 +121,7 @@ class Project(repops.UnaryOpRep):
         
         for name,elem in self._project_sources:
             if(isinstance(elem, representor.Representor)):
-                if not elem._state & RS_SLICES_KNOWN:
+                if not elem._slicesKnown():
                     return 
                 elem = [slice for slice in elem._slices]
 
@@ -132,21 +132,17 @@ class Project(repops.UnaryOpRep):
                 nslices.extend(elem)
         assert nslices, "No slices found with: " + str(args) + " and " + str(kwds)
         
-        if(any([s.type == rtypes.unknown for s in nslices])):
-            state = RS_SLICES_KNOWN
-        else:
-            state = RS_ALL_KNOWN
-        return self._initialize(tuple(nslices),state) 
+        return self._initialize(tuple(nslices)) 
     
 
 class Unproject(Project):
     def _process(self, source, *args, **kwds):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
 
         selslices = Project(source, *args, **kwds)._slices
         nslices = [slice for slice in source._slices if not slice in selslices]
-        return self._initialize(tuple(nslices),source._state) 
+        return self._initialize(tuple(nslices)) 
 
 
 
@@ -159,14 +155,14 @@ class UnpackTuple(repops.UnaryOpRep):
         name: (Optional) if given, unpack only fields with this name
                 if not given, unpack all fields from tuple.
         """
-        if not source._state & RS_TYPES_KNOWN:
+        if not source._typesKnown():
             return
 
         assert len(source._slices) == 1, \
                 "Unpacking tuples can only be done on single slices"
         slice = source._slices[0]
         nslices = unpack_tuple(slice,name,unpack)
-        return self._initialize(tuple(nslices), RS_CHECK)
+        return self._initialize(tuple(nslices))
    
 def unpack_tuple(slice,name="",unpack=True):
     if(not isinstance(slice.type, rtypes.TypeTuple)):
@@ -196,7 +192,7 @@ def unpack_tuple(slice,name="",unpack=True):
 
 class Bookmark(repops.UnaryOpRep):
     def _process(self, source, *names, **kwds): #{{{
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         
         nslices = source._slices
@@ -219,13 +215,13 @@ class Bookmark(repops.UnaryOpRep):
                 nnslices.append(nslice)
             nslices = nnslices
                 
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
         #}}}
 
 
 class SliceRename(repops.UnaryOpRep):
     def _process(self, source, *names, **kwds): #{{{
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
             
         if(names):
@@ -242,12 +238,12 @@ class SliceRename(repops.UnaryOpRep):
                     nslice = slice
                 nslices.append(nslice)
                 
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
         #}}}
 
 class SliceCast(repops.UnaryOpRep):
     def _process(self, source, *newtypes, **kwds): #{{{
-        if not source._state & RS_TYPES_KNOWN:
+        if not source._typesKnown():
             return
             
         if(newtypes):
@@ -269,19 +265,19 @@ class SliceCast(repops.UnaryOpRep):
                     nslice = slice
                 nslices.append(nslice)
                 
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
         #}}}
 
 
 class Tuple(repops.UnaryOpRep):
     _ocls = ops.PackTupleOp
     def _process(self, source, **kwargs):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         
         nslice = self._apply(source._slices, **kwargs)
         #initialize object attributes
-        return self._initialize((nslice,),RS_ALL_KNOWN)
+        return self._initialize((nslice,))
 
     @classmethod
     def _apply(cls, slices, to_python=False, **kwargs):
@@ -304,7 +300,7 @@ class Dict(Tuple):
 
 class HArray(repops.UnaryOpRep):
     def _process(self, source, name=None):
-        if not source._state & RS_TYPES_KNOWN:
+        if not source._typesKnown():
             return
         
         #commonify dimensions
@@ -328,13 +324,13 @@ class HArray(repops.UnaryOpRep):
         nslice = ops.UnpackArrayOp(nslice)
 
         #initialize object attributes
-        return self._initialize((nslice,),RS_ALL_KNOWN)
+        return self._initialize((nslice,))
 
 
 
 class ToPythonRep(repops.UnaryOpRep):
     def _process(self, source):
-        if not source._state & RS_TYPES_KNOWN:
+        if not source._typesKnown():
             return
 
         nslices = []
@@ -351,7 +347,7 @@ class ToPythonRep(repops.UnaryOpRep):
         while(nslice.dims):
             nslice = ops.PackListOp(nslice)
 
-        return self._initialize((nslice,), RS_ALL_KNOWN)
+        return self._initialize((nslice,))
 
 
 

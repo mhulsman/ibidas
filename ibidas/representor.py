@@ -35,28 +35,30 @@ class Representor(Node):
     _state = 0                 #default value
     _slices = []               #default value
 
-    def _initialize(self, slices, state=RS_ALL_KNOWN):
+    def _initialize(self, slices):
         assert isinstance(slices, tuple), "slices should be a tuple"
         self._slices = slices
 
-        if(state == RS_CHECK):
-            if(slices):
-                state |= RS_SLICES_KNOWN
-            if(all([slice.type != rtypes.unknown for slice in slices])):
-                state |= RS_TYPES_KNOWN
-            state &= ~RS_CHECK
-        self._state = state
-        
-    def _checkState(self,filter=RS_SLICES_KNOWN):
-        if(not ((self._state & filter) == filter)):
-            slices = self._getResultSlices(endpoint=False)
-            self._initialize(slices,state=RS_ALL_KNOWN | RS_INFERRED)
+    def _typesKnown(self):
+        return isinstance(self._slices, tuple) and not any([slice.type == rtypes.unknown for slice in self._slices])
+
+    def _slicesKnown(self):
+        return isinstance(self._slices,tuple)
+
+    def _checkState(self,check_type=False):
+        if(check_type is True):
+            found = self._typesKnown()
+        else:
+            found = self._slicesKnown()
+
+        if(not found):
+            self._initialize(self._getResultSlices(endpoint=False))
 
     def Show(self,table_length=100):
         print self.__str__(table_length=table_length)
 
     def __str__(self, print_data=True, table_length=15):
-        self._checkState(filter=RS_SLICES_KNOWN)
+        self._checkState()
         
         names = ["Slices:"] + [s.name for s in self._slices]
         types = ["Type:"] + [str(s.type) for s in self._slices]
@@ -219,7 +221,7 @@ class Representor(Node):
         raise AttributeError("No attribute with name: " + name + " found")
 
     def _getAttributeNames(self):
-        if not self._state & RS_SLICES_KNOWN:
+        if not self._slicesKnown():
             return []
         else:
             #print ""
@@ -228,7 +230,7 @@ class Representor(Node):
 
     def Copy(self):
         res = wrapper.SourceRepresentor()
-        res._initialize(tuple(self._getResultSlices(endpoint=False)),state=RS_CHECK)
+        res._initialize(tuple(self._getResultSlices(endpoint=False)))
         return res
 
    
@@ -237,7 +239,7 @@ class Representor(Node):
         slices = self._getResultSlices(endpoint=False)
         for slice in slices:
             slice.source = None
-        return (python.PyRepresentor, (slices, self._state))
+        return (python.PyRepresentor, (slices,))
 
     def __copy__(self):
         nself = Representor()
@@ -514,7 +516,7 @@ class Representor(Node):
         return repops_funcs.Negative(self)
 
     def __nonzero__(self):
-        self._checkState(filter=RS_SLICES_KNOWN)
+        self._checkState()
 
         if(len(self._slices) != 1):
             raise RuntimeError, "Cannot determine True/False status of a multi-slice representor"

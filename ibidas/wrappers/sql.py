@@ -455,7 +455,7 @@ class CombineRepresentor(wrapper.SourceRepresentor):#{{{
             if row['packdepth']:
                 res_slice = ops.UnpackArrayOp(res_slice, row['packdepth'])
             nslices.append(res_slice)
-        self._initialize(tuple(nslices),RS_ALL_KNOWN)#}}}
+        self._initialize(tuple(nslices))#}}}
 
 class TableRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, table):
@@ -468,7 +468,7 @@ class TableRepresentor(wrapper.SourceRepresentor):#{{{
                 slice = ops.NoneToMissingOp(slice)
             nnslices.append(slice)
                 
-        self._initialize(tuple(nnslices),RS_ALL_KNOWN)#}}}
+        self._initialize(tuple(nnslices))#}}}
 
 class QueryRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, query):
@@ -485,7 +485,7 @@ class QueryRepresentor(wrapper.SourceRepresentor):#{{{
             if slice.type.has_missing:
                 slice = ops.NoneToMissingOp(slice)
             nnslices.append(slice)
-        self._initialize(tuple(nnslices),RS_ALL_KNOWN)#}}}
+        self._initialize(tuple(nnslices))#}}}
 
 class SQLResultEdge(query_graph.Edge):#{{{
     __slots__ = ["realedge","pos"]

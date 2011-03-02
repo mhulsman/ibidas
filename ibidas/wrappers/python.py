@@ -24,8 +24,8 @@ _delay_import_(globals(),"..utils.missing","Missing")
 
 
 class PyRepresentor(wrapper.SourceRepresentor):
-    def __init__(self, slices, state):
-        self._initialize(slices, state)
+    def __init__(self, slices):
+        self._initialize(slices)
 
 def Rep(data=None, dtype=None, unpack=True, name=None):
     """Packs python data structures into a :py:class:`ibidas.representor.Representor` object.

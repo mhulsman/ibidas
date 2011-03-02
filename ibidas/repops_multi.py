@@ -14,14 +14,13 @@ _delay_import_(globals(),"repops_slice")
 
 class Broadcast(repops.MultiOpRep):
     def _process(self,sources, mode="dim"):
-        state = reduce(operator.__and__,[source._state for source in sources])
-        if not state & RS_SLICES_KNOWN:
+        if not all([source._slicesKnown() for source in sources]):
             return
 
         nslices = []
         for bcslices in util.zip_broadcast(*[source._slices for source in sources]):
             nslices.extend(ops.broadcast(bcslices,mode)[0])
-        return self._initialize(tuple(nslices),state)
+        return self._initialize(tuple(nslices))
 
 
 class Nest(repops.MultiOpRep):
@@ -29,8 +28,7 @@ class Nest(repops.MultiOpRep):
         repops.MultiOpRep.__init__(self,(lsource,rsource),dim=dim)
     def _process(self, sources, dim=None):
         assert len(sources) == 2, "Nest expects two representor objects"
-        state = reduce(operator.__and__,[source._state for source in sources])
-        if not state & RS_SLICES_KNOWN:
+        if not all([source._slicesKnown() for source in sources]):
             return
         lsource,rsource = sources
         
@@ -58,17 +56,16 @@ class Nest(repops.MultiOpRep):
                 slice = ops.InsertDimOp(slice,dimpos,idims[dimpos])
             slice = ops.BroadcastOp(slice,references,plan,joinpath + odims)
             nslices.append(slice)
-        return self._initialize(tuple(nslices), state)
+        return self._initialize(tuple(nslices))
 
 class Combine(repops.MultiOpRep):
     def __init__(self, *sources):
         repops.MultiOpRep.__init__(self, sources)
     def _process(self,sources):
-        state = reduce(operator.__and__,[source._state for source in sources])
-        if not state & RS_SLICES_KNOWN:
+        if not all([source._slicesKnown() for source in sources]):
             return
         nslices = self._apply(*[source._slices for source in sources])
-        return self._initialize(nslices,state)
+        return self._initialize(nslices)
 
     @classmethod
     def _apply(cls, *xslicelists):
@@ -86,7 +83,7 @@ class Group(repops.MultiOpRep):
 
     def _process(self,sources, flat):
         source, gsource = sources 
-        if not source._state & RS_SLICES_KNOWN or not gsource._state & RS_TYPES_KNOWN:
+        if not source._slicesKnown() or not gsource._typesKnown():
             return
 
         gslices = [ops.ensure_frozen(slice) for slice in gsource._slices]
@@ -161,7 +158,7 @@ class Group(repops.MultiOpRep):
             for p,fslice in zip(pos,fslices):
                 nslices[p] = fslice
             
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
 
 
 class Filter(repops.MultiOpRep):
@@ -172,9 +169,7 @@ class Filter(repops.MultiOpRep):
 
     def _process(self,sources,dim):
         source,constraint = sources
-        if not source._state & RS_SLICES_KNOWN:
-            return
-        if not constraint._state & RS_TYPES_KNOWN:
+        if not source._slicesKnown() or not constraint._typesKnown():
             return
         assert len(constraint._slices) == 1, "Filter constraint should have 1 slice"
         cslice = constraint._slices[0]
@@ -189,7 +184,7 @@ class Filter(repops.MultiOpRep):
 
         nslices = self._apply(source._slices,cslice,seldimpath,mode)
 
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
 
     @classmethod
     def _apply(cls,fslices,cslice,seldimpath, bcmode):
@@ -233,7 +228,7 @@ class Sort(repops.MultiOpRep):
             repops.MultiOpRep.__init__(self,(source,constraint),descend=descend)
 
     def _process(self, sources, descend):
-        if not any([s._state & RS_SLICES_KNOWN for s in sources]):
+        if not all([s._slicesKnown() for s in sources]):
             return
 
         if(len(sources) == 1): #no explicit constraint, use data itself
@@ -252,7 +247,7 @@ class Sort(repops.MultiOpRep):
         constraint = repops_funcs.Argsort(constraint, descend=descend)
         cslice = ops.PackArrayOp(constraint._slices[0])
         nslices = Filter._apply(source._slices, cslice, cslice.type.dims[:1],"dim")
-        return self._initialize(tuple(nslices),source._state & constraint._state)
+        return self._initialize(tuple(nslices))
 
 
 class Unique(repops.MultiOpRep):
@@ -265,7 +260,7 @@ class Unique(repops.MultiOpRep):
             repops.MultiOpRep.__init__(self,(source,constraint),descend=descend)
 
     def _process(self, sources, descend):
-        if not any([s._state & RS_SLICES_KNOWN for s in sources]):
+        if not all([s._slicesKnown() for s in sources]):
             return
 
         if(len(sources) == 1): #no explicit constraint, use data itself
@@ -285,7 +280,7 @@ class Unique(repops.MultiOpRep):
         uconstraint = repops_funcs.Argunique(constraint)
         cslice = uconstraint._slices[0]
         nslices = Filter._apply(source._slices, cslice, dpath[-1:],"dim")
-        return self._initialize(tuple(nslices),source._state & constraint._state)
+        return self._initialize(tuple(nslices))
 
 
 class Join(repops.MultiOpRep):
@@ -297,8 +292,7 @@ class Join(repops.MultiOpRep):
 
     def _process(self, sources):
         lsource, rsource, constraint = sources
-        if not lsource._state & RS_SLICES_KNOWN or not rsource._state & RS_SLICES_KNOWN \
-           or not constraint._state & RS_TYPES_KNOWN:
+        if not lsource._slicesKnown() or not rsource._slicesKnown() or not constraint._typesKnown():
             return
         
         ldims = dimpaths.createDimSet([s.dims for s in lsource._slices])
@@ -338,7 +332,7 @@ class Join(repops.MultiOpRep):
             nslices = Combine._apply(rslices,lslices)
         else:
             nslices = Combine._apply(lslices,rslices)
-        return self._initialize(tuple(nslices),lsource._state & rsource._state)
+        return self._initialize(tuple(nslices))
 
 
 class Match(repops.MultiOpRep):
@@ -355,7 +349,7 @@ class Match(repops.MultiOpRep):
 
     def _process(self, sources, jointype):
         lsource, rsource, lslice,rslice = sources
-        if not lsource._state & RS_SLICES_KNOWN or not rsource._state & RS_SLICES_KNOWN:
+        if not lsource._slicesKnown() or not rsource._slicesKnown():
             return
         if(lslice is None):
             if(rslice is None):
@@ -373,7 +367,7 @@ class Match(repops.MultiOpRep):
         assert len(lslice._slices) == 1, "lslice parameter in match should have only one slice"
 
         self._sources = (lsource, rsource, lslice, rslice)
-        if not lslice._state & RS_TYPES_KNOWN or not rslice._state & RS_TYPES_KNOWN:
+        if not lslice._typesKnown() or not rslice._typesKnown():
             return
         
         lslice = lslice._slices[0]
@@ -391,7 +385,7 @@ class Match(repops.MultiOpRep):
 
 
         nslices = Combine._apply(lslices,rslices)
-        return self._initialize(tuple(nslices),lsource._state & rsource._state)
+        return self._initialize(tuple(nslices))
 
 
 class Stack(repops.MultiOpRep):
@@ -399,8 +393,7 @@ class Stack(repops.MultiOpRep):
         repops.MultiOpRep.__init__(self,sources, **kwargs)
 
     def _process(self, sources, dim=None):
-        state = reduce(operator.__and__,[source._state for source in sources])
-        if not state & RS_SLICES_KNOWN:
+        if not all([s._slicesKnown() for s in sources]):
             return
 
         slicelens = set([len(source._slices) for source in sources])
@@ -438,7 +431,7 @@ class Stack(repops.MultiOpRep):
                 res = ops.ChangeDimOp(res, len(res.dims) - dimdepth, ndim)
             nslices.append(res)
 
-        return self._initialize(tuple(nslices),RS_CHECK)
+        return self._initialize(tuple(nslices))
 
 
 
@@ -450,8 +443,7 @@ class Intersect(repops.MultiOpRep):
         repops.MultiOpRep.__init__(self,sources, **kwargs)
 
     def _process(self, sources, dim=None):
-        state = reduce(operator.__and__,[source._state for source in sources])
-        if not state & RS_SLICES_KNOWN:
+        if not all([s._slicesKnown() for s in sources]):
             return
 
         slicelens = set([len(source._slices) for source in sources])
@@ -498,7 +490,7 @@ class Intersect(repops.MultiOpRep):
                 pslice = ops.UnpackArrayOp(pslice, mpd)
             nslices.append(pslice)
 
-        return self._initialize(tuple(nslices),RS_CHECK)
+        return self._initialize(tuple(nslices))
 
 class Union(Intersect):
     opercls = repops_funcs.Or

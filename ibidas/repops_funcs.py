@@ -24,13 +24,6 @@ class Param(object):
         self.type = type
         self.default = default
 
-    def getStateMask(self):
-        if(self.type == rtypes.unknown):
-            return RS_SLICES_KNOWN
-        else:
-            return RS_ALL_KNOWN
-    state_mask = property(fget=getStateMask)
-
     def __str__(self):
        if(self.type is None):
            res = self.name
@@ -124,19 +117,17 @@ class UnaryFuncOp(repops.UnaryOpRep, Func):
 
 class UnaryFuncElemOp(UnaryFuncOp):
     def _process(self, source, **kwargs):
-        state = source._state
-        if not state & RS_TYPES_KNOWN:
+        if not source._typesKnown():
             return
 
         nslices = []
         for slice in source._slices:
             slice = self._prepareSlice(slice)
             sig, nkwargs, outparam = self._findSignature(slice=slice,**kwargs)
-            state &= outparam.state_mask
             s = ops.UnaryFuncElemOp(self.__class__.__name__, sig, outparam, **nkwargs)
             s = self._finishSlice(s)
             nslices.append(s)
-        return self._initialize(tuple(nslices),state)
+        return self._initialize(tuple(nslices))
 
     def _prepareSlice(self,slice):
         return slice
@@ -148,14 +139,13 @@ class UnaryFuncDimOp(UnaryFuncOp):
     _slicecls = ops.UnaryFuncSeqOp
 
     def _process(self, source, dim=None, **kwargs):
-        state = source._state
-        if not state & RS_TYPES_KNOWN:
+        if not source._typesKnown():
             return
-        nslices,state = self._apply(source._slices, dim, source._state, **kwargs)
-        return self._initialize(tuple(nslices),state)
+        nslices = self._apply(source._slices, dim, **kwargs)
+        return self._initialize(tuple(nslices))
 
     @classmethod
-    def _apply(cls, xslices, dim, state=None, **kwargs):
+    def _apply(cls, xslices, dim,  **kwargs):
         nslices = []
         found = False
         for slice in xslices:
@@ -167,8 +157,6 @@ class UnaryFuncDimOp(UnaryFuncOp):
             for lastpos in lastposs:
                 packdepth = len(slice.dims) - lastpos
                 sig, nkwargs, outparam = cls._findSignature(slice=slice, packdepth=packdepth, **kwargs)
-                if state:
-                    state &= outparam.state_mask
                 slice = cls._slicecls(cls.__name__, sig, outparam, **nkwargs)
             if(lastposs):
                 slice = cls._finishSlice(slice)
@@ -177,10 +165,7 @@ class UnaryFuncDimOp(UnaryFuncOp):
         if(not found):
             raise RuntimeError, "No slice with dims to apply " + cls.__name__
         
-        if state:
-            return nslices, state      
-        else:
-            return nslices
+        return nslices
 
     @classmethod 
     def _prepareSlice(self,slice):
@@ -205,8 +190,7 @@ class BinaryFuncElemOp(BinaryFuncOp):
     _allow_partial_bc = True
     def _process(self, sources, **kwargs):
         lsource,rsource = sources
-        state = lsource._state & rsource._state
-        if not state & RS_TYPES_KNOWN:
+        if not lsource._typesKnown() or not rsource._typesKnown():
             return
 
         if(isinstance(lsource,repops.PlusPrefix) or isinstance(rsource,repops.PlusPrefix)):
@@ -221,7 +205,7 @@ class BinaryFuncElemOp(BinaryFuncOp):
                 pos = None
             nslices.append(self._apply(binslices, mode, pos, **kwargs))
 
-        return self._initialize(tuple(nslices),RS_CHECK)
+        return self._initialize(tuple(nslices))
 
     @classmethod
     def _apply(cls, binslices, mode, pos=None, **kwargs):

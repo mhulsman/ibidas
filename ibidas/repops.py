@@ -62,9 +62,9 @@ class UnaryOpRep(representor.Representor):
         self._process(source,*args, **kwds)
 
     def _process(self, source):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
-        return self._initialize(source._slices, source._state)
+        return self._initialize(source._slices)
     
 class MultiOpRep(representor.Representor):
     def __init__(self, sources, *args,**kwds):
@@ -83,10 +83,10 @@ class Fixate(UnaryOpRep):#{{{
     is handled correctly."""
 
     def _process(self, source):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         nslice = ops.FixateOp(source._slices)
-        self._initialize((nslice,), RS_SLICES_KNOWN)
+        self._initialize((nslice,))
     #}}}
 
 class Gather(Fixate):#{{{
@@ -94,10 +94,10 @@ class Gather(Fixate):#{{{
     such that there are no exception situations, and slice retrieval
     is handled correctly."""
     def _process(self, source):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         nslice = ops.GatherOp(source._slices)
-        self._initialize((nslice,), RS_SLICES_KNOWN)#}}}
+        self._initialize((nslice,))#}}}
 
 class PlusPrefix(UnaryOpRep):#{{{
     pass
@@ -110,7 +110,7 @@ class ApplyFuncRep(UnaryOpRep):
     """
 
     def _process(self,source,func,*params,**kwds):
-        if not source._state & RS_ALL_KNOWN:
+        if not source._slicesKnown():
             return
         nslices = func(source._slices, *params, **kwds)
         return self._initialize(nslices)

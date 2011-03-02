@@ -13,7 +13,7 @@ class UnpackArray(repops.UnaryOpRep):
         :param source: source with active slices which should be unpacked
         :param name: (Optional) name of dimension to unpack. If not given,  unpack all.
         """
-        if not source._state & RS_TYPES_KNOWN:
+        if not source._typesKnown():
             return
 
         nslices = []                       #new active slices
@@ -28,11 +28,11 @@ class UnpackArray(repops.UnaryOpRep):
                     slice = ops.UnpackArrayOp(slice,ndim=ndim)
             nslices.append(slice)
 
-        return self._initialize(tuple(nslices),RS_CHECK)
+        return self._initialize(tuple(nslices))
 
 class DimRename(repops.UnaryOpRep):#{{{
     def _process(self, source, *names, **kwds):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         if(names):
             unique_dimpath = util.unique(sum([slice.dims for slice in source._slices],dimpaths.DimPath())) 
@@ -46,12 +46,12 @@ class DimRename(repops.UnaryOpRep):#{{{
         
         nslices = [ops.ChangeDimPathOp(slice, slice.dims.changeNames(kwds))
                                                     for slice in source._slices]
-        return self._initialize(tuple(nslices),source._state)#}}}
+        return self._initialize(tuple(nslices))#}}}
 
 
 class Shape(repops.UnaryOpRep):
     def _process(self,source):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
 
         dimnames = set()
@@ -63,12 +63,12 @@ class Shape(repops.UnaryOpRep):
                 nslice = ops.ShapeOp(slice,pos)
                 nslices.append(nslice)
                 dimnames.add(dim.name)
-        return self._initialize(tuple(nslices),RS_SLICES_KNOWN)
+        return self._initialize(tuple(nslices))
        
 
 class InsertDim(repops.UnaryOpRep):
     def _process(self, source, insertpoint, name=None):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         
         assert len(dimpaths.uniqueDimPath([s.dims for s in source._slices],only_complete=False)) >= insertpoint, "No unique dimpath covering dim insertion point"
@@ -77,11 +77,11 @@ class InsertDim(repops.UnaryOpRep):
         for slice in source._slices:
             slice = ops.InsertDimOp(slice,insertpoint,ndim)
             nslices.append(slice)
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
 
 class SplitDim(repops.UnaryOpRep):
     def _process(self,source,lshape,rshape,lname=None,rname=None,dimsel=None):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
 
         selpath = dimpaths.identifyUniqueDimPathSource(source,dimsel)
@@ -103,12 +103,12 @@ class SplitDim(repops.UnaryOpRep):
                 slice = ops.SplitDimOp(slice,lastpos,lshape,rshape,ldim,rdim)
             nslices.append(slice)
             
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
 
 
 class PermuteDims(repops.UnaryOpRep):
     def _process(self, source, permute_idxs):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         
         cpath = dimpaths.commonDimPath([s.dims for s in source._slices])
@@ -123,12 +123,12 @@ class PermuteDims(repops.UnaryOpRep):
             pidx = list(permute_idxs) + range(max(permute_idxs) + 1, len(slice.dims))
             slice = ops.PermuteDimsOp(slice,pidx)
             nslices.append(slice)
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
 
 
 class Array(repops.UnaryOpRep):
     def _process(self, source, tolevel=None):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
     
         if tolevel is None:
@@ -141,12 +141,12 @@ class Array(repops.UnaryOpRep):
                 else:
                     nslices.append(slice)
 
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
 
 
 class Level(repops.UnaryOpRep):
     def _process(self, source, tolevel=1):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
 
         nslices = []
@@ -161,12 +161,12 @@ class Level(repops.UnaryOpRep):
             assert len(upaths) >= tolevel, "Level can only be executed on slices with similar root dimensions"
         
         nslices,plan = ops.broadcast(nslices, mode="dim")
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
 
 
 class FlatAll(repops.UnaryOpRep):
     def _process(self,source,name=None):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         nslices = ops.broadcast(source._slices,mode="dim")[0]
         dims = nslices[0].dims
@@ -187,17 +187,17 @@ class FlatAll(repops.UnaryOpRep):
         for slice in nslices:
             nnslices.append(ops.FlatAllOp(slice, ndim))
 
-        return self._initialize(tuple(nnslices),source._state)
+        return self._initialize(tuple(nnslices))
 
 class Flat(repops.UnaryOpRep):
     def _process(self,source,name=None,dim=-1):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
         nslices = self._apply(source._slices, selpath, name)
 
-        return self._initialize(tuple(nslices),source._state)
+        return self._initialize(tuple(nslices))
 
     @classmethod
     def _apply(cls, fslices, selpath, name=None):
@@ -246,7 +246,7 @@ class Flat(repops.UnaryOpRep):
 
 class GroupIndex(repops.UnaryOpRep):
     def _process(self, source):
-        if not source._state & RS_SLICES_KNOWN:
+        if not source._slicesKnown():
             return
         
         nslices = [ops.ensure_frozen(slice) for slice in source._slices]
@@ -255,7 +255,7 @@ class GroupIndex(repops.UnaryOpRep):
 
         nslice = ops.GroupIndexOp(nslices)
         nslice = ops.UnpackArrayOp(nslice, len(nslices))
-        return self._initialize((nslice,),RS_ALL_KNOWN)
+        return self._initialize((nslice,))
 
 
 

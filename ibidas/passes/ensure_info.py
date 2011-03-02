@@ -14,8 +14,8 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
     @classmethod
     def run(cls, query, run_manager):
         query_root = query.root
-        if(not query_root._state & RS_SLICES_KNOWN):
-            while(not query_root._state & RS_SLICES_KNOWN):
+        if(not query_root._slicesKnown()):
+            while(not query_root._slicesKnown()):
                 self = cls()
                 self.copied_nodes = dict()
                 first_known_nodes = self.findFirstKnown(query_root)
@@ -33,19 +33,19 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
         return query.root
 
     def findFirstKnownRepresentor(self,node):
-        if(node._state & RS_SLICES_KNOWN):
+        if node._slicesKnown():
             return (node,)
         else:
             raise RuntimeError, "Cannot find known slices for " + str(type(node))
 
     def findFirstKnownUnaryOpRep(self,node):
-        if(node._state & RS_SLICES_KNOWN):
+        if node._slicesKnown():
             return (node,)
         else:
             return self.findFirstKnown(node._source)
     
     def findFirstKnownProject(self,node):
-        if(node._state & RS_SLICES_KNOWN):
+        if node._slicesKnown():
             return (node,)
         else:
             x = list(self.findFirstKnown(node._source))
@@ -56,7 +56,7 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
             return tuple(x)
    
     def findFirstKnownMultiOpRep(self,node):
-        if(node._state & RS_SLICES_KNOWN):
+        if node._slicesKnown():
             return (node,)
         else:
             return sum([self.findFirstKnown(source) for source in node._sources],())
@@ -67,16 +67,16 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
         return self.copied_nodes[id(node)]
 
     def processQueryRepresentor(self,node):
-        if(node._state & RS_SLICES_KNOWN):
+        if node._slicesKnown():
             assert id(node) in self.inferred_node_slices, "Cannot find node in inferred nodes map"
             nnode = self.getNodeCopy(node)
-            nnode._initialize(self.inferred_node_slices[id(node)],RS_ALL_KNOWN | RS_INFERRED)
+            nnode._initialize(self.inferred_node_slices[id(node)])
             return nnode
         else:
             raise RuntimeError, "Cannot find known slices for " + str(type(node))
 
     def processQueryUnaryOpRep(self,node):
-        if(node._state & RS_SLICES_KNOWN):
+        if node._slicesKnown():
             return self.processQueryRepresentor(node)
         else:
             nnode = self.getNodeCopy(node)
@@ -85,7 +85,7 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
             return nnode
     
     def processQueryProject(self,node):
-        if(node._state & RS_SLICES_KNOWN):
+        if node._slicesKnown():
             return self.processQueryRepresentor(node)
         else:
             nnode = self.getNodeCopy(node)
@@ -101,7 +101,7 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
             return nnode
    
     def processQueryMultiOpRep(self,node):
-        if(node._state & RS_SLICES_KNOWN):
+        if node._slicesKnown():
             return self.processQueryRepresentor(node)
         else:
             nnode = self.getNodeCopy(node)
@@ -110,7 +110,7 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
             return nnode
 
     def processQueryMatch(self, node):
-        if(node._state & RS_SLICES_KNOWN):
+        if node._slicesKnown():
             return self.processQueryRepresentor(node)
         else:
             nnode = self.getNodeCopy(node)

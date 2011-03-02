@@ -109,12 +109,8 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         else:
             nslices = [slice]
  
-        if(any([slice.type == rtypes.unknown for slice in nslices])):
-            state = RS_SLICES_KNOWN
-        else:
-            state = RS_ALL_KNOWN
         file.close()
-        self._initialize(tuple(nslices),state)
+        self._initialize(tuple(nslices))
 
 
 class TSVOp(ops.ExtendOp):
