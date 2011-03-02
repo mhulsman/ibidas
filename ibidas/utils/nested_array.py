@@ -545,7 +545,6 @@ class NestedArray(object):
         repeats = [1] * len(self.idxs)
         for pos,repeat  in repeat_dict.iteritems():
             repeats[pos + 1] = repeat
-
         tilerepeats = []
         prev_repeat = False
         for pos,idx,repeat in zip(range(len(repeats)),nself.idxs,repeats):
@@ -626,7 +625,7 @@ class NestedArray(object):
         
         assert len(tilerepeats) == len(idx.shape), "Number of repeats does not match shape"
 
-        shapeok = [col == 1 for tr,col in zip(tilerepeats,idx.shape) if tr > 1]
+        shapeok = [col == 1 for tr,col in zip(tilerepeats,idx.shape) if tr != 1]
         if(not shapeok and not prevrepeat):#nothing to broadcast
             return
       

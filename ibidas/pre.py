@@ -15,7 +15,7 @@ class Pre(object):
             setattr(self,name,func)
 predefined_sources = Pre()
 
-
+############################# YEAST ######################################
 def yeast_feats():
     """Returns table of yeast genome features,
        from:  http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab
@@ -82,7 +82,6 @@ predefined_sources.register(yeast_kinome,name="yeast_kinome",category="yeast")
 def yeast_chipchip():
     url = "http://fraenkel.mit.edu/improved_map/orfs_by_factor.tar.gz"
     res = Unpack(Fetch(url))
-    util.debug_here()
     dirname = os.path.dirname(res[0])
     pval_names = ['none', 'p0.005', 'p0.001']
     max_pvals = [1.0, 0.005, 0.001]
@@ -97,25 +96,19 @@ def yeast_chipchip():
             for row in f:
                 res = row.split('\t')
                 results.append((res[0], res[1:-1]))
-            results = Rep(results)/("trans_name","target")
-            loaded_data.append(results.Flat().Get("*", Rep(mpval)/"pval", Rep(con)/"conservation").Level(1))
+            results = Rep(results).Flat()
+            results = results.Get(_.f0/"trans_name",_.f1/"target", Rep(mpval)/"pval", Rep(con)/"conservation").Level(1)
+            loaded_data.append(results)
     res = Stack(*loaded_data)%"chipchip"
 
-    #res.GroupBy((_.trans_name, _.target),flat=("trans_name","target"))
-    return res
-
+    #group on tf,target tuple, keeping trans_name and target flat
+    res = res.GroupBy((_.trans_name, _.target),flat=(_.trans_name, _.target))
+    #take min pval found, and max conservation
+    res = res.Get(_.trans_name, _.target, _.pval.Min(), _.conservation.Max())    
+    return res.Copy()
 predefined_sources.register(yeast_chipchip,name="chipchip_macisaac",category="yeast")  
         
         
-        
-
-
-def in_memory_db():
-    """Returns an empty in memory database"""
-    return Connect("sqlite:///:memory:");
-predefined_sources.register(in_memory_db)
-
-
 def yeastract(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"):
     """Downloads documented transcription factor regulation interactions from yeastract"""
     rtype = "[tftargets:*]<(trans_factor=bytes, target=bytes)"
@@ -123,6 +116,38 @@ def yeastract(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Do
     return res.Copy()
 predefined_sources.register(yeastract,category="yeast")
 
+################################ HUMAN ##################################
+
+def omim_genemap():
+    """The omim genemap data"""
+    rtype = """[omim:*]<(chr_map_entry_nr=bytes, month=bytes, day=bytes, year=bytes, location=bytes, gene_names=bytes, 
+                       gene_status=bytes[1], title=bytes, f8=bytes, mim=bytes, method=bytes, comments=bytes, f12=bytes, 
+                       disease1=bytes, disease2=bytes, disease3=bytes, mouse=bytes, reference=bytes)"""
+    
+    res = Read(Fetch("ftp://ftp.ncbi.nih.gov/repository/OMIM/genemap"),dtype=rtype)
+    
+    res = res.Get(HArray(_.disease1, _.disease2, _.disease3)[_ != " "]/"disease", "~")
+    splitfunc = lambda x: x.split(", ")
+    res = res.To(_.gene_names,  Do=_.Each(splitfunc, dtype="[symbols:~]<string").Elem()[_ != ""])
+    res = res.To(_.method,      Do=_.Each(splitfunc, dtype="[methods:~]<string").Elem()[_ != ""])
+    res = res.To(_.disease,     Do=_.Sum().Each(omim_disease_parse,"[diseases:~]<string").Elem()[_ != ""])
+    res = res.To(_.day, _.month, _.year, Do=_.Cast("int$"))
+    res = res.To(_.mim, Do=_.Cast("int"))
+
+    return res.Without(_.f8, _.f12, _.disease1, _.disease2, _.disease3).Copy()
+predefined_sources.register(omim_genemap, category="human")
+
+def omim_disease_parse(x):
+    x = x.replace('{','').replace('}','')
+    elems =  x.split('; ')
+    return [elem.split(', ')[0] for elem in elems]
+
+
+##################### GENERAL ################################
+def in_memory_db():
+    """Returns an empty in memory database"""
+    return Connect("sqlite:///:memory:");
+predefined_sources.register(in_memory_db)
 
 def string_interactions(dburl, species="Saccharomyces cerevisiae"):
     """Given a Postgres db with String data, specified in dburl, and a species, returns all interactions and their score.
@@ -148,29 +173,6 @@ def string_interactions(dburl, species="Saccharomyces cerevisiae"):
 predefined_sources.register(string_interactions)
 
 
-def omim_genemap():
-    """The omim genemap data"""
-    rtype = """[omim:*]<(chr_map_entry_nr=bytes, month=bytes, day=bytes, year=bytes, location=bytes, gene_names=bytes, 
-                       gene_status=bytes[1], title=bytes, f8=bytes, mim=bytes, method=bytes, comments=bytes, f12=bytes, 
-                       disease1=bytes, disease2=bytes, disease3=bytes, mouse=bytes, reference=bytes)"""
-    
-    res = Read(Fetch("ftp://ftp.ncbi.nih.gov/repository/OMIM/genemap"),dtype=rtype)
-    
-    res = res.Get(HArray(_.disease1, _.disease2, _.disease3)[_ != " "]/"disease", "~")
-    splitfunc = lambda x: x.split(", ")
-    res = res.To(_.gene_names,  Do=_.Each(splitfunc, dtype="[symbols:~]<string").Elem()[_ != ""])
-    res = res.To(_.method,      Do=_.Each(splitfunc, dtype="[methods:~]<string").Elem()[_ != ""])
-    res = res.To(_.disease,     Do=_.Sum().Each(omim_disease_parse,"[diseases:~]<string").Elem()[_ != ""])
-    res = res.To(_.day, _.month, _.year, Do=_.Cast("int$"))
-    res = res.To(_.mim, Do=_.Cast("int"))
-
-    return res.Without(_.f8, _.f12, _.disease1, _.disease2, _.disease3).Copy()
-predefined_sources.register(omim_genemap, category="human")
-
-def omim_disease_parse(x):
-    x = x.replace('{','').replace('}','')
-    elems =  x.split('; ')
-    return [elem.split(', ')[0] for elem in elems]
 
 
 def go_annotations(dburl, genus="Saccharomyces", species="cerevisiae"):
@@ -211,11 +213,31 @@ predefined_sources.register(get_kegg_pathways,name="pathways", category="kegg")
 
 def get_kegg_pathway(pathway):
     serv = kegg()
-    relations = Rep(serv.get_element_relations_by_pathway(pathway))
-    elements = Rep(serv.get_elements_by_pathway(pathway))
-    return Combine(elements,relations)
+    relations = Rep(serv.get_element_relations_by_pathway(pathway))%"relations"
+    elements = Rep(serv.get_elements_by_pathway(pathway))%"nodes"
+    pwdata = Combine(elements,relations)
+    
+    names = pwdata.names.Flat().Unique()()
+    name_info = []
+    while len(names) > 0:
+        xnames = names[:100]
+        names = names[100:]
+        res = serv.btit(" ".join(xnames))
+        for elem in res.split('\n'):
+            if(elem):
+                pos = elem.index(' ')
+                name_info.append((elem[:pos], elem[(pos+1):]))
+    res = (pwdata |Match(jointype="left")| Rep(name_info)/("names","info")).Without(_.R.names).Copy()
+    #info = res.Get((_.names, _.info)).Each(extract_info,dtype="bytes")/"info"
+    #res = res.Without(_.info).Get("*", info)
+    return res
+predefined_sources.register(get_kegg_pathway,name="pathway", category="kegg")
 
 
-    return Rep(serv.list_pathways(org))
-predefined_sources.register(get_kegg_pathways,name="pathways", category="kegg")
+def extract_info(vals):
+    names, info = vals
+    res = str(info).split('; ')[0]
+    if res == "--":
+        res = ""
+    return res
 

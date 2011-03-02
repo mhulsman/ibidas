@@ -1,3 +1,4 @@
+import numpy
 import xmlrpclib
 from ibidas.utils import util,cutils
 
@@ -33,6 +34,15 @@ class CyNetwork(object):
             if name is None:
                 name = "Network"
             self._networkid = self._server.createNetwork(name)
+
+
+    def _getServ(self):
+        return self._server
+    Direct = property(fget=_getServ)
+
+    def _getId(self):
+        return self._networkid
+    Id = property(fget=_getId)
 
     def AddNodes(self, rep, primary=0):
         assert isinstance(rep, representor.Representor), "Rep should be a representor object"
@@ -247,6 +257,21 @@ class CyNetwork(object):
     def __repr__(self):
         return "<CyNetwork " + str(self.Name) + ": " + str(self.NodeCount) + " nodes, " + str(self.EdgeCount) + " edges>"
       
+    def CreateDiscreteColorMap(self, elems, colormap=None):
+        import matplotlib.cm
+        import matplotlib.colors
+        if colormap is None:
+            colormap = matplotlib.cm.gist_rainbow
+        cconv = matplotlib.colors.ColorConverter()
+        z = set(elems)
+        res = {}
+
+        steps = numpy.linspace(0.0, 1.0, len(z))
+        colors = colormap(steps)
+        for elem, colorrow in zip(z, colors):
+            res[elem] = matplotlib.colors.rgb2hex(cconv.to_rgb(colorrow))
+
+        return res
 
 def parse(edgeid):
     split = edgeid.split(' (')

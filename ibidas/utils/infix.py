@@ -18,7 +18,7 @@ class Infix:
         kwargs.update(self.kwargs)
         params = self.params + params
         
-        if(isinstance(params[0],representor.Representor)):
+        if(params and isinstance(params[0],representor.Representor)):
             return self.function(*params, **kwargs)
         else:
             return Infix(self.function,params,kwargs)

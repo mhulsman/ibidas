@@ -284,8 +284,7 @@ class RPCConvertor(VisitorFactory(prefixes=("execConvert","fconvert"),flags=NF_E
                     seqres.append(func(elem))
         else:
             seqres = [func(elem) for elem in seq]
-        
-        seqres = cutils.darray(seqres,seq.dtype)
+        seqres=cutils.darray(seqres)
         return seqres 
     
 

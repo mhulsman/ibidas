@@ -132,6 +132,7 @@ class ResultOp(ops.DataOp):
         self.source = source
         self.bookmarks = source.bookmarks
         self.name = source.name
+        self.dims = source.dims
 
     def __repr__(self):
         res = "\nName: " + str(self.name) + ", Type:   " + str(self.type) + ", Dims: " + str(self.dims) 

@@ -357,7 +357,6 @@ class Match(repops.MultiOpRep):
         lsource, rsource, lslice,rslice = sources
         if not lsource._state & RS_SLICES_KNOWN or not rsource._state & RS_SLICES_KNOWN:
             return
-         
         if(lslice is None):
             if(rslice is None):
                 common_names = set(lsource.Names) & set(rsource.Names)
