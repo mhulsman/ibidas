@@ -618,6 +618,13 @@ class Representor(Node):
     def Match(self, other, lslice=None,rslice=None, jointype="inner"):
         return repops_multi.Match(self, other, lslice, rslice, jointype)
 
+    def Replace(self, slice, translator, fromslice=0, toslice=1):
+        return repops_multi.Replace(self, slice, translator, fromslice, toslice) 
+
+
+    def Merge(self, other):
+        return repops_funcs.Merge(self, other)
+
     def Rename(self, *names, **kwds):
         """Rename slices.
 
@@ -670,7 +677,6 @@ class Representor(Node):
 
     def Each(self, eachfunc, dtype=rtypes.unknown):
         return repops_funcs.Each(self, eachfunc=eachfunc, dtype=dtype)
-    
     
     def Pos(self, dim=None):
         return repops_funcs.Pos(self, dim)

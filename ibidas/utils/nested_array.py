@@ -339,7 +339,7 @@ class NestedArray(object):
                     nself.idxs.insert(matchpoint,lshape)
         return nself
 
-    def mergeDim(self, matchpoint):
+    def mergeDim(self, matchpoint, result_fixed):
         matchpoint += 1
         assert len(self.idxs) > (matchpoint + 1), "Nested array not nested that deep"
         nself = self.copy()
@@ -359,6 +359,8 @@ class NestedArray(object):
                 nlidx[...,0] = nlidx[...,-1] - diff
                 nself.idxs[matchpoint] = nlidx
                 nshape =  (oshape[0] * oshape[ridx],) + oshape[(ridx+1):]
+            for i in range(matchpoint + 1, nextpos):
+                nself.idxs[i] = nself.idxs[i] -1
             nextobj = nextobj.reshape(nshape)
             nself._set_obj(nextpos,nextobj)
         else:
@@ -375,7 +377,28 @@ class NestedArray(object):
                     nlidx.ravel()[-1] = ridx.ravel()[-1]
                 nself.idxs[matchpoint] = nlidx
         del nself.idxs[matchpoint+1]
+        if(not isinstance(nself.idxs[matchpoint],int) and result_fixed):
+            nself._var_to_fixed(matchpoint)
         return nself
+
+    def _var_to_fixed(self, pos):
+        idx = self.idxs[pos]
+        nextpos,nextobj = self._get_next_obj(pos)
+        diff = idx[...,-1] - idx[...,0]
+        diffset = set(diff.ravel())
+
+        assert len(diffset) == 1, "Multiple lengths encountered while expecting fixed dim"
+        nshape = diffset.pop()
+        nextobj = nextobj.reshape(diff.shape + (nshape,) + nextobj.shape[1:])
+
+        if(pos > 0 and isinstance(self.idxs[pos-1],int)):
+            prevpos = self.idxs[pos-1]
+        else:
+            prevpos = 0
+            
+        for i in range(pos, nextpos):
+            self.idxs[i] = (i - pos) + prevpos + 1
+        self._set_obj(nextpos,nextobj)
 
     def mergeLastDims(self,depth):
         curdepth = len(self.idxs) - 1

@@ -15,4 +15,9 @@
 
 
 0.1.2:
+- Much improved performance (memory/speed) for broadcast in in/contains/filter operations
+- Added replace operation, used for identifier mapping
+- Added merge operation, also included in match. Merge operates on two slices that have missing values,
+  creating one consistent slice with where possible missing values replaced by non-missing values. 
 - Improved tab-completion
+

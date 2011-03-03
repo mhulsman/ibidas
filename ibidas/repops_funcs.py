@@ -187,7 +187,7 @@ class BinaryFuncOp(repops.MultiOpRep, Func):
 
         
 class BinaryFuncElemOp(BinaryFuncOp):
-    _allow_partial_bc = True
+    _allow_partial_bc = False
     def _process(self, sources, **kwargs):
         lsource,rsource = sources
         if not lsource._typesKnown() or not rsource._typesKnown():
@@ -210,7 +210,7 @@ class BinaryFuncElemOp(BinaryFuncOp):
     @classmethod
     def _apply(cls, binslices, mode, pos=None, **kwargs):
         binslices = cls._prepareSlices(*binslices)
-        (lslice,rslice),plans = ops.broadcast(binslices,mode)
+        (lslice,rslice),plans = ops.broadcast(binslices,mode, partial=cls._allow_partial_bc)
         sig, nkwargs, outparam = cls._findSignature(left=lslice,right=rslice,**kwargs)
         if(isinstance(outparam, rtypes.TypeUnknown)):
             if(binslices[0].name == binslices[1].name):
@@ -224,8 +224,7 @@ class BinaryFuncElemOp(BinaryFuncOp):
             outparam = Param(name, outparam)
         if(not pos is None):
             outparam = outparam.withNumber(pos)
-        s = ops.BinFuncElemOp(cls.__name__, sig,\
-                        outparam, allow_partial_bc=cls._allow_partial_bc, **nkwargs)
+        s = ops.BinFuncElemOp(cls.__name__, sig,outparam, **nkwargs)
         return s
 
     @classmethod
@@ -234,7 +233,6 @@ class BinaryFuncElemOp(BinaryFuncOp):
 
 
 class WithinSignature(FuncSignature):
-    _allow_partial_bc = False
     def check(self, left, right):#{{{
         in1_type = left.type
         in2_type = right.type
@@ -246,16 +244,18 @@ class WithinSignature(FuncSignature):
 within_sig = WithinSignature("within")
 
 class Within(BinaryFuncElemOp):
+    _allow_partial_bc = True
     _sigs = [within_sig]
     @classmethod
     def _prepareSlices(self,lslice,rslice):
-        return (lslice, ops.PackArrayOp(rslice,1))
+        return (lslice, ops.PackArrayOp(ops.ensure_frozen(rslice),1))
 
 class Contains(BinaryFuncElemOp):
+    _allow_partial_bc = True
     _sigs = [within_sig]
     @classmethod
     def _prepareSlices(self,lslice,rslice):
-        return (ops.PackArrayOp(lslice,1), rslice)
+        return (ops.PackArrayOp(ops.ensure_frozen(lslice),1), rslice)
 
 class BinArithSignature(FuncSignature):
     def check(self, left, right):
@@ -430,6 +430,19 @@ class GreaterEqual(BinaryFuncElemOp):
 class Greater(BinaryFuncElemOp):
     _sigs = [comparestringsig,comparesetsig,compareanysig]
 
+class MergeSignature(FuncSignature):
+    def check(self, left, right):
+        in1_type = left.type
+        in2_type = right.type
+
+        res = casts.castImplicitCommonType(in1_type, in2_type)
+        if res is False:
+            return False
+        return res#}}}
+mergesig = MergeSignature("merge")
+
+class Merge(BinaryFuncElemOp):
+    _sigs = [mergesig]
 
 class EachSignature(FuncSignature):
     def check(self, slice, eachfunc, dtype=rtypes.unknown):#{{{

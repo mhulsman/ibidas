@@ -567,11 +567,8 @@ class BinFuncOp(MultiUnaryOp):#{{{
         MultiUnaryOp.__init__(self, (lslice, rslice), name=outparam.name, rtype=outparam.type, dims=dims, bookmarks=nbookmarks)#}}}
 
 class BinFuncElemOp(BinFuncOp):#{{{
-    __slots__ = ["allow_partial_bc"]
-
-    def __init__(self, funcname, sig, outparam, left, right, allow_partial_bc=False):
+    def __init__(self, funcname, sig, outparam, left, right):
         dims = left.dims
-        self.allow_partial_bc = allow_partial_bc
         assert all([d1 == d2 for d1, d2 in zip(dims, right.dims)]), \
                     "Dimensions of slices do not match"
         

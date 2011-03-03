@@ -373,7 +373,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
     
     def visitFlatDimOp(self, node, slice):
-        ndata = slice.data.mergeDim(node.flatpos-1)
+        ndata = slice.data.mergeDim(node.flatpos-1,result_fixed=len(node.dims[node.flatpos-1].dependent) == 0)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
 
@@ -536,15 +536,41 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.data.mapseq(lambda x: func(x,dtype),res_type=node.type)
        
 
-    def withinWithin(self, data, type1, type2, typeo, op):
+    def withinWithin(self, data, type1, type2, typeo, op, bcdepth=1):
         data1,data2 = data
-        res = [elem in arr for elem,arr in zip(data1,data2)]
+        if(bcdepth > 1):
+            data2 = cutils.darray([set(elem) for elem in data2.ravel()]).reshape(data2.shape)
+            zipdata = numpy.broadcast(data1,data2)
+        else:
+            zipdata = zip(data1,data2)
+        res = [elem in arr for elem,arr in zipdata]
         return cutils.darray(res,bool)
 
-    def withinContains(self, data, type1, type2, typeo, op):
+    def withinContains(self, data, type1, type2, typeo, op, bcdepth=1):
         data2,data1 = data
-        res = [elem in arr for elem,arr in zip(data1,data2)]
+        if(bcdepth > 1):
+            data2 = cutils.darray([set(elem) for elem in data2.ravel()]).reshape(data2.shape)
+            zipdata = numpy.broadcast(data1,data2)
+        else:
+            zipdata = zip(data1,data2)
+        res = [elem in arr for elem,arr in zipdata]
         return cutils.darray(res,bool)
+
+    def mergeMerge(self, data, type1, type2, typeo, op):
+        data1, data2 = data
+        res = []
+        for lelem, relem in zip(data1, data2):
+            if lelem is relem:
+                res.append(lelem)
+            elif lelem is Missing:
+                res.append(relem)
+            elif relem is Missing:
+                res.append(lelem)
+            elif lelem == relem:
+                res.append(lelem)
+            else:
+                raise RuntimeError, "Found unequal values during merge: " + str(lelem) + " != " + str(relem)
+        return cutils.darray(res, typeo.toNumpy())
 
     def simple_arithGeneral(self, data, type1, type2, typeo, op):
         data1,data2 = data

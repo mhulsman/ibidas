@@ -322,8 +322,9 @@ class Join(repops.MultiOpRep):
         return self._initialize(tuple(nslices))
 
 
+
 class Match(repops.MultiOpRep):
-    def __init__(self, lsource, rsource, lslice=None, rslice=None, jointype="inner"):
+    def __init__(self, lsource, rsource, lslice=None, rslice=None, jointype="inner", merge_same=False):
         assert jointype in set(["inner","left","right","full"]), "Jointype should be inner, left, right or full"
         assert (not isinstance(lslice,representor.Representor)), "Representor objects not allowed as lslice. Use context, string or int to indicate slice in lsource"
         assert (not isinstance(rslice,representor.Representor)), "Representor objects not allowed as rslice. Use context, string or int to indicate slice in rsource"
@@ -332,9 +333,9 @@ class Match(repops.MultiOpRep):
             lslice = lsource.Get(lslice)
         if not rslice is None:
             rslice = rsource.Get(rslice)
-        repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice),jointype=jointype)
+        repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice),jointype=jointype, merge_same=merge_same)
 
-    def _process(self, sources, jointype):
+    def _process(self, sources, jointype, merge_same):
         lsource, rsource, lslice,rslice = sources
         if not lsource._slicesKnown() or not rsource._slicesKnown():
             return
@@ -352,14 +353,16 @@ class Match(repops.MultiOpRep):
             rslice = getattr(rsource,lslice.Names[0])
         assert len(rslice._slices) == 1, "rslice parameter in match should have only one slice"
         assert len(lslice._slices) == 1, "lslice parameter in match should have only one slice"
-
         self._sources = (lsource, rsource, lslice, rslice)
         if not lslice._typesKnown() or not rslice._typesKnown():
             return
-        
         lslice = lslice._slices[0]
         rslice = rslice._slices[0]
-
+        nslices = self._apply(lsource, rsource, lslice, rslice, jointype, merge_same)
+        return self._initialize(tuple(nslices))
+   
+    @classmethod
+    def _apply(cls,lsource, rsource, lslice,rslice, jointype="inner", merge_same=False):
         lindex,rindex = ops.EquiJoinIndexOp(lslice,rslice, jointype=jointype).results
 
         lslices = list(lsource._slices)
@@ -367,13 +370,41 @@ class Match(repops.MultiOpRep):
         if(lslice.name == rslice.name and jointype=="inner" and lslice in lslices and rslice in rslices):
             rslices.pop(rslices.index(rslice))
 
-        lslices = Filter._apply(lslices, lindex, lslice.dims, "dim")
-        rslices = Filter._apply(rslices, rindex, rslice.dims, "dim")
+        lslices = list(Filter._apply(lslices, lindex, lslice.dims, "dim"))
+        rslices = list(Filter._apply(rslices, rindex, rslice.dims, "dim"))
+        if merge_same:
+            lnames = [lslice.name for lslice in lslices]
+            for rslice in list(rslices):
+                if not rslice.name in lnames:
+                    continue
+                lpos = lnames.index(rslice.name)
+                lslice = lslices[lpos]
+                lslices[lpos] = repops_funcs.Merge._apply([lslice,rslice], "dim")
+                del rslices[rslices.index(rslice)]
+        
+        return Combine._apply(lslices,rslices)
 
+class Replace(repops.MultiOpRep):
+    def __init__(self, source, slice, translator, fromslice=0, toslice=1):
+        slice = source.Get(slice)
+        fromslice = translator.Get(fromslice)
+        toslice = translator.Get(toslice)
+        translator = Combine(fromslice, toslice)
 
-        nslices = Combine._apply(lslices,rslices)
+        repops.MultiOpRep.__init__(self,(source, slice, translator))
+   
+    def _sprocess(self, sources):
+        source, slice, translator = sources
+        assert len(slice._slices) == 1, "Only one slice can be replaced"
+        assert len(translator._slices) == 2, "Translator should have only two selected slices"
+
+        slice = slice._slices[0]
+        slicepos = source._slices.index(slice)
+
+        nslices = list(Match._apply(source, translator, slice, translator._slices[0],"inner"))
+        nslices[slicepos] = ops.ChangeNameOp(nslices[-1],slice.name)
+        nslices = nslices[:-2]
         return self._initialize(tuple(nslices))
-
 
 class Stack(repops.MultiOpRep):
     def __init__(self, *sources, **kwargs):

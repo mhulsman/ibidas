@@ -36,19 +36,27 @@ def yeast_feats():
 predefined_sources.register(yeast_feats,name="genomic_feats",category="yeast")  
 
 
-def yeast_aliases(feats):
+def yeast_aliases(feats, remove_multi=True):
     """Given a yeast feats table (see ``yeast_feats``), returns a 
-       two column table with the official feature names and a column with aliases.
+       two column table with aliases and the corresponding  official feature names.
+       All names in output are in uppercase.
 
-       Can be used to map names to official names (with match)"""
+       :param remove_multi: if True (default), removes aliases that map to multiple offical feature names.
+       """
 
-    res = Stack(feats.Get(_.feat_name, _.gene_aliases).Flat(), 
-                feats.Get(_.feat_name, _.gene_name), 
+    res = Stack(feats.Get(_.gene_aliases, _.feat_name).Flat(), 
+                feats.Get(_.gene_name, _.feat_name), 
                 feats.Get(_.feat_name, _.feat_name))
-    res = res/("feat_name", "alias")
+    res = res/("alias", "feat_name")
     res = res%"feat_aliases"
-    res = res[_.alias != ""]
-    return res.Unique().Copy()
+    res = res[_.alias != ""].Unique()
+    
+    if remove_multi:
+        multi_aliases = res.GroupBy(_.alias)[_.feat_name.Count() > 1].alias
+        res = res[~(_.alias |In| multi_aliases)]
+    
+    res = res.Each(str.upper, dtype="bytes")
+    return res.Copy()
 predefined_sources.register(yeast_aliases,name="name_aliases",category="yeast")  
 
 
@@ -79,7 +87,7 @@ def yeast_kinome():
 predefined_sources.register(yeast_kinome,name="yeast_kinome",category="yeast")  
 
 
-def yeast_chipchip():
+def yeast_chipchip(translator=None):
     url = "http://fraenkel.mit.edu/improved_map/orfs_by_factor.tar.gz"
     res = Unpack(Fetch(url))
     dirname = os.path.dirname(res[0])
@@ -104,15 +112,23 @@ def yeast_chipchip():
     #group on tf,target tuple, keeping trans_name and target flat
     res = res.GroupBy((_.trans_name, _.target),flat=(_.trans_name, _.target))
     #take min pval found, and max conservation
-    res = res.Get(_.trans_name, _.target, _.pval.Min(), _.conservation.Max())    
+    res = res.Get(_.trans_name, _.target, _.pval.Min(), _.conservation.Max())   
+    if(not translator is None):
+        res = res.To(_.trans_name, _.target, Do=_.Each(str.upper,dtype="bytes"))
+        res = res.Replace(_.trans_name, translator)
+        res = res.Replace(_.target, translator)
     return res.Copy()
 predefined_sources.register(yeast_chipchip,name="chipchip_macisaac",category="yeast")  
         
         
-def yeastract(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"):
+def yeastract(translator=None, url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"):
     """Downloads documented transcription factor regulation interactions from yeastract"""
     rtype = "[tftargets:*]<(trans_factor=bytes, target=bytes)"
     res = Read(Fetch(url),dtype=rtype)
+    if(not translator is None):
+        res = res.Each(str.upper,dtype="bytes")
+        res = res.Replace(_.trans_factor, translator)
+        res = res.Replace(_.target, translator)
     return res.Copy()
 predefined_sources.register(yeastract,category="yeast")
 
