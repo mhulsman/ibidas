@@ -84,7 +84,7 @@ class Project(repops.UnaryOpRep):
                         if(not nelem):
                             if len(cur_slices) == 1 and isinstance(cur_slices[0].type,rtypes.TypeTuple) \
                                and (elem in cur_slices[0].type.fieldnames or (isinstance(elem,int) and elem >= 0 and elem < len(cur_slices[0].type.fieldnames))):
-                               nelem = unpack_tuple(cur_slices[0],elem)
+                               nelem = UnpackTuple._apply(cur_slices[0],elem)
                             else:
                                nelem = [slice for slice in cur_slices if elem in slice.bookmarks]
                                assert len(nelem) > 0, "Could not find (unique) matching slice/bookmark for name: " + elem
@@ -133,7 +133,7 @@ class Unproject(Project):
 
 
 class UnpackTuple(repops.UnaryOpRep):
-    def _process(self,source,name="",unpack=True):
+    def _process(self,source,name=None,unpack=True):
         """
         Parameters:
         source: source to unpack active slices from
@@ -146,34 +146,38 @@ class UnpackTuple(repops.UnaryOpRep):
         assert len(source._slices) == 1, \
                 "Unpacking tuples can only be done on single slices"
         slice = source._slices[0]
-        nslices = unpack_tuple(slice,name,unpack)
+        nslices = self._apply(slice,name,unpack=unpack)
         return self._initialize(tuple(nslices))
-   
-def unpack_tuple(slice,name="",unpack=True):
-    if(not isinstance(slice.type, rtypes.TypeTuple)):
-        if(name):
-            raise RuntimeError, "Asked to unpack tuple attribute " + \
-                name + " but cannot find a tuple."
-        else:
-            raise RuntimeError, "No tuple to unpack"
 
-    if(not name):
-        nslices = [ops.UnpackTupleOp(slice, idx) for idx in range(len(slice.type.subtypes))]
-    else: 
-        try:
-            idx = int(name)
-        except ValueError:
-            assert isinstance(name, basestring), \
-                        "Tuple slice name should be a string"
-            idx = slice.type.fieldnames.index(name)
-        nslices = [ops.UnpackTupleOp(slice, idx)]
-    
-    if(unpack):
-        for pos, nslice in enumerate(nslices):
-            while(nslice.type.__class__ is rtypes.TypeArray):
-                nslice = ops.UnpackArrayOp(nslice)
-            nslices[pos] = nslice
-    return nslices
+    @classmethod
+    def _apply(cls, slice, name=None, unpack=True):
+        if(not isinstance(slice.type, rtypes.TypeTuple)):
+            if(name):
+                raise RuntimeError, "Asked to unpack tuple attribute " + \
+                    name + " but cannot find a tuple."
+            else:
+                raise RuntimeError, "No tuple to unpack"
+
+        if(name is None):
+            nslices = [ops.UnpackTupleOp(slice, idx) for idx in range(len(slice.type.subtypes))]
+        else: 
+            try:
+                idx = int(name)
+            except ValueError:
+                assert isinstance(name, basestring), \
+                            "Tuple slice name should be a string"
+                try:
+                    idx = slice.type.fieldnames.index(name)
+                except ValueError:
+                    raise RuntimeError, "Name: " + str(name) + " not in tuple"
+            nslices = [ops.UnpackTupleOp(slice, idx)]
+        
+        if(unpack):
+            for pos, nslice in enumerate(nslices):
+                while(nslice.type.__class__ is rtypes.TypeArray):
+                    nslice = ops.UnpackArrayOp(nslice)
+                nslices[pos] = nslice
+        return nslices
 
 class Bookmark(repops.UnaryOpRep):
     def _sprocess(self, source, *names, **kwds): #{{{

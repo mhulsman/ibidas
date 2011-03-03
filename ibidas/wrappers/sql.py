@@ -461,7 +461,7 @@ class TableRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, table):
         self._tablename = table.name
         table_type = convert(table.columns,'sqlalchemy',engine, table.name)
-        nslices = repops_slice.unpack_tuple(ops.UnpackArrayOp(SQLOp(engine, table, table_type, util.valid_name(table.name))))
+        nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, table, table_type, util.valid_name(table.name))))
         nnslices = []
         for slice in nslices:
             if slice.type.has_missing:
@@ -479,7 +479,7 @@ class QueryRepresentor(wrapper.SourceRepresentor):#{{{
             query_type = convert(res.cursor.description, res.dialect.name, self.engine)
         res.close() 
         
-        nslices = repops_slice.unpack_tuple(ops.UnpackArrayOp(SQLOp(engine, table, table_type, table.name)))
+        nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, table, table_type, table.name)))
         nnslices = []
         for slice in nslices:
             if slice.type.has_missing:

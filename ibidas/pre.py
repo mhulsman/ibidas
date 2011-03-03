@@ -117,7 +117,7 @@ def yeast_chipchip(translator=None):
         res = res.To(_.trans_name, _.target, Do=_.Each(str.upper,dtype="bytes"))
         res = res.Replace(_.trans_name, translator)
         res = res.Replace(_.target, translator)
-    return res.Copy()
+    return (res%"chipchip").Copy()
 predefined_sources.register(yeast_chipchip,name="chipchip_macisaac",category="yeast")  
         
         
@@ -129,7 +129,7 @@ def yeastract(translator=None, url="http://www.yeastract.com/download/Regulation
         res = res.Each(str.upper,dtype="bytes")
         res = res.Replace(_.trans_factor, translator)
         res = res.Replace(_.target, translator)
-    return res.Copy()
+    return (res%"yeastract").Copy()
 predefined_sources.register(yeastract,category="yeast")
 
 ################################ HUMAN ##################################
