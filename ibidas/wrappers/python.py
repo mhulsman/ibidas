@@ -614,6 +614,15 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def numberGeneral(self, data, type_in, type_out, op):
         return numpy_unary_arith[op](data, sig=type_out.toNumpy())
+    
+    def boolInvert(self, data, type_in, type_out, op):
+        res = []
+        for elem in data:
+            if elem is Missing:
+                res.append(elem)
+            else:
+                res.append(not elem)
+        return cutils.darray(res, type_out.toNumpy())
 
     def corrCorr(self, data, type_in, type_out, op):
         intype = type_in.toNumpy()

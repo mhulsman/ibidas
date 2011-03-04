@@ -466,8 +466,18 @@ class UnaryArithSignature(FuncSignature):
 
 unary_arithsig = UnaryArithSignature("number")
 
+class UnaryBoolSignature(FuncSignature):
+    def check(self, slice):#{{{
+        in_type = slice.type
+        if(not in_type.has_missing or not isinstance(in_type, rtypes.TypeBool)):
+            return False
+
+        return Param(slice.name, in_type)#}}}
+
+unary_boolsig = UnaryBoolSignature("bool")
+
 class Invert(UnaryFuncElemOp):
-    _sigs = [unary_arithsig]
+    _sigs = [unary_boolsig, unary_arithsig]
 
 class Abs(UnaryFuncElemOp):
     _sigs = [unary_arithsig]

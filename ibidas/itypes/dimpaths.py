@@ -599,10 +599,10 @@ def identifyUniqueDimPath(source,dim_selector):#{{{
 def identifyDimPath(sourcepaths, dim_selector):#{{{
    
     if(isinstance(dim_selector, int)):
-        udpath = uniqueDimPath(sourcepaths)
+        udpath = uniqueDimPath(sourcepaths,only_unique=False)
         dim_selector = udpath[dim_selector]
     elif(isinstance(dim_selector, long)):
-        udpath = uniqueDimPath(sourcepaths)
+        udpath = uniqueDimPath(sourcepaths,only_unique=False)
         if(dim_selector < 0):
             dim_selector += len(udpath)
         if not (dim_selector >= 0 and dim_selector < len(udpath)):
