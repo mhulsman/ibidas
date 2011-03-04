@@ -113,6 +113,8 @@ def Unpack(filename, subfiles=None, force=False):
                 os.unlink(nspath)
                 z.extract(subfile, unpackpath)
             res.append(nspath)
+    else:
+        return filename
 
     if isinstance(osubfiles, str):
         return res[0]

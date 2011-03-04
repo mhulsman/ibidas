@@ -315,7 +315,10 @@ class memoized(object):
    def __init__(self, func):
       self.func = func
       self.cache = {}
-   def __call__(self, *args):
+      self.__name__ = func.__name__
+   def __call__(self, *args, **kwargs):
+       if kwargs: #uncacheable
+            return self.func(*args, **kwargs)
        try:
           return self.cache[args]
        except KeyError:

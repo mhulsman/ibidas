@@ -7,8 +7,9 @@ Date: 20-feb-08"""
 import ConfigParser
 import string
 import os
+import os.path
 
-def loadConfig(file, config={}):
+def loadConfig(rc_path, config={}):
     """
     returns a dictionary with key's of the form
     <section>.<option> and the values 
@@ -16,7 +17,7 @@ def loadConfig(file, config={}):
     config = config.copy()
     if(os.path.isfile(rc_path)):    
         cp = ConfigParser.ConfigParser()
-        cp.read(file)
+        cp.read(rc_path)
         for sec in cp.sections():
             name = string.lower(sec)
             for opt in cp.options(sec):
@@ -45,3 +46,12 @@ This method is just a shortcut when only one specific value is of interest.
 def getValue(file, config, value):
     cfg = loadConfig(file, config)
     return cfg[value]
+
+
+_ConfigDefault = {
+    "system.tmp_dir":"/tmp"
+}
+
+
+config = loadConfig(os.path.expanduser('~/.ibidas/ibidas.cfg'), _ConfigDefault)
+

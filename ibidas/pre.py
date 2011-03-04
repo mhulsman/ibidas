@@ -1,4 +1,5 @@
 from ibidas.utils import util
+from ibidas.utils.config import config
 import os.path
 import os
 _delay_import_(globals(),"ibidas","*")
@@ -165,7 +166,13 @@ def in_memory_db():
     return Connect("sqlite:///:memory:");
 predefined_sources.register(in_memory_db)
 
-def string_interactions(dburl, species="Saccharomyces cerevisiae"):
+
+@util.memoized
+def string(dburl=config.get('databases.string_url',None)):
+    return Connect(dburl)
+predefined_sources.register(string)
+
+def string_interactions(dburl=config.get('databases.string_url',None), species="Saccharomyces cerevisiae", subscores=False):
     """Given a Postgres db with String data, specified in dburl, and a species, returns all interactions and their score.
 
     The database data can be obtained from String.
@@ -178,20 +185,61 @@ def string_interactions(dburl, species="Saccharomyces cerevisiae"):
        >>> connect(dburl).items.species.offical_name
 
     """
-    z = Connect(dburl)
+    z = string(dburl)
     inter  = z.items.species |Match| z.network.protein_protein_links
     inter  = inter[_.official_name == species]
     inter  = inter |Match(_.protein_id_a, _.protein_id)| z.items.proteins//"left"
     inter  = inter |Match(_.protein_id_b, _.protein_id)| z.items.proteins//"right"
-    return   inter.Get(_.left.preferred_name/"left", 
-                       _.right.preferred_name/"right", 
-                       _.combined_score) % "interactions"
+    if(subscores):
+        return   inter.Get(_.left.preferred_name/"left", 
+                        _.right.preferred_name/"right",
+                        _.equiv_nscore/"neighborhood_score", _.equiv_nscore_transferred/"neighborhood_score_transferred", 
+                        _.equiv_fscore/"fusion_score", 
+                        _.equiv_pscore/"phylo_cooccurence_score", 
+                        _.equiv_hscore/"homology_score", 
+                        _.array_score/"coexpression_score", 
+                        _.array_score_transferred/"coexpression_score_transferred",
+                        _.experimental_score/"experimental_score",
+                        _.experimental_score_transferred/"experimental_score_transferred", 
+                        _.database_score/"curated_score", 
+                        _.database_score_transferred/"curated_score_transferred", 
+                        _.textmining_score/"textmining_score", 
+                        _.textmining_score_transferred/"textmining_score_transferred",
+                        _.combined_score) % "interactions"
+    else:
+        return   inter.Get(_.left.preferred_name/"left", 
+                        _.right.preferred_name/"right", 
+                        _.combined_score) % "interactions"
 predefined_sources.register(string_interactions)
 
+def string_actions(dburl=config.get('databases.string_url',None), species="Saccharomyces cerevisiae", subscores=False):
+    """Given a Postgres db with String data, specified in dburl, and a species, returns all interactions and their score.
+
+    The database data can be obtained from String.
+
+    example url: "postgres://username:password@hostname:port/string_dbname"
+
+    Use ``connect`` to access the whole database::
+       
+       #Get available species names: 
+       >>> connect(dburl).items.species.offical_name
+
+    """
+    z = string(dburl)
+    inter  = z.network.actions
+    inter  = inter |Match(_.item_id_a, _.protein_id)| z.items.proteins//"left"
+    inter  = inter |Match(_.item_id_b, _.protein_id)| z.items.proteins//"right"
+    inter = inter |Match(_.left.species_id, _.species_id)| z.items.species
+    inter  = inter[_.official_name == species]
+    return   inter.Get(_.left.preferred_name/"left", 
+                    _.right.preferred_name/"right",
+                    _.mode, _.action, _.a_is_acting,
+                    _.score) % "interactions"
+predefined_sources.register(string_actions)
 
 
 
-def go_annotations(dburl, genus="Saccharomyces", species="cerevisiae"):
+def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyces", species="cerevisiae"):
     """Accesses GO annotations in a MySQL database.
 
        Database data can be obtained from the geneontology website.

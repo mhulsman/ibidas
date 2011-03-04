@@ -331,8 +331,12 @@ class Match(repops.MultiOpRep):
 
         if not lslice is None:
             lslice = lsource.Get(lslice)
+
         if not rslice is None:
             rslice = rsource.Get(rslice)
+        elif not lslice is None
+            rslice = rsource.Get(lslice)
+            
         repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice),jointype=jointype, merge_same=merge_same)
 
     def _process(self, sources, jointype, merge_same):

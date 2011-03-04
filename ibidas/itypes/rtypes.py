@@ -793,7 +793,7 @@ class TypeString(TypeArray):#{{{
         if(self.dims[0].shape == UNDEFINED or self.has_missing or self.dims[0].shape > 32):
             return numpy.dtype(object)
         else:
-            return numpy.dtype(self._dtype + str(self.dims[0].shape))
+            return numpy.dtype(self._dtype + str(max(self.dims[0].shape,1)))
     
     def __eq__(self, other):
         return (self.__class__ is other.__class__ and 
