@@ -328,14 +328,14 @@ class Match(repops.MultiOpRep):
         assert jointype in set(["inner","left","right","full"]), "Jointype should be inner, left, right or full"
         assert (not isinstance(lslice,representor.Representor)), "Representor objects not allowed as lslice. Use context, string or int to indicate slice in lsource"
         assert (not isinstance(rslice,representor.Representor)), "Representor objects not allowed as rslice. Use context, string or int to indicate slice in rsource"
+        
+        if not rslice is None:
+            rslice = rsource.Get(rslice)
+        elif not lslice is None:
+            rslice = rsource.Get(lslice)
 
         if not lslice is None:
             lslice = lsource.Get(lslice)
-
-        if not rslice is None:
-            rslice = rsource.Get(rslice)
-        elif not lslice is None
-            rslice = rsource.Get(lslice)
             
         repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice),jointype=jointype, merge_same=merge_same)
 

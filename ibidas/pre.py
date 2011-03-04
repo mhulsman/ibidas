@@ -170,9 +170,9 @@ predefined_sources.register(in_memory_db)
 @util.memoized
 def string(dburl=config.get('databases.string_url',None)):
     return Connect(dburl)
-predefined_sources.register(string)
+predefined_sources.register(string,category="string")
 
-def string_interactions(dburl=config.get('databases.string_url',None), species="Saccharomyces cerevisiae", subscores=False):
+def string_interactions(dburl=config.get('databases.string_url',None), species="Saccharomyces cerevisiae", subscores=False, external_names=False):
     """Given a Postgres db with String data, specified in dburl, and a species, returns all interactions and their score.
 
     The database data can be obtained from String.
@@ -190,9 +190,13 @@ def string_interactions(dburl=config.get('databases.string_url',None), species="
     inter  = inter[_.official_name == species]
     inter  = inter |Match(_.protein_id_a, _.protein_id)| z.items.proteins//"left"
     inter  = inter |Match(_.protein_id_b, _.protein_id)| z.items.proteins//"right"
+    if external_names:
+        names = inter.Get(_.left.protein_external_id/"left", _.right.protein_external_id/"right").Each(lambda x : x.split('.')[1],dtype="bytes")
+    else:
+        names = inter.Get(_.left.preferred_name/"left", _.right.preferred_name/"right")
+
     if(subscores):
-        return   inter.Get(_.left.preferred_name/"left", 
-                        _.right.preferred_name/"right",
+        return   inter.Get(names,
                         _.equiv_nscore/"neighborhood_score", _.equiv_nscore_transferred/"neighborhood_score_transferred", 
                         _.equiv_fscore/"fusion_score", 
                         _.equiv_pscore/"phylo_cooccurence_score", 
@@ -207,12 +211,11 @@ def string_interactions(dburl=config.get('databases.string_url',None), species="
                         _.textmining_score_transferred/"textmining_score_transferred",
                         _.combined_score) % "interactions"
     else:
-        return   inter.Get(_.left.preferred_name/"left", 
-                        _.right.preferred_name/"right", 
+        return   inter.Get(names, 
                         _.combined_score) % "interactions"
-predefined_sources.register(string_interactions)
+predefined_sources.register(string_interactions,name="interactions", category="string")
 
-def string_actions(dburl=config.get('databases.string_url',None), species="Saccharomyces cerevisiae", subscores=False):
+def string_interaction_types(dburl=config.get('databases.string_url',None), species="Saccharomyces cerevisiae", subscores=False):
     """Given a Postgres db with String data, specified in dburl, and a species, returns all interactions and their score.
 
     The database data can be obtained from String.
@@ -235,7 +238,7 @@ def string_actions(dburl=config.get('databases.string_url',None), species="Sacch
                     _.right.preferred_name/"right",
                     _.mode, _.action, _.a_is_acting,
                     _.score) % "interactions"
-predefined_sources.register(string_actions)
+predefined_sources.register(string_interaction_types,name="interaction_types",category="string")
 
 
 
@@ -254,7 +257,7 @@ def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyc
     g = g          |Match(_.relationship_type_id, _.id)|              go.term//"rel"
     g = g[(_.genus==genus) & (_.species == species)]
     return g.Get(_.symbol, _.annot.name/"annotation", _.rel.name/"relation_type", _.distance)%"annotations"
-predefined_sources.register(go_annotations)
+predefined_sources.register(go_annotations,name="annotations",category="go")
 
 
 ########################### #KEGG ######################################

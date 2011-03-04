@@ -52,6 +52,4 @@ _ConfigDefault = {
     "system.tmp_dir":"/tmp"
 }
 
-
 config = loadConfig(os.path.expanduser('~/.ibidas/ibidas.cfg'), _ConfigDefault)
-
