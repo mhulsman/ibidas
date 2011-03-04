@@ -215,7 +215,7 @@ def string_interactions(dburl=config.get('databases.string_url',None), species="
                         _.combined_score) % "interactions"
 predefined_sources.register(string_interactions,name="interactions", category="string")
 
-def string_interaction_types(dburl=config.get('databases.string_url',None), species="Saccharomyces cerevisiae", subscores=False):
+def string_interaction_types(dburl=config.get('databases.string_url',None), species="Saccharomyces cerevisiae", external_names=False):
     """Given a Postgres db with String data, specified in dburl, and a species, returns all interactions and their score.
 
     The database data can be obtained from String.
@@ -234,12 +234,21 @@ def string_interaction_types(dburl=config.get('databases.string_url',None), spec
     inter  = inter |Match(_.item_id_b, _.protein_id)| z.items.proteins//"right"
     inter = inter |Match(_.left.species_id, _.species_id)| z.items.species
     inter  = inter[_.official_name == species]
-    return   inter.Get(_.left.preferred_name/"left", 
-                    _.right.preferred_name/"right",
+    if external_names:
+        names = inter.Get(_.left.protein_external_id/"left", _.right.protein_external_id/"right").Each(lambda x : x.split('.')[1],dtype="bytes")
+    else:
+        names = inter.Get(_.left.preferred_name/"left", _.right.preferred_name/"right")
+    return   inter.Get(names,
                     _.mode, _.action, _.a_is_acting,
                     _.score) % "interactions"
 predefined_sources.register(string_interaction_types,name="interaction_types",category="string")
 
+
+@util.memoized
+def open_go(dburl=config.get("databases.go_url",None)):
+    go = Connect(dburl)
+    return go
+predefined_sources.register(open_go,name="go",category="go")
 
 
 def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyces", species="cerevisiae"):
@@ -249,7 +258,7 @@ def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyc
 
        example url: "mysql://username:password@hostname:port/go
     """
-    go = Connect(dburl)
+    go = open_go(dburl)
     g = go.species |Match(_.id,                   _.species_id)|      go.gene_product
     g = g          |Match(_.gene_product.id,      _.gene_product_id)| go.association
     g = g          |Match(_.association.term_id,  _.term2_id)|        go.graph_path
