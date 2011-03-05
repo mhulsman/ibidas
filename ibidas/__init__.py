@@ -12,7 +12,7 @@ __all__ = ["Rep","Read","Connect","_","CyNetwork",'Unpack',
            "Mean","Median",
            "Sum",
            "Count","Match",
-           "Broadcast","CreateType",
+           "Broadcast","CreateType","MatchType",
            "newdim","Missing",
            "Corr","In","Contains",
            "Fetch","Serve","Get",
@@ -25,7 +25,7 @@ from utils.util import save_rep as Save, load_rep as Load
 from utils.context import _
 from utils.missing import Missing
 from utils.infix import Infix
-from itypes import createType as CreateType
+from itypes import createType as CreateType, matchType as MatchType
 from wrappers.python import Rep
 from representor import newdim
 import repops_dim 

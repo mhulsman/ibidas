@@ -43,6 +43,8 @@ class GenericASTRewriter:#{{{
         return node.type
 
     def preorder(self, node=None):
+        if not isinstance(node, (AST,Token)):
+            return node
         name = 'n_' + self.typestring(node)
         if hasattr(self, name):
             func = getattr(self, name)
@@ -59,6 +61,8 @@ class GenericASTRewriter:#{{{
         return node
 
     def postorder(self, node, context=None):
+        if not isinstance(node, (AST,Token)):
+            return node
         name = 'x_' + self.typestring(node)
         if hasattr(self, name):
             func = getattr(self, name)
