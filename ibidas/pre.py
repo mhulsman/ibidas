@@ -264,8 +264,9 @@ def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyc
     g = g          |Match(_.association.term_id,  _.term2_id)|        go.graph_path
     g = g          |Match(_.term1_id,             _.id)|              go.term//"annot"
     g = g          |Match(_.relationship_type_id, _.id)|              go.term//"rel"
-    g = g[(_.genus==genus) & (_.species == species)]
-    return g.Get(_.symbol, _.annot.name/"annotation", _.rel.name/"relation_type", _.distance)%"annotations"
+    g = g          |Match(_.association.id,       _.association_id)|  go.evidence
+    g = g[(_.genus==genus) & (_.species == species)][_.is_not == False]
+    return g.Get(_.symbol, _.annot.name/"annotation", _.rel.name/"relation_type", _.evidence.code, _.distance)%"annotations"
 predefined_sources.register(go_annotations,name="annotations",category="go")
 
 

@@ -623,10 +623,10 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
 
 
     def eatQuery(self, node):#{{{
-        for edge in self.graph.edge_source[node]:
+        for edge in list(self.graph.edge_source[node]):
             if(isinstance(edge.target, ops.NoneToMissingOp)):
                 self.graph.dropEdge(edge)
-                for tedge in self.graph.edge_source[edge.target]:
+                for tedge in list(self.graph.edge_source[edge.target]):
                     self.graph.addEdge(SQLResultEdge(node, tedge.target, tedge, edge.pos))
         self.expressionEat(node)#}}}
                 
