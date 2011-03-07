@@ -694,7 +694,7 @@ class CorrSignature(FuncSignature):
         ndims = dimpaths.DimPath(corrdim, corrdim2)
 
         ntype = rtypes.TypeReal64(slice.type.has_missing)
-        ntype = rtypes.TypeArray(subtypes=(ntype,),dims=ndims)
+        ntype = dimpaths.dimsToArrays(ndims, ntype)
 
         slice = ops.PackArrayOp(slice,2)
         nkwargs = {'slice':slice}

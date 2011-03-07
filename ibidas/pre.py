@@ -31,8 +31,8 @@ def yeast_feats():
 
     splitfunc = lambda x: x.split("|")
     res = res.To(_.gene_aliases,  Do=_.Each(splitfunc, dtype="[aliases:~]<bytes").Elem()[_ != ""])
-    res = res.To(_.start, _.stop, Do=_.Cast("int$"))
-    res = res.To(_.genetic_pos,   Do=_.Cast("real64$"))
+    res = res.To(_.start, _.stop, Do=_.Cast("int?"))
+    res = res.To(_.genetic_pos,   Do=_.Cast("real64?"))
     return res.Copy()
 predefined_sources.register(yeast_feats,name="genomic_feats",category="yeast")  
 
@@ -148,7 +148,7 @@ def omim_genemap():
     res = res.To(_.gene_names,  Do=_.Each(splitfunc, dtype="[symbols:~]<string").Elem()[_ != ""])
     res = res.To(_.method,      Do=_.Each(splitfunc, dtype="[methods:~]<string").Elem()[_ != ""])
     res = res.To(_.disease,     Do=_.Sum().Each(omim_disease_parse,"[diseases:~]<string").Elem()[_ != ""])
-    res = res.To(_.day, _.month, _.year, Do=_.Cast("int$"))
+    res = res.To(_.day, _.month, _.year, Do=_.Cast("int?"))
     res = res.To(_.mim, Do=_.Cast("int"))
 
     return res.Without(_.f8, _.f12, _.disease1, _.disease2, _.disease3).Copy()

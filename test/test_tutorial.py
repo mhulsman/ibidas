@@ -53,8 +53,8 @@ class TestTutorial(unittest.TestCase):
         resx = res/{'f3': 'feat_name', 'f8':'chromosome', 'f9':'start'}
         str(resx)
 
-        res = res.To(_.start, _.stop, Do=_.Cast("int$"))
-        res = res.To(_.genetic_pos,   Do=_.Cast("real64$"))
+        res = res.To(_.start, _.stop, Do=_.Cast("int?"))
+        res = res.To(_.genetic_pos,   Do=_.Cast("real64?"))
         
         resy = res.To(_.gene_aliases,  Do=_.Each(_.split('|')).Elem()[_ != ""])
 
@@ -112,7 +112,7 @@ class TestTutorial(unittest.TestCase):
         str(Corr(res.count))
         str(Corr(res.count.Transpose()))
 
-        res = res.To(_.chromosome, Do=_.Cast("int$"))
+        res = res.To(_.chromosome, Do=_.Cast("int?"))
 
         str(res.Sort(_.chromosome).Get(_.chromosome, Corr(_.count.Transpose()/"chromo_corr")))
         str(res.Get(_.chromosome, _.count.Sum("gtrans_factor")))

@@ -256,18 +256,18 @@ for use.
 First, when reading a file like this one, all input data is in string(bytes) format. For some slices this is not the ideal format.
 Therefore, we cast the necessary slices from ``bytes`` to ``int`` and ``real``::
 
-    res = res.To(_.start, _.stop, Do=_.Cast("int$"))
-    res = res.To(_.genetic_pos,   Do=_.Cast("real64$"))
+    res = res.To(_.start, _.stop, Do=_.Cast("int?"))
+    res = res.To(_.genetic_pos,   Do=_.Cast("real64?"))
 
 Here we introduce two new operations. To is a utility function, which allow one to apply other operations to a subselection 
 of the slices in a data set. In this case, we cast the ``start`` and ``stop`` slice each to integer, and the ``genetic_pos``
-slice to a double floating point type. Note that we do specify ``int$``, i.e. with a
-dollar sign. The dollar sign here means that missing values (empty fields) are allowed. 
+slice to a double floating point type. Note that we do specify ``int?``, i.e. with a
+question mark sign. The question mark sign here means that missing values (empty fields) are allowed. 
 
 .. note:: 
     Maybe you ask yourself why we do not use the following approach::
         
-        >>> res.genetic_pos = res.genetic_pos.Cast("real64$")
+        >>> res.genetic_pos = res.genetic_pos.Cast("real64?")
 
     The reason for that is that res could have been used in another query before executing this command. Changing res by 
     performing this operation would therefore lead to some problems because of the lazy nature of query execution in Ibidas.
@@ -569,7 +569,7 @@ the number of results::
     >>> res
     Slices: | trans_factor    | chromosome    | count                                                             | start                                                              
     -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    Type:   | bytes           | bytes         | int32                                                             | int32$                                                             
+    Type:   | bytes           | bytes         | int32                                                             | int32?                                                             
     Dims:   | gtrans_factor:* | gchromosome:* | gtrans_factor:*<gchromosome:*                                     | gtrans_factor:*<gchromosome:*<gtftargets_feats_ftftargets_feats_fa~
     Data:   |                 |               |                                                                   |                                                                    
             | Gcr2            | 1             | [17 48 60 37 40 32 24 31 80 48 29 52  0 16 42  8]                 | [ [136914 36509 2169 186321 21566 31567 222406 221049 92900 186836~
@@ -641,14 +641,14 @@ As you can see, a square matrix is calculated with all correlation coefficients.
 For this we use the ``Transpose`` operation, which can be used to reorder the dimensions of slices. Of course, from this matrix it is hard to identify which columns/rows correspond to which chromosome.
 So we would like to order on chromosome number. As it is currently a bytes type, the ``Sort`` operation would perform an alphabetic ordering which is not what we want. So, first we cast it to an integer type::
     
-    >>> res = res.To(_.chromosome, Do=_.Cast("int$"))
+    >>> res = res.To(_.chromosome, Do=_.Cast("int?"))
 
 Next, we ``Sort`` the data on chromosome number, and then calculate the correlation, showing both chromosome number and correlation slice::
 
     >>> res.Sort(_.chromosome).Get(_.chromosome, Corr(_.count.Transpose()/"chromo_corr")).Show()
     Slices: | chromosome    | chromo_corr                                                                                                                                              
     -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    Type:   | int32$        | real64$                                                                                                                                                  
+    Type:   | int32?        | real64?                                                                                                                                                  
     Dims:   | gchromosome:* | gchromosome:*<gchromosome:*                                                                                                                              
     Data:   |               |                                                                                                                                                          
             | 1             | [1.0 0.897940020734 0.854198008099 0.89191885686 0.9054486057;  0.847700761107 0.901032202462 0.894138196259 0.904825094876 0.888353880838;  0.875715852~
@@ -675,7 +675,7 @@ We see that chromosome number 17 has a relatively low correlation. Is this due t
     >>> res.Get(_.chromosome, _.count.Sum("gtrans_factor")).Show()
     Slices: | chromosome    | count
     ---------------------------------------
-    Type:   | int32$        | int32
+    Type:   | int32?        | int32
     Dims:   | gchromosome:* | gchromosome:*
     Data:   |               |
             | 1             | 834

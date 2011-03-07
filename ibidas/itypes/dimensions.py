@@ -162,7 +162,7 @@ class Dim(object):
         else:
             res = self.name + ":" + str(self.shape)
         if(self.has_missing):
-            res += "$"
+            res += "?"
         return res
 
 

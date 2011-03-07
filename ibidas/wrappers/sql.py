@@ -57,7 +57,7 @@ class TypeMapperFromSQLAlchemy(VisitorFactory(prefixes=("convert",), #{{{
     
     def convertAny(self, dbtype, column, typestr="any"):
         if(column.nullable):
-            typestr += "$"
+            typestr += "?"
         return rtypes.createType(typestr)
     convertNullType = convertAny
     
@@ -109,7 +109,7 @@ class TypeMapperFromSQLAlchemy(VisitorFactory(prefixes=("convert",), #{{{
         else:
             typestr = "bytes[%d]" % dbtype.length
         if(column.nullable):
-            typestr += "$"
+            typestr += "?"
         
         return rtypes.createType(typestr)
 
@@ -118,7 +118,7 @@ class TypeMapperFromSQLAlchemy(VisitorFactory(prefixes=("convert",), #{{{
         subtype.has_missing = False
         typestr = "[~](" + str(subtype)
         if(column.nullable):
-            typestr += "$"
+            typestr += "?"
         typestr += ")"
         return rtypes.createType(typestr)#}}}
 
@@ -188,7 +188,7 @@ def convert_mysql(col_descriptor, engine):#{{{
         r = _getMySQLTypes(engine)
         d = r[type_code]
         if(null_ok):
-                d += "$"
+                d += "?"
         subtypes.append(rtypes.createType(d))
         fieldnames.append(util.valid_name(name))
     return (fieldnames, subtypes)#}}}
@@ -208,9 +208,9 @@ def convert_postgres(col_descriptor, engine):#{{{
             if(sn['name'] in pgtoibidas):
                 sd = pgtoibidas[sn['name']]
                 #if(not sn['not_null']):
-                #    sd += "$"
+                #    sd += "?"
             else:
-                sd = "any$"
+                sd = "any?"
             if(n['length'] == -1):
                 d = "[~](" + sd + ")"
             else:
@@ -218,7 +218,7 @@ def convert_postgres(col_descriptor, engine):#{{{
         else:
             d = "any"
         if(null_ok):
-                d += "$"
+                d += "?"
         subtypes.append(rtypes.createType(d))
         fieldnames.append(util.valid_name(name))
     return (fieldnames, subtypes)#}}}
@@ -333,7 +333,7 @@ class Connection(object):
                 tables[key] = newtable
             
             if(len(columns) > 1 or any([row['pickle'] or row['dimname'] is None for row in rowinfo])):
-                self.store(name + "__info__",python.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes$,packdepth=int,val=bytes}"))
+                self.store(name + "__info__",python.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes?,packdepth=int,val=bytes}"))
                
                 tablelist = []
                 for t in tables.values():

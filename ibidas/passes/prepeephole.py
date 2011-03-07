@@ -42,7 +42,7 @@ class PrePeepHole(VisitorFactory(prefixes=("visit",), flags=NF_ERROR), manager.P
         if(not isinstance(target, ops.UnpackArrayOp)):
             return
         
-        pack_depth = len(node.type.dims)
+        pack_depth = len(node.pack_dims)
         unpack_depth = len(target.unpack_dims)
         return self.combine_pack_unpack(pack_depth, unpack_depth, node, target)
 
@@ -56,7 +56,7 @@ class PrePeepHole(VisitorFactory(prefixes=("visit",), flags=NF_ERROR), manager.P
             return
         
         unpack_depth = len(node.unpack_dims)
-        pack_depth = len(target.type.dims)
+        pack_depth = len(target.pack_dims)
         return self.combine_pack_unpack(pack_depth, unpack_depth, node, target)
 
     def combine_pack_unpack(self, pack_depth, unpack_depth, node, target):

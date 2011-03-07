@@ -88,6 +88,8 @@ class NestedArray(object):
             
             if(len(dimpath) > cdepth):
                 dtype = object
+            elif(len(dimpath) < cdepth):
+                dtype = dimpaths.getNestedArraySubType(subtype, cdepth - len(dimpath)).toNumpy()
             else:
                 dtype = subtype.toNumpy()
 

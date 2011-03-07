@@ -553,12 +553,25 @@ def getArrayDimPathFromType(rtype):
     else:
         return DimPath()
 
-def getNestedArraySubType(rtype):
+def getNestedArraySubType(rtype,depth):
+    if depth == 0:
+        return rtype
     if(rtype.__class__ is rtypes.TypeArray):
-        return getNestedArraySubType(self.getSubType())
+        depth -= len(rtype.dims)
+        if depth < 0:
+            return rtype
+        else:
+            return getNestedArraySubType(rtype.getSubType(),depth)
     else:
         return rtype
-   
+
+def dimsToArrays(dims, subtype):
+    dims = dims[::-1]
+    subtype = rtypes.TypeArray(dims=dims[:1],subtypes=(subtype,))
+
+    for pos in xrange(1,len(dims)):
+        subtype = rtypes.TypeArray(dims=dims[pos:(pos+1)],subtypes=(subtype,))
+    return subtype
 
 class DimPathRoot(Dim):
     pass

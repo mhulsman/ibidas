@@ -235,7 +235,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
     def visitPackArrayOp(self, node, slice):
-        ndata=slice.data.pack(node.type, len(node.type.dims))
+        ndata=slice.data.pack(node.type, len(node.pack_dims))
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
     def visitInsertDimOp(self,node,slice):
@@ -251,7 +251,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(data=ndata,dims=node.dims,rtype=node.type)
 
     def visitPackListOp(self, node, slice):
-        ndata=slice.data.pack(node.type, len(node.type.dims))
+        ndata=slice.data.pack(node.type, len(node.pack_dims))
         func = lambda x: x.tolist()
         ndata=ndata.map(func,res_type=node.type)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)

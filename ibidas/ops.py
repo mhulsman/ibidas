@@ -355,7 +355,7 @@ class FilterOp(UnaryUnaryOp):#{{{
                     subtype.has_missing = True
 
         if(sdims):
-            ntype = rtypes.TypeArray(array_has_missing, sdims, (subtype,))
+            ntype = dimpaths.dimsToArrays(sdims, subtype)
         else:
             ntype = subtype
         
@@ -467,14 +467,14 @@ class UnpackTupleOp(UnaryUnaryOp):#{{{
         self.tuple_idx = idx#}}}
 
 class PackArrayOp(UnaryUnaryOp):#{{{
-    __slots__ = []
+    __slots__ = ["pack_dims"]
 
     def __init__(self, pslice, ndim=1):
         assert len(pslice.dims) >= ndim, "Op does not have enough dimensions to pack as " + str(ndim) + "-dimensional array"
         
         dims = pslice.dims[-ndim:]
-        has_missing = any([dim.has_missing for dim in dims])
-        ntype = rtypes.TypeArray(has_missing, dims, (pslice.type,))
+        self.pack_dims = dims
+        ntype = dimpaths.dimsToArrays(dims,pslice.type)
         UnaryUnaryOp.__init__(self, pslice, rtype=ntype, dims=pslice.dims[:-ndim])#}}}
 
 class PackListOp(PackArrayOp):#{{{
@@ -610,8 +610,8 @@ class GroupIndexOp(MultiUnaryOp):#{{{
 
         sdim = dimensions.Dim(UNDEFINED,(True,) * (len(ndims) + len(newdims)),name="g" + slices[0].type.dims[0].name)
         stype = rtypes.TypeInt64()
-        rtype = rtypes.TypeArray(subtypes=(stype,), dims= dimpaths.DimPath(sdim))
-        rtype = rtypes.TypeArray(subtypes=(rtype,), dims= dimpaths.DimPath(*newdims))
+        rtype = dimpaths.dimsToArrays(dimpaths.DimPath(sdim), stype)
+        rtype = dimpaths.dimsToArrays(dimpaths.DimPath(*newdims), rtype)
         MultiUnaryOp.__init__(self,slices, name="groupindex", rtype=rtype, dims=ndims)#}}}
 
 class HArrayOp(MultiUnaryOp):#{{{

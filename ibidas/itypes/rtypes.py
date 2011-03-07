@@ -301,7 +301,7 @@ class TypeAny(TypeUnknown):#{{{
     def __repr__(self):
         res = self.name
         if(self.has_missing):
-            res += "$"
+            res += "?"
         return res
 addType(TypeAny)#}}}
 
@@ -475,7 +475,7 @@ class TypeTuple(TypeAny):#{{{
                     for subtype in self.subtypes))
         res += ')'
         if(self.has_missing):
-            res += "$"
+            res += "?"
         return res
 addType(TypeTuple)#}}}
 
@@ -492,7 +492,7 @@ class TypeRecordDict(TypeTuple):#{{{
                     for subtype in self.subtypes))
         res += '}'
         if(self.has_missing):
-            res += "$"
+            res += "?"
         return res
 
 addType(TypeRecordDict)#}}}
@@ -518,6 +518,7 @@ class TypeArray(TypeAny):#{{{
         """
         assert isinstance(dims, dimpaths.DimPath), \
                 "Dims of an array should be a dimpath"
+        assert len(dims) == 1, "Array should have one dimension"
         assert all([isinstance(dim, dimensions.Dim) for dim in dims]), \
                 "Dims tuple should contain Dim objects"
         assert isinstance(subtypes, tuple) and len(subtypes) == 1, \
@@ -727,7 +728,7 @@ class TypeArray(TypeAny):#{{{
         
         res = '[' + ",".join([str(dim) for dim in self.dims]) + ']'
         if(self.has_missing):
-            res += "$"
+            res += "?"
         if(unpack_depth > 1):
             assert isinstance(self.subtypes, TypeArray), \
                    "Unpack depth of tuple is larger than number of " + \
@@ -754,7 +755,7 @@ class TypeSet(TypeArray):#{{{
     def __repr__(self):
         res = ""
         if(self.has_missing):
-            res += "$"
+            res += "?"
         res += '{' + ",".join([str(dim) for dim in self.dims]) + '}'
         res += '<' + str(self.subtypes[0]) 
         return res
@@ -808,7 +809,7 @@ class TypeString(TypeArray):#{{{
     def __repr__(self):
         res =  self.name
         if(self.has_missing):
-            res += "$"
+            res += "?"
         if(self.dims[0].shape >= 0):
             res += '[' + str(self.dims[0].shape) + ']'
         return res
@@ -1121,7 +1122,7 @@ class TypeStringScanner(GenericScanner):#{{{
         self.rv.append(t)
 
     def t_symbol(self,s):
-        r' \= | \? | \. | \{ | \} | \< | \[ | \] | \( | \) | \, | \* | \~ | \$ | \! | \& | \# | \@ | \: | \^ | \|'
+        r' \= | \$ | \? | \. | \{ | \} | \< | \[ | \] | \( | \) | \, | \* | \~ | \! | \& | \# | \@ | \: | \^ | \|'
         t = Token(type=s)
         self.rv.append(t)#}}}
     
@@ -1130,16 +1131,18 @@ class TypeStringParser(GenericParser):#{{{
         GenericParser.__init__(self, start)
 
     def p_param_1(self,args):
-        '   param ::= # name '
+        '   param ::= @ name '
         return AST(type="param",kids=args[1:])
 
     def p_tmatcher(self, args):
         """
-            tmatcher ::= param
-            tmatcher ::= type
-            tmatcher ::= ^ type
+            tmatcher ::= typenest
+            tmatcher ::= ^ typenest
         """
-        return AST(type="tmatcher",kids=args)
+        if len(args) > 1:
+            return AST(type="tmatcher",kids=args)
+        else:
+            return args[0]
 
     def p_tmatcher_list(self, args):
         """
@@ -1154,14 +1157,22 @@ class TypeStringParser(GenericParser):#{{{
             type_andlist ::= type_andlist & type_orlist
         """
         return AST(type="type_andlist", kids=args[:1] + args[2:])
-    
+   
+    def p_type_andlist_1(self, args):
+        """
+            typenest ::= # type_andlist #
+        """
+        return AST(type="typenest", kids=args[1:2])
+
     def p_dmatcher(self, args):
         """
-            dmatcher ::= param
             dmatcher ::= nameddim
             dmatcher ::= ^ nameddim
         """
-        return AST(type="dmatcher",kids=args)
+        if len(args) > 1:
+            return AST(type="dmatcher",kids=args)
+        else:
+            return args[0]
 
     def p_dmatcher_list(self, args):
         """
@@ -1177,6 +1188,12 @@ class TypeStringParser(GenericParser):#{{{
         """
         return AST(type="dim_andlist", kids=args[:1] + args[2:])
 
+    def p_dim_andlist(self, args):
+        """
+            nameddim ::= # dim_andlist #
+        """
+        return AST(type="nameddim", kids=args[1:2])
+
     def p_param_call(self, args):
         """
             param ::= param ( typelist )
@@ -1186,6 +1203,7 @@ class TypeStringParser(GenericParser):#{{{
 
     def p_type_1(self,args):
         """
+            type ::= param
             type ::= name 
             type ::= ?
         """
@@ -1194,10 +1212,17 @@ class TypeStringParser(GenericParser):#{{{
     def p_type_2(self,args):
         """
             type ::= type $
-            type ::= type @
+            type ::= type ?
+            type ::= type !
         """
         return AST(type="hasmissing", kids=args)
-
+    
+    def p_type_2b(self,args):
+        """
+            type ::= type =
+        """
+        return AST(type="strict", kids=args)
+   
     def p_type_3(self,args):
         ' type ::= type [ dimlist ] '
         return AST(type="dims",kids=(args[0], args[2]))
@@ -1222,8 +1247,9 @@ class TypeStringParser(GenericParser):#{{{
     
     def p_type_8(self,args):
         '''
-            typeelem ::= name : type_andlist 
-            typeelem ::= name = type_andlist
+            typeelem ::= typenest
+            typeelem ::= name : typenest
+            typeelem ::= name = typenest
         '''
         return AST(type="typeelem",kids=(args[2], args[0]))
     
@@ -1240,10 +1266,11 @@ class TypeStringParser(GenericParser):#{{{
     
     def p_typenest_2(self,args):
         """
-        typenest ::= typeelem
-        typenest ::= type_andlist
-        typenest ::= typenest < type_andlist 
-        typenest ::= typenest : type_andlist
+        typenest ::= type
+        typenest ::= typenest < type
+        typenest ::= typenest : type
+        typenest ::= typenest < typenest
+        typenset ::= typenest : typenest
         """
         return AST(type="typenest",kids=args)
 
@@ -1272,6 +1299,7 @@ class TypeStringParser(GenericParser):#{{{
             dim ::= integer 
             dim ::= ~
             dim ::= varlist
+            dim ::= param
         '''
         return AST(type="createdim",kids=args)
 
@@ -1292,13 +1320,14 @@ class TypeStringParser(GenericParser):#{{{
     def p_nameddim_4(self,args):
         ''' 
             nameddim ::= nameddim  $
-            nameddim ::= nameddim  @
+            nameddim ::= nameddim  ?
+            nameddim ::= nameddim  !
         '''
         return AST(type="hasmissing",kids=args)
 
     def p_dim_6(self, args):
         """
-            dimelem ::= dim_andlist
+            dimelem ::= nameddim
             dimelem ::= ?
             dimelem ::= ? ?
         """
@@ -1316,23 +1345,14 @@ class TypeStringParser(GenericParser):#{{{
         return AST(type="dimlist",kids=args[:1] + args[2:])
 
     def p_typelist_1(self,args):
-        ''' typelist ::= typenest 
-            typelist ::= typelist , typenest '''
+        ''' typelist ::= typeelem 
+            typelist ::= typelist , typeelem '''
         return AST(type="typelist", kids=(args[:1] + args[2:]))#}}}
 
 class TypeStringASTRewriterPass1(GenericASTRewriter):#{{{
     def process(self, tree):
         self.dim_annot = {}
         return (self.postorder(tree), self.dim_annot)
-    
-    def remove_single(self, node):
-        if len(node.kids) == 1:
-            return node.kids[0]
-        return node
-       
-    n_tmatcher = remove_single
-    n_dmatcher = remove_single
-    
     
     def collapse_list(listname):
         def func(self, node):
@@ -1347,12 +1367,8 @@ class TypeStringASTRewriterPass1(GenericASTRewriter):#{{{
     n_dim_orlist = collapse_list("dim_orlist")
     n_type_andlist = collapse_list("type_andlist")
     n_dim_andlist = collapse_list("dim_andlist")
+    n_typelist = collapse_list("typelist")
 
-    def n_typelist(self, node):
-        if(node.kids[0].type == "typelist"):
-            node.kids = tuple(node.kids[0].kids) + (node.kids[1],)
-        return node 
-   
     def n_dimlist(self, node):
         if(node.kids[0].type == "dimlist"):
             node.kids = tuple(node.kids[0].kids) + (self.annotateDim(node.kids[1]),)
@@ -1377,30 +1393,43 @@ class TypeStringASTRewriterPass1(GenericASTRewriter):#{{{
 
     def n_typenest(self,node):
         if(len(node.kids) > 1):
-            node.packed = node.kids[0].packed + [node.kids[1].type == "<"]
-            node.kids = tuple(node.kids[0].kids) + (node.kids[2],)
+            if node.kids[2].type == "typenest":
+                node.packed = node.kids[0].packed + [node.kids[1].type == "<"] + node.kids[2].packed
+                node.kids = tuple(node.kids[0].kids) + tuple(node.kids[2].kids)
+            else:
+                node.packed = node.kids[0].packed + [node.kids[1].type == "<"]
+                node.kids = tuple(node.kids[0].kids) + (node.kids[2],)
         else:
             node.packed = []
             node.kids = (node.kids[0],)
         return node
     
     def n_createtype(self, node):
-        node.kids = [node.kids[0], None, None, None, None] #hasmissing, name, dims, subtypes
+        node.kids = [node.kids[0], None, None, None, None, False] #hasmissing, name, dims, subtypes, strict
         return node
   
     def n_createdim(self, node):
-        node.kids = [node.kids[0], None, None] #hasmissing, name
+        node.kids = [node.kids[0], None, None, False] #hasmissing, name, strict
         return node
 
     def n_hasmissing(self, node):
         if(node.kids[0].type == "createtype"):
-            node.kids[0].kids[1] = node.kids[1].type == "$"
+            node.kids[0].kids[1] = node.kids[1].type in ("?","$")
         elif(node.kids[0].type == "createdim"):
-            node.kids[0].has_missing = node.kids[1].type == "$"
+            node.kids[0].kids[1] = node.kids[1].type in ("?","$")
         else:
             raise RuntimeError, "Invalid AST!"
         return node.kids[0]
     
+    def n_strict(self, node):
+        if(node.kids[0].type == "createtype"):
+            node.kids[0].kids[5] = True
+        elif(node.kids[0].type == "createdim"):
+            node.kids[0].kids[3] = True
+        else:
+            raise RuntimeError, "Invalid AST!"
+        return node.kids[0]
+   
     def n_dims(self, node):
         assert node.kids[0].type == "createtype", "Invalid AST!"
         if(len(node.kids) > 1):
@@ -1432,7 +1461,7 @@ class TypeStringASTRewriterPass1(GenericASTRewriter):#{{{
         if not node.type == "createdim":
             return node
        
-        depshape, has_missing, name = node.kids
+        depshape, has_missing, name, strict = node.kids
         if(name is None):
             return node
 
@@ -1487,8 +1516,7 @@ class TypeStringASTRewriterPass2(GenericASTRewriter):#{{{
             assert kids[-1].type == "createtype", "Invalid AST!"
             kids[-1].kids[4]= AST(type="typelist",kids=(right,))
         
-        return kids[0]
-
+        return kids[0]#}}}
 
 class TypeStringASTInterpreter(object):#{{{
     def __init__(self, dim_annot, refdims, env={}):
@@ -1507,7 +1535,7 @@ class TypeStringASTInterpreter(object):#{{{
     def n_createtype(self, node, dimpos=0):
         assert node.type == "createtype", "Cannot create type from this specification!"
       
-        typetoken, has_missing, name, dimlist, subtypelist = node.kids
+        typetoken, has_missing, name, dimlist, subtypelist, strict = node.kids
 
         if has_missing is None:
             has_missing = False
@@ -1554,8 +1582,16 @@ class TypeStringASTInterpreter(object):#{{{
                     fieldnames.append(util.valid_name(name))
             kwargs['fieldnames'] = tuple(fieldnames)
 
-
-        return typecls(**kwargs)
+        if 'dims' in kwargs and len(kwargs['dims']) > 1:
+            assert typecls == TypeArray, "Multidimensional types only allowed with arrays"
+            dims = kwargs['dims'][::-1]
+            kwargs['dims'] = dims[:1]
+            subtype = typecls(**kwargs)
+            for pos in xrange(1,len(dims)):
+                subtype = TypeArray(dims=dims[pos:(pos+1)], subtypes=(subtype,))
+            return subtype
+        else:
+            return typecls(**kwargs)
 
     def n_typeelem(self, node, dimpos):
         return self.visit(node.kids[0],dimpos)
@@ -1567,7 +1603,7 @@ class TypeStringASTInterpreter(object):#{{{
 
     def n_createdim(self, node, dimpos):
         assert node.type == "createdim", "Cannot create dim from this specification!"
-        dimnode, has_missing, name = node.kids
+        dimnode, has_missing, name, strict = node.kids
         if has_missing is None:
             has_missing = False
        
@@ -1633,142 +1669,171 @@ class TypeStringMatchASTInterpreter(object):
         self.error_message = message
     def unsetError(self):
         self.error_message = ""
+    
+    def visit(self, node, matchers):
+        name = 'n_' + str(node.type)
+        if hasattr(self, name):
+            func = getattr(self, name)
+            if isinstance(matchers,tuple):
+                mres = []
+                for matcher in matchers:
+                    mres.append(func(node, matcher))
+                res = any([x for x,y in mres])
+                ms = sum([y for x,y in mres],())
+            else:
+                res, ms = func(node, matchers)
+            return (res, ms)
+        else:
+            raise RuntimeError, "Cannot find method to process: " + name
+
+    def paramvisit(self, node, dims):
+        name = 'p_' + str(node.type)
+        if hasattr(self, name):
+            func = getattr(self, name)
+            return func(node, dims)
+        else:
+            raise RuntimeError, "Cannot find method to process: " + name
 
     def n_typenest(self, node, matchtype, dims=None):
         assert node.type == "typenest", "Invalid AST!"
         packlist = node.packed + [False]
         for packed, kid in zip(packlist[::-1], node.kids[::-1]):
             if packed:
-                res, dims = self.packed_dim_check(node.kids[0], dims) 
+                res, dims = self.paramvisit(kid, dims) 
                 if res is False:
-                    return False
+                    return (False,())
             else:
                 if self.packdepth > 0:
                     raise RuntimeError, "Cannot intermix packed and non-packed types (unpacked: <, packed: :)"
 
         dims = None
+        matchtypes = matchtype
         for pos, (packed, matcher) in enumerate(zip(packlist, node.kids)):
             if packed:
                 continue
-            res = self.visit(matcher, matchtype)      
+            res, matchtypes = self.visit(matcher, matchtypes)      
             if res is False:
-                return False
-            if pos < (len(node.kids)-1):
-                if not hasattr(matchtype, 'subtypes'):
-                    return False
-                if not len(matchtype.subtypes) == 1:
-                    return False
-                matchtype = matchtype.subtypes[0]
-        return True
+                return (False,())
+        return (True,matchtypes)
 
+    def subtype(self, matchtypes):
+        if isinstance(matchtypes, tuple):
+            res = []
+            for matchtype in matchtypes:
+                if hasattr(matchtype, 'subtypes') and len(matchtype.subtypes) == 1:
+                    res.append(matchtype.subtypes[0])
+            res = tuple(res)
+        else:
+            if hasattr(matchtypes, 'subtypes') and len(matchtypes.subtypes) == 1:
+                res = matchtypes.subtypes
+            else:
+                res = ()
+        return res
 
-    def packed_dim_check(self, node, dims):
+    def p_createtype(self, node, dims):
         if not dims:
             self.setError("Asked to pack dimension, but no dimension found")
             return False, None
-        if not node.type == "createtype" or not node.kids[0].attr == "array":
+        if  node.kids[0].attr == "array":
             raise RuntimeError, "Only array type allowed in packed type matcher"
         
         dimlist = node.kids[3]
         if any([d.type == "??" for d in dimlist.kids]):
             raise RuntimeError, "No variable dimension lists (??) allowed in packed type matcher"
 
-
-        self.visit(dimlist, dims[-len(dimlist):])
+        res, rdims = self.visit(dimlist, (dims[-len(dimlist):],))
         self.packdepth += len(dimlist)
-        return True, dims[:-len(dimlist)]
-
-
-    def visit(self, node, matchtype):
-        name = 'n_' + str(node.type)
-        if hasattr(self, name):
-            func = getattr(self, name)
-            return func(node, matchtype)
-        else:
-            raise RuntimeError, "Cannot find method to process: " + name
-
+        return (res, dims[:-len(dimlist)])
+    
     def n_param(self, node, matchtype):
         name = node.kids[0].attr
         if name in self.env and  self.env[name] != matchtype:
             self.setError("Matches of multiple recurrences of variable: " + name + " are not equal")
             return False
         self.env[name] = matchtype
-        return True
+        return (True, self.subtype((matchtype,)))
 
     def n_type_orlist(self, node, matchtype):
-        res = any([self.visit(matcher, matchtype) for matcher in node.kids])
+        results = [self.visit(matcher, matchtype) for matcher in node.kids]
+        res = any([x for x, m in results])
+        ms = sum([m for x, m in results if x],())
         if res is True:
             self.unsetError()
-        return res
+        return (res, ms)
     
     def n_type_andlist(self, node, matchtype):
-        return all([self.visit(matcher, matchtype) for matcher in node.kids])
+        results = [self.visit(matcher, matchtype) for matcher in node.kids]
+        res = all([x for x, m in results])
+        ms = sum([m for x, m in results],())
+        return (res, ms)
 
     def n_tmatcher(self, node, matchtype):
         if node.kids[0].type == "^":
-            res = not self.visit(node.kids[1], matchtype)
+            res,ms = self.visit(node.kids[1], matchtype)
+            res = not res
             if res is False:
                 self.setError("Type " + str(matchtype) + " matches negative constraint")
             else:
                 self.unsetError()
-            return res
+            return (res, ms)
         else:
             return self.visit(node.kids[0], matchtype)
 
 
     def n_createtype(self, node, matchtype):
-        typetoken, has_missing, name, dimlist, subtypelist = node.kids
+        typetoken, has_missing, name, dimlist, subtypelist, strict = node.kids
 
         if(typetoken.type == '?'):
-            return True
+            return (True,())
+        elif(typetoken.type == 'param'):
+            res, ms = self.visit(typetoken, matchtype) 
         else:
             typename = typetoken.attr
+            
+            if(typename not in __typenames__):
+                raise RuntimeError, "Unknown type name: " + str(typename)
+            typecls = __typenames__[typename]
         
-        if(typename not in __typenames__):
-            raise RuntimeError, "Unknown type name: " + str(typename)
-        typecls = __typenames__[typename]
-        
-        if not isinstance(matchtype, typecls):
-            self.setError("Type class mismatch for: " + str(matchtype) + ", expected: " + typecls.name)
-            return False
+            if not isinstance(matchtype, typecls):
+                self.setError("Type class mismatch for: " + str(matchtype) + ", expected: " + typecls.name)
+                return (False,())
 
         
         if not has_missing is None and not matchtype.has_missing is has_missing:
             self.setError("Type: " + str(matchtype) + " has incorrect has_missing state")
-            return False
+            return (False,())
                 
         if not dimlist is None:
             if not hasattr(matchtype, "dims"):
                 self.setError("Required type with dimensions, but found: " + str(matchtype))
-                return False
-            res = self.visit(dimlist, matchtype.dims)
+                return (False,())
+            res,md = self.visit(dimlist, (matchtype.dims,))
             if res is False:
-                return False
+                return (False,())
         
         if not subtypelist is None:
             if not hasattr(matchtype, "subtypes"):
                 self.setError("Required type with subtypes, but found: " + str(matchtype))
-                return False
+                return (False,())
             if subtypelist.type == "typelist":
                 if not len(subtypelist.kids) == len(matchtype.subtypes):
                     self.setError("Incorect number of subtypes, expected: " + str(len(subtypelist.kids)) + " but found: " + str(len(matchtype.subtypes)))
-                    return False
+                    return (False,())
                 for subtype, kid in zip(matchtype.subtypes, subtypelist.kids):
-                    res = self.visit(kid, subtype)
+                    res,ms = self.visit(kid, subtype)
                     if res is False:
-                        return False
+                        return (False,())
             elif subtypelist.type == "createtype":
                 if not len(matchtype.subtypes) == 1:
                     self.setError("Incorect number of subtypes, expected 1 but found: " + str(len(matchtype.subtypes)))
                     return False
-                res = self.visit(subtypelist, matchtype.subtypes[0])
+                res,ms = self.visit(subtypelist, matchtype.subtypes)
                 if res is False:
-                    return False
+                    return (False,())
             else:
                 raise RuntimeError, "Unexpected subtypelist in AST"
 
-
-        return True
+        return (True, self.subtype(matchtype))
 
     def n_typeelem(self, node, matchtype):
         return self.visit(node.kids[0], matchtype)
@@ -1776,18 +1841,18 @@ class TypeStringMatchASTInterpreter(object):
     def n_createdim(self, node, dim):
         if not isinstance(dim, dimensions.Dim):
             self.setError("Expected dimension, but found none")
-            return False
+            return (False,())
 
-        dimnode, has_missing, name = node.kids
+        dimnode, has_missing, name, strict = node.kids
         if not has_missing is None and not dim.has_missing is has_missing:
             self.setError("Dimension: " + str(dim) + " has incorrect has_missing state")
-            return False
+            return (False,())
         
         if not name is None:
             if isinstance(self.dim_annotations[name], dimensions.Dim):
                 if not self.dim_annotations[name] == dim:
                     self.setError("Dimensions with same name: " + name + " in matcher do not match in type for " + str(self.dim_annotations[name]) + " and " + str(dim))
-                    return False
+                    return (False,())
             self.dim_annotations[name] = dim
 
         if(dimnode.type == "varlist"):
@@ -1796,44 +1861,67 @@ class TypeStringMatchASTInterpreter(object):
                 dependent = dependent[:-1]
             if not dim.dependent == dependent:
                 self.setError("Dimenension " + str(dim) + " does have incorrect dependence struture")
-                return False
+                return (False,())
         elif(dimnode.type == "integer"):
             if not dim.shape == dimnode.attr:
                 self.setError("Dimenension " + str(dim) + " does have incorrect shape (" + str(dim.shape) + " instead of " + str(dimnode.attr) + ")")
-                return False
+                return (False,())
         elif(dimnode.type == "~"):
             if not dim.dependent:
                 self.setError("Dimenension " + str(dim) + " should be variable but is not")
-                return False
+                return (False,())
         else:
             raise RuntimeError, "Invalid AST!"
 
-        return True
+        return (True,())
 
     def n_dimlist(self, node, dims):
         return self.match(node.kids, dims)
+    
+    def n_nameddim(self, node, dims):
+        return self.visit(node.kids[0], (dims,))
+    
+    def n_dim_orlist(self, node, dims):
+        xdims = (dims,)
+        results = [self.visit(matcher, xdims) for matcher in node.kids]
+        res = any([x for x, m in results])
+        ms = sum([m for x, m in results if x],())
+        if res is True:
+            self.unsetError()
+        return (res, ms)
+    
+    def n_dim_andlist(self, node, dims):
+        xdism = (dims,)
+        results = [self.visit(matcher, xdims) for matcher in node.kids]
+        res = all([x for x, m in results])
+        ms = sum([m for x, m in results],())
+        return (res, ms)
 
     def match(self, dim_matchers, dims):
         if not dim_matchers and not dims:
-            return True
+            return (True,())
         elif not dims:
             self.setError("Expected dimension, but found none")
-            return False
+            return (False,())
         elif not dim_matchers:
             self.setError("Expected no dimension, but found one")
-            return False
+            return (False,())
 
         if dim_matchers[0].type == "?":
             if len(dims) == 0:
                 self.setError("Expected dimension, but found none")
-                return False
+                return (False,())
             return self.match(dim_matchers[1:], dims[1:])
         elif dim_matchers[0].type == '??':
-            return any([self.match(dim_matchers[1:],dims[pos:])  for pos in xrange(len(dims))])
+            mres = [self.match(dim_matchers[1:],dims[pos:])  for pos in xrange(len(dims) + 1)]
+            res = any([x for x,y in mres])
+            if res is True:
+                self.unsetError()
+            return (res,())
         else:
-            res = self.visit(dim_matchers[0], dims[0])
+            res, md = self.visit(dim_matchers[0], dims[0])
             if res is False:
-                return False
+                return (False,())
             return self.match(dim_matchers[1:], dims[1:])
 
 
@@ -1844,10 +1932,10 @@ def matchType(name, matchtype, env=None, dims=None):
     parser = TypeStringParser()
 
     tree = parser.parse(tokens)
-    print '1: ', tree  
+    #print '1: ', tree  
     rewriter1 = TypeStringASTRewriterPass1()
     tree, dim_annotation = rewriter1.process(tree)
-    print '2: ', tree, dim_annotation
+    #print '2: ', tree, dim_annotation
 
     if env is None:
         env = {}

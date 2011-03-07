@@ -611,7 +611,10 @@ class ContainerScanner(TypeScanner):
     def getType(self):
         subtype = self.getSubDetector().getType()
         dims = dimpaths.DimPath(*[self.getDimRep(i).dim for i in xrange(self.min_dim)])
-        return rtypes.TypeArray(self.detector.hasMissing(), dims, (subtype,))
+        if self.detector.hasMissing():
+            dims[0].has_missing = True
+
+        return dimpaths.dimsToArrays(dims, subtype)
 
     def scan(self, seq):
         has_missing = self.detector.hasMissing()
