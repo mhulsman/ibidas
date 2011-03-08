@@ -22,3 +22,11 @@
 - added support for len
 - various bug fixes
 
+
+0.1.3:
+- version downgrade for numpy dependency
+
+0.1.4:
+- some fixes in array type handling
+- missing values in types now indicated by '?'
+- evidence added to go annotation data source
