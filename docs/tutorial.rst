@@ -298,7 +298,7 @@ As last step, we execute all operations, and store the result in memory::
 
 Note that this whole dataset is also predefined in Ibidas, and can be obtained using::
 
-    yeast_feats = Get.yeast.yeast_feats()
+    yeast_feats = Get.yeast.genomic_feats()
 
 
 Linking the datasets
