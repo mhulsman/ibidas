@@ -669,14 +669,14 @@ class MultiMultiOp(MultiOp):
 class EquiJoinIndexOp(MultiMultiOp):
     __slots__ = ["jointype"]
 
-    def __init__(self, leftslice, rightslice, jointype="inner"):
+    def __init__(self, leftslice, rightslice, jointype="inner", mode="dim"):
         leftslice = ensure_frozen(leftslice)
         rightslice = ensure_frozen(rightslice)
 
         leftslice = PackArrayOp(leftslice)
         rightslice = PackArrayOp(rightslice)
         
-        leftslice,rightslice= broadcast((leftslice,rightslice),mode="dim")[0]
+        leftslice,rightslice= broadcast((leftslice,rightslice),mode=mode)[0]
 
         assert leftslice.dims == rightslice.dims, "Parent dims of join fields should be equal"
         name= leftslice.type.dims[0].name + "_" + rightslice.type.dims[0].name

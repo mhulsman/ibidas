@@ -746,6 +746,7 @@ def co_mapseq(func, nested_arrays, *args, **kwargs):
 
     #determine if there is incomplete broadcasting going on
     lastpos = len(na_ref.idxs)-1
+    lasti = 0
     xshape = []
     for i in range(idxlen):
         pos = idxlen -i - 1
@@ -756,8 +757,12 @@ def co_mapseq(func, nested_arrays, *args, **kwargs):
         if len(res) > 1:
             assert len(res) == 2 and 1 in res, "Unequal dims in co_mapseq"
             lastpos = pos - 1
+            lasti = i
             res.discard(1)
             xshape.append(res.pop())
+        else:
+            xshape.append(res.pop())
+    xshape = xshape[:(lasti+1)]
     bcdepth = len(na_ref.idxs) - lastpos
 
     dummy,flatshape = na_ref._flatData(depth=lastpos)

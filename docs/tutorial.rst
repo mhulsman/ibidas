@@ -275,7 +275,7 @@ question mark sign. The question mark sign here means that missing values (empty
     with the ``To`` operation.
     
 Next, we take a look at the ``gene_aliases`` field, which contains multiple gene aliases separated by the '|' symbol.
-To split this into a nested array, we use the split function::
+To split this into a nested array, we use the standard Python split function::
 
     res = res.To(_.gene_aliases,  Do=_.Each(_.split('|')).Elem()[_ != ""])
 
@@ -372,7 +372,7 @@ a bit more thoroughly, to show the use of some other operations. First, we deter
             | YBL101W-B
             | DEX2
 
-This introduces the ``Except`` commands. Using it, we keep only the targets in yeastract that do not occur in ``tf_feat.target``. Another low level way to accomplish the same result
+This introduces the ``Except`` command. Using it, we keep only the targets in yeastract that do not occur in ``tf_feat.target``. Another low level way to accomplish the same result
 would be::
     
     >>> non_matched = (yeastract.target.Set() - tf_feat.target.Set()).Elem()
@@ -418,7 +418,7 @@ Next we look at the gene_aliases column. As you might remember this slice does c
 As you can see, ``|In|`` matches with the last dimension of ``gene_aliases`` as described before. This means that there are multiple aliases list to be matched, which together with
 the multiple names to be tested results in a matrix of results. Of course, this is not what we exactly want. We can solve this in two different ways:
 
-The straightforward appraoch is to use Any::
+The straightforward approach is to use Any::
 
     >>> Any(nonmatched |In| yeast_feats.gene_aliases.Each(str.upper))
     Slices: | result
@@ -522,20 +522,19 @@ Now we select from the yeastract dataset the pairs with the non matched targets:
 Our approach now would be to match yt_nm with the genomic feature dataset, and then to stack the results with the original dataset.
 
 There is however a small problem. In order to match the data, we have to make sure that each slice in both datasets has the same dimension. However, if we 
-match our data on the gene_aliases field, we first have to flatten it, thereby changing its dimension. The ideal approach to solve this would be to use to more
-flexible ``Join`` command, like so::
+match our data on the gene_aliases field, we first have to flatten it, thereby changing its dimension. It then can not be stacked anymore with
+the gene_aliases field in the `tf_feat` dataset. The ideal approach to solve this would be to use the more flexible ``Join`` command, like so::
 
-    #do not try
     >>> yt_nm.Join(yeast_feats, (_.target == _.gene_aliases).Any())
 
-Unfortunately, the current implementation of Join is not efficient enough to handle this. 
+This works, but unfortunately, the current implementation of Join is not yet efficient enough to handle larger datasets. 
 
-Therefore, we use a small workaround, copying the gene_aliases field, and packaging the original::
+Therefore, we use a small workaround, copying the gene_aliases field, such that we can use one version for matching and one for stacking.
+We package the gene_aliases field used for stacking, such that it is not flattened by the subsequent ``Flat`` operation::
 
     >>> yeast_feats = yeast_feats.Get("*", _.gene_aliases/"gene_aliases2")
     >>> yeast_feats = yeast_feats.To(_.gene_aliases, Do=_.Array())
     
-As the gene_aliases field is now packaged, it will just be handled like any other field when performing the ``Flat`` operation. 
 We are now ready to perform the Match operation:: 
 
     >>> res = yt_nm.Match(yeast_feats.Flat(), _.target, _.gene_aliases2).Without(_.gene_aliases2)
@@ -545,7 +544,7 @@ Using the ``Without`` operation, we remove the ``gene_aliases2`` slice, and then
     >>> tf_feat = Stack(tf_feat, res).Copy()
 
 .. note:: 
-   Of course, we could also just have removed the gene_aliases field from both datasets before stacking if we did not need it in further analyses ...
+   Of course, we could also just have removed the gene_aliases field from both datasets before stacking if it was not needed in further analyses ...
 
 This was a lot of extra work for just a few extra matched pairs. However, hopefully it has illustrated several operations that can be performed with Ibidas. 
 

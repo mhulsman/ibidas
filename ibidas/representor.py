@@ -285,10 +285,10 @@ class Representor(Node):
             if(isinstance(cond,NewDim)):
                 self = repops_dim.InsertDim(self,pos + ipos, cond.name)
             elif(cond is Ellipsis):
-                ulength = len(dimpaths.uniqueDimPath([s.dims for s in self._slices]))
+                ulength = len(dimpaths.uniqueDimPath([s.dims for s in self._slices], only_unique=True))
                 rem_length = len([c for c in condition[(pos + 1):] if not isinstance(cond,NewDim)])
                 newnextpos = ulength - rem_length
-                curnextpos = pos + ipos + 1
+                curnextpos = pos + ipos
                 ipos += newnextpos - curnextpos #skip some dims
         
         #next, perform filtering in backwards order

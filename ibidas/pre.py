@@ -51,12 +51,11 @@ def yeast_aliases(feats, remove_multi=True):
     res = res/("alias", "feat_name")
     res = res%"feat_aliases"
     res = res[_.alias != ""].Unique()
-    
+    res = res.Each(str.upper, dtype="bytes")
     if remove_multi:
         multi_aliases = res.GroupBy(_.alias)[_.feat_name.Count() > 1].alias
         res = res[~(_.alias |In| multi_aliases)]
     
-    res = res.Each(str.upper, dtype="bytes")
     return res.Copy()
 predefined_sources.register(yeast_aliases,name="name_aliases",category="yeast")  
 
@@ -261,13 +260,40 @@ def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyc
     go = open_go(dburl)
     g = go.species |Match(_.id,                   _.species_id)|      go.gene_product
     g = g          |Match(_.gene_product.id,      _.gene_product_id)| go.association
-    g = g          |Match(_.association.term_id,  _.term2_id)|        go.graph_path
-    g = g          |Match(_.term1_id,             _.id)|              go.term//"annot"
-    g = g          |Match(_.relationship_type_id, _.id)|              go.term//"rel"
+    g = g          |Match(_.association.term_id,   _.id)|             go.term//"annot"
     g = g          |Match(_.association.id,       _.association_id)|  go.evidence
+    g = g          |Match(_.gene_product.dbxref_id,           _.id)|  go.dbxref
     g = g[(_.genus==genus) & (_.species == species)][_.is_not == False]
-    return g.Get(_.symbol, _.annot.name/"annotation", _.rel.name/"relation_type", _.evidence.code, _.distance)%"annotations"
+    return g.Get(_.symbol   /"gene_symbol",   _.xref_key / "gene_id",  
+                 _.annot.acc/"go_id",         _.annot.name/"annotation", _.annot.term_type/"go_type", 
+                 _.evidence.code/"evidence")%"annotations"
 predefined_sources.register(go_annotations,name="annotations",category="go")
+
+def go_info(dburl=config.get("databases.go_url",None), genus="Saccharomyces", species="cerevisiae"):
+    """Accesses GO term info in a MySQL database.
+
+       Database data can be obtained from the geneontology website.
+
+       example url: "mysql://username:password@hostname:port/go
+    """
+    go = open_go(dburl)
+    if not genus is None or species is None:
+        g = go.species
+        g = g |Match(_.id, _.species_id)|                   go.gene_product
+        g = g |Match(_.gene_product.id, _.gene_product_id)| go.association
+        g = g |Match(_.association.term_id, _.term2_id)|    go.graph_path
+        g = g[(_.genus==genus) & (_.species == species)]
+    else:
+        g = go.graph_path
+    g = g |Match(_.term2_id, _.id)| go.term//"child"
+    g = g |Match(_.term1_id, _.id)| go.term//"parent"
+    g = g |Match(_.relationship_type_id, _.id)| go.term//"rel"
+    g = g.GroupBy(_.child.acc, flat=_.child.term_type)
+    g = g[_[_.parent.acc == "all"].distance.Count() != 0]
+    return g.Get(_.child.acc/"go_id", _.child.term_type/"go_type", 
+                 _[_.parent.acc == "all"].distance.Max()/"depth",
+                 _.parent.acc / "ancestor", _.rel.name/"relationship",_.distance).Copy()
+predefined_sources.register(go_info,name="term_info",category="go")
 
 
 ########################### #KEGG ######################################

@@ -324,7 +324,7 @@ class Join(repops.MultiOpRep):
 
 
 class Match(repops.MultiOpRep):
-    def __init__(self, lsource, rsource, lslice=None, rslice=None, jointype="inner", merge_same=False):
+    def __init__(self, lsource, rsource, lslice=None, rslice=None, jointype="inner", merge_same=False, mode="dim"):
         assert jointype in set(["inner","left","right","full"]), "Jointype should be inner, left, right or full"
         assert (not isinstance(lslice,representor.Representor)), "Representor objects not allowed as lslice. Use context, string or int to indicate slice in lsource"
         assert (not isinstance(rslice,representor.Representor)), "Representor objects not allowed as rslice. Use context, string or int to indicate slice in rsource"
@@ -337,9 +337,9 @@ class Match(repops.MultiOpRep):
         if not lslice is None:
             lslice = lsource.Get(lslice)
             
-        repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice),jointype=jointype, merge_same=merge_same)
+        repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice),jointype=jointype, merge_same=merge_same,mode=mode)
 
-    def _process(self, sources, jointype, merge_same):
+    def _process(self, sources, jointype, merge_same,mode):
         lsource, rsource, lslice,rslice = sources
         if not lsource._slicesKnown() or not rsource._slicesKnown():
             return
@@ -362,20 +362,20 @@ class Match(repops.MultiOpRep):
             return
         lslice = lslice._slices[0]
         rslice = rslice._slices[0]
-        nslices = self._apply(lsource, rsource, lslice, rslice, jointype, merge_same)
+        nslices = self._apply(lsource, rsource, lslice, rslice, jointype, merge_same, mode)
         return self._initialize(tuple(nslices))
    
     @classmethod
-    def _apply(cls,lsource, rsource, lslice,rslice, jointype="inner", merge_same=False):
-        lindex,rindex = ops.EquiJoinIndexOp(lslice,rslice, jointype=jointype).results
+    def _apply(cls,lsource, rsource, lslice,rslice, jointype="inner", merge_same=False, mode="dim"):
+        lindex,rindex = ops.EquiJoinIndexOp(lslice,rslice, jointype=jointype, mode=mode).results
 
         lslices = list(lsource._slices)
         rslices = list(rsource._slices)
         if(lslice.name == rslice.name and jointype=="inner" and lslice in lslices and rslice in rslices):
             rslices.pop(rslices.index(rslice))
 
-        lslices = list(Filter._apply(lslices, lindex, lslice.dims, "dim"))
-        rslices = list(Filter._apply(rslices, rindex, rslice.dims, "dim"))
+        lslices = list(Filter._apply(lslices, lindex, lslice.dims[-1:], "dim"))
+        rslices = list(Filter._apply(rslices, rindex, rslice.dims[-1:], "dim"))
         if merge_same:
             lnames = [lslice.name for lslice in lslices]
             for rslice in list(rslices):

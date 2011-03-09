@@ -63,7 +63,7 @@ class Shape(repops.UnaryOpRep):
 
 class InsertDim(repops.UnaryOpRep):
     def _sprocess(self, source, insertpoint, name=None):
-        assert len(dimpaths.uniqueDimPath([s.dims for s in source._slices],only_complete=False)) >= insertpoint, "No unique dimpath covering dim insertion point"
+        assert len(dimpaths.uniqueDimPath([s.dims for s in source._slices],only_unique=False)) >= insertpoint, "No unique dimpath covering dim insertion point"
         ndim = dimensions.Dim(1,name=name)
         nslices = []
         for slice in source._slices:
