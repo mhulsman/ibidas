@@ -1,0 +1,8 @@
+include README
+include CHANGELOG
+
+include ez_setup.py
+
+recursive-include src *
+recursive-include docs *
+prune docs/_build

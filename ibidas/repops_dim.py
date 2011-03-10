@@ -208,7 +208,7 @@ class Flat(repops.UnaryOpRep):
                 if(len(sdims) <= flatpos or sdims[flatpos] != selpath[-1]):
                     slice = ops.InsertDimOp(slice,flatpos,bcdim)
                     bcdims = slice.dims[:flatpos] + (selpath[-1],) + slice.dims[flatpos:]
-                    plan = [BCCOPY] * len(slice.dims[:flatpos]) + [BCEXIST] + [BCCOPY] * len(slice.dims[flatpos:])
+                    plan = [BCSOURCE] * len(slice.dims[:flatpos]) + [BCEXIST] + [BCSOURCE] * len(slice.dims[flatpos:])
                     slice = ops.BroadcastOp(slice,[refslices],plan,bcdims)
                 slice = ops.FlatDimOp(slice,flatpos,ndim)
                 if(len(lastpos) > 1):

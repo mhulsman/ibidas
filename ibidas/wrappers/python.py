@@ -354,7 +354,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                     rshape = add_independent(rshape,node.dims[pos])
                 repeat_dict[pos] = rshape
                 bcpos += 1
-            elif(planelem == BCCOPY):
+            elif(planelem == BCCOPY or planelem == BCSOURCE):
                 pass
             else:
                 raise RuntimeError, "Unknown broadcast plan element: " + str(planelem)
@@ -499,7 +499,10 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def castto_numbers(self,castname,node,slice):
         dtype = node.type.toNumpy()
-        return slice.data.mapseq(lambda x:numpy.cast[dtype](x),res_type=node.type)
+        if not node.type.has_missing:
+            return slice.data.mapseq(lambda x:numpy.cast[dtype](x),res_type=node.type)
+        else:
+            raise RuntimeError, "Casting missing values not yet supported"
 
     def caststring_to_int(self, castname, node, slice):
         if(node.type.has_missing):

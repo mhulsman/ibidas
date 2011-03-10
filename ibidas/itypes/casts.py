@@ -91,12 +91,11 @@ def castMultipleImplicitCommonType(*types):
 # CAST: check type functions
 ############
 def checkDefault(intype, outtype):#{{{
-    if(intype.has_missing and not outtype.has_missing):
-        return False
     return True
 
 def simDefault(intype, outtypecls, dimdepth):
     return outtypecls(intype.has_missing)
+#}}}
 addCasts(rtypes.TypeNumbers | set([rtypes.TypeAny]), rtypes.TypeNumbers, checkDefault, simDefault,"to_numbers")
 addCasts(rtypes.TypeAll, rtypes.TypeAny, checkDefault, simDefault,"to_any")
 addCasts(rtypes.TypeStrings, rtypes.TypeIntegers, checkDefault, simDefault,"string_to_int")

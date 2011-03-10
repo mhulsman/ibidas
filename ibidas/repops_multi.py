@@ -174,9 +174,8 @@ class Filter(repops.MultiOpRep):
             mode = "pos"
         else:
             mode = "dim"
-
         nslices = self._apply(source._slices,cslice,seldimpath,mode)
-
+       
         return self._initialize(tuple(nslices))
 
     @classmethod
@@ -191,6 +190,9 @@ class Filter(repops.MultiOpRep):
             cslice = ops.PackArrayOp(cslice,1)
         else:
             assert seldimpath, "Filter dimpath is empty"
+
+            #if(cslice.dims and isinstance(cslice.type,rtypes.TypeInteger)):
+            #    cslice = ops.PackArrayOp(cslice)
 
             if(isinstance(cslice.type, rtypes.TypeInteger)):
                 ndim = None
@@ -367,12 +369,23 @@ class Match(repops.MultiOpRep):
    
     @classmethod
     def _apply(cls,lsource, rsource, lslice,rslice, jointype="inner", merge_same=False, mode="dim"):
-        lindex,rindex = ops.EquiJoinIndexOp(lslice,rslice, jointype=jointype, mode=mode).results
+        lslice = ops.ensure_frozen(lslice)
+        rslice = ops.ensure_frozen(rslice)
+
+        leftslice = ops.PackArrayOp(lslice)
+        rightslice = ops.PackArrayOp(rslice)
+       
+        ((bleftslice,brightslice),(leftplan,rightplan))= ops.broadcast((leftslice,rightslice),mode=mode)
+
+        lindex,rindex = ops.EquiJoinIndexOp(bleftslice,brightslice, jointype=jointype, mode=mode).results
 
         lslices = list(lsource._slices)
         rslices = list(rsource._slices)
         if(lslice.name == rslice.name and jointype=="inner" and lslice in lslices and rslice in rslices):
             rslices.pop(rslices.index(rslice))
+
+        lslices = [ops.broadcastParentsFromPlan(tslice, lslice.dims[-1:], leftplan, leftslice.dims, bleftslice.dims, [rightslice], True) for tslice in lslices]
+        rslices = [ops.broadcastParentsFromPlan(tslice, rslice.dims[-1:], rightplan, rightslice.dims, brightslice.dims, [leftslice], True) for tslice in rslices]
 
         lslices = list(Filter._apply(lslices, lindex, lslice.dims[-1:], "dim"))
         rslices = list(Filter._apply(rslices, rindex, rslice.dims[-1:], "dim"))

@@ -219,7 +219,7 @@ class BroadcastOp(UnaryUnaryOp):#{{{
                 assert refslices[bcpos],"No refslices for broadcast of dim: " + str(bcdims[pos])
                 bcpos += 1
                 ndims, ntype = ndims.updateDim(pos, bcdims[pos], ntype)
-            elif(planelem == BCCOPY):
+            elif(planelem == BCCOPY or planelem == BCSOURCE):
                 pass
             else:
                 raise RuntimeError, "Unknown plan element in plan: " + str(plan)
@@ -243,60 +243,73 @@ def broadcast(slices,mode="pos", partial=False):#{{{
 
     nslices = []
     for plan,slice in zip(bcplan,slices):
-        nplan = []
-        active_bcdims = []
-        for dimpos, bcdim, planelem in zip(range(len(bcdims)),bcdims,plan):
-            if(planelem == BCNEW):
-                ndim = dimensions.Dim(1)
-                slice = InsertDimOp(slice,dimpos,ndim)
-                active_bcdims.append(bcdim)
-                nplan.append(BCEXIST)
-            elif(planelem == BCENSURE):
-                slice = EnsureCommonDimOp(slice,references[bcdim],dimpos,bcdim)
-                nplan.append(BCCOPY)
-            elif(planelem == BCEXIST):
-                active_bcdims.append(bcdim)
-                nplan.append(planelem)
-            elif(planelem == BCINSERT):
-                ndim = dimensions.Dim(1)
-                slice = InsertDimOp(slice,dimpos,ndim)
-                nplan.append(BCCOPY)
-            else:
-                nplan.append(planelem)
-        if(active_bcdims):                
-            slice = BroadcastOp(slice,[references[bcdim] for bcdim in active_bcdims],nplan,bcdims,partial)
+        slice = apply_broadcast_plan(slice, plan, bcdims, references, partial)
         nslices.append(slice)
     return (nslices, bcplan)
     #}}}
 
-def apply_broadcast_plan(slices,bcdims, bcplan):#{{{
+def broadcast_fromplan(slice, refslices, plan, origdims, bcdims,  partial=False):#{{{
     references = defaultdict(list)
     for bcdim in bcdims:
-        for slice in slices:
-            if bcdim in slice.dims:
-                references[bcdim].append(slice)
-   
-    nslices = []
-    for plan,slice in zip(bcplan,slices):
-        nplan = []
-        active_bcdims = []
-        for dimpos, bcdim, planelem in zip(range(len(bcdims)),bcdims,plan):
-            if(planelem == BCNEW):
-                ndim = dimensions.Dim(1)
-                slice = InsertDimOp(slice,dimpos,ndim)
-                active_bcdims.append(bcdim)
-                nplan.append(BCEXIST)
-            elif(planelem == BCENSURE):
-                slice = EnsureCommonDimOp(slice,references[bcdim],dimpos,bcdim)
-                nplan.append(BCCOPY)
-            elif(planelem == BCEXIST):
-                active_bcdims.append(bcdim)
-                nplan.append(planelem)
-            else:
-                nplan.append(planelem)
-        if(active_bcdims):                
-            slice = BroadcastOp(slice,[references[bcdim] for bcdim in active_bcdims],nplan,bcdims)
-        nslices.append(slice)#}}}
+        for rslice in refslices:
+            if bcdim in rslice.dims:
+                references[bcdim].append(rslice)
+
+    sbcdims,splan = dimpaths.planBroadcastFromPlan(slice.dims, plan, origdims, bcdims)
+    slice = apply_broadcast_plan(slice, splan, sbcdims, references, partial)
+    return (slice, splan)
+    #}}}
+
+def apply_broadcast_plan(slice,plan, bcdims, references, partial):#{{{
+    nplan = []
+    active_bcdims = []
+    for dimpos, bcdim, planelem in zip(range(len(bcdims)),bcdims, plan):
+        if(planelem == BCNEW):
+            ndim = dimensions.Dim(1)
+            slice = InsertDimOp(slice,dimpos,ndim)
+            active_bcdims.append(bcdim)
+            nplan.append(BCEXIST)
+        elif(planelem == BCENSURE):
+            slice = EnsureCommonDimOp(slice,references[bcdim],dimpos,bcdim)
+            nplan.append(BCSOURCE)
+        elif(planelem == BCEXIST):
+            active_bcdims.append(bcdim)
+            nplan.append(planelem)
+        else:
+            nplan.append(planelem)
+    if(active_bcdims):                
+        slice = BroadcastOp(slice,[references[bcdim] for bcdim in active_bcdims], nplan, bcdims, partial)
+    return slice
+#}}}
+
+def broadcastParentsFromPlan(slice, seldimpath, plan, origdims, bcdims, refslices, partial):#{{{
+    used_dims = [False,] * len(slice.dims)
+    while True:
+        #determine filter dim
+        lastpos = slice.dims.matchDimPath(seldimpath)
+        for filterpos in lastpos[::-1]:
+             if(not used_dims[filterpos]):
+                break
+        else:
+            break
+
+        #pack up to and including filter dim
+        packdepth = len(slice.dims) - filterpos
+        if(packdepth):
+            slice = PackArrayOp(slice,packdepth)
+
+        #broadcast to constraint
+        slice,splan = broadcast_fromplan(slice, refslices, plan, origdims, bcdims, partial)
+
+        #adapt used_dims
+        used_dims = dimpaths.applyPlan(used_dims,splan,newvalue=True,copyvalue=True,ensurevalue=True,existvalue=True)
+        used_dims[len(splan)] = True
+
+        #unpack dims
+        if(packdepth):
+            slice = UnpackArrayOp(slice,packdepth)
+            
+    return slice#}}}
 
 class PermuteDimsOp(UnaryUnaryOp):#{{{
     __slots__ = ["permute_idxs"]
@@ -384,21 +397,21 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
                 dep.insert(0,False)
 
         #broadcast to constraint
-        (slice,constraint),(splan,cplan) = broadcast([slice,constraint],mode=mode, partial=True)
+        (slice,tconstraint),(splan,cplan) = broadcast([slice,constraint],mode=mode, partial=True)
 
         #adapt ndim to braodcast, apply filter
         if(not ndim is None):
-            if(isinstance(constraint.type,rtypes.TypeSlice)):
+            if(isinstance(tconstraint.type,rtypes.TypeSlice)):
                 ndep = dimpaths.applyPlan(dep,cplan,newvalue=True, copyvalue=True, ensurevalue=True)
             else:
                 ndep = dimpaths.applyPlan(dep,cplan,newvalue=False)
             xndim = ndim.changeDependent(tuple(ndep), slice.dims)
         else:
             xndim = ndim
-        slice = FilterOp(slice,constraint,xndim)
+        slice = FilterOp(slice,tconstraint,xndim)
 
         #adapt used_dims
-        used_dims = dimpaths.applyPlan(used_dims,splan,newvalue=True,copyvalue=True,ensurevalue=True)
+        used_dims = dimpaths.applyPlan(used_dims,splan,newvalue=True,copyvalue=True,ensurevalue=True, existvalue=True)
         
         #handle dim removal, filter_dim is used
         if(ndim is None): #dimension removed/collapsed
@@ -670,14 +683,6 @@ class EquiJoinIndexOp(MultiMultiOp):
     __slots__ = ["jointype"]
 
     def __init__(self, leftslice, rightslice, jointype="inner", mode="dim"):
-        leftslice = ensure_frozen(leftslice)
-        rightslice = ensure_frozen(rightslice)
-
-        leftslice = PackArrayOp(leftslice)
-        rightslice = PackArrayOp(rightslice)
-        
-        leftslice,rightslice= broadcast((leftslice,rightslice),mode=mode)[0]
-
         assert leftslice.dims == rightslice.dims, "Parent dims of join fields should be equal"
         name= leftslice.type.dims[0].name + "_" + rightslice.type.dims[0].name
         ndim = dimensions.Dim(UNDEFINED, (True,) * len(leftslice.dims), name=name)

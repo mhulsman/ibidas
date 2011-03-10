@@ -321,16 +321,19 @@ def planBroadcastMatchPos(paths):#{{{
             l.discard(UNDEFINED)
         assert len(l) == 1, "Different shaped dimensions cannot be broadcast to each other"
         length = l.pop()
+        nxdims = len(set(xdims))
         bcdim = [xdim for xdim in xdims if not xdim is None and xdim.shape == length][0]
         for xdim,plan in zip(xdims,plans):
             if(xdim is None):
                 plan.append(BCNEW)
-            elif(xdim.shape == 1):
+            elif(xdim.shape == 1 and bcdim.shape != 1):
                 plan.append(BCEXIST)
             elif(xdim != bcdim):
                 plan.append(BCENSURE)
-            else:
+            elif nxdims == 1:
                 plan.append(BCCOPY)
+            else:
+                plan.append(BCSOURCE)
         bcdims[curpos] = bcdim 
         curpos -=1 
     for pos in xrange(len(plans)):
@@ -444,9 +447,80 @@ def planBroadcastMatchDim(paths):#{{{
                 plan.append(BCNEW)
 
         plans.append(plan[::-1])
+    
+    #Step 5:discriminate between BCCOPY and BCSOURCE
+    for planpos in xrange(len(plans[0])):
+        x = set([plan[planpos] for plan in plans])
+        if BCCOPY in x and len(x) > 1:
+            for plan in plans:
+                if plan[planpos] == BCCOPY:
+                    plan[planpos] = BCSOURCE
 
     return (bcdims,plans)#}}}
 
+def planBroadcastFromPlan(path, plan, origdims, bcdims):
+    plan = plan[::-1]
+    bcdims = bcdims[::-1]
+    ipath = path[::-1]
+    origdims = origdims[::-1]
+
+    existpos = [None] * len(plan)
+    pathpos = 0
+    origdimpos = 0
+    
+    #determine original dim positions
+    for pos, (planelem, bcdim) in enumerate(zip(plan, bcdims)):
+        if planelem == BCEXIST or planelem == BCENSURE:
+            try: 
+                pathpos = ipath.index(origdims[origdimpos], pathpos)
+                existpos[pos] = pathpos
+            except ValueError:
+                pass
+            origdimpos += 1
+        elif planelem == BCCOPY or planelem == BCSOURCE:
+            try:
+                pathpos = ipath.index(bcdim, pathpos)
+                existpos[pos] = pathpos
+            except ValueError:
+                pass
+            origdimpos += 1
+     
+    #create new plan
+    nplan = []
+    nbcdims = []
+    pathpos = 0
+    for pos, (planelem, bcdim) in enumerate(zip(plan, bcdims)):
+        nposses = [x for x in existpos[pos:] if not x is None]
+        if nposses:
+            nextpos = nposses[0]
+        else:
+            nextpos = len(ipath)
+        if planelem == BCNEW:
+            if pathpos < nextpos and bcdim in ipath[pathpos:nextpos]:
+               xpos = ipath.index(bcdim, pathpos, nextpos)
+               while pathpos <= xpos:
+                    nplan.append(BCSOURCE)
+                    nbcdims.append(ipath[pathpos])
+                    pathpos += 1
+            else:
+                nplan.append(BCNEW)
+                nbcdims.append(bcdim)
+        elif planelem == BCEXIST or planelem == BCENSURE or planelem == BCCOPY or planelem == BCSOURCE:
+            if existpos[pos] is None:
+                nplan.append(BCNEW)
+                nbcdims.append(bcdim)
+            else:
+                while pathpos < existpos[pos]:
+                    nplan.append(BCSOURCE)
+                    nbcdims.append(ipath[pathpos])
+                    pathpos += 1
+                nplan.append(planelem)
+                nbcdims.append(bcdim)
+                pathpos += 1
+        else:
+            raise RuntimeError, "Unknown path element"
+       
+    return (nbcdims[::-1],nplan[::-1])
 
 def processPartial(bcdims, plans):
     nplans = list(plans)
@@ -455,12 +529,12 @@ def processPartial(bcdims, plans):
         if bcdims[pos].dependent:
             break
         if(plans[pos] == BCNEW):
-            nplans[pos] = BCINSERT
-        elif(plans[pos] == BCEXIST):
             nplans[pos] = BCCOPY
+        elif(plans[pos] == BCEXIST):
+            nplans[pos] = BCSOURCE
     return nplans
 
-def applyPlan(seq,plan,newvalue=None,copyvalue=NOVAL,existvalue=NOVAL,ensurevalue=NOVAL):#{{{
+def applyPlan(seq,plan,newvalue=None,copyvalue=NOVAL,existvalue=NOVAL,ensurevalue=NOVAL,sourcevalue=NOVAL):#{{{
     elempos = 0
     nseq = []
     for planelem in plan:
@@ -478,6 +552,12 @@ def applyPlan(seq,plan,newvalue=None,copyvalue=NOVAL,existvalue=NOVAL,ensurevalu
             else:
                 nseq.append(copyvalue)
             elempos += 1
+        elif(planelem == BCSOURCE):
+            if(sourcevalue is NOVAL):
+                nseq.append(seq[elempos])
+            else:
+                nseq.append(sourcevalue)
+            elempos += 1
         elif(planelem == BCENSURE):
             if(copyvalue is NOVAL):
                 nseq.append(seq[elempos])
@@ -488,6 +568,8 @@ def applyPlan(seq,plan,newvalue=None,copyvalue=NOVAL,existvalue=NOVAL,ensurevalu
             raise RuntimeError, "Unknown plan type"
     nseq.extend(seq[elempos:])
     return nseq#}}}
+
+
 
 def flatFirstDims(array,ndim):#{{{
     """Flattens first ndim dims in numpy array into next dim"""
