@@ -602,7 +602,7 @@ registerTypeScanner(RecordDictScanner)
 
 class ContainerScanner(TypeScanner):
     good_cls = set([set, frozenset, MissingType, list, array.array, numpy.ndarray])
-    bad_cls = set([tuple, str, numpy.string_, module_types.soap_struct])
+    bad_cls = set([tuple, str, unicode, numpy.unicode_, numpy.string_, module_types.soap_struct])
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)

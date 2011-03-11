@@ -264,9 +264,11 @@ def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyc
     g = g          |Match(_.association.id,       _.association_id)|  go.evidence
     g = g          |Match(_.gene_product.dbxref_id,           _.id)|  go.dbxref
     g = g[(_.genus==genus) & (_.species == species)][_.is_not == False]
-    return g.Get(_.symbol   /"gene_symbol",   _.xref_key / "gene_id",  
+    g = g.ReplaceMissing()
+    g = g.Get(_.symbol   /"gene_symbol",   _.xref_key / "gene_id",  
                  _.annot.acc/"go_id",         _.annot.name/"annotation", _.annot.term_type/"go_type", 
                  _.evidence.code/"evidence")%"annotations"
+    return g.Copy()
 predefined_sources.register(go_annotations,name="annotations",category="go")
 
 def go_info(dburl=config.get("databases.go_url",None), genus="Saccharomyces", species="cerevisiae"):
@@ -277,22 +279,39 @@ def go_info(dburl=config.get("databases.go_url",None), genus="Saccharomyces", sp
        example url: "mysql://username:password@hostname:port/go
     """
     go = open_go(dburl)
-    if not genus is None or species is None:
-        g = go.species
-        g = g |Match(_.id, _.species_id)|                   go.gene_product
-        g = g |Match(_.gene_product.id, _.gene_product_id)| go.association
-        g = g |Match(_.association.term_id, _.term2_id)|    go.graph_path
-        g = g[(_.genus==genus) & (_.species == species)]
-    else:
-        g = go.graph_path
-    g = g |Match(_.term2_id, _.id)| go.term//"child"
-    g = g |Match(_.term1_id, _.id)| go.term//"parent"
+    #select annotations from a certain species, and their ancestor annotations
+    g = go.species
+    g = g |Match(_.id,                  _.species_id)|      go.gene_product
+    g = g |Match(_.gene_product.id,     _.gene_product_id)| go.association
+    g = g |Match(_.association.term_id, _.term2_id)|        go.graph_path
+    g = g[(_.genus==genus) & (_.species == species)]
+
+    #link them to terms to get actual go accession id
+    g = g |Match(_.term2_id,             _.id)| go.term//"child"
+    g = g |Match(_.term1_id,             _.id)| go.term//"parent"
     g = g |Match(_.relationship_type_id, _.id)| go.term//"rel"
-    g = g.GroupBy(_.child.acc, flat=_.child.term_type)
-    g = g[_[_.parent.acc == "all"].distance.Count() != 0]
-    return g.Get(_.child.acc/"go_id", _.child.term_type/"go_type", 
-                 _[_.parent.acc == "all"].distance.Max()/"depth",
-                 _.parent.acc / "ancestor", _.rel.name/"relationship",_.distance).Copy()
+
+    #get relevant fields
+    g = g.ReplaceMissing()
+    g = g.Get(_.child.acc/"go_id", _.parent.acc/"parent_id", _.child.term_type/"go_type",
+              _.distance, _.rel.name/"relationship", _.gene_product.id/"gene_id").Copy()
+
+    #step A: calculate number of genes associated with go terms
+    ngenes = g.GroupBy(_.parent_id).Get(_.parent_id/"go_id",_.gene_id.Unique().Count()/"ngenes")
+
+    #step B1: group per term
+    goinfo = g.GroupBy(_.go_id, flat=_.go_type)
+    
+    #step B2: for ech term, determine type, max depth to root, ancestors (non-unique) and relationship to ancestors
+    goinfo = goinfo.Get(_.go_id, _.go_type, _[_.parent_id == "all"].distance.Max()/"depth",
+                _.parent_id / "ancestor", _.relationship,_.distance)
+
+    #step B3: select for each ancestor the minimum path length
+    goinfo = goinfo.GroupBy(_.ancestor)[..., _.distance.Argmin()].Copy()
+
+    #step C: combine, copy, return
+    return (goinfo |Match| ngenes).Copy()
+
 predefined_sources.register(go_info,name="term_info",category="go")
 
 

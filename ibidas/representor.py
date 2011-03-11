@@ -621,6 +621,8 @@ class Representor(Node):
     def Replace(self, slice, translator, fromslice=0, toslice=1):
         return repops_multi.Replace(self, slice, translator, fromslice, toslice) 
 
+    def ReplaceMissing(self, def_value=NOVAL):
+        return repops_funcs.ReplaceMissing(self, def_value=def_value)
 
     def Merge(self, other):
         return repops_funcs.Merge(self, other)

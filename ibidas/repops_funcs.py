@@ -485,6 +485,22 @@ class Abs(UnaryFuncElemOp):
 class Negative(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 
+
+class ReplaceMissingSig(FuncSignature):
+    def check(self, slice, def_value=NOVAL):#{{{
+        in_type = slice.type
+        nin_type = in_type.copy()
+        #FIXME: adapt dim in case of array
+        nin_type.has_missing = False
+
+        return Param(slice.name, nin_type)#}}}
+
+repmissing = ReplaceMissingSig("repmissing")
+
+class ReplaceMissing(UnaryFuncElemOp):
+    _sigs =[repmissing]
+
+
 class UnaryFixShapeSignature(FuncSignature):
     def __init__(self,name,check_dependent=True):
         self.check_dependent = check_dependent

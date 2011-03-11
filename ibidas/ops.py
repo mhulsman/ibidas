@@ -510,7 +510,6 @@ class NoneToMissingOp(UnaryUnaryOp):#{{{
         assert slice.type.has_missing, "Cannot apply none to missing on type without has_missing"
         UnaryUnaryOp.__init__(self, slice)#}}}
     
-
 class FreezeOp(UnaryUnaryOp):#{{{
     __slots__ = []
 #}}}
@@ -601,13 +600,13 @@ class PackTupleOp(MultiUnaryOp):#{{{
         nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
         MultiUnaryOp.__init__(self, slices, name=field, rtype=ntype, dims=iter(cdim).next(),bookmarks=nbookmarks)#}}}
 
-class PackDictOp(PackTupleOp):
+class PackDictOp(PackTupleOp):#{{{
     __slots__ = ["with_missing"]
     ocls = rtypes.TypeRecordDict
 
     def __init__(self, slices, field="data", with_missing=False):
         self.with_missing = with_missing
-        PackTupleOp.__init__(self, slices, field)
+        PackTupleOp.__init__(self, slices, field)#}}}
 
 class GroupIndexOp(MultiUnaryOp):#{{{
     def __init__(self, slices):
@@ -660,26 +659,26 @@ class MultiOp(Op):
         assert isinstance(results, tuple), "Results should be a tuple"
         self.results = results
 
-class SelectOp(UnaryUnaryOp):
+class SelectOp(UnaryUnaryOp):#{{{
     __slots__ = ["index"]
     def __init__(self, slice, index, name, rtype, ndims, bookmarks):
         assert isinstance(slice, MultiOp), "Source lice of SelectOp should be a multiop"
         self.index = index
-        UnaryUnaryOp.__init__(self, slice, name=name, rtype=rtype, dims=ndims, bookmarks=bookmarks)
+        UnaryUnaryOp.__init__(self, slice, name=name, rtype=rtype, dims=ndims, bookmarks=bookmarks)#}}}
 
 class UnaryMultiOp(MultiOp):
     __slots__ = ["source"]
 
-class MultiMultiOp(MultiOp):
+class MultiMultiOp(MultiOp):#{{{
     __slots__ = ["sources"]
 
     def __init__(self, sources, results):
         assert isinstance(sources, tuple), "Sources should be a tuple"
         self.sources = sources
-        MultiOp.__init__(self, results)
+        MultiOp.__init__(self, results)#}}}
 
 
-class EquiJoinIndexOp(MultiMultiOp):
+class EquiJoinIndexOp(MultiMultiOp):#{{{
     __slots__ = ["jointype"]
 
     def __init__(self, leftslice, rightslice, jointype="inner", mode="dim"):
@@ -696,7 +695,7 @@ class EquiJoinIndexOp(MultiMultiOp):
         r1 = SelectOp(self,0,leftslice.name, ltype,leftslice.dims, leftslice.bookmarks)
         r2 = SelectOp(self,1,rightslice.name, rtype,leftslice.dims, rightslice.bookmarks)
         self.jointype = jointype
-        MultiMultiOp.__init__(self, (leftslice,rightslice),(r1,r2))
+        MultiMultiOp.__init__(self, (leftslice,rightslice),(r1,r2))#}}}
 
 
 
