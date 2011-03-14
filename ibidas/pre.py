@@ -263,7 +263,7 @@ def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyc
     g = g          |Match(_.association.term_id,   _.id)|             go.term//"annot"
     g = g          |Match(_.association.id,       _.association_id)|  go.evidence
     g = g          |Match(_.gene_product.dbxref_id,           _.id)|  go.dbxref
-    g = g[(_.genus==genus) & (_.species == species)][_.is_not == False]
+    g = g[(_.genus==genus) & (_.species == species)][_.is_not == False][_.evidence.code != "ND"]
     g = g.ReplaceMissing()
     g = g.Get(_.symbol   /"gene_symbol",   _.xref_key / "gene_id",  
                  _.annot.acc/"go_id",         _.annot.name/"annotation", _.annot.term_type/"go_type", 
@@ -293,18 +293,19 @@ def go_info(dburl=config.get("databases.go_url",None), genus="Saccharomyces", sp
 
     #get relevant fields
     g = g.ReplaceMissing()
-    g = g.Get(_.child.acc/"go_id", _.parent.acc/"parent_id", _.child.term_type/"go_type",
+    g = g.Get(_.child.acc/"go_id", _.parent.acc/"parent_id", _.child.term_type/"go_type", _.child.name/"annotation",
               _.distance, _.rel.name/"relationship", _.gene_product.id/"gene_id").Copy()
 
     #step A: calculate number of genes associated with go terms
     ngenes = g.GroupBy(_.parent_id).Get(_.parent_id/"go_id",_.gene_id.Unique().Count()/"ngenes")
 
     #step B1: group per term
-    goinfo = g.GroupBy(_.go_id, flat=_.go_type)
+    goinfo = g.GroupBy(_.go_id, flat=(_.go_type, _.annotation))
     
     #step B2: for ech term, determine type, max depth to root, ancestors (non-unique) and relationship to ancestors
-    goinfo = goinfo.Get(_.go_id, _.go_type, _[_.parent_id == "all"].distance.Max()/"depth",
-                _.parent_id / "ancestor", _.relationship,_.distance)
+    goinfo = goinfo.Get(_.go_id, _.go_type, _.annotation,  
+                        _[_.parent_id == "all"].distance.Max()/"depth",
+                        _.parent_id / "ancestor", _.relationship, _.distance)
 
     #step B3: select for each ancestor the minimum path length
     goinfo = goinfo.GroupBy(_.ancestor)[..., _.distance.Argmin()].Copy()

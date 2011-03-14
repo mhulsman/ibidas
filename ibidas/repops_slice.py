@@ -278,6 +278,9 @@ class Tuple(repops.UnaryOpRep):
 class Dict(Tuple):
     _ocls = ops.PackDictOp
 
+class IndexDict(Tuple):
+    _ocls = ops.PackIndexDictOp
+
 class HArray(repops.UnaryOpRep):
     def _process(self, source, name=None):
         if not source._typesKnown():

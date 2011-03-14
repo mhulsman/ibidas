@@ -363,9 +363,7 @@ class FilterOp(UnaryUnaryOp):#{{{
             if(isinstance(constraint.type,rtypes.TypeSlice)):
                 array_has_missing = True 
             else:
-                if not subtype.has_missing:
-                    subtype = subtype.copy()
-                    subtype.has_missing = True
+                subtype = subtype.setHasMissing(True)
 
         if(sdims):
             ntype = dimpaths.dimsToArrays(sdims, subtype)
@@ -607,6 +605,39 @@ class PackDictOp(PackTupleOp):#{{{
     def __init__(self, slices, field="data", with_missing=False):
         self.with_missing = with_missing
         PackTupleOp.__init__(self, slices, field)#}}}
+
+
+class PackIndexDictOp(MultiUnaryOp):#{{{
+    __slots__ = []
+    ocls = rtypes.TypeIndexDict
+
+    def __init__(self, slices, field="data"):
+        assert len(slices) == 2, "Index dict op should have two slices"
+        assert slices[0].dims == slices[1].dims, "Key and value of dict should have same dimension"
+
+        slices = [PackArrayOp(slice) for slice in slices]
+        ndims = dimpaths.DimPath(dimensions.Dim(UNDEFINED, (), name="dict"))
+        subtypes = [dimpaths.dimsToArrays(ndims, slice.type.subtypes[0]) for slice in slices]
+        
+        fieldnames = [slice.name for slice in slices]
+        ntype = self.ocls(False, tuple(subtypes), tuple(fieldnames))
+        nbookmarks = reduce(set.union,[slice.bookmarks for slice in slices])
+        MultiUnaryOp.__init__(self, slices, name=field, rtype=ntype, dims=slices[0].dims, bookmarks=nbookmarks)#}}}
+        #}}}
+
+
+class TakeOp(MultiUnaryOp):
+    __slots__ = ['allow_missing']
+    def __init__(self, source_slice, take_slice, allow_missing=False):
+        assert isinstance(source_slice.type, rtypes.TypeIndexDict), "Take left op should have type index dict"
+        source_slice, take_slice = broadcast((source_slice, take_slice), mode="dim")[0]
+        ntype = source_slice.type.subtypes[1].subtypes[0]
+        if allow_missing:
+            ntype = ntype.setHasMissing(True)
+        name = source_slice.type.fieldnames[1]
+        nbookmarks = source_slice.bookmarks | take_slice.bookmarks
+        self.allow_missing = allow_missing
+        MultiUnaryOp.__init__(self, [source_slice, take_slice], name=name, rtype=ntype, dims=take_slice.dims, bookmarks = nbookmarks)#}}}
 
 class GroupIndexOp(MultiUnaryOp):#{{{
     def __init__(self, slices):

@@ -420,8 +420,27 @@ class Replace(repops.MultiOpRep):
 
         nslices = list(Match._apply(source, translator, slice, translator._slices[0],"inner"))
         nslices[slicepos] = ops.ChangeNameOp(nslices[-1],slice.name)
-        nslices = nslices[:-2]
+        remove = (len(source._slices) + len(translator._slices)) -len(nslices) - len(translator._slices)
+        nslices = nslices[:remove]
         return self._initialize(tuple(nslices))
+
+
+class Take(repops.MultiOpRep):
+    def __init__(self, source, take_source, allow_missing=False):
+        repops.MultiOpRep.__init__(self,(source, take_source), allow_missing = allow_missing)
+   
+    def _sprocess(self, sources, allow_missing):
+        source, take_source = sources
+        if len(source._slices) == 2:
+            source = source.IndexDict()
+        assert len(source._slices) == 1, "Take source should have one slice"
+        source_slice = source._slices[0]
+
+        nslices = []
+        for take_slice in take_source._slices:
+            nslices.append(ops.TakeOp(source_slice, take_slice, allow_missing))
+        return self._initialize(tuple(nslices))
+
 
 class Stack(repops.MultiOpRep):
     def __init__(self, *sources, **kwargs):

@@ -268,6 +268,11 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 func = lambda x: x.get(didx,Missing)
             else:
                 func = operator.itemgetter(didx)
+        elif(isinstance(slice.type,rtypes.TypeIndexDict)):
+            if node.tuple_idx == 0:
+                func = lambda x: x.keys()
+            else:
+                func = lambda x: x.values()
         else:
             if(node.type.has_missing):
                 def func(x):
@@ -283,7 +288,19 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def visitPackTupleOp(self,node, slices):
         ndata = nested_array.co_mapseq(speedtuplify,[slice.data for slice in slices],res_type=node.type)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
-    
+   
+    def visitPackIndexDictOp(self, node, slices):
+        names = node.type.fieldnames
+        def speed_index_dictify(x):
+            return dict(zip(*x))
+        ndata = nested_array.co_map(speed_index_dictify,[slice.data for slice in slices],res_type=node.type)
+        return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
+       
+    def visitTakeOp(self, node, slices):
+        ndata = nested_array.co_mapseq(speeddictindex,[slice.data for slice in slices],res_type=node.type, 
+                                        dtype=node.type.toNumpy(), allow_missing=node.allow_missing)
+        return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
+
     def visitPackDictOp(self,node, slices):
         names = node.type.fieldnames
         if node.with_missing or not any([slice.type.has_missing for slice in slices]):
@@ -366,7 +383,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         ndata = nested_array.co_map(speedfilter,[slice.data, constraint.data],
                                        has_missing = node.has_missing,ctype=constraint.type,
                                        res_type=node.type)
-        return slice.modify(data=ndata,rtype=node.type)
+        return slice.modify(data=ndata,rtype=node.type, dims=node.dims)
 
     def visitFlatAllOp(self, node, slice):
         ndata = slice.data.mergeAllDims()
@@ -608,8 +625,15 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         #such as "numpy.equal" on string arrays
         #so use direct operations ("__eq__")
         op = python_op[op]
+        #Note: numpy seems to segfault, when using reverse operations on string comparision
+        #using as first argument an  object array and as second a string array. 
+        if(isinstance(data[0],numpy.ndarray) and data[0].dtype == object and isinstance(data[1],numpy.ndarray) and data[1].dtype != object):
+            data = (data[0], numpy.cast[object](data[1]))
+
         res = getattr(data[0], op)(data[1])
         if(res is NotImplemented):
+            if(isinstance(data[0],numpy.ndarray) and data[0].dtype != object and isinstance(data[1],numpy.ndarray) and data[1].dtype == object):
+                data = (numpy.cast[object](data[0]), data[1])
             res = getattr(data[1], reverse_op[op])(data[0])
         assert not res is NotImplemented, "Not implemented error in stringstringGeneral for " \
                                             + str(op) + " and " + str(type1) + ", " + str(type2)
@@ -838,6 +862,13 @@ def speedtuplify(seqs):
 def speedarrayify(seqs,dtype):
     nseq = numpy.array(seqs,dtype).T
     return nseq
+
+
+def speeddictindex(seqs,dtype, allow_missing=False):
+    if allow_missing:
+        return cutils.darray([d.get(k,Missing) for d, k in zip(*seqs)],dtype)
+    else:
+        return cutils.darray([d[k] for d, k in zip(*seqs)],dtype)
 
 
 def speedfilter(seqs,has_missing, ctype):

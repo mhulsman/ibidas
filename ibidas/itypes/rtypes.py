@@ -297,7 +297,15 @@ class TypeAny(TypeUnknown):#{{{
     def copy(self, **newattr):
         """Returns copy of this type"""
         return copy.copy(self)
-    
+
+    def setHasMissing(self, value):
+        if self.has_missing != value:
+            res = self.copy()
+            res.has_missing = value
+        else:
+            res = self
+        return res
+
     def __repr__(self):
         res = self.name
         if(self.has_missing):
@@ -496,6 +504,49 @@ class TypeRecordDict(TypeTuple):#{{{
         return res
 
 addType(TypeRecordDict)#}}}
+
+class TypeIndexDict(TypeTuple):#{{{
+    name = "index_dict"
+    
+    def __init__(self, has_missing=False, subtypes=(), 
+                       fieldnames=("key","value")):
+        """
+        Creates type object.
+
+        :param has_missing: bool, optional
+        :param subtypes: tuple(type objects, i.e. subclasses of TypeUnknown), optional
+        :param fieldnames: tuple(strings), optional
+        """
+
+        assert isinstance(subtypes, tuple), \
+                "The subtypes argument should be a tuple"
+
+        assert all(isinstance(fieldname, basestring) for fieldname in fieldnames), \
+                "Fieldnames should be strings"
+
+        assert not fieldnames or len(fieldnames) == len(subtypes), \
+            "Length of fieldnames should be equal to length of tuples (or empty"
+
+        assert len(subtypes) == 2, "IndexDict should have a key and value subtype"
+
+        TypeAny.__init__(self, has_missing)
+        self.subtypes = subtypes
+        self.fieldnames = fieldnames
+
+    def __repr__(self):
+        res = 'dict(' 
+        if(len(self.fieldnames) == len(self.subtypes)):
+            res += ": ".join((fname + "=" + str(subtype) 
+                for fname, subtype in zip(self.fieldnames, self.subtypes)))
+        else:
+            res += ": ".join((str(subtype) 
+                    for subtype in self.subtypes))
+        res += ')'
+        if(self.has_missing):
+            res += "?"
+        return res
+
+addType(TypeIndexDict)#}}}
 
 #pylint: disable-msg=E1101
 class TypeArray(TypeAny):#{{{
@@ -1122,7 +1173,7 @@ class TypeStringScanner(GenericScanner):#{{{
         self.rv.append(t)
 
     def t_symbol(self,s):
-        r' \= | \$ | \? | \. | \{ | \} | \< | \[ | \] | \( | \) | \, | \* | \~ | \! | \& | \# | \@ | \: | \^ | \|'
+        r' \= | \$ | \? | \. | \{ | \} | \< | \[ | \] | \( | \) | \, | \* | \~ | \! | \& | \# | \@ | \: | \^ | \| | \' '
         t = Token(type=s)
         self.rv.append(t)#}}}
     
@@ -1219,7 +1270,7 @@ class TypeStringParser(GenericParser):#{{{
     
     def p_type_2b(self,args):
         """
-            type ::= type =
+            type ::= type '
         """
         return AST(type="strict", kids=args)
    
@@ -1248,10 +1299,12 @@ class TypeStringParser(GenericParser):#{{{
     def p_type_8(self,args):
         '''
             typeelem ::= typenest
-            typeelem ::= name : typenest
             typeelem ::= name = typenest
         '''
-        return AST(type="typeelem",kids=(args[2], args[0]))
+        if len(args) == 1:
+            return args[0]
+        else:
+            return AST(type="typeelem",kids=(args[2], args[0]))
     
     def p_type_9(self,args):
         ' type ::= ( typelist ) '
@@ -1647,6 +1700,7 @@ def _createType(name, dimpos=0, refdims=[], env={}):
 
     tree = parser.parse(tokens)
     
+    #print tree
     rewriter1 = TypeStringASTRewriterPass1()
     tree, dim_annotation = rewriter1.process(tree)
     #print tree, dim_annotation

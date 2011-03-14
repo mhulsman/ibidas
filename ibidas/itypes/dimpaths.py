@@ -695,7 +695,11 @@ def identifyDimPath(sourcepaths, dim_selector):#{{{
    
     if(isinstance(dim_selector, int)):
         udpath = uniqueDimPath(sourcepaths,only_unique=False)
-        dim_selector = udpath[dim_selector]
+        try: 
+            dim_selector = udpath[dim_selector]
+        except IndexError:
+            raise RuntimeError, "Dimension at depth " + str(dim_selector) + " does not exist"
+
     elif(isinstance(dim_selector, long)):
         udpath = uniqueDimPath(sourcepaths,only_unique=False)
         if(dim_selector < 0):
