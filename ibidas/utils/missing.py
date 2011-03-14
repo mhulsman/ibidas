@@ -25,6 +25,15 @@ class MissingType(object):#{{{
 
     __slots__ = []
 
+    def __new__(cls):
+        if not hasattr(cls, "Missing"):
+            cls.Missing = object.__new__(cls)
+
+        return cls.Missing
+
+    def __getnewargs__(self):
+        return tuple()
+
     def __add__(self, other):
         return self
 

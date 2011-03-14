@@ -574,9 +574,10 @@ class TypeArray(TypeAny):#{{{
                 "Dims tuple should contain Dim objects"
         assert isinstance(subtypes, tuple) and len(subtypes) == 1, \
                 "One subtype should be set for array type"
-        if dims:
-            dims[0].has_missing = has_missing
-
+        
+        has_missing = dims[0].has_missing or has_missing
+        
+        dims[0].has_missing = has_missing
         self.subtypes = subtypes
         self.dims = dims
         TypeAny.__init__(self, has_missing)
@@ -599,6 +600,17 @@ class TypeArray(TypeAny):#{{{
             res = cls(has_missing=type1.has_missing or type2.has_missing, dims=dims, subtypes=tuple(subtypes)) 
         return res
 
+    def setHasMissing(self, value):
+        if self.has_missing != value:
+            self = self.copy()
+            self.has_missing = True
+            assert len(self.dims) == 1, "Expected dimension length 1"
+            dim = self.dims[0].copy()
+            dim.has_missing = True
+            self.dims = dimpaths.DimPath(dim)
+        return self
+        
+        
     def toDefval(self):
         """Returns default value."""
         subtype = self.subtypes[0]

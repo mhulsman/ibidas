@@ -592,6 +592,17 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 raise RuntimeError, "Found unequal values during merge: " + str(lelem) + " != " + str(relem)
         return cutils.darray(res, typeo.toNumpy())
 
+    def simple_arithDivide(self, data, type1, type2, typeo, op):
+        data1,data2 = data
+        if(data1 is Missing or data2 is Missing):
+            return Missing
+        filter = (data2 == 0) & (data1 == 0)
+        if filter.any():
+            data2 = data2.copy()
+            data2[filter] = 1.0
+        res = numpy_arith[op](data1, data2, sig=typeo.toNumpy())
+        return res
+
     def simple_arithGeneral(self, data, type1, type2, typeo, op):
         data1,data2 = data
         if(data1 is Missing or data2 is Missing):
