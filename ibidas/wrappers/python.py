@@ -884,6 +884,8 @@ def speeddictindex(seqs,dtype, allow_missing=False):
 
 def speedfilter(seqs,has_missing, ctype):
     data,constraint = seqs
+    if data is Missing:
+        return data
     if(has_missing):
         if(isinstance(ctype,rtypes.TypeArray)):
             if(isinstance(ctype.subtypes[0],rtypes.TypeBool)):

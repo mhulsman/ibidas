@@ -168,7 +168,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
 
     def execFreezeTypeArray(self, ptype, seq):
         subtype = ptype.subtypes[0]
-        if(subtype.needFreeze(subtype)):
+        if(self.needFreeze(subtype)):
             def subfreeze(elem):
                 elem = self.execFreeze(subtype, elem)
                 elem = elem.view(util.farray)
