@@ -709,7 +709,10 @@ class Representor(Node):
     
     def Median(self, dim=None):
         return repops_funcs.Median(self, dim)
-      
+    
+    def Std(self, dim=None):
+        return repops_funcs.Std(self, dim)
+     
     def Any(self,dim=None):
         return repops_funcs.Any(self,dim)
 

@@ -771,17 +771,42 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             return cutils.darray([[''.join(list(subrow)) for subrow in row.transpose()] for row in data],object,2,2)
         else:
             return cutils.darray([''.join(list(row)) for row in data],object)
+    
+    def fixdimArgmax(self, data, type_in, type_out, op, packdepth):
+        data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
+        func = numpy_dimfuncs[op]
+        dtype = type_out.toNumpy()
+        if type_in.has_missing:               
+            res = []
+            for row in data:
+                pos = numpy.arange(len(row))
+                filter = ~numpy.equal(row, Missing)
+                pos = pos[filter]
+                row = row[filter]
+                res.append(pos[func(row,axis=0)])
+            return cutils.darray(res,dtype)
+        else:            
+            if(len(data.shape) < 2):
+                if(packdepth > 1):
+                    dtype = object
+                return cutils.darray([func(row,axis=0) for row in data],dtype)
+            else:
+                return func(data,axis=1)
+    fixdimArgmin = fixdimArgmax
 
     def fixdimGeneral(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         func = numpy_dimfuncs[op]
         dtype = type_out.toNumpy()
-        if(len(data.shape) < 2):
-            if(packdepth > 1):
-                dtype = object
-            return cutils.darray([func(row,axis=0) for row in data],dtype)
-        else:
-            return func(data,axis=1)
+        if type_in.has_missing:                
+            return cutils.darray([func([elem for elem in row if not elem is Missing],axis=0) for row in data],dtype)
+        else:            
+            if(len(data.shape) < 2):
+                if(packdepth > 1):
+                    dtype = object
+                return cutils.darray([func(row,axis=0) for row in data],dtype)
+            else:
+                return func(data,axis=1)
       
 numpy_cmp = {'Equal':numpy.equal,#{{{
             'NotEqual':numpy.not_equal,
@@ -810,7 +835,8 @@ numpy_dimfuncs = {
     'Sum':numpy.sum,
     'Median':numpy.median,
     'Argmin':numpy.argmin,
-    'Argmax':numpy.argmax
+    'Argmax':numpy.argmax,
+    'Std':numpy.std
     }
 
 python_op = {'Equal':'__eq__',

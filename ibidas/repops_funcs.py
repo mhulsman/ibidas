@@ -646,6 +646,8 @@ class Argmin(UnaryFuncAggregateOp):
 class Median(UnaryFuncAggregateOp):
     _sigs = [number_tofloatsig]
 
+class Std(UnaryFuncAggregateOp):
+    _sigs = [number_tofloatsig]
 
 class CountSignature(FuncSignature):
     def check(self, slice, packdepth):#{{{
