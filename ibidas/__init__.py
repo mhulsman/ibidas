@@ -15,7 +15,7 @@ __all__ = ["Rep","Read","Connect","_","CyNetwork",'Unpack',
            "Broadcast","CreateType","MatchType",
            "newdim","Missing",
            "Corr","In","Contains",
-           "Fetch","Serve","Get",
+           "Fetch","Serve","Get","Alg",
            "Load","Save",'newdim',
            "Invert","Abs", "Negative",
            ]
@@ -34,6 +34,7 @@ import repops_slice
 import repops_funcs
 from download_cache import DownloadCache, Unpack
 from pre import predefined_sources as Get
+from algs import predefined_algs as Alg
 from wrappers.cytoscape import CyNetwork
 from server import Serve
 from constants import *
