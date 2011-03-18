@@ -666,7 +666,18 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         if not type_in.has_missing:
             return data
         if def_value is NOVAL:
-            def_value = type_out.toDefval()
+            if type_out.__class__ is rtypes.TypeArray and type_out.dims[0].shape == UNDEFINED:
+                for elem in data:
+                    if not elem is Missing:
+                        shape = len(elem)
+                        break
+                else:
+                    raise RuntimeError, "Could not determine shape of dimension. ReplaceMissing impossible. Change to variable dim."
+               
+                dim = dimensions.Dim(shape, type_out.dims[0].dependent)
+                def_value = dimpaths.dimsToArrays(dimpaths.DimPath(dim),type_out.subtypes[0]).toDefval()
+            else:                
+                def_value = type_out.toDefval()
         res = []
         for elem in data:
             if elem is Missing:
@@ -915,7 +926,6 @@ def speedfilter(seqs,has_missing, ctype):
     if(has_missing):
         if(isinstance(ctype,rtypes.TypeArray)):
             if(isinstance(ctype.subtypes[0],rtypes.TypeBool)):
-                data = data.ravel()
                 res = []
                 for pos, elem in enumerate(constraint.ravel()):
                     if(elem is Missing):
@@ -924,7 +934,6 @@ def speedfilter(seqs,has_missing, ctype):
                         res.append(data[pos])
                 res = cutils.darray(res,object)
             else:#indices
-                data = data.ravel()
                 res = []
                 for elem in constraint.ravel():
                     if(elem is Missing):

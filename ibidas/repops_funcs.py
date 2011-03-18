@@ -221,9 +221,9 @@ class BinaryFuncElemOp(BinaryFuncOp):
                 name = binslices[0].name
             else:
                 name = "result"
+                if(not pos is None):
+                    outparam = outparam.withNumber(pos)
             outparam = Param(name, outparam)
-        if(not pos is None):
-            outparam = outparam.withNumber(pos)
         s = ops.BinFuncElemOp(cls.__name__, sig,outparam, **nkwargs)
         return s
 
@@ -491,7 +491,7 @@ class ReplaceMissingSig(FuncSignature):
         in_type = slice.type
         nin_type = in_type.copy()
         #FIXME: adapt dim in case of array
-        nin_type.has_missing = False
+        nin_type = nin_type.setHasMissing(False)
 
         return Param(slice.name, nin_type)#}}}
 

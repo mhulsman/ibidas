@@ -284,6 +284,8 @@ def apply_broadcast_plan(slice,plan, bcdims, references, partial):#{{{
 
 def broadcastParentsFromPlan(slice, seldimpath, plan, origdims, bcdims, refslices, partial):#{{{
     used_dims = [False,] * len(slice.dims)
+    if not plan:
+        return slice
     while True:
         #determine filter dim
         lastpos = slice.dims.matchDimPath(seldimpath)
@@ -303,7 +305,7 @@ def broadcastParentsFromPlan(slice, seldimpath, plan, origdims, bcdims, refslice
 
         #adapt used_dims
         used_dims = dimpaths.applyPlan(used_dims,splan,newvalue=True,copyvalue=True,ensurevalue=True,existvalue=True)
-        used_dims[len(splan)] = True
+        used_dims[filterpos] = True
 
         #unpack dims
         if(packdepth):

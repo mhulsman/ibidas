@@ -6,6 +6,7 @@ import collections
 from IPython.Debugger import Tracer; debug_here = Tracer()
 import cPickle, zlib
 import math
+import os.path
 
 _delay_import_(globals(),"missing","Missing")
 def save_rep(r, filename):
@@ -277,6 +278,7 @@ class farray(numpy.ndarray):
 
 
 def open_file(filename):
+    filename = os.path.expanduser(filename)
     if(filename.endswith("gz")):
         import gzip
         file = gzip.open(filename)
