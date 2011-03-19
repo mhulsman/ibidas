@@ -13,6 +13,6 @@ select_engine.register(passes.WrapperPlanner,debug_mode=False)
 #select_engine.register(passes.DebugVisualizer)
 select_engine.register(passes.PythonPeepHole)
 select_engine.register(passes.SerializeExec)
-select_engine.register(python.PyExec,debug_mode=False)
+select_engine.register(python.PyExec,debug_mode=True)
 #select_engine.register(passes.DebugVisualizer)
 

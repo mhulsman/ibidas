@@ -187,9 +187,10 @@ def convert_mysql(col_descriptor, engine):#{{{
         name, type_code, display_size, internal_size, precision, scale, null_ok = col
         r = _getMySQLTypes(engine)
         d = r[type_code]
+        d = rtypes.createType(d)            
         if(null_ok):
-                d += "?"
-        subtypes.append(rtypes.createType(d))
+            d = d.setHasMissing(True)
+        subtypes.append(d)
         fieldnames.append(util.valid_name(name))
     return (fieldnames, subtypes)#}}}
 
@@ -217,9 +218,10 @@ def convert_postgres(col_descriptor, engine):#{{{
                 d = "[" + str(n['length']) + "](" + sd + ")"
         else:
             d = "any"
+        d = rtypes.createType(d)            
         if(null_ok):
-                d += "?"
-        subtypes.append(rtypes.createType(d))
+            d = d.setHasMissing(True)
+        subtypes.append(d)
         fieldnames.append(util.valid_name(name))
     return (fieldnames, subtypes)#}}}
 
@@ -248,7 +250,6 @@ class Connection(object):
         tables = self.meta.tables.copy()
         self.sa_tables = tables
 
-        
         info_tables = [table for table in tables.values() if "__info__" in table.name]
         tabledict = {}
         for info_table in info_tables:
@@ -275,7 +276,7 @@ class Connection(object):
                 for sname in schemanames:
                     sname = sname[0]
                     self.__dict__[sname] = Connection(self.engine, sname);
-            except:
+            except Exception, e:
                 pass#}}}
 
     def __getattr__(self, name):
@@ -464,7 +465,7 @@ class TableRepresentor(wrapper.SourceRepresentor):#{{{
         nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, table, table_type, util.valid_name(table.name))))
         nnslices = []
         for slice in nslices:
-            if slice.type.has_missing:
+            if slice.type.hasMissing():
                 slice = ops.NoneToMissingOp(slice)
             nnslices.append(slice)
                 

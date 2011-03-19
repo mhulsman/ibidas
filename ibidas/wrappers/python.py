@@ -221,6 +221,13 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def visitChangeDimOp(self,node,slice):
         return slice.modify(rtype=node.type,dims=node.dims)
 
+    def visitDetectFixedShapesOp(self,node,slice):
+        data = slice.data.flat()
+        if len(data) == 0:
+            raise RuntimeError, "Cannot determine dim shape from empty data. Please cast dim shape of fixed dims."
+        ntype = detect_shape(data[0],slice.type)
+        return slice.modify(rtype=ntype)
+    
     def visitDetectTypeOp(self,node,slice):
         if(slice.type == rtypes.unknown):
             det = detector.Detector()
@@ -229,7 +236,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             return slice.modify(rtype=det.getType())
         else:
             return slice
-    
+   
     def visitUnpackArrayOp(self,node,slice):
         ndata=slice.data.unpack(node.unpack_dims, subtype=node.type)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
@@ -381,7 +388,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
     def visitFilterOp(self,node, slice, constraint):
         ndata = nested_array.co_map(speedfilter,[slice.data, constraint.data],
-                                       has_missing = node.has_missing,ctype=constraint.type,
+                                       has_missing = node.has_missing,ctype=constraint.type,stype=node.type,
                                        res_type=node.type)
         return slice.modify(data=ndata,rtype=node.type, dims=node.dims)
 
@@ -412,7 +419,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return slice.modify(data=ndata,rtype=node.type)
     
     def visitNoneToMissingOp(self, node, slice):
-        ndata = slice.data.mapseq(none_to_missing,res_type=node.type)
+        ndata = slice.data.mapseq(none_to_missing,res_type=node.type, stype=node.type)
         return slice.modify(data=ndata)
 
     def visitUnaryFuncSeqOp(self,node, slice):
@@ -919,17 +926,18 @@ def speeddictindex(seqs,dtype, allow_missing=False):
         return cutils.darray([d[k] for d, k in zip(*seqs)],dtype)
 
 
-def speedfilter(seqs,has_missing, ctype):
+def speedfilter(seqs,has_missing, ctype, stype):
     data,constraint = seqs
     if data is Missing:
         return data
     if(has_missing):
         if(isinstance(ctype,rtypes.TypeArray)):
+            missing = stype.subtypes[0].toMissingval()
             if(isinstance(ctype.subtypes[0],rtypes.TypeBool)):
                 res = []
                 for pos, elem in enumerate(constraint.ravel()):
                     if(elem is Missing):
-                        res.append(Missing)
+                        res.append(missing)
                     elif(elem == True):
                         res.append(data[pos])
                 res = cutils.darray(res,object)
@@ -937,13 +945,14 @@ def speedfilter(seqs,has_missing, ctype):
                 res = []
                 for elem in constraint.ravel():
                     if(elem is Missing):
-                        res.append(Missing)
+                        res.append(missing)
                     else:
                         res.append(data[elem])
                 res = cutils.darray(res,object)
         else:
+            missing = stype.toMissingval()
             if(constraint is Missing):
-                res = Missing
+                res = missing
             else:
                 try:
                     res = data[constraint]
@@ -1139,9 +1148,20 @@ def string_to_real(seq, dtype):
     return cutils.darray([float(elem) for elem in seq],dtype)
 
 
-def none_to_missing(seq):
+def none_to_missing(seq,stype):
+    missing = stype.toMissingval()
     seq = seq.copy()
-    seq[numpy.equal(seq,None)] = Missing
+    seq[numpy.equal(seq,None)] = missing
     return seq
    
+def detect_shape(data, stype):
+    if stype.__class__ is rtypes.TypeArray:
+        if not stype.dims[0].dependent and stype.dims[0].shape == UNDEFINED:
+            stype.dims[0].shape = len(data)
+
+        subtype = detect_shape(data[0],stype.subtypes[0])
+        stype = stype.copy()
+        stype.subtypes= (subtype,)
+    
+    return stype
 

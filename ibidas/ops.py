@@ -132,6 +132,11 @@ class CastOp(UnaryUnaryOp):#{{{
 class DetectTypeOp(UnaryUnaryOp):#{{{
     __slots__ = []#}}}
 
+
+class DetectFixedShapesOp(UnaryUnaryOp):
+    __slots__ = []
+
+
 class UnpackArrayOp(UnaryUnaryOp):#{{{
     """An slice which is the result of unpacking a source slice."""
     __slots__ = ["unpack_dims"]
@@ -348,30 +353,30 @@ class FilterOp(UnaryUnaryOp):#{{{
     def __init__(self,slice,constraint, ndim):
         stype = slice.type
         assert isinstance(stype, rtypes.TypeArray), "Filter on non-array type not possible"
-        sdims = stype.dims
-        if(ndim is None):
-            sdims, subtype = sdims.removeDim(0, constraint, stype.subtypes[0])
-        else:
-            sdims, subtype = sdims.updateDim(0, ndim, stype.subtypes[0])
         
         if(isinstance(constraint.type,rtypes.TypeArray)):
             has_missing = constraint.type.subtypes[0].has_missing
         else:
             has_missing = constraint.type.has_missing
         self.has_missing = has_missing            
-        
-        array_has_missing = stype.has_missing
-        if(has_missing):
-            if(isinstance(constraint.type,rtypes.TypeSlice)):
-                array_has_missing = True 
-            else:
-                subtype = subtype.setHasMissing(True)
 
+        sdims = stype.dims
+        if(ndim is None):
+            sdims, subtype = sdims.removeDim(0, constraint, stype.subtypes[0])
+        else:
+            sdims, subtype = sdims.updateDim(0, ndim, stype.subtypes[0])
+        
+        
         if(sdims):
             ntype = dimpaths.dimsToArrays(sdims, subtype)
         else:
             ntype = subtype
         
+        if(has_missing):
+            ntype = ntype.setHasMissing(True)
+            if not subtype.hasMissingValInfo():
+                slice = DetectFixedShapesOp(slice)
+      
         self.constraint = constraint
         UnaryUnaryOp.__init__(self, slice, rtype=ntype)#}}}
 
@@ -390,6 +395,8 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
         packdepth = len(slice.dims) - filterpos
         if(packdepth):
             slice = PackArrayOp(slice,packdepth)
+
+
         #prepare adaptation of ndim.dependent
         if(not ndim is None):
             dep = list(ndim.dependent)
@@ -400,6 +407,8 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
         (slice,tconstraint),(splan,cplan) = broadcast([slice,constraint],mode=mode, partial=True)
 
         #adapt ndim to braodcast, apply filter
+        #FIXME: change dependent dims of slice.type
+
         if(not ndim is None):
             if(isinstance(tconstraint.type,rtypes.TypeSlice)):
                 ndep = dimpaths.applyPlan(dep,cplan,newvalue=True, copyvalue=True, ensurevalue=True)

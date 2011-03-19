@@ -55,7 +55,7 @@ _delay_import_(globals(),"dimensions")
 _delay_import_(globals(),"dimpaths")
 _delay_import_(globals(),"casts")
 _delay_import_(globals(),"type_attribute_freeze")
-
+_delay_import_(globals(),"..utils.missing","Missing")
 
 #}}}
 
@@ -109,7 +109,20 @@ class Type(object):#{{{
     def toDefval(self):
         """Returns default value."""
         return self._defval
-   
+  
+    def toMissingval(self):
+        return Missing
+    
+    def hasMissingValInfo(self):
+        try:
+           self.toMissingval()
+           return True
+        except RuntimeError:
+           return False
+
+    def hasMissing(self):
+        return self.has_missing
+
     def getName(self):
         """Returns base type name"""
         return self.name
@@ -576,6 +589,8 @@ class TypeArray(TypeAny):#{{{
                 "One subtype should be set for array type"
         
         has_missing = dims[0].has_missing or has_missing
+        if self.__class__ == TypeArray:
+            assert not has_missing, "Array type not allowed to have missing values"
         
         dims[0].has_missing = has_missing
         self.subtypes = subtypes
@@ -601,38 +616,46 @@ class TypeArray(TypeAny):#{{{
         return res
 
     def setHasMissing(self, value):
-        if self.has_missing != value or self.dims[0].has_missing != value:
+        s = self.subtypes[0].setHasMissing(value)
+        if not s is self.subtypes[0]:
             self = self.copy()
-            self.has_missing = value
-            assert len(self.dims) == 1, "Expected dimension length 1"
-            dim = self.dims[0].copy()
-            dim.has_missing = value
-            self.dims = dimpaths.DimPath(dim)
+            self.subtypes = (s,)
         return self
-        
-        
+
+
+    def toMissingval(self):
+        s = self.subtypes[0].toMissingval()
+        if self.dims[0].dependent:
+            res = numpy.array([],dtype=self.subtypes[0].toNumpy())
+        else:
+            if self.dims[0].shape == UNDEFINED:
+                raise RuntimeError, "Cannot determine shape for missing value. Please cast dim " + str(self.dims[0])
+            res = numpy.array([s] * self.dims[0].shape,dtype=self.toNumpy())
+        return res
+
+    def hasMissing(self):
+        return self.subtypes[0].hasMissing()
+
+
     def toDefval(self):
         """Returns default value."""
         subtype = self.subtypes[0]
-        if(not self.dims):
-            res = numpy.array([], dtype=subtype.toNumpy())
+        shape = [dim.shape for dim in self.dims]
+        for pos, sdim in enumerate(shape):
+            if(sdim < 0):
+                shape[pos] = 0
+        
+        res = numpy.empty(shape, dtype=subtype.toNumpy())
+        subdv = subtype.toDefval()
+        
+        #workaround numpy problem 
+        #(cannot set sequence for a range)
+        if(operator.isSequenceType(subdv)):
+            flatres = res.ravel()
+            for i in range(len(flatres)):
+                flatres[i] = subdv
         else:
-            shape = [dim.shape for dim in self.dims]
-            for pos, sdim in enumerate(shape):
-                if(sdim < 0):
-                    shape[pos] = 0
-            
-            res = numpy.empty(shape, dtype=subtype.toNumpy())
-            subdv = subtype.toDefval()
-           
-            #workaround numpy problem 
-            #(cannot set sequence for a range)
-            if(operator.isSequenceType(subdv)):
-                flatres = res.ravel()
-                for i in range(len(flatres)):
-                    flatres[i] = subdv
-            else:
-                res[:] = subdv
+            res[:] = subdv
         return res
     
 
@@ -822,6 +845,12 @@ class TypeSet(TypeArray):#{{{
         res += '{' + ",".join([str(dim) for dim in self.dims]) + '}'
         res += '<' + str(self.subtypes[0]) 
         return res
+    
+    def hasMissing(self):
+        return self.has_missing
+
+    def toMissingval(self):
+        return frozenset()
 
 addType(TypeSet)#}}}
 
@@ -869,7 +898,13 @@ class TypeString(TypeArray):#{{{
         return (hash(self.__class__) ^ 
                 hash(self.has_missing) ^ 
                 hash(self.dims[0].shape))
+
+    def toMissingval(self):
+        return Missing
     
+    def hasMissing(self):
+        return self.has_missing
+   
     def __repr__(self):
         res =  self.name
         if(self.has_missing):
