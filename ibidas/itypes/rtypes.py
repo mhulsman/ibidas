@@ -1707,7 +1707,19 @@ class TypeStringASTInterpreter(object):#{{{
         dimnode, has_missing, name, strict = node.kids
         if has_missing is None:
             has_missing = False
-       
+        
+        if(dimnode.type == "varlist"):
+            dependent = tuple(dimnode.kids)
+            shape = UNDEFINED
+        elif(dimnode.type == "integer"):
+            dependent = tuple()
+            shape = dimnode.attr
+        elif(dimnode.type == "~"):
+            dependent = (True,) * dimpos
+            shape = UNDEFINED
+        else:
+            raise RuntimeError, "Invalid AST!"
+      
         if(not name is None):
             assert name in self.dim_annot, "Unannotated named dim found!"
             if(not name in self.dims):
@@ -1724,19 +1736,11 @@ class TypeStringASTInterpreter(object):#{{{
             dim = self.dims[name]
             if(len(dim.dependent) > dimpos):
                 raise RuntimeError, "Dim: " + name + " has too many dependent dims: " + str(len(dim.dependent)) + " (max: " + str(dimpos) + ")"
+            if dim.shape != shape and not shape == UNDEFINED and not dim.shape == UNDEFINED:
+                raise RuntimeError, "Dim: " + name + " dimension unequal to known dim"
+
             return dim
 
-        if(dimnode.type == "varlist"):
-            dependent = tuple(dimnode.kids)
-            shape = UNDEFINED
-        elif(dimnode.type == "integer"):
-            dependent = tuple()
-            shape = dimnode.attr
-        elif(dimnode.type == "~"):
-            dependent = (True,) * dimpos
-            shape = UNDEFINED
-        else:
-            raise RuntimeError, "Invalid AST!"
 
         return dimensions.Dim(shape,dependent,has_missing, name=name) #}}}
 

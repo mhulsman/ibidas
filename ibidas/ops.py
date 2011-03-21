@@ -232,6 +232,8 @@ class BroadcastOp(UnaryUnaryOp):#{{{
         UnaryUnaryOp.__init__(self, slice, dims=ndims,rtype=ntype)#}}}
 
 def broadcast(slices,mode="pos", partial=False):#{{{
+    if not slices:
+        return ((),())
     slicedimpaths = [s.dims for s in slices]
     if(mode == "dim"):
         bcdims, bcplan = dimpaths.planBroadcastMatchDim(slicedimpaths)

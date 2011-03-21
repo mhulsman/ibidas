@@ -6,6 +6,7 @@ import ops
 
 
 _delay_import_(globals(),"representor")
+_delay_import_(globals(),"wrappers","python")
 _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"itypes","rtypes","dimpaths","casts")
 
@@ -130,8 +131,18 @@ class Unproject(Project):
         return self._initialize(tuple(nslices)) 
 
 
+class AddSlice(repops.UnaryOpRep):
+    def _sprocess(self, source, data, name=None, dtype=None):
+        if not dtype is None:
+            refdims = sum([slice.dims for slice in source._slices],tuple())
+            dtype = rtypes.createType(dtype,refdims=refdims)
+            
+        data = python.Rep(data, dtype=dtype, name=name)
 
-
+        nslices = list(source._slices)
+        nslices.extend(data._slices)
+        return self._initialize(tuple(nslices)) 
+       
 class UnpackTuple(repops.UnaryOpRep):
     def _process(self,source,name=None,unpack=True):
         """

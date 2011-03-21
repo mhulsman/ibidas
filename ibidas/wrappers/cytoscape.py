@@ -50,20 +50,19 @@ class CyNetwork(object):
 
         primary = rep.Get(primary)
         attributes = rep.Without(primary)
+        attributes = attributes.Level(1)
         
         #package data if needed
-        attributes = attributes.Level(1)
         primary = primary.Level(1).Cast("bytes")
        
         #some checks
         assert len(primary.Slices) == 1, "Node identifiers should consist of only one slice"
         dims = set([primary.Slices[0].dims]) | set([aslice.dims for aslice in attributes.Slices])
         assert len(dims) == 1, "Multiple root dimensions not allowed"
-       
 
         nodeids = primary.ToPython()
         self._server.createNodes(self._networkid, nodeids)
-
+        
         for pos, slice in enumerate(attributes.Slices):
             attribute = attributes.Get(pos)
             xtype, attribute = self._prepareAttribute(attribute)
@@ -82,9 +81,9 @@ class CyNetwork(object):
 
         primary = rep.Get(left, right, itype, directed)
         attributes = rep.Without(primary)
-
-        #package data if needed
         attributes = attributes.Level(1)
+        
+        #package data if needed
         primary = primary.Level(1).To(0,1,2,Do=_.Cast("bytes"))
         
         #some checks
@@ -98,14 +97,12 @@ class CyNetwork(object):
 
         edgeids = primary.Array(0).ToPython()
         cedgeids = self._server.createEdges(self._networkid, edgeids[0], edgeids[1], edgeids[2], edgeids[3], False)
-
-        cedgeids = Rep(cedgeids, dtype=primary.Slices[0].type)
+        
         for pos, slice in enumerate(attributes.Slices):
             attribute = attributes.Get(pos)
             xtype, attribute = self._prepareAttribute(attribute)
-
-            attrmap = dict(Combine(cedgeids, attribute).Tuple().ToPython())
-            self._server.addEdgeAttributes(slice.name, xtype, attrmap,False)
+            attrmap = dict(zip(cedgeids, attribute.ToPython()))
+            self._server.addEdgeAttributes(slice.name, xtype, attrmap)
 
 
     def _prepareAttribute(self, attribute):
@@ -131,6 +128,11 @@ class CyNetwork(object):
             self._server.performDefaultLayout()
         else:
             self._server.performLayout(self._networkid,name)
+
+    def SetNodeLabel(self, name=None):
+        if name is None:
+            name = "canonicalName"
+        self._server.setNodeLabel(self._networkid, name, "", "default")
 
     def Nodes(self): 
         return Rep(self._server.getNodes(self._networkid),dtype="[nodes:*]<bytes")

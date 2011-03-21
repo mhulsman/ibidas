@@ -493,7 +493,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def visitSelectOp(self, node, slice):
         return slice.modify(data=slice.data[node.index],name=node.name, rtype=node.type, dims=node.dims, bookmarks=node.bookmarks)
 
-    def visitFixateOp(self,node,slices):
+    def visitFixateOp(self,node,slices=[]):
         res = []
         for cur_slice, slice in zip(node.sources, slices):
             ndata = slice.data.getStructuredData()
@@ -929,6 +929,8 @@ def speeddictindex(seqs,dtype, allow_missing=False):
 def speedfilter(seqs,has_missing, ctype, stype):
     data,constraint = seqs
     if data is Missing:
+        return data
+    if len(data) == 0 and len(constraint) == 0:
         return data
     if(has_missing):
         if(isinstance(ctype,rtypes.TypeArray)):

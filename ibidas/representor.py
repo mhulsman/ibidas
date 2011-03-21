@@ -806,7 +806,8 @@ class Representor(Node):
         return repops_slice.To(self, *slices, **kwargs)
               
               
-
+    def AddSlice(self, name, data, dtype=None):
+        return repops_slice.AddSlice(self, data, name, dtype)
 
 
     def Get(self, *slices, **kwds):
