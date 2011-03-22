@@ -930,7 +930,7 @@ def speedfilter(seqs,has_missing, ctype, stype):
     data,constraint = seqs
     if data is Missing:
         return data
-    if len(data) == 0 and len(constraint) == 0:
+    if len(data) == 0:
         return data
     if(has_missing):
         if(isinstance(ctype,rtypes.TypeArray)):
