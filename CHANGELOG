@@ -30,3 +30,10 @@
 - some fixes in array type handling
 - missing values in types now indicated by '?'
 - evidence added to go annotation data source
+
+0.1.5:
+- many fixes
+- AddSlice/Take/IndexDict ops
+- add predefined algorithms (Algs)
+- add Whiten/Std ops
+- go annotation sources updated

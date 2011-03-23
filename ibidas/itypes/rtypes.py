@@ -1717,6 +1717,9 @@ class TypeStringASTInterpreter(object):#{{{
         elif(dimnode.type == "~"):
             dependent = (True,) * dimpos
             shape = UNDEFINED
+        elif(dimnode.type == "inherit"):
+            dependent = None
+            shape = None
         else:
             raise RuntimeError, "Invalid AST!"
       
