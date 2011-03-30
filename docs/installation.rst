@@ -5,7 +5,8 @@ If one has the ``setuptools`` package installed, one can simply perform::
 
     easy_install ibidas
 
-This will download and install ibidas and its necessary dependencies. 
+One needs to have root access to do this (see `Execute from source` if this is not available).
+This will download and install ibidas and its necessary dependencies.
 The ``setuptools`` package is available in nearly all Linux distributions. 
 
 Ibidas has currently only been tested on the Linux platform, and probably will 
@@ -29,6 +30,31 @@ one can simply use::
 For the rest of this tutorial, we assume the standard Ibidas interpreter is used.
 
 
+Execute from source
+-------------------
+One can also directly execute ibidas from the source package. Download the source from pypi,
+then execute::
+
+    tar -xzvf ibidas-0.1.5.tar.gz 
+
+to extract the source (version can differ). Enter the source directory using::
+
+    cd ibidas-0.1.5
+
+then start ibidas using::
+
+    ./run
+
+This will install possible dependencies locally. 
+
+By executing in the source directory::
+
+    source ibidas_env.sh
+
+one will add ibidas to the python path, enabling its use in other scripts using::
+
+    from ibidas import *
+
 Manual installation
 -------------------
 Alternatively, one can download the source package, and execute in the unpacked
@@ -36,17 +62,6 @@ source directory::
 
     python setup.py install
 
-One can also directly execute ibidas from the source package by performing::
-
-    ./run
-
-This will install possible dependencies locally. By running::
-
-    source ibidas_env.sh
-
-one will add ibidas to the python path, enabling its use in other scripts by importing using::
-
-    from ibidas import *
 
 Performing unit tests and building the documentation can be done manually using::
 

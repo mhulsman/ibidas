@@ -37,3 +37,6 @@
 - add predefined algorithms (Algs)
 - add Whiten/Std ops
 - go annotation sources updated
+
+0.1.6
+- running from source simplified
