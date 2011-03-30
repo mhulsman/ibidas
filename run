@@ -1,0 +1,5 @@
+#!/bin/bash
+source ibidas_env.sh
+chmod 755 bin/ibidas
+bin/ibidas
+

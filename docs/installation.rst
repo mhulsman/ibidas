@@ -38,11 +38,15 @@ source directory::
 
 One can also directly execute ibidas from the source package by performing::
 
-    python setup.py develop
+    ./run
 
-    source set_env.sh
+This will install possible dependencies locally. By running::
 
-    ibidas
+    source ibidas_env.sh
+
+one will add ibidas to the python path, enabling its use in other scripts by importing using::
+
+    from ibidas import *
 
 Performing unit tests and building the documentation can be done manually using::
 
