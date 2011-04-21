@@ -9,6 +9,18 @@ One needs to have root access to do this (see `Execute from source` if this is n
 This will download and install ibidas and its necessary dependencies.
 The ``setuptools`` package is available in nearly all Linux distributions. 
 
+To install, Ibidas needs some dependencies. Most are automatically installed.
+The following packages need to be installed manually if they are not yet available (an error will be returned in this case):
+
+    * numpy development files
+
+    * psycopg2 (only if access is required to postgres databases)
+
+    * MySQLDB (only if access is required to mysql databases)
+
+    * other databases are also supported. An error will be returned once you try to connect, with the package that needs to be installed.
+    
+
 Ibidas has currently only been tested on the Linux platform, and probably will 
 not work out of the box on Windows. We will look into this in the near future.
 

@@ -227,7 +227,7 @@ class SliceRename(repops.UnaryOpRep):
             nslices = []
             for slice in source._slices:
                 if(slice.name in kwds):
-                    nslice = slice.ChangeNameOp(slice,kdws[slice.name])
+                    nslice = ops.ChangeNameOp(slice,kdws[slice.name])
                 else:
                     nslice = slice
                 nslices.append(nslice)
@@ -254,7 +254,7 @@ class SliceCast(repops.UnaryOpRep):
             for slice in source._slices:
                 if(slice.name in kwds):
                     newtype = rtypes.createType(kwds[slice.name])
-                    nslice = slice.CastOp(slice,newtype)
+                    nslice = ops.CastOp(slice,newtype)
                 else:
                     nslice = slice
                 nslices.append(nslice)
