@@ -630,7 +630,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         res = []
         dtype = typeo.toNumpy()
         for lelem, relem in zip(data1,data2):
-            res.append(numpy.concatenate([numpy.cast[dtype](lelem),numpy.cast[dtype](relem)],axis=0))
+            res.append(numpy.concatenate([numpy.cast[dtype](list(lelem)),numpy.cast[dtype](list(relem))],axis=0))
         return cutils.darray(res,object)
 
     def simple_cmpGeneral(self, data, type1, type2, typeo, op):

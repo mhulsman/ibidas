@@ -341,7 +341,7 @@ class NestedArray(object):
                     nself.idxs.insert(matchpoint,lshape)
         return nself
 
-    def mergeDim(self, matchpoint, result_fixed):
+    def mergeDim(self, matchpoint, result_fixed=True):
         matchpoint += 1
         assert len(self.idxs) > (matchpoint + 1), "Nested array not nested that deep"
         nself = self.copy()
@@ -412,7 +412,7 @@ class NestedArray(object):
             s1 = nself.getDimShape(d-1)
             s2 = nself.getDimShape(d)
             nshapes.append((s1,s2))
-            nself = nself.mergeDim(d-1)
+            nself = nself.mergeDim(d-1, True)
         return nself, nshapes[::-1]
 
     def splitLastDim(self, shapes):
