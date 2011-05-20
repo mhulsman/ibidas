@@ -271,7 +271,7 @@ def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyc
     return g.Copy()
 predefined_sources.register(go_annotations,name="annotations",category="go")
 
-def go_info(dburl=config.get("databases.go_url",None), genus="Saccharomyces", species="cerevisiae"):
+def go_info(dburl=config.get("databases.go_url",None), genus="Saccharomyces", species="cerevisiae", include_ancestors=False):
     """Accesses GO term info in a MySQL database.
 
        Database data can be obtained from the geneontology website.
@@ -279,6 +279,7 @@ def go_info(dburl=config.get("databases.go_url",None), genus="Saccharomyces", sp
        example url: "mysql://username:password@hostname:port/go
     """
     go = open_go(dburl)
+
     #select annotations from a certain species, and their ancestor annotations
     g = go.species
     g = g |Match(_.id,                  _.species_id)|      go.gene_product
@@ -293,22 +294,47 @@ def go_info(dburl=config.get("databases.go_url",None), genus="Saccharomyces", sp
 
     #get relevant fields
     g = g.ReplaceMissing()
-    g = g.Get(_.child.acc/"go_id", _.parent.acc/"parent_id", _.child.term_type/"go_type", _.child.name/"annotation",
-              _.distance, _.rel.name/"relationship", _.gene_product.id/"gene_id").Copy()
+
+    if include_ancestors:
+        g = g.Get(_.child.acc/"go_id", _.parent.acc/"parent_id", _.gene_product.id/"gene_id").Copy()
+    else:
+        g = g.Get(_.child.acc/"go_id", _.parent.acc/"parent_id", _.child.term_type/"go_type", _.child.name/"annotation",
+                _.distance, _.rel.name/"relationship", _.gene_product.id/"gene_id").Copy()
 
     #step A: calculate number of genes associated with go terms
     ngenes = g.GroupBy(_.parent_id).Get(_.parent_id/"go_id",_.gene_id.Unique().Count()/"ngenes")
 
-    #step B1: group per term
-    goinfo = g.GroupBy(_.go_id, flat=(_.go_type, _.annotation))
-    
-    #step B2: for ech term, determine type, max depth to root, ancestors (non-unique) and relationship to ancestors
-    goinfo = goinfo.Get(_.go_id, _.go_type, _.annotation,  
-                        _[_.parent_id == "all"].distance.Max()/"depth",
-                        _.parent_id / "ancestor", _.relationship, _.distance)
 
-    #step B3: select for each ancestor the minimum path length
-    goinfo = goinfo.GroupBy(_.ancestor)[..., _.distance.Argmin()].Copy()
+    if include_ancestors:
+        g2 = go.graph_path
+        g2 = g2 |Match(_.term2_id,             _.id)| go.term//"child"
+        g2 = g2 |Match(_.term1_id,             _.id)| go.term//"parent"
+        g2 = g2 |Match(_.relationship_type_id, _.id)| go.term//"rel"
+        g2 = g2.Get(_.child.acc/"go_id", _.parent.acc/"parent_id", _.child.term_type/"go_type", _.child.name/"annotation",
+                _.distance, _.rel.name/"relationship").Copy()
+      
+        #step B1: group per term
+        g2 = g2[_.go_id |In| ngenes.go_id]
+        goinfo = g2.GroupBy(_.go_id, flat=(_.go_type, _.annotation))
+        
+        #step B2: for ech term, determine type, max depth to root, ancestors (non-unique) and relationship to ancestors
+        goinfo = goinfo.Get(_.go_id, _.go_type, _.annotation,  
+                            _[_.parent_id == "all"].distance.Max()/"depth",
+                            _.parent_id / "ancestor", _.relationship, _.distance)
+
+        #step B3: select for each ancestor the minimum path length
+        goinfo = goinfo.GroupBy(_.ancestor)[..., _.distance.Argmin()].Copy()
+    else:
+        #step B1: group per term
+        goinfo = g.GroupBy(_.go_id, flat=(_.go_type, _.annotation))
+        
+        #step B2: for ech term, determine type, max depth to root, ancestors (non-unique) and relationship to ancestors
+        goinfo = goinfo.Get(_.go_id, _.go_type, _.annotation,  
+                            _[_.parent_id == "all"].distance.Max()/"depth",
+                            _.parent_id / "ancestor", _.relationship, _.distance)
+
+        #step B3: select for each ancestor the minimum path length
+        goinfo = goinfo.GroupBy(_.ancestor)[..., _.distance.Argmin()].Copy()
 
     #step C: combine, copy, return
     return (goinfo |Match| ngenes).Copy()

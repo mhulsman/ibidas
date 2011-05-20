@@ -90,7 +90,7 @@ class Project(repops.UnaryOpRep):
                                nelem = [slice for slice in cur_slices if elem in slice.bookmarks]
                                assert len(nelem) > 0, "Could not find (unique) matching slice/bookmark for name: " + elem
                         else:
-                            assert len(nelem) ==1, "Could not find (unique) matching slice for name: " + elem
+                            assert len(nelem) > 0, "Could not find (unique) matching slice for name: " + elem
                     elem = nelem
                 elif(isinstance(elem, representor.Representor)):
                     pass

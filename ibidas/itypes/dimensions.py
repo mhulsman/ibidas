@@ -167,18 +167,26 @@ class Dim(object):
 
 
     def merge(self, other):
-        if(self.shape == UNDEFINED or other.shape == UNDEFINED):
-            rshape = UNDEFINED
-        else:
-            rshape = max(self.shape, other.shape)
+        if self == other:
+            return self
+        redim_cache = self._getRedimCache()
+        key = (self,other)
+        if not key in redim_cache:
+            if(self.shape == UNDEFINED or other.shape == UNDEFINED):
+                rshape = UNDEFINED
+            else:
+                rshape = max(self.shape, other.shape)
 
-        ndep = tuple([ldep or rdep for ldep, rdep in itertools.izip_longest(self.dependent, other.dependent,fillvalue=False)])
+            ndep = tuple([ldep or rdep for ldep, rdep in itertools.izip_longest(self.dependent, other.dependent,fillvalue=False)])
 
-        if(self.name == other.name):
-            nname = self.name
-        else:
-            nname = self.name + "_" + other.name
-        return Dim(rshape, ndep, self.has_missing or other.has_missing, name=nname)
+            if(self.name == other.name):
+                nname = self.name
+            else:
+                nname = self.name + "_" + other.name
+            
+            ndim = Dim(rshape, ndep, self.has_missing or other.has_missing, name=nname)
+            redim_cache[key] = ndim
+        return redim_cache[key]
 
             
 
