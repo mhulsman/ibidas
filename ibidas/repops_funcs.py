@@ -562,6 +562,10 @@ sortablesig = UnarySortableSignature("sortable")
 class Argsort(UnaryFuncDimOp):
     _sigs = [sortablesig]
 
+sortablesig = UnarySortableSignature("sortable")
+class Rank(UnaryFuncDimOp):
+    _sigs = [sortablesig]
+
 class Pos(UnaryFuncDimOp):
     _sigs = [any_nodepsig]
 

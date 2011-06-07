@@ -686,6 +686,9 @@ class Representor(Node):
     def Argsort(self, dim=None, descend=False):
         return repops_funcs.Argsort(self, dim, descend=descend)
     
+    def Rank(self, dim=None, descend=False):
+        return repops_funcs.Rank(self, dim, descend=descend)
+   
     def Argunique(self, dim=None):
         return repops_funcs.Argunique(self, dim)
 

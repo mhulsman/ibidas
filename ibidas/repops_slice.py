@@ -206,7 +206,7 @@ class Bookmark(repops.UnaryOpRep):
             nnslices = []
             for slice in source._slices:
                 if(slice.dims[0].name in kwds):
-                    nslice = slice.ChangeBookmarkOp(slice,kdws[slice.dims[0].name])
+                    nslice = slice.ChangeBookmarkOp(slice,kwds[slice.dims[0].name])
                 else:
                     nslice = slice
                 nnslices.append(nslice)
@@ -227,7 +227,7 @@ class SliceRename(repops.UnaryOpRep):
             nslices = []
             for slice in source._slices:
                 if(slice.name in kwds):
-                    nslice = ops.ChangeNameOp(slice,kdws[slice.name])
+                    nslice = ops.ChangeNameOp(slice,kwds[slice.name])
                 else:
                     nslice = slice
                 nslices.append(nslice)

@@ -720,7 +720,21 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             if(descend):
                 res = res[:,::-1,...]
         return res
-   
+ 
+    def sortableRank(self, data, type_in, type_out, op, packdepth, descend=False):
+        data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
+        if(len(data.shape) < 2):
+            if(descend):
+                res = cutils.darray([numpy.argsort(numpy.flipud(numpy.argsort(row,axis=0)),axis=0) for row in data],object)
+            else:
+                res = cutils.darray([numpy.argsort(numpy.argsort(row,axis=0),axis=0) for row in data],object)
+        else:
+            res = numpy.argsort(data,axis=1)
+            if(descend):
+                res = res[:,::-1,...]
+            res = numpy.argsort(res,axis=1)                
+        return res
+  
     def any_nodepPos(self, data, type_in, type_out, op, packdepth):
         dtype = type_out.toNumpy()
         if(len(data.shape) == 1):

@@ -169,6 +169,8 @@ class Dim(object):
     def merge(self, other):
         if self == other:
             return self
+        if self.shape == other.shape and self.shape != UNDEFINED and self.name == other.name and not self.dependent and not other.dependent and not self.has_missing and not other.has_missing:
+            return self
         redim_cache = self._getRedimCache()
         key = (self,other)
         if not key in redim_cache:
