@@ -44,3 +44,9 @@
 0.1.7
 - several fixes
 - improved installation documention 
+
+0.1.8
+- fixes in replacemissing
+- fix in cytoscape wrapper
+- add xml read format
+- add rank function

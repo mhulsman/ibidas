@@ -595,7 +595,7 @@ class TypeArray(TypeAny):#{{{
         dims[0].has_missing = has_missing
         self.subtypes = subtypes
         self.dims = dims
-        TypeAny.__init__(self, has_missing)
+        TypeAny.__init__(self, False)
     
     @classmethod
     def commonType(cls, type1, type2):
@@ -617,9 +617,19 @@ class TypeArray(TypeAny):#{{{
 
     def setHasMissing(self, value):
         s = self.subtypes[0].setHasMissing(value)
-        if not s is self.subtypes[0]:
-            self = self.copy()
-            self.subtypes = (s,)
+        dims = list(self.dims)
+        dims[0] = dims[0].copy()
+        dims[0].has_missing = value
+
+        if not self.__class__ == TypeArray:
+            if not s is self.subtypes[0] or not dims[0].has_missing is self.dims[0].has_missing:
+                self = self.copy()
+                self.subtypes = (s,)
+                self.dims = dimpaths.DimPath(*dims)
+        else:
+            if not s is self.subtypes[0]:
+                self = self.copy()
+                self.subtypes = (s,)
         return self
 
 

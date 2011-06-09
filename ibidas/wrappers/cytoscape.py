@@ -108,12 +108,12 @@ class CyNetwork(object):
     def _prepareAttribute(self, attribute):
         assert len(attribute.Slices) == 1, "Attribtue slice nr should be 1"
         slice = attribute.Slices[0]
-        if(isinstance(slice.type, rtypes.TypeReal64) and not slice.type.has_missing):
-            xtype = "FLOATING"
+        if(isinstance(slice.type, rtypes.TypeBool) and not slice.type.has_missing):
+            xtype = "BOOLEAN"
         elif(isinstance(slice.type, rtypes.TypeInteger) and not slice.type.has_missing):
             xtype = "INTEGER"
-        elif(isinstance(slice.type, rtypes.TypeBool) and not slice.type.has_missing):
-            xtype = "BOOLEAN"
+        elif(isinstance(slice.type, rtypes.TypeReal64) and not slice.type.has_missing):
+            xtype = "FLOATING"
         else:
             xtype = "STRING"
             attribute = attribute.Cast("bytes")

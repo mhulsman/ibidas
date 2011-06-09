@@ -78,6 +78,9 @@ def Read(url, **kwargs):
     if(format == 'tsv'):
         from wrappers.tsv import TSVRepresentor
         return TSVRepresentor(url, **kwargs) 
+    elif(format == 'xml'):
+        from wrappers.xml_wrapper import XMLRepresentor
+        return XMLRepresentor(url, **kwargs) 
     else:
         raise RuntimeError("Unknown format specified")
 
