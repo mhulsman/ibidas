@@ -227,7 +227,7 @@ class SliceRename(repops.UnaryOpRep):
             nslices = []
             for slice in source._slices:
                 if(slice.name in kwds):
-                    nslice = slice.ChangeNameOp(slice,kdws[slice.name])
+                    nslice = ops.ChangeNameOp(slice,kwds[slice.name])
                 else:
                     nslice = slice
                 nslices.append(nslice)
