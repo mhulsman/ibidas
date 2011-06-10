@@ -501,6 +501,16 @@ class ReplaceMissing(UnaryFuncElemOp):
     _sigs =[repmissing]
 
 
+class IsMissingSig(FuncSignature):
+    def check(self, slice, def_value=NOVAL):#{{{
+        in_type = slice.type
+        o_type = rtypes.TypeBool()
+        return Param(slice.name, o_type)#}}}
+ismissingsig = IsMissingSig("ismissing")
+
+class IsMissing(UnaryFuncElemOp):
+    _sigs =[ismissingsig]
+
 class UnaryFixShapeSignature(FuncSignature):
     def __init__(self,name,check_dependent=True):
         self.check_dependent = check_dependent

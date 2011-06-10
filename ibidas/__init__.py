@@ -5,7 +5,7 @@ The ibidas module contains all main functions for working with ibidas objects.
 __all__ = ["Rep","Read","Connect","_","CyNetwork",'Unpack',
            "Array","Tuple","Combine","HArray",
            "Stack","Intersect","Union","Except","Difference",
-           "Pos","Argsort","Rank",
+           "Pos","Argsort","Rank","IsMissing",
            "Any","All",
            "Max","Min",
            "Argmin","Argmax",
@@ -50,6 +50,7 @@ Except = Infix(repops_multi.Except)
 Difference = Infix(repops_multi.Difference)
 
 Pos = repops.delayable(default_params="#")(repops_funcs.Pos)
+IsMissing = repops.delayable()(repops_funcs.IsMissing)
 Argsort = repops.delayable()(repops_funcs.Argsort)
 Rank = repops.delayable()(repops_funcs.Rank)
 Argmax = repops.delayable()(repops_funcs.Argmin)

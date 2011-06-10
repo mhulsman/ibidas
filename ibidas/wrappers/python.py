@@ -694,6 +694,17 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 res.append(elem)
         return cutils.darray(res, type_out.toNumpy())
     
+    def ismissingIsMissing(self, data, type_in, type_out, op, def_value=NOVAL):
+        if not type_in.has_missing:
+            return data
+        res = []
+        for elem in data:
+            if elem is Missing:
+                res.append(True)
+            else:
+                res.append(False)
+        return cutils.darray(res, type_out.toNumpy())
+   
     def corrCorr(self, data, type_in, type_out, op):
         intype = type_in.toNumpy()
         res = []

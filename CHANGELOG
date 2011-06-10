@@ -50,3 +50,4 @@
 - fix in cytoscape wrapper
 - add xml read format
 - add rank function
+- add ismissing
