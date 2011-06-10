@@ -51,3 +51,4 @@
 - add xml read format
 - add rank function
 - add ismissing
+- fix in dim handling
