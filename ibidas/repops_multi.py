@@ -251,7 +251,7 @@ class Unique(repops.MultiOpRep):
                 constraint = repops.PlusPrefix(python.Rep(constraint,name="filter"))
             repops.MultiOpRep.__init__(self,(source,constraint),descend=descend)
 
-    def _sprocess(self, sources, descend):
+    def _process(self, sources, descend):
         if(len(sources) == 1): #no explicit constraint, use data itself
             source = sources[0]
             if len(source._slices) > 1:
@@ -260,6 +260,8 @@ class Unique(repops.MultiOpRep):
                 constraint = source
         else:
             source,constraint = sources 
+        if not source._slicesKnown() or not constraint._typesKnown():
+            return
 
         if len(constraint._slices) > 1:
             constraint = constraint.Tuple()

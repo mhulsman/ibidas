@@ -352,7 +352,7 @@ class Representor(Node):
     def __call__(self, **args):
         res = self._getResultSlices(args)
 
-        if(len(self._slices) == 1):
+        if(len(res) == 1):
             return res[0].data
         else:
             return tuple([slice.data for slice in res])
