@@ -578,6 +578,8 @@ class Rank(UnaryFuncDimOp):
 class Pos(UnaryFuncDimOp):
     _sigs = [any_nodepsig]
 
+class CumSum(UnaryFuncDimOp):
+    _sigs = [int_tointsig, float_tofloatsig]
 
 class Any(UnaryFuncAggregateOp):
     _sigs = [boolsig]

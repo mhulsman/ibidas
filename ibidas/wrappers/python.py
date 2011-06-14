@@ -730,7 +730,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             if(descend):
                 res = res[:,::-1,...]
         return res
- 
+    
     def sortableRank(self, data, type_in, type_out, op, packdepth, descend=False):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(len(data.shape) < 2):
@@ -744,7 +744,15 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 res = res[:,::-1,...]
             res = numpy.argsort(res,axis=1)                
         return res
-  
+    
+    def fixdimCumSum(self, data, type_in, type_out, op, packdepth):
+        data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
+        if(len(data.shape) < 2):
+            res = cutils.darray([numpy.cumsum(row,axis=0) for row in data],object)
+        else:
+            res = numpy.cumsum(data,axis=1)
+        return res
+ 
     def any_nodepPos(self, data, type_in, type_out, op, packdepth):
         dtype = type_out.toNumpy()
         if(len(data.shape) == 1):

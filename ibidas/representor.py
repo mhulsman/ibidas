@@ -683,6 +683,9 @@ class Representor(Node):
     def Pos(self, dim=None):
         return repops_funcs.Pos(self, dim)
     
+    def CumSum(self, dim=None):
+        return repops_funcs.CumSum(self, dim)
+   
     def Argsort(self, dim=None, descend=False):
         return repops_funcs.Argsort(self, dim, descend=descend)
     
