@@ -43,7 +43,7 @@ class NestedArray(object):
             rshape = seq.shape[:(self.idxs[depth]+1)]
             seq = dimpaths.flatFirstDims(seq,self.idxs[depth])
         else:
-            assert depth == -1 or depth==(len(self.idxs)-1),"Cannot flat data on non-fixed dim"
+            #assert depth == -1 or depth==(len(self.idxs)-1),"Cannot flat data on non-fixed dim"
             rshape = (len(seq),)
         return (seq,rshape)
 
