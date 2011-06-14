@@ -503,7 +503,6 @@ class ReplaceMissing(UnaryFuncElemOp):
 
 class IsMissingSig(FuncSignature):
     def check(self, slice, def_value=NOVAL):#{{{
-        in_type = slice.type
         o_type = rtypes.TypeBool()
         return Param(slice.name, o_type)#}}}
 ismissingsig = IsMissingSig("ismissing")
