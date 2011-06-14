@@ -746,7 +746,6 @@ class StringScanner(TypeScanner):
             ntype = rtypes.TypeBytes
         else:
             ntype = rtypes.TypeString
-
         if self.max_nchars < 32:
             d = dimensions.Dim(self.max_nchars, tuple(), self.detector.hasMissing())
         else:

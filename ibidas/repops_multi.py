@@ -428,10 +428,12 @@ class Replace(repops.MultiOpRep):
 
 
 class Take(repops.MultiOpRep):
-    def __init__(self, source, take_source, allow_missing=False):
-        repops.MultiOpRep.__init__(self,(source, take_source), allow_missing = allow_missing)
+    def __init__(self, source, take_source, allow_missing=False, keep_missing=False):
+        if (isinstance(source,dict)):
+             source = python.Rep(list(source.iteritems())).IndexDict()
+        repops.MultiOpRep.__init__(self,(source, take_source), allow_missing = allow_missing, keep_missing=keep_missing)
    
-    def _sprocess(self, sources, allow_missing):
+    def _sprocess(self, sources, allow_missing,keep_missing):
         source, take_source = sources
         if len(source._slices) == 2:
             source = source.IndexDict()
@@ -440,7 +442,7 @@ class Take(repops.MultiOpRep):
 
         nslices = []
         for take_slice in take_source._slices:
-            nslices.append(ops.TakeOp(source_slice, take_slice, allow_missing))
+            nslices.append(ops.TakeOp(source_slice, take_slice, allow_missing, keep_missing))
         return self._initialize(tuple(nslices))
 
 

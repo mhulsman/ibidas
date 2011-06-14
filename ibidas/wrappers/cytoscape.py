@@ -14,6 +14,11 @@ def cyconnect(url=None):
     return xmlrpclib.ServerProxy("http://localhost:9000").Cytoscape
 
 
+def nan_to_zero(val):
+    if numpy.isnan(val):
+        return 0.
+    else:
+        return val
 
 
 class CyNetwork(object):
@@ -114,6 +119,7 @@ class CyNetwork(object):
             xtype = "INTEGER"
         elif(isinstance(slice.type, rtypes.TypeReal64) and not slice.type.has_missing):
             xtype = "FLOATING"
+            attribute = attribute.Each(nan_to_zero,dtype="real64")
         else:
             xtype = "STRING"
             attribute = attribute.Cast("bytes")

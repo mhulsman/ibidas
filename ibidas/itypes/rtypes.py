@@ -589,13 +589,9 @@ class TypeArray(TypeAny):#{{{
                 "One subtype should be set for array type"
         
         has_missing = dims[0].has_missing or has_missing
-        if self.__class__ == TypeArray:
-            assert not has_missing, "Array type not allowed to have missing values"
-        
-        dims[0].has_missing = has_missing
         self.subtypes = subtypes
         self.dims = dims
-        TypeAny.__init__(self, False)
+        TypeAny.__init__(self, has_missing)
     
     @classmethod
     def commonType(cls, type1, type2):
@@ -616,20 +612,16 @@ class TypeArray(TypeAny):#{{{
         return res
 
     def setHasMissing(self, value):
-        s = self.subtypes[0].setHasMissing(value)
-        dims = list(self.dims)
-        dims[0] = dims[0].copy()
-        dims[0].has_missing = value
-
-        if not self.__class__ == TypeArray:
-            if not s is self.subtypes[0] or not dims[0].has_missing is self.dims[0].has_missing:
-                self = self.copy()
-                self.subtypes = (s,)
-                self.dims = dimpaths.DimPath(*dims)
+        if value and not self.dims[0].dependent: #fixed dim, needs has_missing subtype if unpacked
+            s = self.subtypes[0].setHasMissing(value)
         else:
-            if not s is self.subtypes[0]:
-                self = self.copy()
-                self.subtypes = (s,)
+            s = self.subtypes[0]
+            
+        if not self.has_missing == value or not s is self.subtypes[0]:
+            self = self.copy()
+            self.has_missing = value
+            self.subtypes = (s,)
+            
         return self
 
 

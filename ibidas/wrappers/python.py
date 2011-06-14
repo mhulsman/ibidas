@@ -305,7 +305,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
        
     def visitTakeOp(self, node, slices):
         ndata = nested_array.co_mapseq(speeddictindex,[slice.data for slice in slices],res_type=node.type, 
-                                        dtype=node.type.toNumpy(), allow_missing=node.allow_missing)
+                                        dtype=node.type.toNumpy(), allow_missing=node.allow_missing, keep_missing = node.keep_missing)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
 
     def visitPackDictOp(self,node, slices):
@@ -945,8 +945,10 @@ def speedarrayify(seqs,dtype):
     return nseq
 
 
-def speeddictindex(seqs,dtype, allow_missing=False):
-    if allow_missing:
+def speeddictindex(seqs,dtype, allow_missing=False, keep_missing=False):
+    if keep_missing:
+        return cutils.darray([d.get(k,k) for d, k in zip(*seqs)],dtype)
+    elif allow_missing:
         return cutils.darray([d.get(k,Missing) for d, k in zip(*seqs)],dtype)
     else:
         return cutils.darray([d[k] for d, k in zip(*seqs)],dtype)
