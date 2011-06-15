@@ -352,7 +352,10 @@ class ShapeOp(UnaryUnaryOp):#{{{
 class FilterOp(UnaryUnaryOp):#{{{
     __slots__ = ["constraint","has_missing"]
 
-    def __init__(self,slice,constraint, ndim):
+    def __init__(self,slice,constraint, ndim,refconstraint=None):
+        if refconstraint is None:
+            refconstraint = constraint
+
         stype = slice.type
         assert isinstance(stype, rtypes.TypeArray), "Filter on non-array type not possible"
         
@@ -364,7 +367,7 @@ class FilterOp(UnaryUnaryOp):#{{{
 
         sdims = stype.dims
         if(ndim is None):
-            sdims, subtype = sdims.removeDim(0, constraint, stype.subtypes[0])
+            sdims, subtype = sdims.removeDim(0, refconstraint, stype.subtypes[0])
         else:
             sdims, subtype = sdims.updateDim(0, ndim, stype.subtypes[0])
         
@@ -419,7 +422,7 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
             xndim = ndim.changeDependent(tuple(ndep), slice.dims)
         else:
             xndim = ndim
-        slice = FilterOp(slice,tconstraint,xndim)
+        slice = FilterOp(slice,tconstraint,xndim,constraint)
 
         #adapt used_dims
         used_dims = dimpaths.applyPlan(used_dims,splan,newvalue=True,copyvalue=True,ensurevalue=True, existvalue=True)
