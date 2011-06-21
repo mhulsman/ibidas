@@ -52,3 +52,4 @@
 - add rank function
 - add ismissing
 - fix in dim handling
+- OMIM link updated, renamed gene_names to gene_alias, added warning for outdatedness'

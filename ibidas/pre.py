@@ -2,6 +2,7 @@ from ibidas.utils import util
 from ibidas.utils.config import config
 import os.path
 import os
+from logging import warning
 _delay_import_(globals(),"ibidas","*")
 
 class Pre(object):
@@ -136,15 +137,16 @@ predefined_sources.register(yeastract,category="yeast")
 
 def omim_genemap():
     """The omim genemap data"""
-    rtype = """[omim:*]<(chr_map_entry_nr=bytes, month=bytes, day=bytes, year=bytes, location=bytes, gene_names=bytes, 
+    rtype = """[omim:*]<(chr_map_entry_nr=bytes, month=bytes, day=bytes, year=bytes, location=bytes, gene_alias=bytes, 
                        gene_status=bytes[1], title=bytes, f8=bytes, mim=bytes, method=bytes, comments=bytes, f12=bytes, 
                        disease1=bytes, disease2=bytes, disease3=bytes, mouse=bytes, reference=bytes)"""
-    
-    res = Read(Fetch("ftp://ftp.ncbi.nih.gov/repository/OMIM/genemap"),dtype=rtype)
+
+    warning('OMIM FTP is not up to date. See ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/README.txt')
+    res = Read(Fetch("ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/genemap"),dtype=rtype)
     
     res = res.Get(HArray(_.disease1, _.disease2, _.disease3)[_ != " "]/"disease", "~")
     splitfunc = lambda x: x.split(", ")
-    res = res.To(_.gene_names,  Do=_.Each(splitfunc, dtype="[symbols:~]<string").Elem()[_ != ""])
+    res = res.To(_.gene_alias,  Do=_.Each(splitfunc, dtype="[symbols:~]<string").Elem()[_ != ""])
     res = res.To(_.method,      Do=_.Each(splitfunc, dtype="[methods:~]<string").Elem()[_ != ""])
     res = res.To(_.disease,     Do=_.Sum().Each(omim_disease_parse,"[diseases:~]<string").Elem()[_ != ""])
     res = res.To(_.day, _.month, _.year, Do=_.Cast("int?"))
@@ -154,8 +156,7 @@ def omim_genemap():
 predefined_sources.register(omim_genemap, category="human")
 
 def omim_disease_parse(x):
-    x = x.replace('{','').replace('}','')
-    elems =  x.split('; ')
+    elems = x.replace('{','').replace('}','').split('; ')
     return [elem.split(', ')[0] for elem in elems]
 
 
