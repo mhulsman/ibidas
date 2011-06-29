@@ -85,7 +85,11 @@ def Rep(data=None, dtype=None, unpack=True, name=None):
             dtype = rtypes.TypeAny(True)
 
     if(name is None):
-        name = "data"
+        res = util.find_names([data])
+        if res:
+            name = res[0]
+        else:            
+            name = "data"
 
     data_slice = ops.DataOp(data,name=name,rtype=dtype)
     
@@ -630,7 +634,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         res = []
         dtype = typeo.toNumpy()
         for lelem, relem in zip(data1,data2):
-            mshape = max(1,min(len(lelem.shape), len(relem.shape)))
+            mshape = max(1,min(len(getattr(lelem,'shape',(0,))), len(getattr(relem,'shape',(0,)))))
             res.append(numpy.concatenate([cutils.darray(list(lelem),dtype,mshape),cutils.darray(list(relem),dtype,mshape)],axis=0))
         return cutils.darray(res,object)
 

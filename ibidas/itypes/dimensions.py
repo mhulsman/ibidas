@@ -195,4 +195,23 @@ class Dim(object):
 
             
 
+def toCommonDim(name, dims):
+    shapes = set()
+    dependent = set()
+    for dim in dims:
+        shapes.add(dim.shape)
+        dependent.add(dim.dependent)
+    shapes.discard(UNDEFINED)
+    assert len(shapes) <= 1, "Dims with different shape cannot be cast to each other"
+    if not shapes:
+        shape = UNDEFINED
+    else:
+        shape = shapes.pop()
 
+    assert len(dependent) == 1, "Dims with different dependencies cannot be cast to each other"
+    dependent = dependent.pop()
+    return Dim(shape, dependent, name=name)
+
+
+        
+        

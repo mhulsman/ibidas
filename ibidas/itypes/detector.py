@@ -478,7 +478,6 @@ class AnyScanner(TypeScanner):
 registerTypeScanner(AnyScanner)
 TypeScanner.parentcls = AnyScanner
 
-
 class TupleScanner(TypeScanner):
     good_cls = set([tuple, MissingType])
 
@@ -486,11 +485,13 @@ class TupleScanner(TypeScanner):
         TypeScanner.__init__(self, detector)
         self.max_len = 0
         self.min_len = 999999999
+        self.fieldnames = []
 
     def getType(self):
-        fieldnames = ['f' + str(i) for i in xrange(self.max_len)]
+        if(not len(self.fieldnames) == self.max_len):
+            self.fieldnames = ['f' + str(i) for i in xrange(self.max_len)]
         subtypes = tuple([self.getSubDetector(i).getType() for i in xrange(self.max_len)])
-        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, fieldnames)
+        return rtypes.TypeTuple(self.detector.hasMissing(), subtypes, self.fieldnames)
     
     def scan(self, seq):
         if not self.detector.objectclss.issubset(self.good_cls):
@@ -503,6 +504,9 @@ class TupleScanner(TypeScanner):
         self.max_len = max(maxlen, self.max_len)
         self.min_len = min(minlen, self.min_len)
 
+        if(len(seq) == 1 and self.max_len == self.min_len):           
+            self.fieldnames = util.find_names(seq[0])
+            
         for i in xrange(self.max_len):
             d = self.getSubDetector(i)
             f = operator.itemgetter(i)

@@ -103,7 +103,7 @@ class Project(repops.UnaryOpRep):
                         elem = self._source.Get(*elem).Array()
                 else:
                     elem = util.select(cur_slices, elem)
-
+                   
                 project_sources.append((name,elem))
             self._project_sources = project_sources
      

@@ -22,7 +22,6 @@ _delay_import_(globals(),"repops_funcs")
 _delay_import_(globals(),"ops")
 
 
-
 class NewDim(object):
     def __init__(self,name=None):
         self.name = name
@@ -137,9 +136,6 @@ class Representor(Node):
             srows = tableprint.row_crop(nwidths, srows)
             res += tableprint.indent(srows,hasHeader=True) 
         return res 
-
-
-
 
     def _getInfo(self):
         class Info(object):
@@ -258,6 +254,10 @@ class Representor(Node):
                     tuple([slice.type for slice in self._slices]), 
                     tuple([slice.name for slice in self._slices]))
     Type=property(fget=getType)
+
+
+    def Redim(self, *args, **kwds):
+        return repops_dim.Redim(self, *args, **kwds)
 
     def getSlices(self):
         return list(self._slices)

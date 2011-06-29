@@ -7,6 +7,45 @@ from IPython.Debugger import Tracer; debug_here = Tracer()
 import cPickle, zlib
 import math
 import os.path
+import gc, sys
+import itertools
+
+
+#objs: objs to find names for
+#req_objs: objs which should be in same frame
+def find_names(objs, req_objs=[],skip_frames=True):
+    #after: http://pythonic.pocoo.org/2009/5/30/finding-objects-names
+    result = []
+    referrers = dict()
+    refsetobjs = []
+
+    frame = sys._getframe()
+    #refs should be in locals dict
+    frameobj = []
+    for fcounter,frame in enumerate(iter(lambda: frame.f_back, None)):
+        fid = id(frame.f_locals)
+        if not skip_frames or fcounter >= 1:
+            referrers[fid] = frame.f_locals
+            frameobj.append(fid)
+    refsetobjs.append(set(frameobj))
+
+    for obj in itertools.chain(objs,req_objs):
+        refsetobj = [id(referrer) for referrer in gc.get_referrers(obj) if isinstance(referrer, dict)]
+        refsetobjs.append(set(refsetobj))
+    refs_with_all_objs = reduce(operator.__and__,refsetobjs)
+
+    for refid in frameobj:
+        if not refid in refs_with_all_objs:
+            continue
+        referrer = referrers[refid]
+        result = []
+        for obj in objs:
+            for k, v in referrer.iteritems():
+                if v is obj and not k.startswith('_') and not k[:2].isupper():
+                    result.append(k)
+        if(len(result) == len(objs)):
+            return result
+    return []
 
 _delay_import_(globals(),"missing","Missing")
 def save_rep(r, filename):

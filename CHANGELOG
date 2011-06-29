@@ -52,4 +52,6 @@
 - add rank function
 - add ismissing
 - fix in dim handling
+- fix in handling empty arrays
 - OMIM link updated, renamed gene_names to gene_alias, added warning for outdatedness'
+- automatic field name detection from variable names

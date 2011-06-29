@@ -4,6 +4,7 @@ from itertools import izip_longest
 
 _delay_import_(globals(),"itypes","rtypes","dimpaths","dimensions")
 _delay_import_(globals(),"ops")
+_delay_import_(globals(),"repops_slice")
 _delay_import_(globals(),"utils","util")
 
 class UnpackArray(repops.UnaryOpRep):
@@ -46,6 +47,40 @@ class DimRename(repops.UnaryOpRep):#{{{
                                                     for slice in source._slices]
         return self._initialize(tuple(nslices))#}}}
 
+
+
+class Redim(repops.UnaryOpRep):
+    def _sprocess(self, source, *args, **kwds):
+        dimname = args[0]
+        dimsel = []
+        slicesel = []
+        for arg in args[1:]:
+            dimsel.append(0)
+            slicesel.append(arg)
+        for k,v in kwds.iteritems():
+            dimsel.append(v)
+            slicesel.append(k)
+        
+        selslices = repops_slice.Project(source, *slicesel)._slices
+       
+        nslices = list(source._slices)
+        dims = set()
+        for slice,dim in zip(selslices,dimsel):
+            slice = nslices[nslices.index(slice)]
+            dimidxs = slice.dims.getDimIndices(dim)
+            for dimidx in dimidxs:
+                dims.add(slice.dims[dimidx])
+
+        ndim = dimensions.toCommonDim(dimname, dims)
+        for slice,dim in zip(selslices,dimsel):
+            sliceidx = nslices.index(slice)
+            slice = nslices[sliceidx]
+            dimidxs = slice.dims.getDimIndices(dim)
+            for dimidx in dimidxs:
+                slice = ops.ChangeDimOp(slice, dimidx, ndim)
+            nslices[sliceidx] = slice                            
+       
+        return self._initialize(tuple(nslices))
 
 class Shape(repops.UnaryOpRep):
     def _sprocess(self,source):

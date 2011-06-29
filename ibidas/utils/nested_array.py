@@ -142,8 +142,11 @@ class NestedArray(object):
                 idxres.shape =  data.shape + (2,)
                 nself.idxs.append(idxres)
             else:
-                assert (ndata.shape[0] % len(cdata)) == 0, "Leftover elements in joining dimensions"
-                pshape = ndata.shape[0] / len(cdata)
+                assert (len(cdata) == 0) or ((ndata.shape[0] % len(cdata)) == 0), "Leftover elements in joining dimensions"
+                if len(cdata):
+                    pshape = ndata.shape[0] / len(cdata)
+                else:
+                    pshape = 0
                 ndata.shape = data.shape + (pshape,) + ndata.shape[1:]
                 nself.idxs.append(len(data.shape))
             data = ndata    

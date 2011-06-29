@@ -1741,7 +1741,7 @@ class TypeStringASTInterpreter(object):#{{{
             dim = self.dims[name]
             if(len(dim.dependent) > dimpos):
                 raise RuntimeError, "Dim: " + name + " has too many dependent dims: " + str(len(dim.dependent)) + " (max: " + str(dimpos) + ")"
-            if dim.shape != shape and not shape == UNDEFINED and not dim.shape == UNDEFINED:
+            if dim.shape != shape and not shape is None and not shape == UNDEFINED and not dim.shape == UNDEFINED:
                 raise RuntimeError, "Dim: " + name + " dimension unequal to known dim"
 
             return dim

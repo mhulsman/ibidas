@@ -41,6 +41,14 @@ class DimPath(tuple):
         except ValueError:
             return None
 
+    def getDimIndices(self, selector):
+        if isinstance(selector,int):
+            return (selector,)
+        elif isinstance(selector,str):
+            return (self.getDimIndexByName(selector),)
+        elif isinstance(selector,tuple):
+            return sum([self.getDimIndices(elem) for elem in selector],())
+
     def __getslice__(self,*idx):
         res = tuple.__getslice__(self,*idx)
         if(isinstance(res,tuple)):
