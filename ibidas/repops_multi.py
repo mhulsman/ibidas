@@ -135,7 +135,7 @@ class Group(repops.MultiOpRep):
         #filter flattened slices 
         gidx = range(len(gsource._slices))
         gdims = gslice.dims[-len(gsource._slices):]
-        firstelem = python.Rep(0)._slices[0]
+        firstelem = python.Rep(0,name="data")._slices[0]
         for key, pos in xflat.iteritems():
             tslice = gslice
             for elem in gidx:
@@ -430,7 +430,7 @@ class Replace(repops.MultiOpRep):
 class Take(repops.MultiOpRep):
     def __init__(self, source, take_source, allow_missing=False, keep_missing=False):
         if (isinstance(source,dict)):
-             source = python.Rep(list(source.iteritems())).IndexDict()
+             source = python.Rep(list(source.iteritems()),name="data").IndexDict()
         repops.MultiOpRep.__init__(self,(source, take_source), allow_missing = allow_missing, keep_missing=keep_missing)
    
     def _sprocess(self, sources, allow_missing,keep_missing):

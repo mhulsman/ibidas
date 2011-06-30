@@ -112,7 +112,7 @@ class Func(object):
 class UnaryFuncOp(repops.UnaryOpRep, Func):
     def __init__(self, source, *params, **kwargs):
         if(not isinstance(source, representor.Representor)):
-            source = python.Rep(source)
+            source = python.Rep(source,name="data")
         repops.UnaryOpRep.__init__(self,source, *params,**kwargs)
 
 class UnaryFuncElemOp(UnaryFuncOp):
@@ -180,9 +180,9 @@ class UnaryFuncAggregateOp(UnaryFuncDimOp):
 class BinaryFuncOp(repops.MultiOpRep, Func):
     def __init__(self, lsource, rsource, **kwargs):
         if(not isinstance(lsource, representor.Representor)):
-            lsource = repops.PlusPrefix(python.Rep(lsource))
+            lsource = repops.PlusPrefix(python.Rep(lsource,name="data"))
         if(not isinstance(rsource, representor.Representor)):
-            rsource = repops.PlusPrefix(python.Rep(rsource))
+            rsource = repops.PlusPrefix(python.Rep(rsource,name="data"))
         repops.MultiOpRep.__init__(self,(lsource,rsource), **kwargs)
 
         
