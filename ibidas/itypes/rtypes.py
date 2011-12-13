@@ -914,6 +914,12 @@ class TypeString(TypeArray):#{{{
         if(self.dims[0].shape >= 0):
             res += '[' + str(self.dims[0].shape) + ']'
         return res
+
+
+    def toDefval(self):
+        """Returns default value."""
+        return ""
+
 addType(TypeString)#}}}
 
 class TypeBytes(TypeString):#{{{

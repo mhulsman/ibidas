@@ -21,7 +21,7 @@ __all__ = ["Rep","Read","Connect","_","CyNetwork",'Unpack',
            ]
 
 from utils import delay_import
-from utils.util import save_rep as Save, load_rep as Load
+from utils.util import save_rep, load_rep, save_csv
 from utils.context import _
 from utils.missing import Missing
 from utils.infix import Infix
@@ -83,6 +83,9 @@ def Read(url, **kwargs):
     elif(format == 'xml'):
         from wrappers.xml_wrapper import XMLRepresentor
         return XMLRepresentor(url, **kwargs) 
+    elif(format == 'psimi'):
+        from wrappers.psimi import read_psimi
+        return read_psimi(url, **kwargs)
     else:
         raise RuntimeError("Unknown format specified")
 
@@ -95,8 +98,19 @@ def Connect(url, **kwargs):
         raise RuntimeError("Unknown format specified")
 
 
+def Save(r, filename):
+    if filename.endswith('tsv') or filename.endswith('csv') or filename.endswith('tab'):
+        save_csv(r, filename);
+    else:
+        save_rep(r, filename);
 
 
+def Load(filename,**kwargs):
+    if filename.endswith('tsv') or filename.endswith('csv') or filename.endswith('tab'):
+        from wrappers.tsv import TSVRepresentor
+        return TSVRepresentor(filename, **kwargs) 
+    else:
+        return load_rep(filename)
 
 delay_import.perform_delayed_imports()
 

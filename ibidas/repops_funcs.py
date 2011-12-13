@@ -221,9 +221,9 @@ class BinaryFuncElemOp(BinaryFuncOp):
                 name = binslices[0].name
             else:
                 name = "result"
-                if(not pos is None):
-                    outparam = outparam.withNumber(pos)
             outparam = Param(name, outparam)
+            if(not pos is None and name == "result"):
+                outparam = outparam.withNumber(pos)
         s = ops.BinFuncElemOp(cls.__name__, sig,outparam, **nkwargs)
         return s
 

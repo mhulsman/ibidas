@@ -367,7 +367,17 @@ def get_kegg_pathway(pathway):
     elements = Rep(serv.get_elements_by_pathway(pathway))%"nodes"
     pwdata = Combine(elements,relations)
     
-    names = pwdata.names.Flat().Unique()()
+    names = pwdata.names.Flat().Unique()
+    name_info = get_kegg_btit(names)
+    res = (pwdata |Match(_.names, _.id, jointype="left")| name_info).Without(_.id)
+    #info = res.Get((_.names, _.info)).Each(extract_info,dtype="bytes")/"info"
+    #res = res.Without(_.info).Get("*", info)
+    return res.Copy()
+predefined_sources.register(get_kegg_pathway,name="pathway", category="kegg")
+
+def get_kegg_btit(names):
+    serv = kegg()
+    names = names()
     name_info = []
     while len(names) > 0:
         xnames = names[:100]
@@ -376,13 +386,12 @@ def get_kegg_pathway(pathway):
         for elem in res.split('\n'):
             if(elem):
                 pos = elem.index(' ')
-                name_info.append((elem[:pos], elem[(pos+1):]))
-    res = (pwdata |Match(jointype="left")| Rep(name_info)/("names","info")).Without(_.R.names).Copy()
-    #info = res.Get((_.names, _.info)).Each(extract_info,dtype="bytes")/"info"
-    #res = res.Without(_.info).Get("*", info)
-    return res
-predefined_sources.register(get_kegg_pathway,name="pathway", category="kegg")
-
+                id = elem[:pos]
+                info = elem[(pos+1):].split('; ')
+                name_info.append((id, info[0],info[1:]))
+    dtype = '[idinfo:*]<(id=string, full_name=string, info=[info_elems:~]:string)'
+    return Rep(name_info,dtype=dtype)/("id", "full_name","info")
+predefined_sources.register(get_kegg_btit,name="id_info", category="kegg")
 
 def extract_info(vals):
     names, info = vals

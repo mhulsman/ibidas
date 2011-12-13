@@ -9,6 +9,7 @@ import math
 import os.path
 import gc, sys
 import itertools
+import csv
 
 
 #objs: objs to find names for
@@ -54,10 +55,23 @@ def save_rep(r, filename):
     s = zlib.compress(s)
     f.write(s)
 
+
+def save_csv(r, filename):
+    f = open(filename,'wb')
+    r= r.Array(tolevel=1)
+    data = r.Tuple().ToPython();
+    if filename.endswith('tsv'):
+        w = csv.writer(f,delimiter='\t');
+    else:
+        w = csv.writer(f);
+    w.writerow(r.Names);
+    w.writerows(data);
+
 def load_rep(filename):
     f = open(filename, 'rb')
     s = zlib.decompress(f.read())
     return cPickle.loads(s)
+
 
 def valid_name(name):
     name = name.lower()

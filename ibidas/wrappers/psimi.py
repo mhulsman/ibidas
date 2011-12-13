@@ -14,51 +14,49 @@ import xml.parsers.expat
 import numpy
 
 from ..utils.multi_visitor import DirectVisitorFactory, NF_ELSE
+from ..utils.missing import Missing
 import wrapper
-_delay_import_(globals(),"wrapper_py","Result")
-_delay_import_(globals(),"..itypes","rtypes")
-_delay_import_(globals(),"..utils.missing","Missing")
-
-_delay_import_(globals(),"..slices")
-_delay_import_(globals(),"..repops_dim")
+from ..itypes import rtypes
+from .. import ops
+from ..constants import *
+import python
+from ..utils import nested_array,util
 
 def read_psimi(filename):
-    return repops_dim.unpack_array(PSIMIRepresentor(filename))
+    return PSIMIRepresentor(filename).Fields().Copy()
 
 Interaction = namedtuple('Interaction', ('id', 'type', 'participants', 'experiments', 'biogrid_type', 'author_confidence', 'intact_confidence'))
-interaction_type= "[interactions:*](tuple(id=int32, type=string[]$, " + \
-                    "participants=[iinteractors:~](tuple(id=int32, interactor_id=int32, role=string[]$)), " + \
-                    "experiments=[iexperiemnts:~](int32), biogrid_type=string[]$, author_confidence=string[]$, intact_confidence=real32$" + \
+interaction_type= "[interactions:*]<(id=int32, type=string?, " + \
+                    "participants=[iinteractors:~]<(id=int32, interactor_id=int32, role=string[]?), " + \
+                    "experiments=[iexperiemnts:~]<int32, biogrid_type=string[]?, author_confidence=string[]?, intact_confidence=real32?" + \
                     ")"
 Participant = namedtuple('Participant', ('id', 'interactor_id', 'role'))
 
 Interactor = namedtuple('Interactor', ('id', 'short_name', 'refseq_id', 'type_id'))
-interactor_type = "[interactors:*](tuple(id=int32, short_name=string[], refseq_id=string[]$, type_id=string[]$))"
+interactor_type = "[interactors:*]<(id=int32, short_name=string[], refseq_id=string[]?, type_id=string[]?)"
 
 Experiment = namedtuple('Experiment', ('id', 'method_id', 'method_name', 'pubmed_id'))
-experiment_type = "[experiments:*](tuple(id=int32, method_id=string[], method_name=string[], pubmed_id=string[]))"
+experiment_type = "[experiments:*]<(id=int32, method_id=string[], method_name=string[], pubmed_id=string[])"
 
 Organism = namedtuple('Organism', ('id', 'short_label', 'full_name'))
 
 class PSIMIRepresentor(wrapper.SourceRepresentor):
-    _select_indicator = None
-    _select_executor = None
-
     def __init__(self, filename):
-        self._filename = filename
-        etype = rtypes.createType(experiment_type)
-        self._eslice = slices.Slice("experiments", etype)
-        itype = rtypes.createType(interactor_type)
-        self._islice = slices.Slice("interactors", itype)
-        intype = rtypes.createType(interaction_type)
-        self._inslice = slices.Slice("interactions", intype)
-        tslices = (self._eslice, self._islice, self._inslice)
+        xtype = "(experiment=" + experiment_type + ", interactor=" + interactor_type + ", interaction=" + interaction_type + ")"
+        xtype = rtypes.createType(xtype)
+        slice = PSIMIOp(filename,xtype,"data")
+        self._initialize((slice,))
 
-        all_slices = dict([(slice.id, slice) for slice in tslices])
-        wrapper.SourceRepresentor.__init__(self, all_slices, tslices)
 
-    def pyexec(self, executor):
-        file = open(self._filename)
+
+class PSIMIOp(ops.ExtendOp):
+    __slots__ = ['filename']
+    def __init__(self, filename, rtype, name="data"):
+        self.filename = filename
+        ops.ExtendOp.__init__(self, name=name, rtype=rtype)
+
+    def py_exec(self):
+        file = open(self.filename)
         psimi_handler = PSIMIParser()
         parser = xml.parsers.expat.ParserCreate()
         parser.StartElementHandler = psimi_handler.startElement
@@ -77,7 +75,9 @@ class PSIMIRepresentor(wrapper.SourceRepresentor):
             interaction['participants'] = [Participant(**par) for par in interaction['participants']]
             interactions.append(Interaction(**interaction))
 
-        return Result({self._eslice.id: exps, self._islice.id:interactors, self._inslice.id:interactions})
+        data = (exps, interactors, interactions)
+        ndata = nested_array.NestedArray(data,self.type)
+        return python.ResultOp.from_slice(ndata,self)
         
 
 
