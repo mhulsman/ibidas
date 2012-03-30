@@ -55,3 +55,11 @@
 - fix in handling empty arrays
 - OMIM link updated, renamed gene_names to gene_alias, added warning for outdatedness'
 - automatic field name detection from variable names
+
+0.1.9
+- add csv/tsv support to Load/Save
+- add psimi format to Read
+- various bugfixes
+
+0.1.10
+- fixes to support IPython 0.11 and up

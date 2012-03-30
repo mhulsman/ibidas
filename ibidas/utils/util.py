@@ -3,7 +3,7 @@ import hashlib
 from itertools import izip
 import operator
 import collections
-from IPython.Debugger import Tracer; debug_here = Tracer()
+#from IPython.Debugger import Tracer; debug_here = Tracer()
 import cPickle, zlib
 import math
 import os.path
