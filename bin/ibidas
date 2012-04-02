@@ -9,7 +9,7 @@ from ibidas import representor
 import IPython
 
 ipversion = IPython.__version__.split('.')
-oldip = ipversion[0] == 0 and ipversion[1] <= 10
+oldip = int(ipversion[0]) == 0 and int(ipversion[1]) <= 10
 
 if oldip:
     from IPython.Shell import IPShellEmbed

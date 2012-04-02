@@ -737,7 +737,10 @@ class EquiJoinIndexOp(MultiMultiOp):#{{{
 
     def __init__(self, leftslice, rightslice, jointype="inner", mode="dim"):
         assert leftslice.dims == rightslice.dims, "Parent dims of join fields should be equal"
-        name= leftslice.type.dims[0].name + "_" + rightslice.type.dims[0].name
+        if leftslice.type.dims[0].name == rightslice.type.dims[0].name:
+            name= leftslice.type.dims[0].name
+        else:
+            name= leftslice.type.dims[0].name + "_" + rightslice.type.dims[0].name
         ndim = dimensions.Dim(UNDEFINED, (True,) * len(leftslice.dims), name=name)
 
         ltype = rtypes.TypePlatformInt(has_missing=(jointype == "right" or jointype=="full"))
