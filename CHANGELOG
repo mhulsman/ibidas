@@ -63,3 +63,6 @@
 
 0.1.10
 - fixes to support IPython 0.11 and up
+
+0.1.11
+- further fix for support IPython 0.10 and down
