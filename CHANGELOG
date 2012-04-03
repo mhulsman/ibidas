@@ -66,3 +66,8 @@
 
 0.1.11
 - further fix for support IPython 0.10 and down
+
+0.1.12
+- fix to accomodate change in numpy C API behaviour from version 1.6 onwards
+- allow for use of Elems instead of Elem (will become default behaviour in one of the next versions)
+

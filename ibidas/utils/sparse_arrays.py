@@ -41,10 +41,10 @@ class FullSparse(numpy.ndarray):
         otype = kwargs.get('otype',self.dtype)
 
         if(otype == object):
-            res = cutils.darray([func(elem) for elem in self.ravel()])
+            res = util.darray([func(elem) for elem in self.ravel()])
             res.shape = self.shape
         elif(self.dtype.char == 'S' or self.dtype.char == 'U' or self.dtype.char == 'V'):
-            res = cutils.darray([func(elem) for elem in self.ravel()],otype)
+            res = util.darray([func(elem) for elem in self.ravel()],otype)
             res.shape = self.shape
         else:
             func = numpy.frompyfunc(func,1,1)

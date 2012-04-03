@@ -6,7 +6,7 @@ _delay_import_(globals(),"..utils.missing","Missing")
 _delay_import_(globals(),"..itypes","dimpaths","rtypes","dimensions")
 class NestedArray(object):
     def __init__(self,data,cur_type):
-        self.data = cutils.darray([data],object)
+        self.data = util.darray([data],object)
         self.cur_type = cur_type
         self.idxs = [0]
         
@@ -34,7 +34,7 @@ class NestedArray(object):
 
     def flat(self):
         data,rshape = self._flatData()
-        data= cutils.darray([subelem for subelem in data],object,1,1)
+        data= util.darray([subelem for subelem in data],object,1,1)
         return data
 
     def _flatData(self,depth=-1):
@@ -108,13 +108,13 @@ class NestedArray(object):
                 
                     #check that elem shape is not smaller or larger than expected 
                     if(not isinstance(elem,numpy.ndarray)):
-                        elem = cutils.darray(list(elem),dtype,cdepth,cdepth)
+                        elem = util.darray(list(elem),dtype,cdepth,cdepth)
                     else:
                         elem = validate_array(elem,cdepth,dtype)
                         assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
                     res.append(elem)
                 if not res:
-                    ndata = cutils.darray([])
+                    ndata = util.darray([])
                 else:
                     ndata = numpy.concatenate(res)
             else:
@@ -122,18 +122,18 @@ class NestedArray(object):
                     r = []
                     for elem in cdata:
                         r.extend(elem)
-                    ndata = cutils.darray(r,dtype,1,1)
+                    ndata = util.darray(r,dtype,1,1)
                 else:
                     res = []
                     for elem in cdata:
                         #check that elem shape is not smaller or larger than expected 
                         if(not isinstance(elem,numpy.ndarray)):
-                            elem = cutils.darray(list(elem),dtype,cdepth,cdepth)
+                            elem = util.darray(list(elem),dtype,cdepth,cdepth)
                         else:
                             elem = validate_array(elem,cdepth,dtype)
                         res.append(elem)
                     if not res:
-                        ndata = cutils.darray([])
+                        ndata = util.darray([])
                     else:
                         ndata = numpy.concatenate(res)
 
@@ -176,7 +176,7 @@ class NestedArray(object):
                         res.append(Missing)
                      else:
                         res.append(data[start:stop])
-                nself.data = cutils.darray(res,object)
+                nself.data = util.darray(res,object)
                 nself.data.shape = idx.shape[:-1]
             depth -= 1
         nself.cur_type = subtype
@@ -197,12 +197,12 @@ class NestedArray(object):
                         res.append(Missing)
                     else:
                         res.append(func(elem, *args, **kwargs))
-                nseq = cutils.darray(res,dtype)
+                nseq = util.darray(res,dtype)
                 return nseq
         else:
             def wrapfunc(seq, *args, **kwargs):
                 res = [func(elem, *args, **kwargs) for elem in seq]
-                nseq = cutils.darray(res,dtype)
+                nseq = util.darray(res,dtype)
                 return nseq
             
         return self.mapseq(wrapfunc, *args, **kwargs)
@@ -689,7 +689,7 @@ class NestedArray(object):
             nidx[rowpos,:] += lastpos - start
             lastpos += stop - start
         if not res:
-            nextobj = cutils.darray(res)
+            nextobj = util.darray(res)
         else:
             nextobj = numpy.concatenate(res)
         nidx.shape  = oshape
@@ -717,7 +717,7 @@ class NestedArray(object):
                 respos += stop - start
                 nidx[rowpos,1] = respos
             if not res:
-                nextobj = cutils.darray(res)
+                nextobj = util.darray(res)
             else:
                 nextobj = numpy.concatenate(res)
             nidx.shape  = oshape
@@ -774,7 +774,7 @@ def co_mapseq(func, nested_arrays, *args, **kwargs):
         seq,dummy = na._flatData(depth=lastpos)
         if(bcdepth > 1 and len(seq.shape) > bcdepth): #if broadcasting, we want to explicitly pack data 
             nseq = dimpaths.flatFirstDims(seq,bcdepth-1)
-            nseq = cutils.darray(list(nseq))
+            nseq = util.darray(list(nseq))
             nseq.shape = seq.shape[:bcdepth]
             seq = nseq
         data.append(seq)
@@ -814,7 +814,7 @@ def co_map(func, narrays, *args, **kwargs):
             res = [func(elems, *args, **kwargs) for elems in zipdata]
             xres = []
             for pos,dtype in enumerate(dtypes):
-                nseq = cutils.darray([row[pos] for row in res],dtype)
+                nseq = util.darray([row[pos] for row in res],dtype)
                 xres.append(nseq)
             return tuple(xres)
     else: 
@@ -826,7 +826,7 @@ def co_map(func, narrays, *args, **kwargs):
             else:
                 zipdata = zip(*seqs)
             res = [func(elems, *args, **kwargs) for elems in zipdata]
-            nseq = cutils.darray(res,dtype)
+            nseq = util.darray(res,dtype)
             return nseq
     return co_mapseq(wrapfunc, narrays, **kwargs)
 
@@ -866,16 +866,16 @@ def validate_array(seq, cdepth, dtype):
         oshape = seq.shape
         rem_ndims = cdepth - len(seq.shape) + 1
         if len(seq) == 0:
-            seq = cutils.darray([],dtype)
+            seq = util.darray([],dtype)
             seq.shape = (0,) * rem_ndims
         else:
-            seq = cutils.darray(list(seq.ravel()),dtype,rem_ndims,rem_ndims)
+            seq = util.darray(list(seq.ravel()),dtype,rem_ndims,rem_ndims)
             seq.shape = oshape + seq.shape[1:]
         assert len(seq.shape) == cdepth, "Non array values encountered for dims " + str(dims[len(seq.shape):])
     elif(len(seq.shape) > cdepth):
         oshape = seq.shape
         seq = dimpaths.flatFirstDims(seq,cdepth-1)
-        seq = cutils.darray([subelem for subelem in seq],object,1,1)
+        seq = util.darray([subelem for subelem in seq],object,1,1)
         seq.shape = oshape[:cdepth]
 
     if not seq.dtype == dtype:

@@ -185,11 +185,11 @@ class CyNetwork(object):
         dimpath=dimpaths.DimPath(dimensions.Dim(shape=UNDEFINED,has_missing=False,dependent=(),name="node_attributes"))
         for attribute, atype in attributes.Tuple()():
             atype = self._prepareType(atype)
-            has_attribute = cutils.darray(self._server.nodesHaveAttribute(attribute,nodes) ,bool)
+            has_attribute = util.darray(self._server.nodesHaveAttribute(attribute,nodes) ,bool)
             if False in has_attribute:
                 atype.has_missing=True
-                res = cutils.darray([Missing] * len(nodes))
-                fnodes = list(cutils.darray(nodes)[has_attribute])
+                res = util.darray([Missing] * len(nodes))
+                fnodes = list(util.darray(nodes)[has_attribute])
                 res[has_attribute] = self._server.getNodesAttributes(attribute,fnodes)
             else:
                 res = self._server.getNodesAttributes(attribute, nodes)
@@ -221,11 +221,11 @@ class CyNetwork(object):
         dimpath=dimpaths.DimPath(dimensions.Dim(shape=UNDEFINED,has_missing=False,dependent=(),name="edge_attributes"))
         for attribute, atype in attributes.Tuple()():
             atype = self._prepareType(atype)
-            has_attribute = cutils.darray(self._server.edgesHaveAttribute(attribute,edges) ,bool)
+            has_attribute = util.darray(self._server.edgesHaveAttribute(attribute,edges) ,bool)
             if False in has_attribute:
                 atype.has_missing=True
-                res = cutils.darray([Missing] * len(edges))
-                fedges = list(cutils.darray(edges)[has_attribute])
+                res = util.darray([Missing] * len(edges))
+                fedges = list(util.darray(edges)[has_attribute])
                 res[has_attribute] = self._server.getEdgesAttributes(attribute,fedges)
             else:
                 res = self._server.getEdgesAttributes(attribute, edges)

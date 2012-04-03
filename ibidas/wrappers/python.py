@@ -316,7 +316,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         names = node.type.fieldnames
         if node.with_missing or not any([slice.type.has_missing for slice in slices]):
             def speeddictify(x):
-                return cutils.darray([dict(zip(names,row)) for row in zip(*x)])
+                return util.darray([dict(zip(names,row)) for row in zip(*x)])
         else:
             def speeddictify(x):
                 non_hasmissing = []
@@ -324,8 +324,8 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                     if not slice.type.has_missing:
                         non_hasmissing.append(pos)
                 if(non_hasmissing):
-                    nx = cutils.darray(x)[non_hasmissing] 
-                    snames = cutils.darray(names)[non_hasmissing]
+                    nx = util.darray(x)[non_hasmissing] 
+                    snames = util.darray(names)[non_hasmissing]
                     d = [dict(zip(snames,row)) for row in zip(*nx)]
                 else:
                     d = [{} for i in xrange(len(x[0]))]
@@ -338,7 +338,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                         elem = val[rowpos]
                         if not elem is Missing:
                             d[rowpos][name] =elem
-                return cutils.darray(d)
+                return util.darray(d)
 
         ndata = nested_array.co_mapseq(speeddictify,[slice.data for slice in slices],res_type=node.type)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
@@ -570,22 +570,22 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def withinWithin(self, data, type1, type2, typeo, op, bcdepth=1):
         data1,data2 = data
         if(bcdepth > 1):
-            data2 = cutils.darray([set(elem) for elem in data2.ravel()]).reshape(data2.shape)
+            data2 = util.darray([set(elem) for elem in data2.ravel()]).reshape(data2.shape)
             zipdata = numpy.broadcast(data1,data2)
         else:
             zipdata = zip(data1,data2)
         res = [elem in arr for elem,arr in zipdata]
-        return cutils.darray(res,bool)
+        return util.darray(res,bool)
 
     def withinContains(self, data, type1, type2, typeo, op, bcdepth=1):
         data2,data1 = data
         if(bcdepth > 1):
-            data2 = cutils.darray([set(elem) for elem in data2.ravel()]).reshape(data2.shape)
+            data2 = util.darray([set(elem) for elem in data2.ravel()]).reshape(data2.shape)
             zipdata = numpy.broadcast(data1,data2)
         else:
             zipdata = zip(data1,data2)
         res = [elem in arr for elem,arr in zipdata]
-        return cutils.darray(res,bool)
+        return util.darray(res,bool)
 
     def mergeMerge(self, data, type1, type2, typeo, op):
         data1, data2 = data
@@ -601,7 +601,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 res.append(lelem)
             else:
                 raise RuntimeError, "Found unequal values during merge: " + str(lelem) + " != " + str(relem)
-        return cutils.darray(res, typeo.toNumpy())
+        return util.darray(res, typeo.toNumpy())
 
     def simple_arithDivide(self, data, type1, type2, typeo, op):
         data1,data2 = data
@@ -625,7 +625,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         data1,data2 = data
         if(data1 is Missing or data2 is Missing):
             return Missing
-        return cutils.darray(list(numpy_arith[op](numpy.cast[object](data1), numpy.cast[object](data2))),typeo.toNumpy())
+        return util.darray(list(numpy_arith[op](numpy.cast[object](data1), numpy.cast[object](data2))),typeo.toNumpy())
     
     def array_add_arrayAdd(self, data, type1, type2, typeo, op):
         data1,data2 = data
@@ -635,8 +635,8 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         dtype = typeo.toNumpy()
         for lelem, relem in zip(data1,data2):
             mshape = max(1,min(len(getattr(lelem,'shape',(0,))), len(getattr(relem,'shape',(0,)))))
-            res.append(numpy.concatenate([cutils.darray(list(lelem),dtype,mshape),cutils.darray(list(relem),dtype,mshape)],axis=0))
-        return cutils.darray(res,object)
+            res.append(numpy.concatenate([util.darray(list(lelem),dtype,mshape),util.darray(list(relem),dtype,mshape)],axis=0))
+        return util.darray(res,object)
 
     def simple_cmpGeneral(self, data, type1, type2, typeo, op):
         #a numpy bug gives all true arrays when using
@@ -672,7 +672,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 res.append(elem)
             else:
                 res.append(not elem)
-        return cutils.darray(res, type_out.toNumpy())
+        return util.darray(res, type_out.toNumpy())
 
     def repmissingReplaceMissing(self, data, type_in, type_out, op, def_value=NOVAL):
         if not type_in.has_missing:
@@ -696,7 +696,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 res.append(def_value)
             else:
                 res.append(elem)
-        return cutils.darray(res, type_out.toNumpy())
+        return util.darray(res, type_out.toNumpy())
     
     def ismissingIsMissing(self, data, type_in, type_out, op, def_value=NOVAL):
         res = []
@@ -705,30 +705,30 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 res.append(True)
             else:
                 res.append(False)
-        return cutils.darray(res, type_out.toNumpy())
+        return util.darray(res, type_out.toNumpy())
    
     def corrCorr(self, data, type_in, type_out, op):
         intype = type_in.toNumpy()
         res = []
         for elem in data:
             if(len(elem.shape) < 2):
-                elem = cutils.darray(list(elem),intype,2,2)
+                elem = util.darray(list(elem),intype,2,2)
             res.append(numpy.corrcoef(elem))
-        return cutils.darray(res,object,1,1)
+        return util.darray(res,object,1,1)
 
     def eachEach(self, data, type_in, type_out, op, eachfunc):
         if(isinstance(eachfunc,context.Context)):
-            return cutils.darray([context._apply(eachfunc,elem) for elem in data],type_out.toNumpy())
+            return util.darray([context._apply(eachfunc,elem) for elem in data],type_out.toNumpy())
         else:
-            return cutils.darray([eachfunc(elem) for elem in data],type_out.toNumpy())
+            return util.darray([eachfunc(elem) for elem in data],type_out.toNumpy())
 
     def sortableArgsort(self, data, type_in, type_out, op, packdepth, descend=False):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(len(data.shape) < 2):
             if(descend):
-                res = cutils.darray([numpy.flipud(numpy.argsort(row,axis=0)) for row in data],object)
+                res = util.darray([numpy.flipud(numpy.argsort(row,axis=0)) for row in data],object)
             else:
-                res = cutils.darray([numpy.argsort(row,axis=0) for row in data],object)
+                res = util.darray([numpy.argsort(row,axis=0) for row in data],object)
         else:
             res = numpy.argsort(data,axis=1)
             if(descend):
@@ -739,9 +739,9 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(len(data.shape) < 2):
             if(descend):
-                res = cutils.darray([numpy.argsort(numpy.flipud(numpy.argsort(row,axis=0)),axis=0) for row in data],object)
+                res = util.darray([numpy.argsort(numpy.flipud(numpy.argsort(row,axis=0)),axis=0) for row in data],object)
             else:
-                res = cutils.darray([numpy.argsort(numpy.argsort(row,axis=0),axis=0) for row in data],object)
+                res = util.darray([numpy.argsort(numpy.argsort(row,axis=0),axis=0) for row in data],object)
         else:
             res = numpy.argsort(data,axis=1)
             if(descend):
@@ -752,7 +752,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def fixdimCumSum(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(len(data.shape) < 2):
-            res = cutils.darray([numpy.cumsum(row,axis=0) for row in data],object)
+            res = util.darray([numpy.cumsum(row,axis=0) for row in data],object)
         else:
             res = numpy.cumsum(data,axis=1)
         return res
@@ -771,17 +771,17 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                     else:
                         subres = []
                         for r,d in zip(res.ravel(),row.ravel()):
-                            subres.append(cutils.darray([r] * len(d),dtype))
-                        res = cutils.darray(subres,object)
+                            subres.append(util.darray([r] * len(d),dtype))
+                        res = util.darray(subres,object)
                     xres.append(res)
-            xres = cutils.darray(xres)
+            xres = util.darray(xres)
         elif(len(data.shape) == 2):
             xres = numpy.tile(numpy.arange(data.shape[1],dtype=dtype),data.shape[0]).reshape(data.shape[:2])
             if(packdepth > 1):
                 res = []
                 for r,d in zip(xres.ravel(),data.ravel()):
-                    res.append(cutils.darray([r] * len(d),dtype))
-                xres = cutils.darray(res,object,1,1).reshape(data.shape)
+                    res.append(util.darray([r] * len(d),dtype))
+                xres = util.darray(res,object,1,1).reshape(data.shape)
         else:
             assert len(data.shape) == 3, "Unexpected data shape"
             r =  numpy.tile(numpy.arange(data.shape[1],dtype=dtype),data.shape[0]).reshape(data.shape[:2])
@@ -792,39 +792,39 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
     def countCount(self, data, type_in, type_out, op, packdepth):
         dtype = type_out.toNumpy()
         if(len(data.shape) == 1):
-            return cutils.darray([len(row) for row in data],dtype)
+            return util.darray([len(row) for row in data],dtype)
         else:
-            return cutils.darray([data.shape[1]] * data.shape[0],dtype)
+            return util.darray([data.shape[1]] * data.shape[0],dtype)
     
     def setGeneral(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         dtype = type_out.toNumpy()
         if(packdepth > 1):
-           return cutils.darray([[set(subrow) for subrow in row.transpose()] for row in data],dtype,2,2)
+           return util.darray([[set(subrow) for subrow in row.transpose()] for row in data],dtype,2,2)
         else:
-           return cutils.darray([set(row) for row in data],dtype)
+           return util.darray([set(row) for row in data],dtype)
     
     def uniqueGeneral(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         dtype = type_out.toNumpy()
         if(packdepth > 1):
-           return cutils.darray([[numpy.unique(subrow,return_index=True)[1] for subrow in row.transpose()] for row in data],dtype,2,2)
+           return util.darray([[numpy.unique(subrow,return_index=True)[1] for subrow in row.transpose()] for row in data],dtype,2,2)
         else:
-           return cutils.darray([numpy.unique(row, return_index=True)[1] for row in data],dtype)
+           return util.darray([numpy.unique(row, return_index=True)[1] for row in data],dtype)
    
     def arrayarraySum(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(packdepth > 1):
-            return cutils.darray([[numpy.concatenate(list(subrow),axis=0) for subrow in row.transpose()] for row in data],object,2,2)
+            return util.darray([[numpy.concatenate(list(subrow),axis=0) for subrow in row.transpose()] for row in data],object,2,2)
         else:
-            return cutils.darray([numpy.concatenate(list(row),axis=0) for row in data],object)
+            return util.darray([numpy.concatenate(list(row),axis=0) for row in data],object)
     
     def stringstringSum(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         if(packdepth > 1):
-            return cutils.darray([[''.join(list(subrow)) for subrow in row.transpose()] for row in data],object,2,2)
+            return util.darray([[''.join(list(subrow)) for subrow in row.transpose()] for row in data],object,2,2)
         else:
-            return cutils.darray([''.join(list(row)) for row in data],object)
+            return util.darray([''.join(list(row)) for row in data],object)
     
     def fixdimArgmax(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
@@ -838,12 +838,12 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
                 pos = pos[filter]
                 row = row[filter]
                 res.append(pos[func(row,axis=0)])
-            return cutils.darray(res,dtype)
+            return util.darray(res,dtype)
         else:            
             if(len(data.shape) < 2):
                 if(packdepth > 1):
                     dtype = object
-                return cutils.darray([func(row,axis=0) for row in data],dtype)
+                return util.darray([func(row,axis=0) for row in data],dtype)
             else:
                 return func(data,axis=1)
     fixdimArgmin = fixdimArgmax
@@ -853,12 +853,12 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         func = numpy_dimfuncs[op]
         dtype = type_out.toNumpy()
         if type_in.has_missing:                
-            return cutils.darray([func([elem for elem in row if not elem is Missing],axis=0) for row in data],dtype)
+            return util.darray([func([elem for elem in row if not elem is Missing],axis=0) for row in data],dtype)
         else:            
             if(len(data.shape) < 2):
                 if(packdepth > 1):
                     dtype = object
-                return cutils.darray([func(row,axis=0) for row in data],dtype)
+                return util.darray([func(row,axis=0) for row in data],dtype)
             else:
                 return func(data,axis=1)
       
@@ -946,7 +946,7 @@ reverse_op = {'__eq__':'__eq__',
 
 #util funcs
 def speedtuplify(seqs):
-    nseq = cutils.darray(zip(*seqs))
+    nseq = util.darray(zip(*seqs))
     return nseq
 
 
@@ -957,11 +957,11 @@ def speedarrayify(seqs,dtype):
 
 def speeddictindex(seqs,dtype, allow_missing=False, keep_missing=False):
     if keep_missing:
-        return cutils.darray([d.get(k,k) for d, k in zip(*seqs)],dtype)
+        return util.darray([d.get(k,k) for d, k in zip(*seqs)],dtype)
     elif allow_missing:
-        return cutils.darray([d.get(k,Missing) for d, k in zip(*seqs)],dtype)
+        return util.darray([d.get(k,Missing) for d, k in zip(*seqs)],dtype)
     else:
-        return cutils.darray([d[k] for d, k in zip(*seqs)],dtype)
+        return util.darray([d[k] for d, k in zip(*seqs)],dtype)
 
 
 def speedfilter(seqs,has_missing, ctype, stype):
@@ -980,7 +980,7 @@ def speedfilter(seqs,has_missing, ctype, stype):
                         res.append(missing)
                     elif(elem == True):
                         res.append(data[pos])
-                res = cutils.darray(res,object)
+                res = util.darray(res,object)
             else:#indices
                 res = []
                 for elem in constraint.ravel():
@@ -988,7 +988,7 @@ def speedfilter(seqs,has_missing, ctype, stype):
                         res.append(missing)
                     else:
                         res.append(data[elem])
-                res = cutils.darray(res,object)
+                res = util.darray(res,object)
         else:
             missing = stype.toMissingval()
             if(constraint is Missing):
@@ -997,12 +997,12 @@ def speedfilter(seqs,has_missing, ctype, stype):
                 try:
                     res = data[constraint]
                 except Exception:
-                    res = cutils.darray(data)[constraint]
+                    res = util.darray(data)[constraint]
     else:
         try:
             res = data[constraint]
         except Exception:
-            res = cutils.darray(data)[constraint]
+            res = util.darray(data)[constraint]
     return res
 
 def ensure_fixeddims(seqs,packdepth,dtype):
@@ -1013,10 +1013,10 @@ def ensure_fixeddims(seqs,packdepth,dtype):
                 if(len(seq.shape) >= 2):
                     res.append(seq)
                 else:
-                    res.append(cutils.darray(seq,dtype,100000,2))
-            res = cutils.darray(res,object)
+                    res.append(util.darray(seq,dtype,100000,2))
+            res = util.darray(res,object)
         elif(len(seqs.shape) == 2):
-            res = cutils.darray(seqs.tolist(),dtype,1000,3)
+            res = util.darray(seqs.tolist(),dtype,1000,3)
         else:
             res = seqs
     else:
@@ -1041,12 +1041,12 @@ def groupindex(data):
             data_dict[elems].append(pos)
        
         shape = [len(index) for index in indexes]
-        indexdata = [cutils.darray([],int)] * numpy.prod(shape)
-        indexdata = cutils.darray(indexdata, object, 1).reshape(tuple(shape))
+        indexdata = [util.darray([],int)] * numpy.prod(shape)
+        indexdata = util.darray(indexdata, object, 1).reshape(tuple(shape))
         
         for key, posses in data_dict.iteritems():
             loc = tuple([index[keypart] for index, keypart in zip(indexes,key)])
-            indexdata[loc] = cutils.darray(posses, int)
+            indexdata[loc] = util.darray(posses, int)
     else:
         data_dict = defaultdict(list)
         for pos, elems in enumerate(*data):
@@ -1054,8 +1054,8 @@ def groupindex(data):
                 data_dict["__TEMP__" + str(elems.__hash__())].append(pos)
             else:
                 data_dict[elems].append(pos)
-        indexdata = [cutils.darray(elem, int) for elem in data_dict.values()]
-        indexdata = cutils.darray(indexdata, object, 1)
+        indexdata = [util.darray(elem, int) for elem in data_dict.values()]
+        indexdata = util.darray(indexdata, object, 1)
    
     return indexdata
 
@@ -1112,7 +1112,7 @@ def joinindex(data, jointype):
     else:
         rdtype = int
 
-    return (cutils.darray(tlpos,ldtype), cutils.darray(trpos,rdtype))
+    return (util.darray(tlpos,ldtype), util.darray(trpos,rdtype))
 
 def remove_independent(data,dim):
     wx = [0] * len(data.shape)
@@ -1138,8 +1138,8 @@ def stringset_to_array(seq, dtype):
         if elem is Missing:
             res.append(Missing)
         else:
-            res.append(cutils.darray(list(elem),dtype))
-    return cutils.darray(res)
+            res.append(util.darray(list(elem),dtype))
+    return util.darray(res)
 
 
 def any_tobytes_missing(seq):
@@ -1149,11 +1149,11 @@ def any_tobytes_missing(seq):
             res.append(Missing)
         else:
             res.append(str(elem))
-    return cutils.darray(res)
+    return util.darray(res)
 
 def any_tobytes(seq):
     res = [str(elem) for elem in seq]
-    return cutils.darray(res)
+    return util.darray(res)
 
 
 def string_to_int_missing(seq, dtype):
@@ -1166,10 +1166,10 @@ def string_to_int_missing(seq, dtype):
                 res.append(int(elem))
             except ValueError:
                 res.append(Missing)
-    return cutils.darray(res,dtype)
+    return util.darray(res,dtype)
 
 def string_to_int(seq, dtype):
-    return cutils.darray([int(elem) for elem in seq],dtype)
+    return util.darray([int(elem) for elem in seq],dtype)
 
 
 def string_to_real_missing(seq, dtype):
@@ -1182,10 +1182,10 @@ def string_to_real_missing(seq, dtype):
                 res.append(float(elem))
             except ValueError:
                 res.append(Missing)
-    return cutils.darray(res,dtype)
+    return util.darray(res,dtype)
 
 def string_to_real(seq, dtype):
-    return cutils.darray([float(elem) for elem in seq],dtype)
+    return util.darray([float(elem) for elem in seq],dtype)
 
 
 def none_to_missing(seq,stype):

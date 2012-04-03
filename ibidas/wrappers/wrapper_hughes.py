@@ -6,7 +6,7 @@ _delay_import_(globals(),"..itypes","rtypes")
 _delay_import_(globals(),"..slices")
 _delay_import_(globals(),"wrapper_py","Result","rep")
 _delay_improt_(globals(),"wrapper_tsv","read_tsv")
-_delay_import_(globals(),"..utils","cutils")
+_delay_import_(globals(),"..utils","cutils","util")
 
 def read_hughes(path):
     experiments = read_tsv(path + "/experiment_list.txt", skiprows=2)
@@ -46,7 +46,7 @@ class HughesRepresentor(wrapper.SourceRepresentor):
         meas_names = reader.next()[2:]
         data = [row for row in reader]
 
-        data = cutils.darray(data,object,2)
+        data = util.darray(data,object,2)
         gene_names = data[:, 0]
         gene_symbols = data[:,1]
         intensity = data[:, 2:-1:4]

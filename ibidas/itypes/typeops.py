@@ -223,17 +223,17 @@ def exec_object_func(data1, data2, type1, type2, otype, op):
                                   not type1.__class__ is rtypes.TypeArray):
         if(isinstance(data2, numpy.ndarray) and 
                                       not type2.__class__ is rtypes.TypeArray):
-            res = cutils.darray([func(left, right) 
+            res = util.darray([func(left, right) 
                                  for left, right in zip(data1, data2)], 
                                  otype.toNumpy()).view(sparse_arrays.FullSparse)
         else:
-            res = cutils.darray([func(left, data2) 
+            res = util.darray([func(left, data2) 
                                  for left in data1], 
                                  otype.toNumpy()).view(sparse_arrays.FullSparse)
     else:
         if(isinstance(data2, numpy.ndarray) and 
                                       not type2.__class__ is rtypes.TypeArray):
-            res = cutils.darray([func(data1, right) 
+            res = util.darray([func(data1, right) 
                                  for right in data2], 
                                  otype.toNumpy()).view(sparse_arrays.FullSparse)
         else:

@@ -58,19 +58,19 @@ class ArrayConvertor(BaseConvertor):
             if(not isinstance(elem, numpy.ndarray)):
                 if(not isinstance(elem, collections.Sequence)):
                     elem = list(elem)
-                elem = cutils.darray(elem,elem_numpy_type,depth,1)
+                elem = util.darray(elem,elem_numpy_type,depth,1)
             
             #assure correct number of dimensions
             if(len(elem.shape) < depth):
                 oshape = elem.shape
                 rem_ndims = depth - len(elem.shape) + 1
-                elem = cutils.darray(list(elem.ravel()),elem_numpy_type,rem_ndims,rem_ndims)
+                elem = util.darray(list(elem.ravel()),elem_numpy_type,rem_ndims,rem_ndims)
                 elem.shape = oshape + elem.shape[1:]
                 assert len(elem.shape) == depth, "Non array values encountered for dims " + str(dims[len(elem.shape):])
             elif(len(elem.shape) > depth):
                 oshape = elem.shape
                 elem = dimpaths.flatFirstDims(elem,depth-1)
-                elem = cutils.darray([subelem for subelem in elem],object,1,1)
+                elem = util.darray([subelem for subelem in elem],object,1,1)
                 elem.shape = oshape[:depth]
 
             if not elem.dtype == elem_numpy_type:
@@ -86,9 +86,9 @@ class ArrayConvertor(BaseConvertor):
             res.append(elem)
 
         if(variable):
-            nseq = cutils.darray(res,seq_numpy_type)
+            nseq = util.darray(res,seq_numpy_type)
         else:
-            nseq = cutils.darray(res,seq_numpy_type,depth+1,1)
+            nseq = util.darray(res,seq_numpy_type,depth+1,1)
 
         return nseq
 
@@ -110,11 +110,11 @@ class StringConvertor(BaseConvertor):
                         except KeyError:
                             r[elem] = elem
                         res.append(elem)
-                seq = cutils.darray(res)
+                seq = util.darray(res)
         elif(not seq.dtype == dtype):
             #numpy bug: numpy.cast[<string dtype>] always cast to S1, irrespective 
             #requested length
-            seq = cutils.darray(list(seq),numpy.string_)
+            seq = util.darray(list(seq),numpy.string_)
         return seq
 
 
@@ -130,7 +130,7 @@ class FloatConvertor(BaseConvertor):
         else:
             seqres = [float(elem) for elem in seq]
          
-        return cutils.darray(seqres,elem_type.toNumpy())
+        return util.darray(seqres,elem_type.toNumpy())
 
 class IntegerConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
@@ -144,7 +144,7 @@ class IntegerConvertor(BaseConvertor):
         else:
             seqres = [int(elem) for elem in seq]
          
-        return cutils.darray(seqres,elem_type.toNumpy())
+        return util.darray(seqres,elem_type.toNumpy())
  
 class SetConvertor(BaseConvertor):
 
@@ -161,7 +161,7 @@ class SetConvertor(BaseConvertor):
                 seqres = [frozenset(elem) for elem in seq]
         else:
             seqres = seq
-        return cutils.darray(seqres,elem_type.toNumpy())
+        return util.darray(seqres,elem_type.toNumpy())
 
 
 
@@ -175,9 +175,9 @@ class DictConvertor(BaseConvertor):
                 except (KeyError, TypeError):
                     return Missing
             
-            subseq = cutils.darray([getname(elem) for elem in seq],subtype.toNumpy())
+            subseq = util.darray([getname(elem) for elem in seq],subtype.toNumpy())
             columns.append(subseq)
-        return cutils.darray(zip(*columns))
+        return util.darray(zip(*columns))
 
 class NamedTupleConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
@@ -188,9 +188,9 @@ class NamedTupleConvertor(BaseConvertor):
                     return getattr(elem,fieldname)
                 except (KeyError, TypeError):
                     return Missing
-            subseq = cutils.darray([getname(elem) for elem in seq],subtype.toNumpy())
+            subseq = util.darray([getname(elem) for elem in seq],subtype.toNumpy())
             columns.append(subseq)
-        return cutils.darray(zip(*columns))
+        return util.darray(zip(*columns))
 
 class TupleConvertor(BaseConvertor):
     def convert(self,seq,elem_type):
@@ -202,9 +202,9 @@ class TupleConvertor(BaseConvertor):
                     return itemfunc(elem)
                 except IndexError:
                     return Missing
-            subseq = cutils.darray([getitem(elem) for elem in seq],subtype.toNumpy())
+            subseq = util.darray([getitem(elem) for elem in seq],subtype.toNumpy())
             columns.append(subseq)
-        return cutils.darray(zip(*columns))
+        return util.darray(zip(*columns))
 
 
 
@@ -284,7 +284,7 @@ class RPCConvertor(VisitorFactory(prefixes=("execConvert","fconvert"),flags=NF_E
                     seqres.append(func(elem))
         else:
             seqres = [func(elem) for elem in seq]
-        seqres=cutils.darray(seqres)
+        seqres=util.darray(seqres)
         return seqres 
     
 
@@ -303,7 +303,7 @@ class RPCConvertor(VisitorFactory(prefixes=("execConvert","fconvert"),flags=NF_E
                 seqres.append(r)
         else:
             seqres = [dict([(key, self.fconvert(value)) for key,value in elem.iteritems()]) for elem in seq]
-        seqres = cutils.darray(seqres,seq.dtype)
+        seqres = util.darray(seqres,seq.dtype)
         return seqres
   
     def execConvertTypeSlice(self, ptype, seq):

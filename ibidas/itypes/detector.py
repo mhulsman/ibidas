@@ -106,14 +106,14 @@ class Detector(object):
         self._scanners = [OuterContainerScanner(self,dims)]
 
     def process(self, obj):
-        self.processSeq(sparse_arrays.FullSparse(cutils.darray([obj])))
+        self.processSeq(sparse_arrays.FullSparse(util.darray([obj])))
 
     def processSeq(self, seq):
         if not isinstance(seq, (sparse_arrays.FullSparse)):
             if isinstance(seq, (set, frozenset)):
-                seq = cutils.darray(list(seq))
+                seq = util.darray(list(seq))
             elif not isinstance(seq, numpy.ndarray):
-                seq = cutils.darray(seq)
+                seq = util.darray(seq)
             seq = sparse_arrays.FullSparse(seq)
         
         objclasses = seq.classes

@@ -53,13 +53,13 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
         return tuple([self.ftype(elem) for elem in obj])
 
     def _ftypesequence(self, obj):
-        return cutils.darray([self.ftype(elem) 
+        return util.darray([self.ftype(elem) 
                 for elem in obj]).view(util.farray) 
     ftypelist = _ftypesequence
 
     def ftypendarray(self, obj):
         if(obj.dtype == object):
-            return cutils.darray([self.ftype(elem) 
+            return util.darray([self.ftype(elem) 
                 for elem in obj]).view(util.farray) 
         else:
             return obj.view(util.farray)
@@ -81,7 +81,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
         else:
             seqres = [func(elem) for elem in seq]
         
-        seqres = cutils.darray(seqres,seq.dtype)
+        seqres = util.darray(seqres,seq.dtype)
         return seqres 
     
 
@@ -115,7 +115,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
                 subseq = seq.sparse_filter(l > pos).map(f,out_empty=Missing,otype=object,has_missing=True)
             columns.append(self.execFreeze(subtype, subseq))
 
-        nseq = cutils.darray(zip(*columns))
+        nseq = util.darray(zip(*columns))
         nseq.shape = seq.shape
         seq = sparse_arrays.FullSparse(nseq)
         return seq
@@ -138,7 +138,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     #            subseq = seq.map(getname,otype=object,out_empty=Missing,has_missing=rtype.has_missing)
     #            columns.append(self.execFreeze(subtype, subseq))
 
-    #        nseq = cutils.darray(zip(*columns))
+    #        nseq = util.darray(zip(*columns))
     #        nseq.shape = seq.shape
     #        seq = sparse_arrays.FullSparse(nseq)
     #    return seq
@@ -161,7 +161,7 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
     #            subseq = seq.map(getname,otype=object,out_empty=Missing,has_missing=rtype.has_missing)
     #            columns.append(self.execFreeze(subtype, subseq))
 
-    #        nseq = cutils.darray(zip(*columns))
+    #        nseq = util.darray(zip(*columns))
     #        nseq.shape = seq.shape
     #        seq = sparse_arrays.FullSparse(nseq)
     #    return seq

@@ -880,10 +880,10 @@ class Representor(Node):
     def Without(self, *slices):
         return repops_slice.Unproject(self,*slices)
 
-    def Elem(self, name=None):
+    def Elems(self, name=None):
         """Unpacks array type into dimension"""
         return repops_dim.UnpackArray(self, name)
-
+    Elem = Elems
     def Fields(self, name=None):
         """Unpacks tuple type into slices"""
         return repops_slice.UnpackTuple(self, name)
