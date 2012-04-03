@@ -47,11 +47,11 @@ Execute from source
 One can also directly execute ibidas from the source package. Download the source from pypi,
 then execute::
 
-    tar -xzvf ibidas-0.1.5.tar.gz 
+    tar -xzvf ibidas-0.1.12.tar.gz 
 
 to extract the source (version can differ). Enter the source directory using::
 
-    cd ibidas-0.1.5
+    cd ibidas-0.1.12
 
 then start ibidas using::
 

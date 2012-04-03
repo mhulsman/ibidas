@@ -153,7 +153,7 @@ def addprotein_dna_edges(network, gn_to_orf):
 
         #add chipchip data, based on out orfs, in orfs, and feature data (pval, conservation)
         print "Adding protein-dna edges..."
-        set_ccdata = cutils.darray(list(set(ccdata)),object,1)
+        set_ccdata = util.darray(list(set(ccdata)),object,1)
         cctypes = []
         res = numpy.zeros((len(ccdata), len(set_ccdata) + len(ae_expfactor)),dtype=float)
         for tpos in xrange(len(set_ccdata)):

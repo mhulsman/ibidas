@@ -98,19 +98,19 @@ class TestMatrix(TestArray):
 
 class TestNestedArray(TestMatrix):
     def setUp(self):
-        self.data = cutils.darray([[1,2,3],[1,2],[1]])
-        self.fres0 = cutils.darray([1,1,1])
+        self.data = util.darray([[1,2,3],[1,2],[1]])
+        self.fres0 = util.darray([1,1,1])
 
 class TestNestedMatrix(TestMatrix):
     def setUp(self):
-        self.data = cutils.darray([[[1,2],[2,4],[3,5]],[[1,3],[5,2]],[[1,2]]])
-        self.fres0 = cutils.darray([[1,2,3],[1,5],[1]])
+        self.data = util.darray([[[1,2],[2,4],[3,5]],[[1,3],[5,2]],[[1,2]]])
+        self.fres0 = util.darray([[1,2,3],[1,5],[1]])
         self.transpose_couples = [((0,2,1),(0,2,1)),((2,0,1),(1,2,0))]
 
 class TestNestedMatrixString(TestMatrix):
     def setUp(self):
-        self.data = cutils.darray([[["abc","abcd"],["def","defg"],["abg","fev"]],[["zeK","sdf"],["sdf","sdfff"]],[["sdf","kjl"]]])
-        self.fres0 = cutils.darray([["abc","def","abg"],["zeK","sdf"],["sdf"]])
+        self.data = util.darray([[["abc","abcd"],["def","defg"],["abg","fev"]],[["zeK","sdf"],["sdf","sdfff"]],[["sdf","kjl"]]])
+        self.fres0 = util.darray([["abc","def","abg"],["zeK","sdf"],["sdf"]])
         self.transpose_couples = [((0,2,1),(0,2,1)),((2,0,1),(1,2,0))]
     
     def test_filter(self):
@@ -120,8 +120,8 @@ class TestNestedMatrixString(TestMatrix):
 
 class TestNestedNestedArray(TestMatrix):
     def setUp(self):
-        self.data = cutils.darray([[[1,2],[2,3,3,3,4,5],[]],[[1],[2]],[[1,4,5]]])
-        self.fres0 = cutils.darray([[1,2,[]],[1,2],[1]])
+        self.data = util.darray([[[1,2],[2,3,3,3,4,5],[]],[[1],[2]],[[1,4,5]]])
+        self.fres0 = util.darray([[1,2,[]],[1,2],[1]])
 
     def test_filter2(self):
         k = Rep(self.data)
@@ -135,7 +135,7 @@ class TestNestedNestedArray(TestMatrix):
 
 class TestNestedNestedMatrix(TestMatrix):
     def setUp(self):
-        self.data = cutils.darray([[[[1,2],[3,4]],[[5,6],[7,9],[9,8]],[[4,9]]],[[[1,4]],[[2,5]]],[[[1,5],[4,7],[8,5]]]])
+        self.data = util.darray([[[[1,2],[3,4]],[[5,6],[7,9],[9,8]],[[4,9]]],[[[1,4]],[[2,5]]],[[[1,5],[4,7],[8,5]]]])
         self.transpose_couples = [((0,1,3,2),(0,1,3,2)),((0,3,1,2),(0,2,3,1)),((3,0,1,2),(1,2,3,0))]
 
     def test_filter2(self):
@@ -144,8 +144,8 @@ class TestNestedNestedMatrix(TestMatrix):
 
 class TestArrayNestedNestedMatrix(TestMatrix):
     def setUp(self):
-        nnmatrix = cutils.darray([[[[1,2],[3,4]],[[5,6],[7,9],[9,8]],[[8,9]]],[[[1,4]],[[2,5]]],[[[1,5],[4,7],[8,5]]]])
-        self.data = cutils.darray([nnmatrix, nnmatrix, nnmatrix])
+        nnmatrix = util.darray([[[[1,2],[3,4]],[[5,6],[7,9],[9,8]],[[8,9]]],[[[1,4]],[[2,5]]],[[[1,5],[4,7],[8,5]]]])
+        self.data = util.darray([nnmatrix, nnmatrix, nnmatrix])
         self.transpose_couples = [((1,2,3,4,0),(4,0,1,2,3)),((1,0,2,3,4),(1,0,2,3,4)),((1,2,0,3,4),(2,0,1,3,4)),((1,2,3,0,4),(3,0,1,2,4))]
 
     def test_filter2(self):
@@ -154,9 +154,9 @@ class TestArrayNestedNestedMatrix(TestMatrix):
 
 class TestNestedVarMatrix(TestMatrix):
     def setUp(self):
-        self.data = cutils.darray([[[1,2],[3,4],[5,6]],[[4,5,6],[7,8,9]]])
+        self.data = util.darray([[[1,2],[3,4],[5,6]],[[4,5,6],[7,8,9]]])
         self.dtype=["[arr]<[var1:.]<[var2:*.]<int64"]
-        self.fres0 = cutils.darray([[1,3,5],[4,7]])
+        self.fres0 = util.darray([[1,3,5],[4,7]])
         self.transpose_couples = [((0,2,1),(0,2,1))]
         
 if __name__ == "__main__":

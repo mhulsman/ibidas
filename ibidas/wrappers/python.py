@@ -586,7 +586,7 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             zipdata = zip(data1,data2)
         res = [elem in arr for elem,arr in zipdata]
         return util.darray(res,bool)
-
+    
     def mergeMerge(self, data, type1, type2, typeo, op):
         data1, data2 = data
         res = []
@@ -611,14 +611,20 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         if filter.any():
             data2 = data2.copy()
             data2[filter] = 1.0
-        res = numpy_arith[op](data1, data2, sig=typeo.toNumpy())
+        if util.numpy16up:
+            res = numpy_arith[op](data1, data2, dtype=typeo.toNumpy())
+        else:
+            res = numpy_arith[op](data1, data2, sig=typeo.toNumpy())
         return res
 
     def simple_arithGeneral(self, data, type1, type2, typeo, op):
         data1,data2 = data
         if(data1 is Missing or data2 is Missing):
             return Missing
-        return numpy_arith[op](data1, data2, sig=typeo.toNumpy())
+        if util.numpy16up:
+            return numpy_arith[op](data1, data2, dtype=typeo.toNumpy())
+        else:
+            return numpy_arith[op](data1, data2, sig=typeo.toNumpy())
     boolboolGeneral = simple_arithGeneral
 
     def string_add_stringAdd(self, data, type1, type2, typeo, op):
@@ -663,7 +669,10 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         return res
 
     def numberGeneral(self, data, type_in, type_out, op):
-        return numpy_unary_arith[op](data, sig=type_out.toNumpy())
+        if util.numpy16up:
+            return numpy_unary_arith[op](data, dtype=type_out.toNumpy())
+        else:
+            return numpy_unary_arith[op](data, sig=type_out.toNumpy())
     
     def boolInvert(self, data, type_in, type_out, op):
         res = []

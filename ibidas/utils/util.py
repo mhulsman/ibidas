@@ -444,9 +444,9 @@ def replace_darray(data, type=object, maxdim=1, mindim=0):
         
 
 nversion = numpy.__version__.split('.')    
-wrong_numpy = int(nversion[0]) >= 1 and int(nversion[1]) >= 6
+numpy16up = int(nversion[0]) >= 1 and int(nversion[1]) >= 6
 
-if wrong_numpy:
+if numpy16up:
     darray = replace_darray
 else:
     darray = cutils.darray

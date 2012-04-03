@@ -149,7 +149,10 @@ def exec_arith(data, type1, type2, typeo, op):
     data1,data2 = data
     if(data1 is Missing or data2 is Missing):
         return Missing
-    return numpy_arith[op](data1, data2, sig=typeo.toNumpy())
+    if util.numpy16up:
+        return numpy_arith[op](data1, data2, dtype=typeo.toNumpy())
+    else:
+        return numpy_arith[op](data1, data2, sig=typeo.toNumpy())
 
 arith_ops = set(numpy_arith.keys())
 addOps(rtypes.TypeNumbers, rtypes.TypeNumbers, arith_ops, Operation(check_arith, py=exec_arith))
@@ -407,7 +410,10 @@ def check_unary_arith(in_type, op):#{{{
 
 
 def exec_unary_arith(data1, intype, outtype, op):
-    return numpy_unary_arith[op](data1, sig=outtype.toNumpy())
+    if util.numpy16up:
+        return numpy_unary_arith[op](data1, dtype=outtype.toNumpy())
+    else:
+        return numpy_unary_arith[op](data1, sig=outtype.toNumpy())
 
 addOps(rtypes.TypeNumbers, (), unary_ops, 
         Operation(check_unary_arith, py=exec_unary_arith))
