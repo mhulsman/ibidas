@@ -119,7 +119,6 @@ class UnaryFuncElemOp(UnaryFuncOp):
     def _process(self, source, **kwargs):
         if not source._typesKnown():
             return
-
         nslices = []
         for slice in source._slices:
             slice = self._prepareSlice(slice)

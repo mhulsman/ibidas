@@ -999,8 +999,8 @@ def speedfilter(seqs,has_missing, ctype, stype):
                         res.append(data[elem])
                 res = util.darray(res,object)
         else:
-            missing = stype.toMissingval()
             if(constraint is Missing):
+                missing = stype.toMissingval()
                 res = missing
             else:
                 try:

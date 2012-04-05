@@ -1,5 +1,6 @@
 import os
 import csv
+from logging import info, warning
 
 import wrapper
 from ..itypes import rtypes
@@ -13,46 +14,12 @@ from ..utils import nested_array, util
 class TSVRepresentor(wrapper.SourceRepresentor):
     def __init__(self, filename, dialect=False, skiprows=-1, dtype=rtypes.unknown, fieldnames=None):
         file = util.open_file(filename)
-   
-        #determine dialect, create csv parser
-        if(dialect is False):
-            lines = []
-            #get sample
-            for line in file:
-                lines.append(line)
-                if(len(lines) > 500):
-                    break
-            #sniff last 20 lines
-            lines = lines[-20:]
-            dialect = csv.Sniffer().sniff("\n".join(lines))
-            file.seek(0)
-            reader = csv.reader(file, dialect)
-        else:
-            if(issubclass(dialect, csv.Dialect)):
-                reader = csv.reader(file, dialect)
-            else:
-                reader = csv.reader(file, delimiter=dialect)
+  
+        reader, dialect = self.getReader(file, dialect)
         
         #determine number of rows to skip (e.g. comments)
         if(skiprows == -1):
-            splitsize = []
-            for row in reader:
-                splitsize.append(len(row))
-                if(not row or len(row[0]) == 0 or ((len(splitsize) == 1 or splitsize[-2] == 0) and (row[0][0] == '#' or row[0][0] == '%' or row[0][0] == "!"))):
-                    splitsize[-1] = 0
-                elif(len(splitsize) > 75):
-                    x = set(splitsize[-20:])
-                    if(len(x) == 1):
-                        break
-                elif(len(splitsize) > 500):
-                    raise RuntimeError, "Cannot find correct number of columns. Incorrect delimiter?"                    
-            
-            real_split  = splitsize[-1]
-            skiprows = 0
-            for pos, split in enumerate(splitsize):
-                if(split != real_split):
-                    skiprows = pos + 1
-            file.seek(0)
+            skiprows = self.determineSkipRows(file, reader)
 
         for i in xrange(skiprows):
             file.readline()
@@ -112,6 +79,48 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         file.close()
         self._initialize(tuple(nslices))
 
+    def getReader(self, file, dialect=False):
+        #determine dialect, create csv parser
+        if(dialect is False):
+            lines = []
+            #get sample
+            for line in file:
+                lines.append(line)
+                if(len(lines) > 500):
+                    break
+            #sniff last 20 lines
+            lines = lines[-20:]
+            dialect = csv.Sniffer().sniff("\n".join(lines))
+            file.seek(0)
+            reader = csv.reader(file, dialect)
+        else:
+            if(issubclass(dialect, csv.Dialect)):
+                reader = csv.reader(file, dialect)
+            else:
+                reader = csv.reader(file, delimiter=dialect)
+        return (reader, dialect)
+
+    def determineSkipRows(self, file, reader):
+        splitsize = []
+        for row in reader:
+            splitsize.append(len(row))
+            if(not row or len(row[0]) == 0 or ((len(splitsize) == 1 or splitsize[-2] == 0) and (row[0][0] == '#' or row[0][0] == '%' or row[0][0] == "!"))):
+                splitsize[-1] = 0
+            elif(len(splitsize) > 75):
+                x = set(splitsize[-20:])
+                if(len(x) == 1 and not x.pop() == 1):
+                    break
+            elif(len(splitsize) > 500):
+                raise RuntimeError, "Cannot find correct number of columns. Incorrect delimiter?" 
+        
+        real_split  = splitsize[-1]
+        skiprows = 0
+        for pos, split in enumerate(splitsize):
+            if(split != real_split):
+                skiprows = pos + 1
+        info('Skipping first %d rows', skiprows)                
+        file.seek(0)
+        return skiprows        
 
 class TSVOp(ops.ExtendOp):
     __slots__ = ["filename", "dialect","startpos"]

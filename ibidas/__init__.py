@@ -80,6 +80,9 @@ def Read(url, **kwargs):
     if(format == 'tsv'):
         from wrappers.tsv import TSVRepresentor
         return TSVRepresentor(url, **kwargs) 
+    if(format == 'matrix_tsv'):
+        from wrappers.matrix_tsv import MatrixTSVRepresentor
+        return MatrixTSVRepresentor(url, **kwargs) 
     elif(format == 'xml'):
         from wrappers.xml_wrapper import XMLRepresentor
         return XMLRepresentor(url, **kwargs) 

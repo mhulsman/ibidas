@@ -34,4 +34,7 @@ class TestBugs(unittest.TestCase):
         yeastract = Get.yeast.yeastract()
         y = yeastract.GroupBy(_.trans_factor)[:10].Copy()
         str(y.Get(_.trans_factor, _.target[:,newdim][:10]).Count())
-       
+    
+    def test_slicesunknownmatch(self):
+        x = Rep(['test']).Each(str.upper)
+        str(x |Match(_.Each(str.upper))| x)

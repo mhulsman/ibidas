@@ -14,7 +14,9 @@ class TestTutorial(unittest.TestCase):
         str(yeastract)
         yeastract = yeastract/('trans_factor','target')
         yeastract = yeastract%'tftargets'
+        str(yeastract)
         yeastract = yeastract.Rename('trans_factor','target')
+        yeastract = yeastract.DimRename('tftargets')
         str(yeastract)
         yeastract = yeastract.Copy()
         

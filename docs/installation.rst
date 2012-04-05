@@ -1,5 +1,5 @@
-Installation
-============
+Installation and Use
+====================
 
 If one has the ``setuptools`` package installed, one can simply perform::
 
@@ -47,11 +47,11 @@ Execute from source
 One can also directly execute ibidas from the source package. Download the source from pypi,
 then execute::
 
-    tar -xzvf ibidas-0.1.12.tar.gz 
+    tar -xzvf ibidas-0.1.13.tar.gz 
 
 to extract the source (version can differ). Enter the source directory using::
 
-    cd ibidas-0.1.12
+    cd ibidas-0.1.13
 
 then start ibidas using::
 
@@ -83,17 +83,17 @@ Performing unit tests and building the documentation can be done manually using:
     #build documentation (available then under docs/_build/html)
     python setup.py build_sphinx
 
-Ibidas installation dependencies include:
+Ibidas dependencies include:
 
  * python >= 2.6
 
- * numpy >= v1.5.1
+ * numpy >= v1.4.1
 
  * ipython >= 0.10.1
 
  * sqlalchemy >= 0.6.4
 
- * sphinx >= 1.0.5
+ * sphinx >= 1.0.5 [only to build documentation]
 
 Also, installing database client libraries such as `sqlite`, `postgres` and `mysql`,
 will alow one to use the sql wrapper to connect to these various databases. 

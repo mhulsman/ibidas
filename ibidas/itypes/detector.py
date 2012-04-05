@@ -32,7 +32,7 @@ d.getType()
     a common detection step in that it determines a set of class types available in the
     sequence. 
 
-    Once the user ask for the type, the detector asks every active scanner for a type, and
+    Once the user asks for the type, the detector asks every active scanner for a type, and
     next will (try) to determine which type should be returned. For this, the scanner class
     should have a getType method, where it creates an type based on the collected information.
 
@@ -767,6 +767,62 @@ class StringScanner(TypeScanner):
             self.max_nchars = max(self.max_nchars, max_nchars)
         return True
 registerTypeScanner(StringScanner)
+
+class StringRealScanner(StringScanner):
+    parentcls=StringScanner
+    missing_str = set(["", "NA", "N/A","NaN", "nan", "--", "?", "null"])
+    def __init__(self, detector):
+        StringScanner.__init__(self, detector)
+        self.has_missing = False
+    
+    def unregister(self, create_parent=False):
+        res = super(StringRealScanner,self).unregister(self, create_parent)
+        if create_parent:
+            res.max_nchars = self.max_nchars
+        return res
+
+    def getType(self):
+        return rtypes.TypeReal64(self.detector.hasMissing() or self.has_missing, needscast=True)
+
+    def scan(self, seq):
+        res = StringScanner.scan(self, seq)
+        if res:
+            for elem in seq:
+                try:
+                    float(elem)
+                except ValueError:
+                    if elem.__class__ in missing_cls or elem in self.missing_str:
+                        self.has_missing = True
+                    else:
+                        return False
+        return res
+#registerTypeScanner(StringRealScanner)
+
+class StringIntScanner(StringRealScanner):
+    parentcls=StringRealScanner
+    
+    def unregister(self, create_parent=False):
+        res = super(StringIntScanner,self).unregister(self, create_parent)
+        if create_parent:
+            res.has_missing = self.has_missing
+        return res
+
+    def getType(self):
+        return rtypes.TypeInt64(self.detector.hasMissing() or self.has_missing, needscast=True)
+
+    def scan(self, seq):
+        res = StringScanner.scan(self, seq)
+        if res:
+            for elem in seq:
+                try:
+                    int(elem)
+                except ValueError:
+                    if elem.__class__ in missing_cls or elem in self.missing_str:
+                        self.has_missing = True
+                    else:
+                        return False
+        return res
+#registerTypeScanner(StringIntScanner)
 
 class SliceScanner(TypeScanner):
     __doc__ = 'Slice scanner'

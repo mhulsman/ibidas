@@ -251,7 +251,7 @@ def open_go(dburl=config.get("databases.go_url",None)):
 predefined_sources.register(open_go,name="go",category="go")
 
 
-def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyces", species="cerevisiae"):
+def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyces", species="cerevisiae", include_ancestors=False):
     """Accesses GO annotations in a MySQL database.
 
        Database data can be obtained from the geneontology website.
@@ -261,9 +261,15 @@ def go_annotations(dburl=config.get("databases.go_url",None), genus="Saccharomyc
     go = open_go(dburl)
     g = go.species |Match(_.id,                   _.species_id)|      go.gene_product
     g = g          |Match(_.gene_product.id,      _.gene_product_id)| go.association
-    g = g          |Match(_.association.term_id,   _.id)|             go.term//"annot"
     g = g          |Match(_.association.id,       _.association_id)|  go.evidence
     g = g          |Match(_.gene_product.dbxref_id,           _.id)|  go.dbxref
+    if include_ancestors:
+        g = g          |Match(_.association.term_id, _.term2_id)|     go.graph_path
+        g = g          |Match(_.term1_id, _.id)|                      go.term//"annot"
+        g = g          |Match(_.relationship_type_id, _.id)|          go.term//"rel"
+        g = g[_.rel.name == "is_a"]
+    else:
+        g = g          |Match(_.association.term_id,   _.id)|         go.term//"annot"
     g = g[(_.genus==genus) & (_.species == species)][_.is_not == False][_.evidence.code != "ND"]
     g = g.ReplaceMissing()
     g = g.Get(_.symbol   /"gene_symbol",   _.xref_key / "gene_id",  

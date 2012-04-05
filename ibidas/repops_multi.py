@@ -359,6 +359,8 @@ class Match(repops.MultiOpRep):
                 lslice = getattr(lsource,rslice.Names[0])
         elif(rslice is None):
             rslice = getattr(rsource,lslice.Names[0])
+        if not lslice._slicesKnown() or not rslice._slicesKnown():
+            return
         assert len(rslice._slices) == 1, "rslice parameter in match should have only one slice"
         assert len(lslice._slices) == 1, "lslice parameter in match should have only one slice"
         self._sources = (lsource, rsource, lslice, rslice)
@@ -498,6 +500,8 @@ class Intersect(repops.MultiOpRep):
         repops.MultiOpRep.__init__(self,sources, **kwargs)
 
     def _sprocess(self, sources, dim=None):
+        if any([not source._typesKnown() for source in sources]):
+            return
         slicelens = set([len(source._slices) for source in sources])
         assert len(slicelens) == 1, "Sources of stack should have same number of slices"
         nslice = slicelens.pop()

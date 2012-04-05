@@ -1,0 +1,24 @@
+- Installation and Use [Done]
+
+- Tutorial
+
+- Data objects
+    * From python, to python
+    * Slice adressing
+    * Slice rename
+    * Dimension rename
+    * Bookmarks
+    * Data type specification
+
+- Data import/export/access
+    * Load / Save
+    * Predefined data sources
+    * Importing data files
+    * Accessing databases
+
+- Operations
+    * Packing/unpacking
+    * Broadcasting
+    * match etc.
+
+- Building extensions

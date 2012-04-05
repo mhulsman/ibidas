@@ -71,3 +71,9 @@
 - fix to accomodate change in numpy C API behaviour from version 1.6 onwards
 - allow for use of Elems instead of Elem (will become default behaviour in one of the next versions)
 
+0.1.13
+- allow for use of In in Ipython 0.11 and up
+- fix for using an unknown type upon an unknown type follwed by a Match
+- addition of matrix_tsv reader. Can be used to parse e.g. microarray files
+- update tutorial documentation
+
