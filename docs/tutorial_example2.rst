@@ -246,6 +246,7 @@ Next, we use the ``Elem`` operation to unpack the resulting set.
 
 The names in the list suggest that we might find matching rows by looking either at the ``gene_name`` or ``gene_aliases`` column. 
 Before we do this, we first convert each name in nonmatched to uppercase::
+    
     >>> nonmatched = nonmatched.Each(str.upper)
 
 First, we check the ``gene_name`` column. This does not give any matches however::
@@ -446,9 +447,7 @@ per chromosome. The division operator knows on which dimension it should divide 
 
 As you can see, a square matrix is calculated with all correlation coefficients. What if we now want to calculate a correlation between chromosomes instead?::
     >>> normchrom_counts = res.count.Cast("real64") / res.count.Sum("gtrans_factor")
-
     >>> Corr(res.count.Transpose())
-    
     Slices: | count                                                                                                                                                                    
     -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
     Type:   | real64                                                                                                                                                                   

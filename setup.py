@@ -30,7 +30,7 @@ if not os.path.isdir('docs/_build'):
 
 setup(
     name="Ibidas",
-    version="0.1.13",
+    version="0.1.13b",
     packages = find_packages(),
     test_suite = "test",
     scripts = ['bin/ibidas'],
@@ -52,7 +52,7 @@ setup(
             extra_compile_args=["-Wall"]
         ),
      ],
-     install_requires=['numpy>=1.4.1','sqlalchemy>=0.6.4','ipython>=0.10.1','sphinx>=1.0.5'],
+     install_requires=['numpy>=1.4.1','numpy!=1.6.0','sqlalchemy>=0.6.4','ipython>=0.10.1','sphinx>=1.0.5'],
      author = "M. Hulsman & J.J.Bot",
      author_email = "m.hulsman@tudelft.nl",
      description = "Ibidas is an environment for data handling and exploration, able to cope with different data structures and sources",
