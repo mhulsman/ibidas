@@ -416,10 +416,10 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
 
         if(not ndim is None):
             if(isinstance(tconstraint.type,rtypes.TypeSlice)):
-                ndep = dimpaths.applyPlan(dep,cplan,newvalue=True, copyvalue=True, ensurevalue=True)
+                ndep = dimpaths.applyPlan(dep[::-1],cplan,newvalue=True, copyvalue=True, ensurevalue=True)
             else:
-                ndep = dimpaths.applyPlan(dep,cplan,newvalue=False)
-            xndim = ndim.changeDependent(tuple(ndep), slice.dims)
+                ndep = dimpaths.applyPlan(dep[::-1],cplan,newvalue=False)
+            xndim = ndim.changeDependent(tuple(ndep[::-1]), slice.dims)
         else:
             xndim = ndim
         slice = FilterOp(slice,tconstraint,xndim,constraint)

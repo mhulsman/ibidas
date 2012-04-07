@@ -121,6 +121,57 @@ class Graph(object):
             else:
                 self.edge_target[key] = r
 
+
+    def walkUseContig(self, node, include_first=True):
+        return WalkContigIter(self, node, True, include_first)
+
+    def walkSourceContig(self, node, include_first=True):
+        return WalkContigIter(self, node, False, include_first)
+    
+    def remove_unaryop(self, node):
+        source = self.getDataEdge(node).source
+        target_edges = list(self.edge_source[node])
+        self.dropNode(node)
+        for target_edge in target_edges:
+            assert isinstance(target_edge,ParamEdge), "Unknown edge type encountered"
+            target_edge.source = source
+            self.addEdge(target_edge)
+        return source            
+
+
+class WalkContigIter(object):
+    def __init__(self, graph, node, walk_users, include_first=True):
+        self.node = node
+        self.graph = graph
+        self.walk_users = walk_users
+        if not include_first:
+            self.next()
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        node = self.node
+        if not node is None:
+            if self.walk_users:
+                edges = self.graph.edge_source[self.node]
+                if len(edges) > 1:
+                    self.node = None
+                else:
+                    edge = list(edges)[0]
+                    self.node = edge.target
+            else: #walk_source
+                edges = self.graph.edge_target[self.node]
+                if len(edges) > 1:
+                    self.node = None
+                else:
+                    edge = list(edges)[0]
+                    self.node = edge.source
+            return node
+        else:
+            raise StopIteration
+    
+
 class Node(object):
     pass
 
