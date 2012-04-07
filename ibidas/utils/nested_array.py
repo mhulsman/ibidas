@@ -383,7 +383,7 @@ class NestedArray(object):
                 nself.idxs[matchpoint] = nlidx
         del nself.idxs[matchpoint+1]
         if(not isinstance(nself.idxs[matchpoint],int) and result_fixed):
-            nself._var_to_fixed(matchpoint)
+            assert nself._var_to_fixed(matchpoint), "Multiple lengths encountered while expecting fixed dim"
         return nself
 
     def _var_to_fixed(self, pos):
@@ -392,7 +392,9 @@ class NestedArray(object):
         diff = idx[...,-1] - idx[...,0]
         diffset = set(diff.ravel())
 
-        assert len(diffset) == 1, "Multiple lengths encountered while expecting fixed dim"
+        if len(diffset) != 1:
+            return False
+        
         nshape = diffset.pop()
         nextobj = nextobj.reshape(diff.shape + (nshape,) + nextobj.shape[1:])
 
@@ -404,6 +406,7 @@ class NestedArray(object):
         for i in range(pos, nextpos):
             self.idxs[i] = (i - pos) + prevpos + 1
         self._set_obj(nextpos,nextobj)
+        return True
 
     def mergeLastDims(self,depth):
         curdepth = len(self.idxs) - 1
@@ -745,6 +748,7 @@ def co_mapseq(func, nested_arrays, *args, **kwargs):
     idxlen = set([len(na.idxs) for na in nested_arrays])
     assert len(idxlen) == 1, "Nested arrays should have same dimensions!"
     idxlen = idxlen.pop()
+
     na_ref = nested_arrays[0]
 
     #determine if there is incomplete broadcasting going on
@@ -753,10 +757,21 @@ def co_mapseq(func, nested_arrays, *args, **kwargs):
     xshape = []
     for i in range(idxlen):
         pos = idxlen -i - 1
-        if(not isinstance(na_ref.idxs[pos], int)):
+
+        nested = [not isinstance(na.idxs[pos],int) for na in nested_arrays]
+        if all(nested):
             break
-        
-        res = set([na.getDimShape(pos-1) for na in nested_arrays])
+        dshapes = [na.getDimShape(pos-1) for na in nested_arrays]
+        if any(nested):
+            for dpos in xrange(len(dshapes)):
+               if not isinstance(dshapes[dpos],int):
+                  red = set(dshapes[dpos])
+                  assert len(red) == 1, "Unequal dims (mixed nested/non-nested) in co_mapseq"
+                  assert nested_arrays[dpos]._var_to_fixed(pos), "Nested to fixed dim conversion failed"
+                  dshapes[dpos] = nested_arrays[dpos].getDimShape(pos-1)
+                  assert isinstance(dshapes[dpos],int), "After conversion to fixed dim still nested dim"
+          
+        res = set(dshapes)
         if len(res) > 1:
             assert len(res) == 2 and 1 in res, "Unequal dims in co_mapseq"
             lastpos = pos - 1
