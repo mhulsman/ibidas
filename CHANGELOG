@@ -79,3 +79,6 @@
 
 0.1.14
 - blacklist numpy 1.6.0 (http://projects.scipy.org/numpy/ticket/1870)
+- bug fix in determining which parent dims a dependent dims depends on
+- add transposer optimization step. Optimizes some filter/group/.. operations on matrices with nested vectors 
+  that depend only on one dimension of the matrix.
