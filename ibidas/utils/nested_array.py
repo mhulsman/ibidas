@@ -445,7 +445,12 @@ class NestedArray(object):
                 tmp = pidx[lidx]
                 pidx[lidx] = pidx[ridx]
                 pidx[ridx] = tmp
-                nextobj = numpy.transpose(nextobj,axes=pidx)
+                #added copy to ensure that array is c-contiguous,
+                #as not being contiguous kills performance
+                #In the future, maybe we should move contigious checks
+                #to the operations that benefit from them, then we 
+                #can remove this copy (and the copy below in var-var)
+                nextobj = numpy.transpose(nextobj,axes=pidx).copy()
             else: #fixed-var --> var-fixed
                 fixshape = ridx.shape[-2]
                 nnextobj = numpy.zeros(nextobj.shape,dtype=nextobj.dtype)
@@ -538,7 +543,7 @@ class NestedArray(object):
                         rightlen= (rsrc.stop - rsrc.start) / leftlen
 
                     d = numpy.reshape(nextobj[rsrc],(leftlen,rightlen) +  nextobj.shape[1:])
-                    d = numpy.transpose(d,pidx)
+                    d = numpy.transpose(d,pidx).copy()
                     nnextobj[rsrc] = d.ravel()
                 nextobj = nnextobj
 
