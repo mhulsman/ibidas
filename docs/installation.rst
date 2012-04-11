@@ -10,9 +10,10 @@ This will download and install ibidas and its necessary dependencies.
 The ``setuptools`` package is available in nearly all Linux distributions. 
 
 To install, Ibidas needs some dependencies. Most are automatically installed.
-The following packages need to be installed manually if they are not yet available (an error will be returned in this case):
+The following packages need to be installed manually (i.e. using the package manager of your distribution) if they are not 
+yet available (an error will be returned in this case):
 
-    * numpy development files
+    * numpy (development) files
 
     * psycopg2 (only if access is required to postgres databases)
 

@@ -77,3 +77,5 @@
 - addition of matrix_tsv reader. Can be used to parse e.g. microarray files
 - update tutorial documentation
 
+0.1.14
+- blacklist numpy 1.6.0 (http://projects.scipy.org/numpy/ticket/1870)
