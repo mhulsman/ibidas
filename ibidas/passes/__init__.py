@@ -6,6 +6,7 @@ from prepeephole import PrePeepHole
 from create_expression_objects import CreateExpressions
 from wrapper_planner import WrapperPlanner
 from python_peephole import PythonPeepHole
+from transposer import Transposer
 from serialize_exec import SerializeExec
 from cytoscape_vis import DebugVisualizer
 

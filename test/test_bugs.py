@@ -38,3 +38,9 @@ class TestBugs(unittest.TestCase):
     def test_slicesunknownmatch(self):
         x = Rep(['test']).Each(str.upper)
         str(x |Match(_.Each(str.upper))| x)
+
+
+    def test_filter_on_transposed_nested(self):
+        z = Rep((['a','b','b','c'],[[1,2,3,4],[1,2,3,4],[4,3,2,1]]))
+        res = z.To(_.f1, Do=_.Transpose()).GroupBy(_.f0).To(_.f1, Do=_.Mean(dim=1)).To(_.f1, Do=_.Transpose()).Filter(slice(0,5),dim=1)
+        str(res)

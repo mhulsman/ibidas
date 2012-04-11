@@ -460,8 +460,10 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             if(node.packdepth > 2):
                 ndata,nshapes = ndata.mergeLastDims(node.packdepth-2)
             ndata = ndata.pack(slice.type, 2)
-        else:
+        elif(node.packdepth == 1):
             ndata = ndata.pack(slice.type)
+        else: #packdepth == 0
+            ndata = ndata
         ndata = ndata.mapseq(func,type_in=slice.type,type_out=node.type,
                                   res_type=node.type,op=node.funcname,packdepth=node.packdepth, **node.kwargs)
         
