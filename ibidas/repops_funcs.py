@@ -563,7 +563,7 @@ class UnarySortableSignature(UnaryFixShapeSignature):
         if(in_type.__class__ == rtypes.TypeArray):
             return False
 
-        nstype = rtypes.TypePlatformInt(in_type.has_missing)
+        nstype = rtypes.TypePlatformInt()
         return Param(slice.name, nstype)#}}}
 
 sortablesig = UnarySortableSignature("sortable")

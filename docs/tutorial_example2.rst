@@ -1,10 +1,10 @@
 Chromosome distribution
 =======================
 
-In this example, we will analyze the genomic locations of transcription factor targets. We will determine if transription 
-factors favor specific chromosomes. Also, it would be interesting to determine if certain chromosomes are common in terms of transcription factors,
-and/or transcription factors common in the chromosomes they target. 
-
+In this example, we will analyze the genomic locations of transcription factor targets, to determine if transription 
+factors favor specific chromosomes. Also, we will compare transcription factors on the chromosomes they target, to see if there are transcription
+factors that target similar sets of chromosomes. Likewise, we will compare chromosomes, to see if there are chromosomes that attract common
+transcription factors. 
 
 Importing the data
 ~~~~~~~~~~~~~~~~~~
@@ -13,7 +13,7 @@ can be obtained directly using::
 
     >>> yeastract = Get.yeast.yeastract()
 
-Next to the transcription factor data, we need the location of all genes on the chromosomes.
+Next to this transcription factor data, we also need the location of all genes on the chromosomes.
 This information can be found in the ``SGD_features.tab``, which can be obtained from yeastgenome.org. 
 
 Unfortunately, similar to yeastract, also this file comes without fieldnames, so we specify those through the type::
@@ -51,9 +51,9 @@ question mark sign. The indicates that missing values (empty fields) are allowed
         
         >>> res.genetic_pos = res.genetic_pos.Cast("real64?")
 
-    The reason for that is that res could have been used in another query before executing this command. Changing res by 
+    The reason is that res could have been used in another query before executing this command. Changing res by 
     performing this operation would therefore lead to some problems because of the lazy nature of query execution in Ibidas.
-    It might be possible to allow this in the future, however it would require some trickery. So, for now, we use the approach
+    It might be possible to allow this in the future, however it would require some trickery/overhead. So, for now, we use the approach
     with the ``To`` operation.
     
 
@@ -133,14 +133,12 @@ So, instead, we convert each target and feat_name to upper case before matching:
             | ...               | ...               | ...               | ...               | ...
 
 
-When using a regular ``Match`` operation, any ``target`` row for which no entry can be found in ``feat_name`` will be left out (there are options to prevent this). 
-
-
+When using a regular ``Match`` operation, any ``target`` row for which no entry can be found in ``feat_name`` will be left out, and vice versa (there are options to prevent this). 
 
 Sidestep: Checking what is linked
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-The linking of both datasets is now complete. In this section, we will determine what could be linked, and what not. These steps are performed just to introduce some commands and concepts, and
-are not necessary to complete the example.   
+The linking of both datasets is now complete. In this section, we will determine which elements  could not be linked, and see if we can do better. 
+These steps are performed just to introduce some commands and concepts, and are not necessary to complete the example.   
 
 First, we do a quick check to determine how many rows in the yeastract dataset could not be matched. A naive approach to this would be::
     
@@ -195,13 +193,13 @@ However, even a better approach is to circumvent this extra assumption, by check
     Data:   |              |
             | 72           | 72
 
-This introduces the ``Except`` command. This command ony keeps rows of yeastract that do not occur in tf_feat. These rows are subsequently counted. Note that this gives the same answer as 
+This introduces the ``Except`` command. This command only keeps rows of yeastract that do not occur in tf_feat. These rows are subsequently counted. Note that this gives the same answer as 
 we had before. 
 
 A shorter version of this command, that also scales to cases in which `yeastract` has many slices, is the following::
     >>> (yeastract |Except| tf_feat.Get(*yeastract.Names)).Count()
 
-Next, we determine which targets where not matched::
+Next, we determine which target names could not matched::
 
     >>> nonmatched = yeastract.target |Except| tf_feat.target
     >>> nonmatched.Show()
@@ -233,7 +231,7 @@ Next, we determine which targets where not matched::
             | YBR075w                      
             | DEX2  
 
-Using ``Except``, we keep only the targets in yeastract that do not occur in ``tf_feat.target``. Another low level way to accomplish the same result
+Using ``Except``, we keep only the targets in yeastract that do not occur in ``tf_feat.target``. Another lower level way to accomplish the same result
 would be::
     
     >>> non_matched = (yeastract.target.Set() - tf_feat.target.Set()).Elem()
@@ -244,7 +242,7 @@ Sets have some special operations defined on them. One of them is set substracti
 also occur in the set of the second operand, leaving only the elements that do not occur in the second operand. In this case thus the elements that were not matched by the Match operation. 
 Next, we use the ``Elem`` operation to unpack the resulting set. 
 
-The names in the list suggest that we might find matching rows by looking either at the ``gene_name`` or ``gene_aliases`` column. 
+The names in the list suggest that we might find matching rows by looking either at the ``gene_name`` or ``gene_aliases`` column of the `yeast_feats` dataset
 Before we do this, we first convert each name in nonmatched to uppercase::
     
     >>> nonmatched = nonmatched.Each(str.upper)
@@ -278,7 +276,7 @@ Next we look at the gene_aliases column. As you might remember this slice does c
             | ...      
 
 As you can see, ``|In|`` matches with the last dimension of ``gene_aliases``. This means that there are multiple aliases list to be matched, which together with
-the multiple names to be tested results in a matrix of results. Of course, this is not what we exactly want. We can solve this using ``Any``::
+the multiple names to be tested results in a matrix of results, of size(non_matched) by size(yeast_feats). Of course, this is not what we exactly want. We can solve this using ``Any``::
     
     >>> Any(nonmatched |In| yeast_feats.gene_aliases.Each(str.upper))
     Slices: | result
@@ -291,10 +289,11 @@ the multiple names to be tested results in a matrix of results. Of course, this 
             | True
             | ...
 
-This aggregates across the ``feats`` dimension, to determine if any of the features had any alias that matched something in our list. As you can see, we indeed found
+This aggregates across the ``feats`` dimension, to determine if any of the features had any alias that matched something in our list. Indeed, we found
 matches for the targets.
 
-Now that we have found this result, we will use the Match function to find which genes match to these non-matched targets::
+We will use the Match function to find which genes match to these non-matched targets (we could also have done this directly of course, but that would have prevented us from introducing some operations). 
+Using Flat, we flatten the gene alias list, and then apply Match as we did before::
 
     >>> nonmatched_feats = nonmatched |Match(_.target, _.gene_aliases.Each(str.upper))| yeast_feats.Flat()
     >>> nonmatched_feats
@@ -319,15 +318,13 @@ Now that we have found this result, we will use the Match function to find which
             | MALS                            | S000003524                      | ORF                             | Verified                        | YGR292W                        
             | ...                             | ...                             | ...                             | ...                             | ...    
 
-This shows a possible reason due to which some of these targets do not have an offical name, as a couple of them match to multiple genomic features.
+This shows a possible reason why some of these targets do not have an offical name, as they match to multiple genomic features. However, other targets
+only have a single corresonding genomic feature, and could have been linked. To improve our mapping, we decide to redo our match, and include rows 
+that have a unique ``gene_alias`` match. Our strategy is as follows:
 
-To improve our mapping, we decide to redo our match, and include rows that have a uniuqe ``gene_alias`` match. Our strategy is as follows:
-
-1. Filter out gene_aliases that occur multiple times
-2. Convert yeastract targets names that match to the remaining gene_aliases, to the corresponding feat_names
+1. Filter out gene_aliases that occur multiple times, as we only want unique matches
+2. Convert yeastract targets names that match to gene_aliases to the corresponding feat_names
 3. Rematch the data. 
-
-
 
 
 First, we determine what names need to be filtered, and filter these from the gene_aliases::
@@ -335,14 +332,14 @@ First, we determine what names need to be filtered, and filter these from the ge
 
     >>> name_alias_list = yeast_feats[_.gene_aliases |In| unique_gene_aliases]
 
-The first command first flattens the nested gene alias lists to get a flat table (If there were would have been more than one nested list 
+The first command flattens the nested gene_alias lists, to get a flat table (If there were would have been more than one nested list 
 dimension, we would have had to specify `yeast_feats.Flat(_.gene_aliases)`). 
 
 Next, we group the data on common gene_aliases, and then remove those gene_aliases that have more than more than one associated feat_name. 
 
 Subsequently, we filter the yeast_feats table, such that we only keep the gene_aliases that are in the list of unique gene aliases. 
 
-Next, we convert the yeastract names that occur in the gene_aliases. This can be done using the ``TakeFrom`` command::
+In the second step, we convert the yeastract names that occur in the gene_aliases. This can be done using the ``TakeFrom`` command::
     >>> convert_table = name_alias_list.Get(_.gene_aliases.Each(str.upper), _.feat_name).Flat()
     
     >>> yeastract = yeastract.To(_.target, Do=_.Each(str.upper).TakeFrom(convert_table, keep_missing=True))
@@ -356,7 +353,7 @@ Now we can redo our match, as we did before::
 
 
 Counting again the number of yeastract rows that could be matched, we find::
-    >>> (yeastract |Except| tf_feat.Get(_.trans_factor, _.target)).Count()
+    >>> (yeastract |Except| tf_feat.Get(*yeastract.Names)).Count()
     Slices: | trans_factor | target
     -------------------------------
     Type:   | int64        | int64
@@ -364,10 +361,26 @@ Counting again the number of yeastract rows that could be matched, we find::
     Data:   |              |
             | 6            | 6
 
-Thus, 66 additional rows have been matched. 
+Thus, 72 - 6 = 66 additional rows in yeastract have been matched. 
 
-Chromosome distribution
-~~~~~~~~~~~~~~~~~~~~~~~
+Short version
+^^^^^^^^^^^^^
+
+To obtain directly the results of the last section, do::
+
+    #remove non-unique gene_aliases
+    >>> name_alias_list = yeast_feats[_.gene_aliases |In| _.Flat().GroupBy(_.gene_aliases)[Count(_.feat_name) == 1].gene_aliases]
+    
+    #convert yeastract target names that match to gene_aliases, to the corresponding feat_names
+    >>> convert_table = name_alias_list.Get(_.gene_aliases.Each(str.upper), _.feat_name).Flat()
+    >>> yeastract = yeastract.To(_.target, Do=_.Each(str.upper).TakeFrom(convert_table, keep_missing=True))
+
+    >>> tf_feat = yeastract |Match(_.target.Each(str.upper), _.feat_name.Each(str.upper))| yeast_feats
+
+
+Save dataset
+~~~~~~~~~~~~
+
 First, we save the current dataset. This can be done using::
 
     >>> Save(tf_feat, 'tf_feat.dat')
@@ -377,6 +390,8 @@ The data can be loaded again using::
     >>> tf_feat = Load('tf_feat.dat')
 
 
+Chromosome distribution
+~~~~~~~~~~~~~~~~~~~~~~~
 We start with determining for each transcription factor the number of targets per chromosome. To do this, we use a two-dimensional group, grouping both on transcription factor
 and chromosome, and counting the number of targets per transcription_factor / chromosome pair::
 
@@ -413,10 +428,9 @@ To calculate now a correlation correlation between transcription factors, based 
     >>> Corr(res.count)
 
 However, the resulting correlations are positively biased as we did not control for the different numbers of genes on each chromosome.
-Therefore, we normalize the count data first by dividing by the total number of targets per chromosome::
+To normalize the count data, we divide by the total number of targets per chromosome::
     
-    >>> normchrom_counts = res.count.Cast("real64") / res.count.Sum("gtrans_factor")
-    >>> Corr(normchrom_counts)
+    >>> Corr(res.count.Cast("real64") / res.count.Sum("gtrans_factor").count)
     Slices: | count                                                                                                                                                  
     -----------------------------------------------------------------------------------------------------------------------------------------------------------------
     Type:   | real64                                                                                                                                                 
@@ -441,154 +455,115 @@ Therefore, we normalize the count data first by dividing by the total number of 
 Note that we first cast to double, as integer division will only result in whole integers. We sum along the `gtrans_factor` dimension to determine the number of targets
 per chromosome. The division operator knows on which dimension it should divide and how it should broadcast, as it can use the dimension identities. 
 
+As you can see, a square matrix is calculated with all correlation coefficients. What if we now want to calculate a correlation between chromosomes instead? We
+first normalize by dividing by the total targets per transcription factor, and then perform the correlation on the transposed matrix::
 
-
-
-
-As you can see, a square matrix is calculated with all correlation coefficients. What if we now want to calculate a correlation between chromosomes instead?::
-    >>> normchrom_counts = res.count.Cast("real64") / res.count.Sum("gtrans_factor")
-    >>> Corr(res.count.Transpose())
-    Slices: | count                                                                                                                                                                    
-    -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    Type:   | real64                                                                                                                                                                   
-    Dims:   | gchromosome:*<gchromosome:*                                                                                                                                              
-    Data:   |                                                                                                                                                                          
-            | [ 1.          0.89794002  0.9010322   0.88750552  0.88835388  0.87571585;   0.90482509  0.87475769  0.89191886  0.86099942  0.8941382   0.89517086;   0.0478764   0.8541~
-            | [ 0.89794002  1.          0.9522306   0.93640212  0.93131438  0.94136578;   0.91872408  0.93151153  0.97403148  0.9407366   0.91162125  0.9375463;   0.09015854  0.91941~
-            | [ 0.9010322   0.9522306   1.          0.97481982  0.95779989  0.96366473;   0.94670432  0.96283067  0.94969844  0.96663783  0.94634064  0.9705861;   0.07341518  0.91507~
-            | [ 0.88750552  0.93640212  0.97481982  1.          0.94343915  0.95542594;   0.93340581  0.96223144  0.94080503  0.95758314  0.94135692  0.96550212;   0.07373773  0.8979~
-            | [ 0.88835388  0.93131438  0.95779989  0.94343915  1.          0.95198183;   0.94894526  0.95801655  0.94905974  0.94857988  0.94038115  0.95604521;   0.05784699  0.8935~
-            | [ 0.87571585  0.94136578  0.96366473  0.95542594  0.95198183  1.;   0.92715493  0.95535543  0.94584436  0.95664342  0.92404194  0.94985628;   0.09451878  0.89830133  0.~
-            | [ 0.90482509  0.91872408  0.94670432  0.93340581  0.94894526  0.92715493;   1.          0.93897798  0.92797838  0.91586707  0.92713411  0.95517812;   0.06729443  0.8927~
-            | [ 0.87475769  0.93151153  0.96283067  0.96223144  0.95801655  0.95535543;   0.93897798  1.          0.94242741  0.95495536  0.94368535  0.96420902;   0.0483322   0.8920~
-            | [ 0.89191886  0.97403148  0.94969844  0.94080503  0.94905974  0.94584436;   0.92797838  0.94242741  1.          0.95004305  0.92081038  0.94154646;   0.07403729  0.9210~
-            | [ 0.86099942  0.9407366   0.96663783  0.95758314  0.94857988  0.95664342;   0.91586707  0.95495536  0.95004305  1.          0.92405937  0.94925448;   0.07162337  0.9030~
-            | [ 0.8941382   0.91162125  0.94634064  0.94135692  0.94038115  0.92404194;   0.92713411  0.94368535  0.92081038  0.92405937  1.          0.94417153;   0.05994558  0.8858~
-            | [ 0.89517086  0.9375463   0.9705861   0.96550212  0.95604521  0.94985628;   0.95517812  0.96420902  0.94154646  0.94925448  0.94417153  1.;   0.07112272  0.88703263  0.~
-            | [ 0.0478764   0.09015854  0.07341518  0.07373773  0.05784699  0.09451878;   0.06729443  0.0483322   0.07403729  0.07162337  0.05994558  0.07112272;   1.          0.0832~
-            | [ 0.85419801  0.91941182  0.91507757  0.89795194  0.89359741  0.89830133;   0.8927235   0.89203255  0.92109235  0.90301833  0.88589314  0.88703263;   0.08322617  1.    ~
+    >>> chr_normtf = res.To(_.count, Do=_.Cast("real64") / _.count.Sum("gchromosome"))
+    >>> Corr(chr_normtf.count.Transpose())
+    Slices: | count                                                                                                                     
+    ------------------------------------------------------------------------------------------------------------------------------------
+    Type:   | real64                                                                                                                    
+    Dims:   | gchromosome:*<gchromosome:*                                                                                               
+    Data:   |                                                                                                                           
+            | [ 1.          0.03923059 -0.04462679 -0.04095488 -0.07967297  0.15137151;   0.07687509 -0.03606974 -0.07361156 -0.0433545~
+            | [ 0.03923059  1.         -0.11188931 -0.01870759 -0.14574641  0.33008009;  -0.16066959 -0.03152373  0.06936447 -0.0485143~
+            | [-0.04462679 -0.11188931  1.         -0.13657844 -0.11330372 -0.08524838;   0.06324146 -0.19655547 -0.17755139  0.1707482~
+            | [-0.04095488 -0.01870759 -0.13657844  1.         -0.14262329 -0.10862002;  -0.16384278 -0.08640234 -0.20092264 -0.2123649~
+            | [-0.07967297 -0.14574641 -0.11330372 -0.14262329  1.         -0.05929658;  -0.13892804 -0.12049258 -0.13792648 -0.0087695~
+            | [ 0.15137151  0.33008009 -0.08524838 -0.10862002 -0.05929658  1.;  -0.19181151 -0.15118885  0.08037876 -0.11170856 -0.170~
+            | [ 0.07687509 -0.16066959  0.06324146 -0.16384278 -0.13892804 -0.19181151;   1.          0.05264461  0.15371278  0.0332715~
+            | [-0.03606974 -0.03152373 -0.19655547 -0.08640234 -0.12049258 -0.15118885;   0.05264461  1.         -0.20148438 -0.1066510~
+            | [-0.07361156  0.06936447 -0.17755139 -0.20092264 -0.13792648  0.08037876;   0.15371278 -0.20148438  1.         -0.0583490~
+            | [-0.04335456 -0.04851435  0.17074828 -0.21236499 -0.00876959 -0.11170856;   0.03327151 -0.10665103 -0.05834909  1.       ~
+            | [-0.06679718 -0.18103018 -0.18679103  0.03853411  0.02583352 -0.17084297;  -0.16592298 -0.08229363 -0.21797934 -0.1814246~
+            | [-0.06091041 -0.19461361 -0.15352177 -0.11909199 -0.15047679 -0.07791267;  -0.01086654 -0.09348471  0.01221415 -0.1780629~
+            | [ 0.00375829  0.05897814  0.00921063  0.0324667  -0.00383316  0.02390791;   0.02505551 -0.01051652 -0.07514931 -0.0357086~
+            | [-0.01192451 -0.06100544 -0.07468588 -0.07741828 -0.1110399  -0.1256938;  -0.05487917  0.11389759  0.02129484  0.10186774~
+            | ... 
 
 For this we use the ``Transpose`` operation, which can be used to reorder the dimensions of slices. Of course, from this matrix it is hard to identify which columns/rows correspond to which chromosome.
-So we would like to order on chromosome number. As it is currently a bytes type, the ``Sort`` operation would perform an alphabetic ordering which is not what we want. So, we cast it to an integer type::
+So we would like to order on chromosome number. As chromosome is currently a bytes type, the ``Sort`` operation would perform an alphabetic ordering. We therefore
+convert chromosome to an integer (allowing for missing values, as not all genes have an associated chromosome) before sorting::
+
+    >>> chr_normtf.Sort(_.chromosome.Cast("int?")).Get(_.chromosome, Corr(_.count.Transpose()/"chromo_corr")).Show()
+    Slices: | chromosome    | chromo_corr                                                                                                                                     
+    --------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+    Type:   | int64?        | real64?                                                                                                                                         
+    Dims:   | gchromosome:* | gchromosome:*<gchromosome:*                                                                                                                     
+    Data:   |               |                                                                                                                                                 
+            | 1             | [1.0 0.0392305859056 -0.0119245063359 -0.0736115605627 0.126794737292;  0.0828449457975 -0.0446267914596 -0.0667971839521 0.0768750883472;  -0.~
+            | 2             | [0.0392305859056 1.0 -0.0610054408293 0.069364465012 0.00176664423332;  -0.0648967053241 -0.111889306527 -0.181030176875 -0.160669588901;  -0.1~
+            | 3             | [-0.0119245063359 -0.0610054408293 1.0 0.0212948400421 0.137105024317;  0.040951946291 -0.0746858789864 -0.136588616096 -0.0548791659491;  -0.1~
+            | 4             | [-0.0736115605627 0.069364465012 0.0212948400421 1.0 0.109860736686;  0.0822441736783 -0.177551393828 -0.217979339847 0.153712776242;  -0.13792~
+            | 5             | [0.126794737292 0.00176664423332 0.137105024317 0.109860736686 1.0;  0.203198536954 -0.0357373652455 -0.23231214159 -0.0247653270345;  -0.01625~
+            | 6             | [0.0828449457975 -0.0648967053241 0.040951946291 0.0822441736783;  0.203198536954 1.0 -0.0202264350435 -0.11125475417 -0.0138921581198;  -0.047~
+            | 7             | [-0.0446267914596 -0.111889306527 -0.0746858789864 -0.177551393828;  -0.0357373652455 -0.0202264350435 1.0 -0.186791033472 0.0632414609691;  -0~
+            | 8             | [-0.0667971839521 -0.181030176875 -0.136588616096 -0.217979339847;  -0.23231214159 -0.11125475417 -0.186791033472 1.0 -0.165922975268;  0.02583~
+            | 9             | [0.0768750883472 -0.160669588901 -0.0548791659491 0.153712776242;  -0.0247653270345 -0.0138921581198 0.0632414609691 -0.165922975268 1.0;  -0.1~
+            | 10            | [-0.0796729677666 -0.145746411585 -0.111039896564 -0.137926483313;  -0.0162510011049 -0.0471924113471 -0.113303722071 0.0258335246367;  -0.1389~
+            | 11            | [0.151371512687 0.330080094412 -0.12569380041 0.0803787562745;  0.215208353694 0.069267205163 -0.0852483767543 -0.170842971844;  -0.19181151482~
+            | 12            | [-0.0433545580052 -0.048514346702 0.101867737225 -0.0583490943535;  0.00349728862612 0.0928809373801 0.170748282214 -0.181424654113;  0.0332715~
+            | 13            | [0.0984893827189 -0.0649125722394 -0.0498315789475 -0.0299329134474;  0.201054942739 0.143592852561 -0.0271264696499 -0.205023822594;  0.179569~
+            | 14            | [-0.0360697420734 -0.0315237313111 0.113897592107 -0.201484376028;  -0.187782203257 -0.182313717367 -0.196555466146 -0.0822936292235;  0.052644~
+            | 15            | [-0.0609104133205 -0.194613609877 -0.0966953240163 0.0122141518555;  -0.112996020284 -0.0504902614406 -0.15352176825 -0.154372238875;  -0.01086~
+            | 16            | [-0.0409548824216 -0.0187075856301 -0.0774182808418 -0.20092264034;  -0.117518827147 -0.072661793534 -0.136578435161 0.0385341077911;  -0.16384~
+            | 17            | [0.0404627721039 0.078285703677 -0.0464339341667 -0.0313786020908;  -0.0676937374275 0.129106527976 -0.0483567167497 -0.00501764528626;  0.0048~
+            | --            | [0.00375829063026 0.0589781371356 0.0190755740297 -0.0751493121398;  0.0134731513957 0.0904799039122 0.00921063035375 -0.0219148554581;  0.0250~
+
+
+We plot the results using::
     
-    >>> res = res.To(_.chromosome, Do=_.Cast("int?"))
+    res = chr_normtf.Sort(_.chromosome.Cast("int?")).Get(_.chromosome, Corr(_.count.Transpose()/"chromo_corr"))
+    imshow(res.chromo_corr(), interpolation='nearest')
+    xticks(Pos(res.chromosome)(), res.chromosome())
+    yticks(Pos(res.chromosome)(), res.chromosome())
+    colorbar()
+    show()    
 
-Next, we ``Sort`` the data on chromosome number, and then calculate the correlation, showing both chromosome number and correlation slice::
+.. image:: chromo_corr.png
 
-    >>> res.Sort(_.chromosome).Get(_.chromosome, Corr(_.count.Transpose()/"chromo_corr")).Show()
-    Slices: | chromosome    | chromo_corr                                                                                                                                              
-    -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-    Type:   | int32?        | real64?                                                                                                                                                  
-    Dims:   | gchromosome:* | gchromosome:*<gchromosome:*                                                                                                                              
-    Data:   |               |                                                                                                                                                          
-            | 1             | [1.0 0.897940020734 0.854198008099 0.89191885686 0.9054486057;  0.847700761107 0.901032202462 0.894138196259 0.904825094876 0.888353880838;  0.875715852~
-            | 2             | [0.897940020734 1.0 0.919411822605 0.974031484327 0.921561322359;  0.903932265285 0.952230596519 0.911621246046 0.918724075112 0.93131438346;  0.9413657~
-            | 3             | [0.854198008099 0.919411822605 1.0 0.921092346661 0.887224003105;  0.882968908511 0.915077574905 0.885893140026 0.892723501095 0.893597408111;  0.898301~
-            | 4             | [0.89191885686 0.974031484327 0.921092346661 1.0 0.932660005081;  0.899203041744 0.949698439024 0.920810377233 0.927978380412 0.949059735695;  0.9458443~
-            | 5             | [0.9054486057 0.921561322359 0.887224003105 0.932660005081 1.0;  0.884149425526 0.930355325662 0.890784666788 0.934683503715 0.940616915228;  0.91522908~
-            | 6             | [0.847700761107 0.903932265285 0.882968908511 0.899203041744 0.884149425526;  1.0 0.9341103835 0.916102953444 0.902049890891 0.937622750781;  0.92873987~
-            | 7             | [0.901032202462 0.952230596519 0.915077574905 0.949698439024 0.930355325662;  0.9341103835 1.0 0.946340639279 0.946704322698 0.957799890746;  0.96366472~
-            | 8             | [0.894138196259 0.911621246046 0.885893140026 0.920810377233 0.890784666788;  0.916102953444 0.946340639279 1.0 0.927134108999 0.940381149843;  0.924041~
-            | 9             | [0.904825094876 0.918724075112 0.892723501095 0.927978380412 0.934683503715;  0.902049890891 0.946704322698 0.927134108999 1.0 0.94894526088;  0.9271549~
-            | 10            | [0.888353880838 0.93131438346 0.893597408111 0.949059735695 0.940616915228;  0.937622750781 0.957799890746 0.940381149843 0.94894526088 1.0;  0.95198183~
-            | 11            | [0.875715852477 0.941365783875 0.898301329812 0.945844355986 0.915229084942;  0.928739873918 0.963664725752 0.924041936219 0.927154931247 0.9519818303; ~
-            | 12            | [0.860999420572 0.940736601384 0.903018327462 0.950043051223 0.898309825619;  0.931077837874 0.96663782684 0.92405937455 0.915867066669 0.948579877392; ~
-            | 13            | [0.890483734871 0.947971265947 0.89653077661 0.949365125369 0.925409063547;  0.92909231685 0.975192117256 0.935007023899 0.950230753511 0.959563025937; ~
-            | 14            | [0.874757692555 0.93151152716 0.892032546886 0.942427414978 0.906462858776;  0.928214562702 0.962830665329 0.943685349899 0.938977976517 0.958016551185;~
-            | 15            | [0.895170862494 0.937546297182 0.887032632031 0.941546463876 0.926728792948;  0.913203658988 0.970586099908 0.944171525867 0.955178119088 0.956045211742~
-            | 16            | [0.887505518635 0.936402117242 0.897951938723 0.940805029861 0.905165349958;  0.920197445731 0.974819815867 0.94135692062 0.93340580682 0.943439150747; ~
-            | 17            | [0.320441396715 0.434059532382 0.39111506662 0.374280121929 0.346409832854;  0.385450229121 0.365643846425 0.371215994602 0.312121467777 0.308091894183;~
-            | --            | [0.0478763953923 0.09015853553 0.0832261725262 0.0740372911537;  0.0609880189341 0.132869014898 0.0734151794607 0.0599455812233;  0.067294433364 0.05784~
 
-We see that chromosome number 17 has a relatively low correlation. Is this due to a low number of targets on this chromosome?::
 
-    >>> res.Get(_.chromosome, _.count.Sum("gtrans_factor")).Show()
-    Slices: | chromosome    | count
-    ---------------------------------------
-    Type:   | int32?        | int32
-    Dims:   | gchromosome:* | gchromosome:*
-    Data:   |               |
-            | 1             | 834
-            | 2             | 3274
-            | 7             | 4300
-            | 16            | 3512
-            | 10            | 2990
-            | 11            | 2491
-            | 9             | 1901
-            | 14            | 3025
-            | 4             | 6014
-            | 12            | 4135
-            | 8             | 2402
-            | 15            | 4341
-            | --            | 11
-            | 3             | 1442
-            | 13            | 3624
-            | 6             | 1034
-            | 5             | 2672
-            | 17            | 73
-
-Indeed it seems that the low number of targets is the cause. Note that we give ``Sum`` the dimension 
-accross which it has to sum the results, as normally it would take the last dimension, and calculate a 
-Sum for each transcription factor, which is not what we want. 
+Transcription factor specificity
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 As last step, we like to calculate to what extent transcription factors target specific chromosomes. 
 
-Our first approach calculates this using::
+First, we obtain a dataset that is normalized for counts per chromosome::
+    >>> chr_normchr = res.To(_.count, Do=_.Cast("real64") / _.count.Sum("gtrans_factor"))
 
-    >>> res.count.Sort().Sum("gtrans_factor")
-    Slices: | count
-    -----------------------
-    Type:   | int32
-    Dims:   | gchromosome:*
-    Data:   |
-            | 1
-            | 72
-            | 634
-            | 948
-            | 1279
-            | 1657
-            | 1986
-            | 2281
-            | 2546
-            | 2790
-            | 3020
-            | 3292
-            | 3551
-            | 3813
-            | ...
+Next, we group for each TF the chromosome counts from low to high. Subsequently, we 
+sum across the rows, for all transcription factors, to get the following result::
 
-That is, we sort the counts for each transcription factor, and then sum the most visited chromosome for each transcription factor,
-the second most visited, and so on. 
-
-However, this does not control for the fact that some chromosomes have much more targets than others. So, Now we can finish::
-
-    >>> normalized_counts.Sort().Sum("gtrans_factor").Show()
+    >>> chr_normtf.count.Sort().Sum("gtrans_factor")
     Slices: | count          
     -------------------------
     Type:   | real64         
     Dims:   | gchromosome:*  
     Data:   |                
-            | 0.0299760191847
-            | 0.204644460173 
-            | 0.556406790278 
-            | 0.65490950643  
-            | 0.718375717458 
-            | 0.777312026173 
-            | 0.83069212706  
-            | 0.886076633193 
-            | 0.928012809055 
-            | 0.962799237777 
-            | 1.00445068188  
-            | 1.05156749621  
-            | 1.10260676947  
-            | 1.16260229285  
-            | 1.22164191558  
-            | 1.30508535495  
-            | 1.47473492256  
-            | 3.12810523972  
-    
+            | 0.0300120048019
+            | 0.19843303089  
+            | 0.55413076386  
+            | 0.653791379541 
+            | 0.718104362671 
+            | 0.776878372718 
+            | 0.829423749173 
+            | 0.885342987674 
+            | 0.927864695259 
+            | 0.962609282328 
+            | 1.00208988772  
+            | 1.05152541613  
+            | 1.1006070164   
+            | 1.15928017163  
+            | 1.22155081093  
+            | 1.30419432548  
+            | 1.50241732864  
+            | 3.12174441416
+
 It seems that indeed there is some chromosome specificness for transcription factors
-(although making this a hard conclusion would probably require a permutation analysis). 
+(although making this a hard conclusion would probably require a permutation analysis). Try
+for yourself to see if the effect persists if you remove all transcription factors with less than 20 
+targets from the data. 
 
 We plot the results using matplotlib::
 
@@ -602,4 +577,29 @@ We plot the results using matplotlib::
 
 
 .. image:: chromo_spec.png
+
+Summary
+~~~~~~~
+To directly get the results, do::
+    
+    #data import
+    >>> yeast_feats = Get.yeast.genomic_feats()
+    >>> yeastract = Get.yeast.yeastract()
+    
+    #structurize data
+    >>> res = yeastract |Match(_.target.Each(str.upper), _.feat_name.Each(str.upper))| yeast_feats
+    >>> res = res.GroupBy(_.trans_factor, _.chromosome)
+    >>> res = res.Get(_.trans_factor, _.chromosome, _.target.Count()/"count", _.start).Copy()
+    
+    #tf similarity
+    >>> chr_normchr = res.To(_.count, Do=_.Cast("real64") / _.count.Sum("gtrans_factor"))
+    >>> chr_normchr.Get(_.trans_factor, Corr(_.count))
+    
+    #chromosome similarity, sorted on chromosome
+    >>> chr_normtf = res.To(_.count, Do=_.Cast("real64") / _.count.Sum("gchromosome"))
+    >>> chr_normtf.Sort(_.chromosome.Cast("int?")).Get(_.chromosome, Corr(_.count.Transpose()/"chromo_corr")).Show()
+
+    #tf specificity
+    >>> chr_normtf.count.Sort().Sum("gtrans_factor")
+
 

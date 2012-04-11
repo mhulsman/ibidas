@@ -79,6 +79,9 @@
 
 0.1.14
 - blacklist numpy 1.6.0 (http://projects.scipy.org/numpy/ticket/1870)
+
+0.1.15
 - bug fix in determining which parent dims a dependent dims depends on
-- add transposer optimization step. Optimizes some filter/group/.. operations on matrices with nested vectors 
+- Argsort/Rank now do not take missing attribute from input slice
+- add transposer optimization step. Currently optimizes some filter/group/.. operations on matrices with nested vectors 
   that depend only on one dimension of the matrix.
