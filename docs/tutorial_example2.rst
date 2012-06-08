@@ -511,8 +511,9 @@ convert chromosome to an integer (allowing for missing values, as not all genes 
             | --            | [0.00375829063026 0.0589781371356 0.0190755740297 -0.0751493121398;  0.0134731513957 0.0904799039122 0.00921063035375 -0.0219148554581;  0.0250~
 
 
-We plot the results using::
+We plot the results using matplotlib::
     
+    >>> from matplotlib.pylab import *
     res = chr_normtf.Sort(_.chromosome.Cast("int?")).Get(_.chromosome, Corr(_.count.Transpose()/"chromo_corr"))
     imshow(res.chromo_corr(), interpolation='nearest')
     xticks(Pos(res.chromosome)(), res.chromosome())

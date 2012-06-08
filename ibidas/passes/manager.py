@@ -41,11 +41,11 @@ class PassManager(object):
         self.objs.append(objcls)
         self.params.append((args,kwargs))
 
-    def run(self, query):
+    def run(self, query, log=False):
         """Performs registered passes on query, by
         performing a stable topological sort."""
 
-        return PassManagerRun(self, query, self.log).run()
+        return PassManagerRun(self, query, self.log or log).run()
 
 
 class PassManagerRun(object):

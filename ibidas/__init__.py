@@ -2,7 +2,7 @@
 The ibidas module contains all main functions for working with ibidas objects.
 """
 
-__all__ = ["Rep","Read","Connect","_","CyNetwork",'Unpack',
+__all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack',
            "Array","Tuple","Combine","HArray",
            "Stack","Intersect","Union","Except","Difference",
            "Pos","Argsort","Rank","IsMissing","CumSum",
@@ -74,7 +74,7 @@ HArray = repops.delayable(nsources=UNDEFINED)(repops_slice.HArray)
 Tuple = repops.delayable(nsources=UNDEFINED)(repops_slice.Tuple)
 Array = repops.delayable()(repops_dim.Array)
 
-def Read(url, **kwargs):
+def Import(url, **kwargs):
     format = kwargs.pop('format','tsv')
 
     if(format == 'tsv'):
@@ -91,6 +91,7 @@ def Read(url, **kwargs):
         return read_psimi(url, **kwargs)
     else:
         raise RuntimeError("Unknown format specified")
+Read = Import
 
 def Connect(url, **kwargs):
     format = kwargs.pop('format','db')
