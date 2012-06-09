@@ -23,7 +23,7 @@ Unfortunately, similar to yeastract, also this file comes without fieldnames, so
                           start=bytes, stop=bytes, strand=bytes[1], genetic_pos=bytes, coordinate_version=bytes[10], 
                           sequence_version=bytes, description=bytes)"""
 
-    res = Read(Fetch("http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab"),dtype=rtype)
+    res = Read(Fetch("http://downloads.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"),dtype=rtype)
 
 Note that, instead of specifying the type, we could also just have named the slicees that were needed, for example using::
 

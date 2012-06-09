@@ -118,24 +118,24 @@ class NestedArray(object):
                 else:
                     ndata = numpy.concatenate(res)
             else:
-                if(cdepth == 1):
-                    r = []
-                    for elem in cdata:
-                        r.extend(elem)
-                    ndata = util.darray(r,dtype,1,1)
-                else:
-                    res = []
-                    for elem in cdata:
-                        #check that elem shape is not smaller or larger than expected 
-                        if(not isinstance(elem,numpy.ndarray)):
-                            elem = util.darray(list(elem),dtype,cdepth,cdepth)
-                        else:
-                            elem = validate_array(elem,cdepth,dtype)
-                        res.append(elem)
-                    if not res:
-                        ndata = util.darray([])
+                #if(cdepth == 1):
+                #    r = []
+                #    for elem in cdata:
+                #        r.extend(elem)
+                #    ndata = util.darray(r,dtype,1,1)
+                #else:
+                res = []
+                for elem in cdata:
+                    #check that elem shape is not smaller or larger than expected 
+                    if(not isinstance(elem,numpy.ndarray)):
+                        elem = util.darray(list(elem),dtype,cdepth,cdepth)
                     else:
-                        ndata = numpy.concatenate(res)
+                        elem = validate_array(elem,cdepth,dtype)
+                    res.append(elem)
+                if not res:
+                    ndata = util.darray([])
+                else:
+                    ndata = numpy.concatenate(res)
 
 
             if(variable):

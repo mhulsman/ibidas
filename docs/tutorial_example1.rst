@@ -24,7 +24,7 @@ This data contains protein-DNA interactions that have been curated from literatu
 
 To get the data into Ibidas we perform the following operations::
 
-    >>> url = "http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"
+    >>> url = "http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20111009.tsv.gz"
     >>> yeastract = Read(Fetch(url))
 
 ``Fetch`` is an operation that takes a url, downloads the file to the data directory (default ~/.ibidas/data/),
@@ -129,7 +129,7 @@ adding the yeastract data resource yourself, would have required the following c
 
     from ibidas import *
 
-    def yeastract(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"):
+    def yeastract(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20111009.tsv.gz"):
         """Downloads documented transcription factor regulation interactions from yeastract"""
 
         res = Read(Fetch(url),dtype="[tftargets:*]<(trans_factor=bytes, target=bytes)")

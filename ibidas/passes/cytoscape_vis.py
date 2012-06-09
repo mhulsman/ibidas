@@ -7,7 +7,7 @@ import create_graph
 from ..utils.multi_visitor import VisitorFactory, DirectVisitorFactory, NF_ELSE
 from ..utils import util
 import xmlrpclib
-
+from ibidas.utils.config import config
 _delay_import_(globals(),"..representor")
 
 networkid = util.seqgen().next
@@ -16,12 +16,12 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
 
     after = set([create_graph.CreateGraph])
     @classmethod
-    def run(cls, query, run_manager):
+    def run(cls, query, run_manager, portnumber=config.get('debug.cytoscape_port_number',9000)):
         self = cls()
         self.rand = random.randint(0,10000000)
         self.graph = run_manager.pass_results[create_graph.CreateGraph]
         self.graph.pruneGraph()
-        self.server = xmlrpclib.ServerProxy("http://localhost:9000").Cytoscape
+        self.server = xmlrpclib.ServerProxy("http://localhost:" + str(portnumber)).Cytoscape
         self.network = self.server.createNetwork("network" + str(networkid()))
         
         self.unique_names = defaultdict(int)

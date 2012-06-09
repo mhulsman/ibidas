@@ -8,7 +8,7 @@ from ibidas import *
 class TestTutorial(unittest.TestCase):
     
     def test_yeastract_inoutdegree(self):
-        url = "http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"
+        url = "http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20111009.tsv.gz"
         yeastract = Read(Fetch(url))
         
         str(yeastract)
@@ -34,7 +34,7 @@ class TestTutorial(unittest.TestCase):
 
 
     def test_yeastract_inoutdegreeb(self):
-        def yeastract2(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"):
+        def yeastract2(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20111009.tsv.gz"):
             """Downloads documented transcription factor regulation interactions from yeastract"""
 
             res = Read(Fetch(url),dtype="[tftargets:*]<(trans_factor=bytes, target=bytes)")
@@ -50,7 +50,7 @@ class TestTutorial(unittest.TestCase):
                 start=bytes, stop=bytes, strand=bytes[1], genetic_pos=bytes, coordinate_version=bytes[10],
                 sequence_version=bytes, description=bytes)"""
 
-        res = Read(Fetch("http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab"),dtype=rtype)
+        res = Read(Fetch("http://downloads.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"),dtype=rtype)
 
         resx = res/{'f3': 'feat_name', 'f8':'chromosome', 'f9':'start'}
         str(resx)
@@ -74,7 +74,7 @@ class TestTutorial(unittest.TestCase):
         tf_feat = yeastract.Match(yeast_feats, _.target, _.feat_name)
         str(tf_feat)
 
-        self.assertTrue((yeastract.target.Count() - tf_feat.target.Count()) == 72)
+        self.assertTrue((yeastract.target.Count() - tf_feat.target.Count()) == 74)
 
         nonmatched = (yeastract.target.Set() - tf_feat.target.Set()).Elem()
         str(nonmatched)

@@ -20,7 +20,7 @@ predefined_sources = Pre()
 ############################# YEAST ######################################
 def yeast_feats():
     """Returns table of yeast genome features,
-       from:  http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab
+       from:  http://downloads.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab
     """
 
     rtype = """[feats:*]<(sgdid=bytes, feat_type=bytes, feat_qual=bytes, feat_name=bytes, gene_name=bytes, 
@@ -28,7 +28,7 @@ def yeast_feats():
                           start=bytes, stop=bytes, strand=bytes[1], genetic_pos=bytes, coordinate_version=bytes[10], 
                           sequence_version=bytes, description=bytes)"""
     
-    res = Read(Fetch("http://downloads.yeastgenome.org/chromosomal_feature/SGD_features.tab"),dtype=rtype)
+    res = Read(Fetch("http://downloads.yeastgenome.org/curation/chromosomal_feature/SGD_features.tab"),dtype=rtype)
 
     splitfunc = lambda x: x.split("|")
     res = res.To(_.gene_aliases,  Do=_.Each(splitfunc, dtype="[aliases:~]<bytes").Elem()[_ != ""])
@@ -122,7 +122,7 @@ def yeast_chipchip(translator=None):
 predefined_sources.register(yeast_chipchip,name="chipchip_macisaac",category="yeast")  
         
         
-def yeastract(translator=None, url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20101213.tsv.gz"):
+def yeastract(translator=None, url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20111009.tsv.gz"):
     """Downloads documented transcription factor regulation interactions from yeastract"""
     rtype = "[tftargets:*]<(trans_factor=bytes, target=bytes)"
     res = Read(Fetch(url),dtype=rtype)

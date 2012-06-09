@@ -224,9 +224,9 @@ class Representor(Node):
             #print self.__str__(False)
             return [slice.name for slice in self._slices]
 
-    def Copy(self, log=False):
+    def Copy(self, log=False, debug=False):
         res = wrapper.SourceRepresentor()
-        res._initialize(tuple(self._getResultSlices(endpoint=False, log=log)))
+        res._initialize(tuple(self._getResultSlices(endpoint=False, log=log, debug=debug)))
         return res
 
    
@@ -345,9 +345,12 @@ class Representor(Node):
             condition = context._apply(condition, self)
         return repops_multi.Filter(self, condition, dim) 
 
-    def _getResultSlices(self, args={}, endpoint=True, log=False):
+    def _getResultSlices(self, args={}, endpoint=True, log=False, debug=False):
         query = query_context.QueryContext(self, args, endpoint)
-        return tuple(engines.select_engine.run(query, log))
+        if debug:
+            return tuple(engines.debug_engine.run(query, log))
+        else:
+            return tuple(engines.select_engine.run(query, log))
 
     def __call__(self, **args):
         res = self._getResultSlices(args)
