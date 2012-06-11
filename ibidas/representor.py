@@ -353,7 +353,7 @@ class Representor(Node):
             return tuple(engines.select_engine.run(query, log))
 
     def __call__(self, **args):
-        res = self._getResultSlices(args)
+        res = self._getResultSlices(**args)
 
         if(len(res) == 1):
             return res[0].data
@@ -772,9 +772,9 @@ class Representor(Node):
     def TakeFrom(self, other, allow_missing=False,keep_missing=False):
         return repops_multi.Take(other, self, allow_missing,keep_missing)
 
-    def ToPython(self):
+    def ToPython(self, **args):
         """Converts data into python data structure"""
-        return repops_slice.ToPythonRep(self)()
+        return repops_slice.ToPythonRep(self)(**args)
 
     def Sort(self, *slices, **kwargs):
         """Performs sort on data.

@@ -422,6 +422,17 @@ def fill(data, x, pos):
         x[:] = data
 
 def replace_darray(data, type=object, maxdim=1, mindim=0):
+    if maxdim == 1 and type == object:
+        if not check_realseq(data):
+            if mindim == 0:  return data
+            else: raise ValueError, "Object not deep enough"
+        else:
+            nlen = len(data)
+            x = numpy.zeros((nlen,),dtype=type)
+            for pos,e in enumerate(data): #numpy insists on processing the nested data when using x[:] = data, making it really inefficient
+                x[pos] = e
+            return x
+       
     try:
         return cutils.darray(data,type,maxdim,mindim)
     except ValueError:
