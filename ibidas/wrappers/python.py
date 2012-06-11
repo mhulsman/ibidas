@@ -1163,7 +1163,7 @@ def any_tobytes_missing(seq):
     return util.darray(res)
 
 def any_tobytes(seq):
-    res = [str(elem) for elem in seq]
+    res = [str(elem) for elem in seq.astype(object)]
     return util.darray(res)
 
 

@@ -66,7 +66,7 @@ def save_rep(r, filename):
 def save_csv(r, filename):
     f = open(filename,'wb')
     r= r.Array(tolevel=1)
-    data = r.ToPython();
+    data = r.Cast(str).ToPython();
     if filename.endswith('tsv'):
         w = csv.writer(f,delimiter='\t');
     else:
