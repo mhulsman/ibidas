@@ -31,17 +31,22 @@ class To(repops.UnaryOpRep):
         nslices = list(source._slices)
         for ssel in slicesel:
             r = source.Get(ssel) 
-            assert len(r._slices) == 1, "To action can only be applied to single slices"
-            slice = r._slices[0]
-            assert slice in source._slices, "Selected slice in to should not be operated upon"
-            pos = source._slices.index(slice)
+            #assert len(r._slices) == 1, "To action can only be applied to single slices"
+            all_pos = []
+            for slice in r._slices:
+                #slice = r._slices[0]
+                assert slice in source._slices, "Selected slice in to should not be operated upon"
+                pos = source._slices.index(slice)
+                all_pos.append(pos)
 
             if(isinstance(do, context.Context)):
                 r = context._apply(do, r)
             else:
                 r = do(r)
 
-            nslices = nslices[:pos] + list(r._slices) + nslices[(pos+1):]
+            
+            for slice,pos in zip(r._slices, all_pos):
+                nslices[pos] = slice
 
         self._initialize(tuple(nslices))
        
@@ -224,14 +229,17 @@ class SliceRename(repops.UnaryOpRep):
             nslices = [ops.ChangeNameOp(slice,name) 
                     for slice, name in zip(source._slices, names)]
         else:
-            nslices = []
-            for slice in source._slices:
-                if(slice.name in kwds):
-                    nslice = ops.ChangeNameOp(slice,kwds[slice.name])
+            nslices = list(source._slices)
+            for name, newname in kwds.iteritems():
+                sels = [(pos,slice) for pos, slice in enumerate(source._slices) if slice.name == name]
+                if isinstance(newname,tuple):
+                    assert len(newname) == len(sels), 'Number of new names for slice %s does not match number of slices (%d)' % (name, len(sels))
+                    for (pos,slice),nname in zip(sels,newname):
+                        nslices[pos] = ops.ChangeNameOp(slice, nname)
                 else:
-                    nslice = slice
-                nslices.append(nslice)
-                
+                    for (pos,slice) in sels:
+                        nslices[pos] = ops.ChangeNameOp(slice, newname)
+
         return self._initialize(tuple(nslices))
         #}}}
 
@@ -250,15 +258,19 @@ class SliceCast(repops.UnaryOpRep):
                 nslices = [ops.CastOp(slice,rtypes.createType(newtypes[0])) 
                         for slice in source._slices]
         else:
-            nslices = []
-            for slice in source._slices:
-                if(slice.name in kwds):
-                    newtype = rtypes.createType(kwds[slice.name])
-                    nslice = ops.CastOp(slice,newtype)
+            nslices = list(source._slices)
+            for name, newtype in kwds.iteritems():
+                sels = [(pos,slice) for pos, slice in enumerate(source._slices) if slice.name == name]
+                if isinstance(newtype,tuple):
+                    assert len(newtype) == len(sels), 'Number of new types for slice %s does not match number of slices (%d)' % (name, len(sels))
+                    for (pos,slice),ntype in zip(sels,newtype):
+                        ntype = rtypes.createType(ntype)
+                        nslices[pos] = ops.CastOp(slice, ntype)
                 else:
-                    nslice = slice
-                nslices.append(nslice)
-                
+                    for (pos,slice) in sels:
+                        rnewtype = rtypes.createType(newtype)
+                        nslices[pos] = ops.CastOp(slice, rnewtype)
+
         return self._initialize(tuple(nslices))
         #}}}
 

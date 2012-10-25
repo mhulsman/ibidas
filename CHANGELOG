@@ -95,3 +95,7 @@
 0.1.17
 - Windows newline support in tsv parser, and allow overriding delimiter choice
 - Fix bug in Filter optimization introduced in 0.1.16
+- To command can now handle multiple slices simultaneously
+- Rename(fieldname=('f1','f2')) type of command now supported to rename multiple slices with same name
+- Similar support for Cast
+
