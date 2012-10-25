@@ -337,13 +337,13 @@ class farray(numpy.ndarray):
         return res
 
 
-def open_file(filename):
+def open_file(filename,mode='r'):
     filename = os.path.expanduser(filename)
     if(filename.endswith("gz")):
         import gzip
         file = gzip.open(filename)
     else:
-        file = open(filename)
+        file = open(filename,mode=mode)
     return file
 
 

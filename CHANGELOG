@@ -85,3 +85,13 @@
 - Argsort/Rank now do not take missing attribute from input slice
 - add transposer optimization step. Currently optimizes some filter/group/.. operations on matrices with nested vectors 
   that depend only on one dimension of the matrix.
+
+0.1.16
+- language debug / log support
+- update some outdated urls
+- work around some numpy inefficiencies
+- add Import as alias for Read
+
+0.1.17
+- Windows newline support in tsv parser, and allow overriding delimiter choice
+- Fix bug in Filter optimization introduced in 0.1.16

@@ -12,10 +12,10 @@ from ..itypes import detector
 from ..utils import nested_array, util
 
 class TSVRepresentor(wrapper.SourceRepresentor):
-    def __init__(self, filename, dialect=False, skiprows=-1, dtype=rtypes.unknown, fieldnames=None):
-        file = util.open_file(filename)
+    def __init__(self, filename, dialect=False, skiprows=-1, dtype=rtypes.unknown, fieldnames=None, delimiter=None):
+        file = util.open_file(filename,mode='rU')
   
-        reader, dialect = self.getReader(file, dialect)
+        reader, dialect = self.getReader(file, dialect, delimiter=delimiter)
         
         #determine number of rows to skip (e.g. comments)
         if(skiprows == -1):
@@ -79,7 +79,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         file.close()
         self._initialize(tuple(nslices))
 
-    def getReader(self, file, dialect=False):
+    def getReader(self, file, dialect=False, delimiter=None):
         #determine dialect, create csv parser
         if(dialect is False):
             lines = []
@@ -90,7 +90,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                     break
             #sniff last 20 lines
             lines = lines[-20:]
-            dialect = csv.Sniffer().sniff("\n".join(lines))
+            dialect = csv.Sniffer().sniff("\n".join(lines),delimiters=delimiter)
             file.seek(0)
             reader = csv.reader(file, dialect)
         else:
@@ -132,7 +132,7 @@ class TSVOp(ops.ExtendOp):
         ops.ExtendOp.__init__(self,name=name,rtype=rtype)
 
     def py_exec(self):
-        file = util.open_file(self.filename)
+        file = util.open_file(self.filename,mode='rU')
         file.seek(self.startpos)
 
         if(issubclass(self.dialect, csv.Dialect)):

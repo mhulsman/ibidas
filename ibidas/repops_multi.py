@@ -191,9 +191,6 @@ class Filter(repops.MultiOpRep):
         else:
             assert seldimpath, "Filter dimpath is empty"
 
-            if(cslice.dims and isinstance(cslice.type,rtypes.TypeInteger)):
-                cslice = ops.PackArrayOp(cslice)
-
             if(isinstance(cslice.type, rtypes.TypeInteger)):
                 ndim = None
             elif(isinstance(cslice.type, rtypes.TypeArray)):

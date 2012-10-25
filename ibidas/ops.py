@@ -399,7 +399,9 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
         #pack up to and including filter dim
         packdepth = len(slice.dims) - filterpos
         if(packdepth):
-            slice = PackArrayOp(slice,packdepth)
+            tslice = PackArrayOp(slice,packdepth)
+        else:
+            tslice = slice
 
 
         #prepare adaptation of ndim.dependent
@@ -409,7 +411,7 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
                 dep.insert(0,False)
 
         #broadcast to constraint
-        (slice,tconstraint),(splan,cplan) = broadcast([slice,constraint],mode=mode, partial=True)
+        (tslice,tconstraint),(splan,cplan) = broadcast([tslice,constraint],mode=mode, partial=True)
 
         #adapt ndim to braodcast, apply filter
         #FIXME: change dependent dims of slice.type
@@ -419,10 +421,15 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
                 ndep = dimpaths.applyPlan(dep[::-1],cplan,newvalue=True, copyvalue=True, ensurevalue=True)
             else:
                 ndep = dimpaths.applyPlan(dep[::-1],cplan,newvalue=False)
-            xndim = ndim.changeDependent(tuple(ndep[::-1]), slice.dims)
+            xndim = ndim.changeDependent(tuple(ndep[::-1]), tslice.dims)
         else:
+            #optimization: do not broadcast array of integer dim, to later remove it
+            if cplan and cplan[-1] == BCSOURCE:
+                ndim = constraint.dims[-1]
+                constraint = PackArrayOp(constraint)
+                continue
             xndim = ndim
-        slice = FilterOp(slice,tconstraint,xndim,constraint)
+        slice = FilterOp(tslice,tconstraint,xndim,constraint)
 
         #adapt used_dims
         used_dims = dimpaths.applyPlan(used_dims,splan,newvalue=True,copyvalue=True,ensurevalue=True, existvalue=True)
