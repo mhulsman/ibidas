@@ -2,12 +2,20 @@ Ibidas is an environment for data handling and exploration, able to cope with di
 
 Execute from source directory
 =============================
-To run from source, execute: './run'
+To run from source, execute: './run' from the source directory.
+
+If this does not work, you probably do not have the required dependencies installed. 
+Read the package documentation for more details.
 
 
 Installation
 ============
-sudo python setup.py install
+Execute in a terminal:
+
+sudo easy_install ibidas
+
+If this does not work (or you do not have root/sudo access), 
+read the package documentation for more details.
 
 
 Documentation

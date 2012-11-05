@@ -99,3 +99,6 @@
 - Rename(fieldname=('f1','f2')) type of command now supported to rename multiple slices with same name
 - Similar support for Cast
 
+
+0.1.18
+- Add warning for old numpy versions
