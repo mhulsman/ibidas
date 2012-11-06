@@ -30,7 +30,7 @@ if not os.path.isdir('docs/_build'):
 
 setup(
     name="Ibidas",
-    version="0.1.17",
+    version="0.1.18",
     packages = find_packages(),
     test_suite = "test",
     scripts = ['bin/ibidas'],

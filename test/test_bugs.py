@@ -44,3 +44,11 @@ class TestBugs(unittest.TestCase):
         z = Rep((['a','b','b','c'],[[1,2,3,4],[1,2,3,4],[4,3,2,1]]))
         res = z.To(_.f1, Do=_.Transpose()).GroupBy(_.f0).To(_.f1, Do=_.Mean(dim=1)).To(_.f1, Do=_.Transpose()).Filter(slice(0,5),dim=1)
         str(res)
+
+    def test_add_on_matrix_plus_nested(self):
+        data = [([6,2],[0.5]), ([3,4], [0.3,0.4]), ([6,4], [0.8,0.2])]
+        z = Rep(data)
+        str(z.f0 + z.f1)
+        str(z.f1 + z.f0)
+        str(z.f0.Transpose() + z.f1)
+        str(z.f1 + z.f0.Transpose())

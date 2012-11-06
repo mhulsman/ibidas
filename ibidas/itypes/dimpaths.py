@@ -347,7 +347,9 @@ def planBroadcastMatchPos(paths):#{{{
     for pos in xrange(len(plans)):
         plans[pos] = plans[pos][::-1]
     
-    return (bcdims, plans)        #}}}
+    nbcdims = adaptDependentDims(bcdims, plans)
+
+    return (nbcdims, bcdims, plans)        #}}}
 
 def planBroadcastMatchDim(paths):#{{{
     """Matches dims in paths based on their identity, as well
@@ -463,8 +465,26 @@ def planBroadcastMatchDim(paths):#{{{
             for plan in plans:
                 if plan[planpos] == BCCOPY:
                     plan[planpos] = BCSOURCE
+    
+    nbcdims = adaptDependentDims(bcdims, plans)
+             
+    return (nbcdims,bcdims, plans)#}}}
 
-    return (bcdims,plans)#}}}
+def adaptDependentDims(bcdims, plans):    
+    nbcdims = list(bcdims)
+    for pos, bcdim in enumerate(bcdims):
+        if not bcdim.dependent:
+            continue
+        for plan in plans:
+            if not plan[pos] == BCSOURCE:
+                continue
+            dep = bcdim.dependent
+            ndep = applyPlan(list(dep), plan[max(0, pos - len(dep)):pos][::-1], newvalue=False, existvalue=False)
+            while not ndep[-1]:
+                ndep.pop()
+            nbcdim = bcdim.changeDependent(tuple(ndep),nbcdims[max(0, pos - len(ndep)):pos][::-1])
+            nbcdims[pos] = nbcdim
+    return nbcdims
 
 def planBroadcastFromPlan(path, plan, origdims, bcdims):
     plan = plan[::-1]

@@ -18,6 +18,7 @@ __all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack',
            "Fetch","Serve","Get","Alg",
            "Load","Save",'newdim',
            "Invert","Abs", "Negative",
+           "Add","Subtract","Multiply","Modulo","Divide","FloorDivide","And","Or","Xor","Power","Equal","NotEqual","LessEqual","Less","GreaterEqual","Greater","Each",
            ]
 
 from utils import delay_import
@@ -68,6 +69,25 @@ Corr = repops.delayable()(repops_funcs.Corr)
 Invert = repops.delayable()(repops_funcs.Invert)
 Abs = repops.delayable()(repops_funcs.Abs)
 Negative = repops.delayable()(repops_funcs.Negative)
+
+
+Add = repops.delayable()(repops_funcs.Add)
+Subtract = repops.delayable()(repops_funcs.Subtract)
+Multiply = repops.delayable()(repops_funcs.Multiply)
+Modulo= repops.delayable()(repops_funcs.Modulo)
+Divide = repops.delayable()(repops_funcs.Divide)
+FloorDivide = repops.delayable()(repops_funcs.FloorDivide)
+And = repops.delayable()(repops_funcs.And)
+Or = repops.delayable()(repops_funcs.Or)
+Xor = repops.delayable()(repops_funcs.Xor)
+Power = repops.delayable()(repops_funcs.Power)
+Equal = repops.delayable()(repops_funcs.Equal)
+NotEqual = repops.delayable()(repops_funcs.NotEqual)
+LessEqual = repops.delayable()(repops_funcs.LessEqual)
+Less = repops.delayable()(repops_funcs.Less)
+GreaterEqual = repops.delayable()(repops_funcs.GreaterEqual)
+Greater = repops.delayable()(repops_funcs.Greater)
+Each = repops.delayable()(repops_funcs.Each)
 
 
 HArray = repops.delayable(nsources=UNDEFINED)(repops_slice.HArray)

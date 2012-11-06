@@ -236,22 +236,26 @@ def broadcast(slices,mode="pos", partial=False):#{{{
         return ((),())
     slicedimpaths = [s.dims for s in slices]
     if(mode == "dim"):
-        bcdims, bcplan = dimpaths.planBroadcastMatchDim(slicedimpaths)
+        nbcdims, bcdims, bcplan = dimpaths.planBroadcastMatchDim(slicedimpaths)
     elif(mode == "pos"):
-        bcdims, bcplan = dimpaths.planBroadcastMatchPos(slicedimpaths)
+        nbcdims, bcdims, bcplan = dimpaths.planBroadcastMatchPos(slicedimpaths)
     else:
         raise RuntimeError, "Unknown broadcast mode: " + str(mode)
 
     references = defaultdict(list)
-    for bcdim in bcdims:
+    for bcdim,nbcdim in zip(bcdims,bcdims):
         for slice in slices:
             if bcdim in slice.dims:
-                references[bcdim].append(slice)
+                references[nbcdim].append(slice)
 
     nslices = []
     for plan,slice in zip(bcplan,slices):
         slice = apply_broadcast_plan(slice, plan, bcdims, references, partial)
         nslices.append(slice)
+
+    for slice in nslices:
+        #assert slice.dims == nslices[0].dims,'Dimension mismatch in broadcast: ' + str(slice.dims) + ' vs. ' + str(nslices[0].dims)
+        slice.dims = dimpaths.DimPath(*nbcdims) #HACK, we have to make the dims dependent on ids
     return (nslices, bcplan)
     #}}}
 
