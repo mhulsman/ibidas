@@ -35,7 +35,7 @@ setup(
     version="0.1.18",
     packages = find_packages(),
     test_suite = "test",
-    scripts = ['bin/ibidas'],
+    scripts = ['bin/ibidas','bin/ibidas_shell.py'],
     ext_modules = [
         Extension(
     		'closure', 
