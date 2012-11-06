@@ -98,6 +98,8 @@
 - To command can now handle multiple slices simultaneously
 - Rename(fieldname=('f1','f2')) type of command now supported to rename multiple slices with same name
 - Similar support for Cast
+- Handle distributions in which the 'python' interpreter is mapped to python 3.x (assumes 'python2' exists in those cases)
+- Handle errors where develop directory is created, but develop scripts fails
 
 
 0.1.18
