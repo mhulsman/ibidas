@@ -34,7 +34,7 @@ if numpy.version.version == '1.6.0':
 nv = numpy.version.version.split('.')
 if len(nv) ==3:
     try:
-        if int(nv[0]) == 1 and (int(nv[1]) <= 7 or (int(nv[1]) == 4 and int(nv[2]) == 0)):
+        if int(nv[0]) == 1 and (int(nv[1]) <= 3 or (int(nv[1]) == 4 and int(nv[2]) == 0)):
             print 'WARNING: your numpy version (%s) is too old. Some commands will not work. Please update to a newer version.' % numpy.version.version
             print ''
     except ValueError:
@@ -65,7 +65,13 @@ def which(program):
 
     return None
 
-interpreter = which('python2')
+
+cur_version = sys.version_info
+if cur_version[0] >= 3:
+    interpreter = which('python2')
+else:
+    interpreter = None
+
 if interpreter is None:
     interpreter = which('python')
 if interpreter is None:
