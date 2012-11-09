@@ -118,6 +118,15 @@ class ApplyFuncRep(UnaryOpRep):
         return self._initialize(nslices)
 
 
+class Detect(UnaryOpRep):
+    """Detect types
+    """
+
+    def _sprocess(self,source):
+        nslices = tuple([ops.DetectTypeOp(slice) for slice in source._slices])
+        return self._initialize(nslices)
+
+
 def apply_slice(slices, slicecls, dim_selector, *params, **kwds):
     """Applies slice class in `slicecls` to every field in source.
 

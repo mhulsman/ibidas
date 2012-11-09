@@ -532,7 +532,15 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
         if not node.type.has_missing:
             return slice.data.mapseq(lambda x:numpy.cast[dtype](x),res_type=node.type)
         else:
-            raise RuntimeError, "Casting missing values not yet supported"
+            xtype = dtype.type
+            def val(v):
+                try:
+                    return xtype(v)
+                except ValueError:
+                    return Missing
+
+            return slice.data.map(val, res_type=node.type)
+            #raise RuntimeError, "Casting missing values not yet supported"
 
     def caststring_to_int(self, castname, node, slice):
         if(node.type.has_missing):

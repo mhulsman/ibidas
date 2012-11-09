@@ -260,6 +260,7 @@ class Representor(Node):
         return repops_dim.Redim(self, *args, **kwds)
 
     def getSlices(self):
+        self._checkState()
         return list(self._slices)
     Slices=property(fget=getSlices)
 
@@ -272,6 +273,7 @@ class Representor(Node):
     
 
     def getNames(self):
+        self._checkState()
         return [slice.name for slice in self._slices]
     Names=property(fget=getNames)
 
@@ -890,4 +892,15 @@ class Representor(Node):
     def Fields(self, name=None):
         """Unpacks tuple type into slices"""
         return repops_slice.UnpackTuple(self, name)
+
+    def GetRepeatedSliceNames(self):
+        Pos = repops.delayable()(repops_funcs.Pos)
+        Rep = python.Rep
+        self._checkState()
+
+        r = Rep(self.Names).Get(_/'name', Pos()/'pos').GroupBy(_.name)
+        return r[_.pos.Count() > 1].Dict().ToPython()
+        
+        
+            
 

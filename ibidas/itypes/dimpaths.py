@@ -369,7 +369,7 @@ def planBroadcastMatchDim(paths):#{{{
             translate[dim] = [curid]
             curid += 1
             if(dim.name in dimnames and dimnames[dim.name] != dim):
-                raise RuntimeError, "Cannot broadcast, there are different dimensions with same name: " + str(dim.name) + ". Please rename (dim_rename) or state their equivalence."
+                raise RuntimeError, "Cannot broadcast, there are different dimensions with same name: " + str(dim.name) + ". Please rename (DimRename) or state their equivalence."
             dimnames[dim.name] = dim
     
     #broadcast dim mergers

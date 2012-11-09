@@ -2090,3 +2090,4 @@ if(platform.architecture()[0] == "32bit"):
 else:
     TypePlatformInt = TypeInt64
 __typenames__["int"] = TypePlatformInt    
+__typenames__['unknown'] = TypeUnknown

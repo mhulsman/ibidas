@@ -17,7 +17,7 @@ import gc, sys
 import itertools
 import csv
 import cutils
-
+from logging import error,warning,info,debug
 
 #objs: objs to find names for
 #req_objs: objs which should be in same frame
