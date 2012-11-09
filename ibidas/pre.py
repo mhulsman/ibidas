@@ -166,6 +166,11 @@ def in_memory_db():
     return Connect("sqlite:///:memory:");
 predefined_sources.register(in_memory_db)
 
+def file_db(filename):
+    """Returns an empty in memory database"""
+    return Connect("sqlite:///%s" % filename);
+predefined_sources.register(file_db)
+
 
 @util.memoized
 def string(dburl=config.get('databases.string_url',None)):

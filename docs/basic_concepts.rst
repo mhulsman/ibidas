@@ -526,8 +526,8 @@ Note how only dimension ``d2`` remains, dimension ``d1`` has been aggrated over 
 Other functions which can be used in this way include ``Max``, ``Min``, ``Argmax``, ``Argmin``, ``Any``, ``All``, ``CumSum``, ``Mean``, ``Sort``, ``Argsort``, ``Rank`` and ``Std``.
 
 
-Broadcasting
-------------
+Broadcasting on dimension
+-------------------------
 
 We already saw some examples of broadcasting in action. A simple example is this one::
 
@@ -591,6 +591,7 @@ To also divide by the standard deviation, we simply add::
     >>> (r - r.Mean(dim='d1')) / r.Std(dim='d1')
 
 A simple shortcut is::
+    
     >>> Alg.scaling.Whiten(r,dim='d1')
 
 
@@ -614,7 +615,7 @@ First, the ordering of the dimensions. Suppose we have a dataset::
 What happens if we add f0 and f1? ri
 
 
- The first is the case in which dimensions in both operands are available, but not ordered correctly. E.g. can we add something with dimensions ``a<b`` to a slice with dimensions ``b<a``? 
+The first is the case in which dimensions in both operands are available, but not ordered correctly. E.g. can we add something with dimensions ``a<b`` to a slice with dimensions ``b<a``? 
 Ibidas does not reorder dimensions in such cases. So, suppose we have::
 
     >>> r.f0
@@ -647,9 +648,47 @@ Ibidas does not reorder dimensions in such cases. So, suppose we have::
             | [[12  8] [6 7] [12 10]]
             | [[8 4] [7 8] [10  8]]  
 
-Summary::
+(Note that the Transpose operation reverses the dimension ordering)
+
+As you can see, the output is ``b<a<b``. The rules for these types of broadcasting are as follows::
+    * one starts with the rightmost operand, and the last dimension
+    * one maps this dimension where possible to the other operands, taking the first matching dimension up from the most nested dimension. 
+    * next, one maps the next dimension in the rightmost operand. However, one only looks further upward from the last matched dimenson in the other operand. 
+    * if a dimension cannot be matched, it is broadcasted.
+
+E.g. in this case one start with dimension ``d1`` in the right operand, this one is matched to the dimension ``d1`` in the left operand. The next dimension in the
+rightmost operand (``d2``) cannot be matched in the leftmost operand, as there is no more upward dimension than ``d1``, so it is broadcasted. The rightmost operand
+is finished, so we move on to the next operand, and as the first d2 dimension is not yet matched, we broadcast it to the rightmost operand. 
+
+Due to the ordering dependence of operands, this means that one can influence the dimension ordering by rearranging operands. For example::
+    
+    >>> r.f0.Transpose() + r.f0
+    Slices: | f0                  
+    ------------------------------
+    Type:   | int64               
+    Dims:   | d1:3<d2:2<d1:3      
+    Data:   |                     
+            | [[12  9 12] [4 6 6]]
+            | [[9 6 9] [6 8 8]]   
+            | [[12  9 12] [6 8 8]]
+
+Now the ordering is ``a<b<a``. In reality, these situations in which the operand position matters do not occur that often.
 
 
+Summary:
+    * Broadcasting maps dimensions in operands to each other, repeating across dimensions that do not occur in any of the operands
+
+    * Broadcasting does not reorder dimensions. 
+
+    * In some cases, the ordering of the operands can influence the dimension ordering. 
+
+    
+
+Broadcasting on position
+------------------------
+
+Ibidas matches operands normally on dimension identity. In cases these dimensions do not match, they are broadcasted.
+This means that if one has:
 
 
 

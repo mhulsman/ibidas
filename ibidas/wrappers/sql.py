@@ -20,6 +20,8 @@ from ..itypes import rtypes, dimensions, dimpaths
 import python
 from .. import repops_slice
 
+alias_name_id = util.seqgen()
+
 class TypeMapperToSQLAlchemy(VisitorFactory(prefixes=("convert",), #{{{
                                       flags=NF_ELSE)):
     
@@ -112,15 +114,26 @@ class TypeMapperFromSQLAlchemy(VisitorFactory(prefixes=("convert",), #{{{
             typestr += "?"
         
         return rtypes.createType(typestr)
+    
+    def convertelse(self,dbtype,column, deftype="int64"):
+        if isinstance(dbtype, sqlalchemy.dialects.postgresql.base.ARRAY):
+            return self.convertPGArray(dbtype, column)
+        else:
+            warning('Cannot convert database type: %s for column: %s',repr(dbtype), str(column))
+            return self.convertAny(dbtype, column)
 
     def convertPGArray(self, dbtype, column):
         subtype = self.convert(dbtype.item_type, column)
         subtype.has_missing = False
-        typestr = "[~](" + str(subtype)
+        name = util.valid_name(column.name)
+        typestr = ("[%s:~]<" % name) + str(subtype)
+        typestr = ("[%s:~]<" % name) + str(subtype)
         if(column.nullable):
             typestr += "?"
-        typestr += ")"
-        return rtypes.createType(typestr)#}}}
+        #JUST USE unknown: postgresql does not enforce array dimensions, so this messes up our code            
+        #only thing we can do is make it possible to handle 1 dimension, that should take care of most
+        #cases
+        return rtypes.createType('unknown')#}}}
 
 sa_typemapper = TypeMapperFromSQLAlchemy()
 
@@ -130,7 +143,7 @@ def _getPostgresTypes(engine):#{{{
         information on each type in the database"""
     if(not engine in postgres_types):
         res = engine.execute("SELECT oid,typname,typlen,typelem,\
-                                typdefault,typbasetype,typnotnull,typtype \
+                                typdefault,typbasetype,typnotnull,typtype,typndims \
                         FROM pg_type");
         type_info_lists = res.fetchall()
         type_info_dicts = dict([(til[0],{
@@ -140,11 +153,13 @@ def _getPostgresTypes(engine):#{{{
                             'default_expression':til[4],
                             'base_type':til[5],\
                             'not_null':til[6], \
-                            'type':til[7]}
+                            'type':til[7],
+                            'ndims':til[8]
+                            }
                              ) for til in type_info_lists])
         postgres_types[engine] = type_info_dicts
     return postgres_types[engine]#}}}
-pgtoibidas = {'int2':'int16','varchar':'string[]','int4':'int32','text':'string[]', 'float4':'real32', 'float8':'real64'}
+pgtoibidas = {'bool':'bool','oid':'uint32', 'int2':'int16','varchar':'string[]','int4':'int32','text':'string[]', 'float4':'real32', 'float8':'real64'}
 
 
 mysql_types = {}
@@ -157,7 +172,7 @@ mysqlid_toibidas = {0:'real64',1:'int8',2:'int16',3:'int32',4:'real32',5:'real64
                     251:'any',252:'any',253:'string[]',254:'string[]',255:'any'};
 
 def convert(col_descriptor, type, engine, tablename=None):#{{{
-    if(type == 'postgres'):
+    if(type == 'postgres' or type == 'postgresql'):
         fieldnames, subtypes = convert_postgres(col_descriptor, engine)
     elif(type == 'sqlalchemy'):
         fieldnames, subtypes = convert_sqlalchemy(col_descriptor, engine)
@@ -178,7 +193,7 @@ def convert(col_descriptor, type, engine, tablename=None):#{{{
 
     table_type = rtypes.TypeArray(dims=ndims,
                                     subtypes=(table_type,))
-    return table_type#}}}
+    return (fieldnames, table_type)#}}}
 
 def convert_mysql(col_descriptor, engine):#{{{
     fieldnames = []
@@ -197,6 +212,7 @@ def convert_mysql(col_descriptor, engine):#{{{
 def convert_postgres(col_descriptor, engine):#{{{
     fieldnames = []
     subtypes = []
+    util.debug_here()
     for col in col_descriptor:
         name, type_code, display_size, internal_size, precision, scale, null_ok = col
         r = _getPostgresTypes(engine)
@@ -206,18 +222,31 @@ def convert_postgres(col_descriptor, engine):#{{{
         elif(n['array_element_type_index'] > 0):
             subtype_id = n['array_element_type_index']
             sn = r[subtype_id]
-            if(sn['name'] in pgtoibidas):
-                sd = pgtoibidas[sn['name']]
-                #if(not sn['not_null']):
-                #    sd += "?"
-            else:
-                sd = "any?"
-            if(n['length'] == -1):
-                d = "[~](" + sd + ")"
-            else:
-                d = "[" + str(n['length']) + "](" + sd + ")"
+            if sn['name'] == 'char' or sn['name'] == 'text': #string
+                sd = 'bytes'
+                if(n['length'] == -1):
+                    d = sd + "[~]"
+                else:
+                    d = sd + "[" + str(n['length']) + "]"
+                if(not sn['not_null']):
+                    sd += "?"
+            else:                
+                if(sn['name'] in pgtoibidas):
+                    sd = pgtoibidas[sn['name']]
+                    #if(not sn['not_null']):
+                    #    sd += "?"
+                    if(n['length'] == -1):
+                        d = "[~]<"  
+                    else:
+                        d = "[" + str(n['length']) + "]<"
+                    #JUST USE unknown: postgresql does not enforce array dimensions, so this messes up our code            
+                    #only thing we can do is make it possible to handle 1 dimension, that should take care of most
+                    #cases
+                    d = 'unknown'
+                else:
+                    d = "unknown"
         else:
-            d = "any"
+            d = "unknown"
         d = rtypes.createType(d)            
         if(null_ok):
             d = d.setHasMissing(True)
@@ -240,15 +269,16 @@ def open_db(*args, **kwargs):
 
 class Connection(object):
     def __init__(self, engine, schemaname=None):#{{{
-        self.engine = engine
-        self.meta = sqlalchemy.MetaData()
+        self._engine = engine
+        self._meta = sqlalchemy.MetaData()
+        self._schemas = []
         if(schemaname):
-            self.meta.reflect(bind=self.engine, schema=schemaname)
+            self._meta.reflect(bind=self._engine, schema=schemaname)
         else:
-            self.meta.reflect(bind=self.engine)
+            self._meta.reflect(bind=self._engine)
         
-        tables = self.meta.tables.copy()
-        self.sa_tables = tables
+        tables = self._meta.tables.copy()
+        self._sa_tables = tables
 
         info_tables = [table for table in tables.values() if "__info__" in table.name]
         tabledict = {}
@@ -259,45 +289,50 @@ class Connection(object):
             subtables = []
             for tablename,table in list(tables.iteritems()):
                 if(tablename == name or '__dim__' in tablename and tablename.split('__dim__')[0] == name):
-                    subtables.append(TableRepresentor(self.engine, table))
+                    subtables.append(TableRepresentor(self._engine, table))
                     del tables[tablename]
-            info_table = TableRepresentor(self.engine, info_table)
-            t = CombineRepresentor(self.engine, info_table, subtables)    
+            info_table = TableRepresentor(self._engine, info_table)
+            t = CombineRepresentor(self._engine, info_table, subtables)    
             tabledict[name] = t
             
         for table in tables.values():
-            t = TableRepresentor(self.engine, table)
+            t = TableRepresentor(self._engine, table)
             tabledict[table.name] = t
-        self.tabledict = tabledict 
+        self._tabledict = tabledict 
 
         if(not schemaname):
             try:
-                schemanames = self.engine.execute('SELECT schema_name FROM information_schema.schemata').fetchall()
-                for sname in schemanames:
-                    sname = sname[0]
-                    self.__dict__[sname] = Connection(self.engine, sname);
+                schemanames = self._engine.execute('SELECT schema_name FROM information_schema.schemata').fetchall()
             except Exception, e:
-                pass#}}}
+                schemanames = []
+            
+            for sname in schemanames:
+                sname = sname[0]
+                self.__dict__[sname] = Connection(self._engine, sname);
+                self._schemas.append(sname)#}}}
 
     def __getattr__(self, name):
-        return self.tabledict[name]//name
+        return self._tabledict[name]//name
 
     def _getAttributeNames(self):
-        return self.tabledict.keys()
+        return self._tabledict.keys()
    
     
-    def query(self, query):
-        return QueryRepresentor(self.engine, query)
+    def Query(self, query):
+        return QueryRepresentor(self._engine, query)
 
     def __repr__(self):
-        res = "Database: " + str(self.engine.url) + "\n"
-        tablenames = self.tabledict.keys()
+        res = "Database: " + str(self._engine.url) + "\n"
+        tablenames = self._tabledict.keys()
         tablenames.sort()
-        res += "Tables: " + ", ".join([str(tname) for tname in tablenames])
+        if tablenames:
+            res += "Tables: " + ", ".join([str(tname) for tname in tablenames])
+        if self._schemas:
+            res += "Schemas: " + ", ".join(self._schemas)
         return res
 
-    def store(self, name, rep):#{{{
-        if(not name in self.tabledict):
+    def Store(self, name, rep):#{{{
+        if(not name in self._tabledict):
             columns = defaultdict(list)
             rowinfo = []
             rep = rep.Copy()
@@ -329,40 +364,40 @@ class Connection(object):
                    tablename = name + "__dim__" + key.name
                 else:
                    tablename = name
-                newtable = sqlalchemy.Table(tablename, self.meta, *value) 
-                newtable.create(bind=self.engine, checkfirst=True)
+                newtable = sqlalchemy.Table(tablename, self._meta, *value) 
+                newtable.create(bind=self._engine, checkfirst=True)
                 tables[key] = newtable
             
             if(len(columns) > 1 or any([row['pickle'] or row['dimname'] is None for row in rowinfo])):
-                self.store(name + "__info__",python.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes?,packdepth=int,val=bytes}"))
+                self.Store(name + "__info__",python.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes?,packdepth=int,val=bytes}"))
                
                 tablelist = []
                 for t in tables.values():
-                    self.sa_tables[t.name] = t
-                    table = self.meta.tables[t.name]
-                    t = TableRepresentor(self.engine, table)
+                    self._sa_tables[t.name] = t
+                    table = self._meta.tables[t.name]
+                    t = TableRepresentor(self._engine, table)
                     tablelist.append(t)
-                infotable = self.meta.tables[name + "__info__"]
-                del self.tabledict[name + "__info__"]
-                info = TableRepresentor(self.engine, infotable)
-                t = CombineRepresentor(self.engine, info, tablelist)
+                infotable = self._meta.tables[name + "__info__"]
+                del self._tabledict[name + "__info__"]
+                info = TableRepresentor(self._engine, infotable)
+                t = CombineRepresentor(self._engine, info, tablelist)
             else:
-                self.sa_tables[name] = tables.values()[0]
-                table = self.meta.tables[name]
-                t = TableRepresentor(self.engine, table)
-            self.tabledict[name] = t
+                self._sa_tables[name] = tables.values()[0]
+                table = self._meta.tables[name]
+                t = TableRepresentor(self._engine, table)
+            self._tabledict[name] = t
 
         self._append(name, rep)
-        return self.tabledict[name]#}}}
+        return self._tabledict[name]#}}}
     
     def _append(self, name, rep):#{{{
-        tbl = self.tabledict[name]
+        tbl = self._tabledict[name]
         if(isinstance(tbl,CombineRepresentor)):
             rep = rep.Array(tolevel=1) 
             pickle = tbl._info[tbl._info.pickle == True].name()
             rep = rep.To(*pickle, Do=_.Cast("pickle").Each(buffer,dtype="pickle"))
             rep = rep.Copy()
-            for col in tbl._info.dict().ToPython():
+            for col in tbl._info.Dict().ToPython():
                 if 'dimname' in col:
                     continue
                 val = rep.Get(col['name']).ToPython()
@@ -391,23 +426,23 @@ class Connection(object):
                     stored as a table"
 
         values = rep.Dict(with_missing=True).ToPython()
-        self.engine.execute(self.sa_tables[table._tablename].insert(), values)#}}}
+        self._engine.execute(self._sa_tables[table._tablename].insert(), values)#}}}
 
-    def drop(self, name):#{{{
-        tbl = self.tabledict[name]
+    def Drop(self, name):#{{{
+        tbl = self._tabledict[name]
         if isinstance(tbl, CombineRepresentor):
             info_table = tbl._info
-            self.sa_tables[info_table._tablename].drop(bind=self.engine, checkfirst=True)
-            del self.sa_tables[info_table._tablename]
+            self._sa_tables[info_table._tablename].drop(bind=self._engine, checkfirst=True)
+            del self._sa_tables[info_table._tablename]
 
             tablelist = tbl._tablelist
             for tbl in tablelist:
-                self.sa_tables[tbl._tablename].drop(bind=self.engine, checkfirst=True)
-                del self.sa_tables[tbl._tablename]
+                self._sa_tables[tbl._tablename].drop(bind=self._engine, checkfirst=True)
+                del self._sa_tables[tbl._tablename]
         else:
-            self.sa_tables[name].drop(bind=self.engine, checkfirst=True)
-            del self.sa_tables[name]
-        del self.tabledict[name]#}}}
+            self._sa_tables[name].drop(bind=self._engine, checkfirst=True)
+            del self._sa_tables[name]
+        del self._tabledict[name]#}}}
 
 class CombineRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, info, tablelist):
@@ -424,7 +459,7 @@ class CombineRepresentor(wrapper.SourceRepresentor):#{{{
                 tablepos[table._tablename] = pos
         
         nslices = []
-        for row in info.sort(info.spos).dict()():
+        for row in info.Sort(info.spos).Dict()():
             if not 'dimname' in row:
                 dimpos = 0
             else:
@@ -461,8 +496,8 @@ class CombineRepresentor(wrapper.SourceRepresentor):#{{{
 class TableRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, table):
         self._tablename = table.name
-        table_type = convert(table.columns,'sqlalchemy',engine, table.name)
-        nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, table, table_type, util.valid_name(table.name))))
+        fieldnames, table_type = convert(table.columns,'sqlalchemy',engine, table.name)
+        nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, table, fieldnames, table_type, util.valid_name(table.name))))
         nnslices = []
         for slice in nslices:
             if slice.type.hasMissing():
@@ -473,14 +508,19 @@ class TableRepresentor(wrapper.SourceRepresentor):#{{{
 
 class QueryRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, query):
-        res = self.engine.execute(query)
+        res = engine.execute('select * from (%s) table_alias_33 limit 0;' %query)
         try:
-            query_type = convert(res.context.compiled.statement.columns, "sqlalchemy", self.engine)
+            fieldnames, query_type = convert(res.context.compiled.statement.columns, "sqlalchemy", engine)
         except AttributeError:
-            query_type = convert(res.cursor.description, res.dialect.name, self.engine)
-        res.close() 
+            fieldnames, query_type = convert(res.cursor.description, res.dialect.name, engine)
+        res.close()            
         
-        nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, table, table_type, table.name)))
+
+        if not query.lower().startswith('select'):
+            error('Query should start with SELECT')
+        query = query[7:] #drop select, as it is added again by sql.expression.select
+        query = sqlalchemy.sql.expression.select([sqlalchemy.sql.expression.text(query)])
+        nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, query, fieldnames,  query_type, "query_result")))
         nnslices = []
         for slice in nslices:
             if slice.type.has_missing:
@@ -582,7 +622,10 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
 
     #SOURCE OBJECTS
     def eatSQLOp(self, node):#{{{
-        o = Query(node.conn, Table(node.query))
+        if(isinstance(node.query, sqlalchemy.sql.expression.Executable)):
+            o = Query(node.conn, TableQuery(node.query, node.columns))
+        else:
+            o = Query(node.conn, Table(node.query, node.columns))
         
         self.graph.addNode(o)
         self.next_round.add(o)
@@ -852,7 +895,7 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         tslice = ops.PackTupleOp(results)
         aslice = ops.PackArrayOp(tslice)
         
-        sslice = SQLOp(fnode.conn, fnode.compile(), aslice.type)
+        sslice = SQLOp(fnode.conn, fnode.compile(), [column.name for column in columns], aslice.type)
         rslice = ops.UnpackArrayOp(sslice)
         self.addPairToGraph(sslice,rslice)
         
@@ -915,12 +958,14 @@ SQLOperators = {'Equal':lambda x, y: x==y,
 class SQLOp(ops.ExtendOp):#{{{
     __slots__ = []
     passes = [SQLPlanner]
-    def __init__(self, conn, query, rtype, name="result"):
+    def __init__(self, conn, query, columns, rtype, name="result"):
         self.conn = conn
         self.query = query
+        self.columns = columns
         ops.ExtendOp.__init__(self,name=name,rtype=rtype)
 
     def py_exec(self):
+        util.debug('Executing query: %s', str(self))
         if(isinstance(self.query, sqlalchemy.sql.expression.Executable)):
             res = self.conn.execute(self.query)
         else:
@@ -959,8 +1004,9 @@ class Column(Element):#{{{
         return column_dict.get(self,self)
 
     def compile(self):
-        pos = self.table.getColPos(self.id)
-        return list(self.table.compile().columns)[pos]
+        #pos = self.table.getColPos(self.id)
+        return sqlalchemy.sql.expression.literal_column(self.table.getAlias() + '.' + self.name)
+        #return list(self.table.compile().columns)[pos]
 
     def getTables(self):
         return set([self.table])
@@ -1017,16 +1063,18 @@ class Term(Column):#{{{
         return str(self.compile())#}}}
 
 class Table(object):#{{{
-    def __init__(self, source_descriptor):
+    def __init__(self, source_descriptor, column_names):
         self.source_descriptor = source_descriptor
-        self.colids = range(len(list(self.source_descriptor.columns)))
+        self.colids = range(len(list(column_names)))
+        self.column_names = column_names
+        self.alias = self.getName() + str(alias_name_id.next()) 
 
     def getSource(self):
         return self.source_descriptor
 
     def getColumns(self):
-        cols = list(self.getSource().columns)
-        return [Column(self, col.name, colid) for col,colid in zip(cols,self.colids)]
+        cols = self.column_names
+        return [Column(self, col, colid) for col,colid in zip(cols,self.colids)]
 
     def getColPos(self, id):
         return self.colids.index(id)
@@ -1043,19 +1091,62 @@ class Table(object):#{{{
         return set([self])
 
     def compile(self):
-        return self.source_descriptor
+        return self.source_descriptor.alias(self.alias)
+
+    def getName(self):
+        return self.source_descriptor.name
+
+    def getAlias(self):
+        return self.alias
 
     def __str__(self):
-        return str(self.compile())#}}}
+        return str(self.compile().alias(self.alias))#}}}
+
+class TableQuery(Table):
+    def __init__(self, source_descriptor, columns):
+        self.alias = 'query' + str(alias_name_id.next()) 
+        Table.__init__(self, source_descriptor.alias(self.alias), columns)
+    
+    def getName(self):
+        return self.alias
+
+class AliasSubQuery(TableQuery):#{{{
+    def __init__(self, source):
+        self.cached = None
+        TableQuery(source, source.getColumns())
+
+    def realias(self, realias_dict):
+        self = realias_dict[self]
+        self.source_descriptor = self.source_descriptor.realias(realias_dict)
+        self.cached = None
+        return self
+
+    def alias(self, realias_dict):
+        n = self.source_descriptor.to_subquery()
+        realias_dict[self] = n
+        return n
+
+    def getTables(self):
+        return set([self]) | self.source_descriptor.getTables()
+
+    def compile(self):
+        if(self.cached is None):
+            self.cached = self.source_descriptor.compile().alias(self.alias)
+        return self.cached#}}}
 
 class AliasTable(Table):#{{{
     def __init__(self, origtable):
         self.origtable = origtable
-        Table.__init__(self,origtable.getSource().alias())
+        self.alias = origtable.getName() + str(alias_name_id.next())
+        Table.__init__(self,origtable.getSource().alias(self.alias))
 
     def alias(self, realias_dict):
         return self.origtable.alias(realias_dict)#}}}
- 
+
+    def getName(self):
+        return self.origtable.getName()
+
+
 class Join(Table):#{{{
     def __init__(self, left, right, jointype, condition):
         assert not left.getTables() & right.getTables(), "Overlap in tables in join condition"
@@ -1241,36 +1332,5 @@ class Query(Element):#{{{
     def __str__(self):
         return str(self.compile())#}}}
 
-aliasid = util.seqgen().next
-class AliasSubQuery(Table):#{{{
-    def __init__(self, source):
-        self.source = source
-        self.colids = range(len(source.columns))
-        self.cached = None
-
-    def getColumns(self):
-        return [Column(self, col.name, colid) for col,colid in zip(self.source.columns, self.colids)]
-
-    def realias(self, realias_dict):
-        self = realias_dict[self]
-        self.source = self.source.realias(realias_dict)
-        self.cached = None
-        return self
-
-    def alias(self, realias_dict):
-        n = self.source.to_subquery()
-        realias_dict[self] = n
-        return n
-
-    def getSource(self):
-        return self.source
-
-    def getTables(self):
-        return set([self]) | self.source.getTables()
-
-    def compile(self):
-        if(self.cached is None):
-            self.cached = self.source.compile().alias()
-        return self.cached#}}}
 
 

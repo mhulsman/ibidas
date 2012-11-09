@@ -776,18 +776,18 @@ class StringRealScanner(StringScanner):
         self.has_missing = False
     
     def unregister(self, create_parent=False):
-        res = super(StringRealScanner,self).unregister(self, create_parent)
+        res = super(StringRealScanner,self).unregister(create_parent)
         if create_parent:
             res.max_nchars = self.max_nchars
         return res
 
     def getType(self):
-        return rtypes.TypeReal64(self.detector.hasMissing() or self.has_missing, needscast=True)
+        return rtypes.TypeReal64(self.detector.hasMissing() or self.has_missing)
 
     def scan(self, seq):
         res = StringScanner.scan(self, seq)
         if res:
-            for elem in seq:
+            for elem in seq.ravel():
                 try:
                     float(elem)
                 except ValueError:
@@ -802,18 +802,18 @@ class StringIntScanner(StringRealScanner):
     parentcls=StringRealScanner
     
     def unregister(self, create_parent=False):
-        res = super(StringIntScanner,self).unregister(self, create_parent)
+        res = super(StringIntScanner,self).unregister(create_parent)
         if create_parent:
             res.has_missing = self.has_missing
         return res
 
     def getType(self):
-        return rtypes.TypeInt64(self.detector.hasMissing() or self.has_missing, needscast=True)
+        return rtypes.TypeInt64(self.detector.hasMissing() or self.has_missing)
 
     def scan(self, seq):
         res = StringScanner.scan(self, seq)
         if res:
-            for elem in seq:
+            for elem in seq.ravel():
                 try:
                     int(elem)
                 except ValueError:

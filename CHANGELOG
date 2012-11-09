@@ -104,3 +104,9 @@
 
 0.1.18
 - Add warning for old numpy versions
+- Changed names of db connection functions to start with uppercase (Query, Store, Drop)
+- Added handling for special db types
+- Fixed free query support
+- Fixed store support
+- Added file_db command to Get  (use Get.file_db('my_database.db'))
+- Get string functions do not work for string9, rename Get.string. to Get.string8. Support for string9 will come later.
