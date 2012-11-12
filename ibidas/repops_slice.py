@@ -44,7 +44,8 @@ class To(repops.UnaryOpRep):
             else:
                 r = do(r)
 
-            
+            if not r._slicesKnown():
+                return
             for slice,pos in zip(r._slices, all_pos):
                 nslices[pos] = slice
 
