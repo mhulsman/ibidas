@@ -240,7 +240,13 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             return slice.modify(rtype=det.getType())
         else:
             return slice
-   
+    
+    def visitDetectAndCastOp(self,node,slice):
+        det = detector.Detector(allow_need_convert=True)
+        det.setParentDimensions(node.dims)
+        det.processSeq(slice.data.flat())
+        slice = slice.modify(rtype=det.getType())
+  
     def visitUnpackArrayOp(self,node,slice):
         ndata=slice.data.unpack(node.unpack_dims, subtype=node.type)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
