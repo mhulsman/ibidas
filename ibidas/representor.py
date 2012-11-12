@@ -362,6 +362,9 @@ class Representor(Node):
         else:
             return tuple([slice.data for slice in res])
 
+    def Detect(self):
+        return repops.Detect(self).Copy()
+
     # Overloaded functions. The r* functions are implemented because you
     # want to the same behaviour no matter no which side the known object
     # resides. (a + b == b + a)

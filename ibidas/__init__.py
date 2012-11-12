@@ -18,8 +18,7 @@ __all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack',
            "Fetch","Serve","Get","Alg",
            "Load","Save",'newdim',
            "Invert","Abs", "Negative",
-           "Add","Subtract","Multiply","Modulo","Divide","FloorDivide","And","Or","Xor","Power","Equal","NotEqual","LessEqual","Less","GreaterEqual","Greater","Each",
-           "Detect",
+           "Add","Subtract","Multiply","Modulo","Divide","FloorDivide","And","Or","Xor","Power","Equal","NotEqual","LessEqual","Less","GreaterEqual","Greater","Each"
            ]
 
 from utils import delay_import

@@ -123,7 +123,7 @@ class Detect(UnaryOpRep):
     """
 
     def _sprocess(self,source):
-        nslices = tuple([ops.DetectTypeOp(slice) for slice in source._slices])
+        nslices = tuple([ops.DetectAndCastOp(slice) for slice in source._slices])
         return self._initialize(nslices)
 
 

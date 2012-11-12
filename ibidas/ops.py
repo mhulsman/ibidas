@@ -132,6 +132,8 @@ class CastOp(UnaryUnaryOp):#{{{
 class DetectTypeOp(UnaryUnaryOp):#{{{
     __slots__ = []#}}}
 
+class DetectAndCastOp(DetectTypeOp):#{{{
+    __slots__ = []#}}}
 
 class DetectFixedShapesOp(UnaryUnaryOp):
     __slots__ = []

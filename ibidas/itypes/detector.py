@@ -89,10 +89,11 @@ missing_val = set([Missing])
 
 
 class Detector(object):
-    def __init__(self, parent_scanner=None, dim_eq=None):
+    def __init__(self, parent_scanner=None, dim_eq=None, allow_need_convert=False):
         self._scanners = None
         self.objectclss = set()
         self.count_elem = 0
+        self.allow_need_convert = allow_need_convert
 
         if not dim_eq:
             dim_eq = DimEqualizer()
@@ -155,7 +156,7 @@ class Detector(object):
         return restypes[0]
 
     def _findAcceptableDescendants(self, seq, scanner=None):
-        schildren = [sc(self) for sc in _scanchildren[scanner.__class__]]
+        schildren = [sc(self) for sc in _scanchildren[scanner.__class__] if (sc.need_convert == True and self.allow_need_convert == True) or sc.need_convert == False]
        
         res = set()
         for sc in schildren:
@@ -392,6 +393,7 @@ class DimEqualizer(object):
 
 
 class TypeScanner(object):
+    need_convert=False
     typecls = rtypes.TypeAny
     good_cls = set()
 
@@ -769,6 +771,7 @@ class StringScanner(TypeScanner):
 registerTypeScanner(StringScanner)
 
 class StringRealScanner(StringScanner):
+    need_convert=True
     parentcls=StringScanner
     missing_str = set(["", "NA", "N/A","NaN", "nan", "--", "?", "null"])
     def __init__(self, detector):
