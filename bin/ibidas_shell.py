@@ -26,11 +26,18 @@ else:
 from ibidas.command_parser import parseCommandLine
 
 import numpy
+if numpy.version.version == '1.6.0':
+    print 'WARNING: numpy 1.6.0 has a regression (http://projects.scipy.org/numpy/ticket/1870). Some commands wil not work. Please update to a newer version.'
+    print ''
 
-if numpy.__version__ == '1.6.0':
-    print 'WARNING: numpy 1.6.0 has a regression (http://projects.scipy.org/numpy/ticket/1870). Please update to a newer version'
-
-
+nv = numpy.version.version.split('.')
+if len(nv) ==3:
+    try:
+        if int(nv[0]) == 1 and (int(nv[1]) <= 3 or (int(nv[1]) == 4 and int(nv[2]) == 0)):
+            print 'WARNING: your numpy version (%s) is too old. Some commands will not work. Please update to a newer version.' % numpy.version.version
+            print ''
+    except ValueError:
+        pass
 
 rc_path = "~/.ibidas_rc"
 rc_path = os.path.expanduser(rc_path)
