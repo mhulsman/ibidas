@@ -110,3 +110,9 @@
 - Fixed store support
 - Added file_db command to Get  (use Get.file_db('my_database.db'))
 - Get string functions do not work for string9, rename Get.string. to Get.string8. Support for string9 will come later.
+
+0.1.19? I don't know your versioning system Marc.
+- Added a primitive format detection.
+- Fixed gz unpacking with 
+- Fixed a FASTA read bug
+- Allow user to add custom formats

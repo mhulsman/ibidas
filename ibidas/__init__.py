@@ -2,7 +2,7 @@
 The ibidas module contains all main functions for working with ibidas objects.
 """
 
-__all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack',
+__all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack', "Addformat",
            "Array","Tuple","Combine","HArray",
            "Stack","Intersect","Union","Except","Difference",
            "Pos","Argsort","Rank","IsMissing","CumSum",
@@ -100,22 +100,27 @@ Array = repops.delayable()(repops_dim.Array)
 def fimport_tsv(url, **kwargs):
     from wrappers.tsv import TSVRepresentor
     return TSVRepresentor(url, **kwargs) 
+#edef
 
 def fimport_matrixtsv(url, **kwargs):
     from wrappers.matrix_tsv import MatrixTSVRepresentor
     return MatrixTSVRepresentor(url, **kwargs)
+#edef
 
 def fimport_xml(url, **kwargs):
     from wrappers.xml_wrapper import XMLRepresentor
     return XMLRepresentor(url, **kwargs) 
+#edef
 
 def fimport_psimi(url, **kwargs):
     from wrappers.psimi import read_psimi
     return read_psimi(url, **kwargs)
+#edef
 
 def fimport_fasta(url, **kwargs):
     from wrappers.fasta import read_fasta;
     return read_fasta(url, **kwargs);
+#edef
 
 
 formats = { 'tsv' : fimport_tsv,
@@ -125,20 +130,33 @@ formats = { 'tsv' : fimport_tsv,
 	    'fasta' : fimport_fasta, 'fa' : fimport_fasta, 'fas' : fimport_fasta
 	  };
 
+def Addformat(ext, read_fn):
+  formats[ext] = read_fn;
+#edef
+
+
 def Import(url, **kwargs):
 
-    from os.path import splitext;
+  from os.path import splitext;
 
-    (base, ext) = splitext(url);
+  base = url;
+
+  while True:
+
+    (base, ext) = splitext(base);
     ext = ext.split('.')[1] if ext else 'tsv';
     format = kwargs.pop('format', ext).lower();
 
-    print format
-
-    if format not in formats:
+    if not format:
       raise RuntimeError("Unknown format specified")
+    if format not in formats:
+      continue;
     else:
       return formats[format](url, **kwargs);
+    #fi
+
+  #ewhile
+#edef
 
 Read = Import
 
