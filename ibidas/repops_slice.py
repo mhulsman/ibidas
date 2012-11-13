@@ -22,44 +22,53 @@ class ProjectBookmark(repops.UnaryOpRep):
         assert nslices,  "Cannot find matching slices for bookmark: " + str(name)
         self._initialize(tuple(nslices))
 
+class RequestUnaryOpRep(repops.UnaryOpRep):
+    def __init__(self,source,*args, **kwds):
+        self._req_sources = []
+        repops.UnaryOpRep.__init__(self,source,*args, **kwds)
 
-class To(repops.UnaryOpRep):
+
+class To(RequestUnaryOpRep):
     def _sprocess(self, source, *slicesel, **kwargs):
         do = kwargs.pop("Do")
         assert not kwargs, "Unknown parameters: " + str(kwargs)
 
+        if not self._req_sources:
+            for ssel in slicesel:
+                r = source.Get(ssel) 
+                #assert len(r._slices) == 1, "To action can only be applied to single slices"
+                all_pos = []
+                for slice in r._slices:
+                    #slice = r._slices[0]
+                    assert slice in source._slices, "Selected slice in to should not be operated upon"
+                    pos = source._slices.index(slice)
+                    all_pos.append(pos)
+
+                if(isinstance(do, context.Context)):
+                    r = context._apply(do, r)
+                else:
+                    r = do(r)
+
+                self._req_sources.append((all_pos, r))
+
         nslices = list(source._slices)
-        for ssel in slicesel:
-            r = source.Get(ssel) 
-            #assert len(r._slices) == 1, "To action can only be applied to single slices"
-            all_pos = []
-            for slice in r._slices:
-                #slice = r._slices[0]
-                assert slice in source._slices, "Selected slice in to should not be operated upon"
-                pos = source._slices.index(slice)
-                all_pos.append(pos)
-
-            if(isinstance(do, context.Context)):
-                r = context._apply(do, r)
-            else:
-                r = do(r)
-
+        for all_pos, r in self._req_sources:
             if not r._slicesKnown():
-                return
+                return 
             for slice,pos in zip(r._slices, all_pos):
                 nslices[pos] = slice
 
         self._initialize(tuple(nslices))
        
 
-class Project(repops.UnaryOpRep):
+class Project(RequestUnaryOpRep):
     def __init__(self,source,*args, **kwds):
-        self._project_sources = []
+        self._req_sources = []
         repops.UnaryOpRep.__init__(self,source,*args, **kwds)
 
-    def _getUsedSourceSlicesSet(self,project_sources):
+    def _getUsedSourceSlicesSet(self,req_sources):
         nslices = []
-        for name, elem in project_sources:
+        for name, elem in req_sources:
             if isinstance(elem, representor.Representor):
                 nslices.extend(elem._slices)
             else:
@@ -70,14 +79,14 @@ class Project(repops.UnaryOpRep):
         cur_slices = self._source._slices
         
         nslices = []
-        if(not self._project_sources):
-            project_sources = []
+        if(not self._req_sources):
+            req_sources = []
             for name, elem in chain(zip([None] * len(args),args),kwds.iteritems()):
                 if(isinstance(elem, context.Context)):
                     elem = context._apply(elem, self._source)
                 elif(isinstance(elem, basestring)):
                     if(elem == "~"):
-                        used_slices = set([slice.name for slice in self._getUsedSourceSlicesSet(project_sources)])
+                        used_slices = set([slice.name for slice in self._getUsedSourceSlicesSet(req_sources)])
                         nelem = [slice for slice in cur_slices if slice.name not in used_slices]
                     elif(elem == "#"):
                         common_dims = set([slice.dims for slice in cur_slices])
@@ -110,11 +119,11 @@ class Project(repops.UnaryOpRep):
                 else:
                     elem = util.select(cur_slices, elem)
                    
-                project_sources.append((name,elem))
-            self._project_sources = project_sources
+                req_sources.append((name,elem))
+            self._req_sources = req_sources
      
         
-        for name,elem in self._project_sources:
+        for name,elem in self._req_sources:
             if(isinstance(elem, representor.Representor)):
                 if not elem._slicesKnown():
                     return 

@@ -2,7 +2,7 @@
 The ibidas module contains all main functions for working with ibidas objects.
 """
 
-__all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack',
+__all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack', "Addformat",
            "Array","Tuple","Combine","HArray",
            "Stack","Intersect","Union","Except","Difference",
            "Pos","Argsort","Rank","IsMissing","CumSum",
@@ -95,23 +95,69 @@ HArray = repops.delayable(nsources=UNDEFINED)(repops_slice.HArray)
 Tuple = repops.delayable(nsources=UNDEFINED)(repops_slice.Tuple)
 Array = repops.delayable()(repops_dim.Array)
 
-def Import(url, **kwargs):
-    format = kwargs.pop('format','tsv')
 
-    if(format == 'tsv'):
-        from wrappers.tsv import TSVRepresentor
-        return TSVRepresentor(url, **kwargs) 
-    if(format == 'matrix_tsv'):
-        from wrappers.matrix_tsv import MatrixTSVRepresentor
-        return MatrixTSVRepresentor(url, **kwargs) 
-    elif(format == 'xml'):
-        from wrappers.xml_wrapper import XMLRepresentor
-        return XMLRepresentor(url, **kwargs) 
-    elif(format == 'psimi'):
-        from wrappers.psimi import read_psimi
-        return read_psimi(url, **kwargs)
+
+def fimport_tsv(url, **kwargs):
+    from wrappers.tsv import TSVRepresentor
+    return TSVRepresentor(url, **kwargs) 
+#edef
+
+def fimport_matrixtsv(url, **kwargs):
+    from wrappers.matrix_tsv import MatrixTSVRepresentor
+    return MatrixTSVRepresentor(url, **kwargs)
+#edef
+
+def fimport_xml(url, **kwargs):
+    from wrappers.xml_wrapper import XMLRepresentor
+    return XMLRepresentor(url, **kwargs) 
+#edef
+
+def fimport_psimi(url, **kwargs):
+    from wrappers.psimi import read_psimi
+    return read_psimi(url, **kwargs)
+#edef
+
+def fimport_fasta(url, **kwargs):
+    from wrappers.fasta import read_fasta;
+    return read_fasta(url, **kwargs);
+#edef
+
+
+formats = { 'tsv' : fimport_tsv,
+            'tsv_matrix' : fimport_matrixtsv,
+	    'xml' : fimport_xml,
+	    'psimi' : fimport_psimi,
+	    'fasta' : fimport_fasta, 'fa' : fimport_fasta, 'fas' : fimport_fasta
+	  };
+
+def Addformat(ext, read_fn):
+  formats[ext] = read_fn;
+#edef
+
+
+def Import(url, **kwargs):
+
+  from os.path import splitext;
+
+  base = url;
+
+  while True:
+
+    (base, ext) = splitext(base);
+    ext = ext.split('.')[1] if ext else 'tsv';
+    format = kwargs.pop('format', ext).lower();
+
+    if not format:
+      raise RuntimeError("Unknown format specified")
+    if format not in formats:
+      continue;
     else:
-        raise RuntimeError("Unknown format specified")
+      return formats[format](url, **kwargs);
+    #fi
+
+  #ewhile
+#edef
+
 Read = Import
 
 def Connect(url, **kwargs):

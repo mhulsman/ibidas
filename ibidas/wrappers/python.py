@@ -20,6 +20,7 @@ _delay_import_(globals(),"..utils","util","cutils","nested_array","context")
 _delay_import_(globals(),"..itypes","detector","type_attribute_freeze","convertors","dimensions")
 _delay_import_(globals(),"..repops_slice")
 _delay_import_(globals(),"..repops_dim")
+_delay_import_(globals(),"..repops_funcs")
 _delay_import_(globals(),"..utils.missing","Missing")
 
 
@@ -27,7 +28,7 @@ class PyRepresentor(wrapper.SourceRepresentor):
     def __init__(self, slices):
         self._initialize(slices)
 
-def Rep(data=None, dtype=None, unpack=True, name=None):
+def Rep(data=None, dtype=None, unpack=True, name=None, allow_convert=False):
     """Packs python data structures into a :py:class:`ibidas.representor.Representor` object.
         
        :param data: any python object
@@ -101,7 +102,9 @@ def Rep(data=None, dtype=None, unpack=True, name=None):
 
     if(unpack and isinstance(res.getType(), rtypes.TypeTuple)):
         res = repops_slice.UnpackTuple(res)
-    
+   
+    if allow_convert:
+        res = res.Detect()
     return res
 
 
@@ -148,7 +151,7 @@ class ResultOp(ops.DataOp):
         res += '\n' + r
         return res
 
-class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE), 
+class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE), 
              DirectVisitorFactory(prefixes=("cast",),flags=NF_ERROR), manager.Pass):
 
     after = set([create_graph.CreateGraph, serialize_exec.SerializeExec])
@@ -242,11 +245,51 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
             return slice
     
     def visitDetectAndCastOp(self,node,slice):
-        det = detector.Detector(allow_need_convert=True)
+        det = detector.Detector(allow_need_convert=node.allow_convert)
         det.setParentDimensions(node.dims)
         det.processSeq(slice.data.flat())
-        slice = slice.modify(rtype=det.getType())
-  
+        nslice = slice.modify(rtype=det.getType())
+        return self.unpackCast(nslice.type, slice, nslice)
+
+    def unpackCastTypeTuple(self, rtype, oslice, nslice):
+        nslices = []
+        for i in range(len(rtype.fieldnames)):
+            tnnode = ops.UnpackTupleOp(nslice, i)
+            tonode = ops.UnpackTupleOp(oslice, i)
+            toslice = self.visitUnpackTupleOp(tonode, oslice)
+            toslice = self.unpackCast(tnnode.type, toslice, tnnode)
+            nslices.append(toslice)
+        newnode = ops.PackTupleOp(tuple(nslices), nslice.name)
+        return self.visitPackTupleOp(newnode, nslices)
+
+    def unpackCastTypeArray(self, rtype, oslice, nslice):
+        onode = ops.UnpackArrayOp(oslice)
+        nnode = ops.UnpackArrayOp(nslice)
+
+        toslice = self.visitUnpackArrayOp(onode, oslice)
+        toslice = self.unpackCast(nnode.type, toslice, nnode)
+        
+        onode = ops.PackArrayOp(toslice)
+        return self.visitPackArrayOp(onode, toslice)
+    
+    def unpackCastTypeSet(self, rtype, oslice, nslice):
+        onode = ops.UnpackArrayOp(oslice)
+        nnode = ops.UnpackArrayOp(nslice)
+
+        toslice = self.visitUnpackArrayOp(onode, oslice)
+        toslice = self.unpackCast(nnode.type, toslice, nnode)
+        
+        onode = ops.UnaryFuncAggregateOp('Set',repops_funcs.setsig, repops_funcs.Param(nslice.name, nslice.type), 1, toslice)
+        return self.visitUnaryFuncAggregateOp(onode, toslice)
+    
+    
+    def unpackCastTypeScalar(self, rtype, oslice, nslice):
+        newnode = ops.CastOp(oslice, nslice.type)
+        return self.visitCastOp(newnode, oslice)
+    
+    unpackCastTypeString = unpackCastTypeScalar
+    unpackCastTypeAny = unpackCastTypeScalar
+
     def visitUnpackArrayOp(self,node,slice):
         ndata=slice.data.unpack(node.unpack_dims, subtype=node.type)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
@@ -582,6 +625,14 @@ class PyExec(VisitorFactory(prefixes=("visit",), flags=NF_ELSE),
 
         return slice.data.mapseq(lambda x: func(x,dtype),res_type=node.type)
        
+    def caststring_to_string(self, castname, node, slice):
+        if(node.type.has_missing):
+            func = string_to_string_missing
+        else:
+            func = string_to_string
+        dtype = node.type.getPythonType()
+
+        return slice.data.mapseq(lambda x: func(x,dtype),res_type=node.type)
 
     def withinWithin(self, data, type1, type2, typeo, op, bcdepth=1):
         data1,data2 = data
@@ -1211,6 +1262,21 @@ def string_to_real_missing(seq, dtype):
 
 def string_to_real(seq, dtype):
     return util.darray([float(elem) for elem in seq],dtype)
+
+def string_to_string_missing(seq, dtype):
+    res = []
+    for elem in seq:
+        if elem is Missing or elem == "":
+            res.append(Missing)
+        else:
+            try:
+                res.append(dtype(elem))
+            except ValueError:
+                res.append(Missing)
+    return util.darray(res,object)
+
+def string_to_string(seq, dtype):
+    return util.darray([dtype(elem) for elem in seq],object)
 
 
 def none_to_missing(seq,stype):

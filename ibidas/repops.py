@@ -2,6 +2,7 @@ import copy
 from constants import *
 import representor
 _delay_import_(globals(),"ops")
+_delay_import_(globals(),"itypes","rtypes")
 _delay_import_(globals(),"itypes","dimpaths")
 _delay_import_(globals(),"utils","context")
 _delay_import_(globals(),"repops_multi")
@@ -122,9 +123,19 @@ class Detect(UnaryOpRep):
     """Detect types
     """
 
-    def _sprocess(self,source):
-        nslices = tuple([ops.DetectAndCastOp(slice) for slice in source._slices])
-        return self._initialize(nslices)
+    def _sprocess(self,source, *args, **kwargs):
+        only_unknown = kwargs.pop('only_unknown',False)
+        allow_convert = kwargs.pop('allow_convert',True)
+        if only_unknown:
+            nslices = []
+            for slice in source._slices:
+                if slice.type == rtypes.unknown:
+                    nslices.append(ops.DetectAndCastOp(slice, allow_convert=allow_convert))
+                else:
+                    nslices.append(slice)
+        else:
+            nslices = [ops.DetectAndCastOp(slice, allow_convert=allow_convert) for slice in source._slices]
+        return self._initialize(tuple(nslices))
 
 
 def apply_slice(slices, slicecls, dim_selector, *params, **kwds):

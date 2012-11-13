@@ -44,17 +44,23 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
         else:
             return self.findFirstKnown(node._source)
     
-    def findFirstKnownProject(self,node):
+    def findFirstKnownRequestUnaryOpRep(self,node):
         if node._slicesKnown():
             return (node,)
         else:
             x = list(self.findFirstKnown(node._source))
-            if(node._project_sources):
-               for name, elem in node._project_sources:
+            if(node._req_sources):
+               for name, elem in node._req_sources:
                     if(isinstance(elem, representor.Representor)):
                         x.extend(self.findFirstKnown(elem))
             return tuple(x)
    
+    def findFirstKnownMultiOpRep(self,node):
+        if node._slicesKnown():
+            return (node,)
+        else:
+            return sum([self.findFirstKnown(source) for source in node._sources],())
+    
     def findFirstKnownMultiOpRep(self,node):
         if node._slicesKnown():
             return (node,)
@@ -84,19 +90,19 @@ class EnsureInfo(VisitorFactory(prefixes=("findFirstKnown","processQuery"),
             nnode._process(nnode._source,*node._params[0], **node._params[1])
             return nnode
     
-    def processQueryProject(self,node):
+    def processQueryRequestUnaryOpRep(self,node):
         if node._slicesKnown():
             return self.processQueryRepresentor(node)
         else:
             nnode = self.getNodeCopy(node)
             nnode._source = self.processQuery(node._source)
-            if(nnode._project_sources):
+            if(nnode._req_sources):
                 npsources = []
-                for name,elem in nnode._project_sources:
+                for name,elem in nnode._req_sources:
                      if(isinstance(elem,representor.Representor)):
                         elem = self.processQuery(elem)
                      npsources.append((name,elem))
-                nnode._project_sources = npsources
+                nnode._req_sources = npsources
             nnode._process(nnode._source,*node._params[0], **node._params[1])
             return nnode
    
