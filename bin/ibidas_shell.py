@@ -3,7 +3,10 @@ import getopt
 import os
 
 #make sure we import the development version
-sys.path = [os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..'))] + sys.path
+try:
+    sys.path = [os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..'))] + sys.path
+except:
+    pass
 
 from ibidas import *
 from ibidas.server import Serve
