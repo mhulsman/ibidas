@@ -362,8 +362,15 @@ class Representor(Node):
         else:
             return tuple([slice.data for slice in res])
 
-    def Detect(self):
-        return repops.Detect(self).Copy()
+    def Detect(self, *args, **kwargs):
+        """Detects types fo slices, and casts result to this type
+            
+            :param only_unknown: Only detect slices with unknown types [default: False]
+
+            :param allow_convert: Convert also types (e.g. bytes to integers/floats where possible) [default: True]
+
+        """
+        return repops.Detect(self, *args, **kwargs).Copy()
 
     # Overloaded functions. The r* functions are implemented because you
     # want to the same behaviour no matter no which side the known object
@@ -741,7 +748,6 @@ class Representor(Node):
         assert len(set([s.dims[0] for s in self._slices])) == 1, "To execute len, there should be only one root dimension"
         return self.Get(0).Array(1).Count()()
         
-
     def Set(self, dim=None):
         return repops_funcs.Set(self,dim)
     

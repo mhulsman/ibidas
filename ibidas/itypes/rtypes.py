@@ -224,6 +224,7 @@ class TypeAny(TypeUnknown):#{{{
     """Type which represents that any value is allowed"""
 
     name = "any"
+    _ptype = lambda x : x
 
     def __init__(self, has_missing=False):
         """
@@ -254,6 +255,9 @@ class TypeAny(TypeUnknown):#{{{
         :param subtype_id: id of subtype, default 0. Should be >= 0 and < :py:meth:`getSubTypeNumber`.
         :rtype: obj of class :py:class:`Type`"""
         raise TypeError, "Expected subtypeable type, but found " + str(self)
+    
+    def getPythonType(self):
+        return self._ptype
 
     def __eq__(self, other):
         if(isinstance(other, basestring)):
@@ -330,6 +334,7 @@ class TypeTuple(TypeAny):#{{{
     """Tuple or record type, having multiple values of 
        possibly different types"""
     name = "tuple"
+    _ptype = tuple
 
     def __init__(self, has_missing=False, subtypes=(), 
                        fieldnames=()):
@@ -502,6 +507,7 @@ addType(TypeTuple)#}}}
 
 class TypeRecordDict(TypeTuple):#{{{
     name = "record_dict"
+    _ptype = None
 
     def __repr__(self):
         res = '{' 
@@ -520,6 +526,7 @@ addType(TypeRecordDict)#}}}
 
 class TypeIndexDict(TypeTuple):#{{{
     name = "index_dict"
+    _ptype = None
     
     def __init__(self, has_missing=False, subtypes=(), 
                        fieldnames=("key","value")):
@@ -566,6 +573,7 @@ class TypeArray(TypeAny):#{{{
     """Type representing a collection of values, 
        possibly in an dimensional structure"""
     name = "array"
+    _ptype = list
 
     def __init__(self, has_missing=False, dims=(), \
                        subtypes=(unknown,)):
@@ -829,6 +837,7 @@ addType(TypeArray)#}}}
 
 class TypeSet(TypeArray):#{{{
     name = "set"
+    _ptype = set
 
     def __init__(self, has_missing=False, dims=(), subtypes=(unknown,)):
 
@@ -861,6 +870,7 @@ class TypeString(TypeArray):#{{{
     name = "string"
     _dtype = "U"
     _defval = u""
+    _ptype = unicode
     _reqRPCcon=False
     
     def __init__(self, has_missing=False, dims=()):
@@ -880,6 +890,7 @@ class TypeString(TypeArray):#{{{
         res = cls(has_missing=type1.has_missing or type2.has_missing, 
                   dims=dimpaths.DimPath(dim))
         return res
+
 
     def toNumpy(self):
         """Returns dtype of a numpy container which
@@ -927,6 +938,7 @@ class TypeBytes(TypeString):#{{{
     name = "bytes"
     _dtype = "S"
     _defval = b""
+    _ptype = bytes
 addType(TypeBytes)#}}}
 
 class TypePickle(TypeBytes):#{{{
@@ -948,6 +960,7 @@ addType(TypeChar)#}}}
 class TypeSlice(TypeScalar):#{{{
     """Type representing slices"""
     name = "slice"
+    _ptype = slice
     
 addType(TypeSlice)#}}}
 
@@ -999,6 +1012,7 @@ class TypeReal64(TypeComplex128):#{{{
     _scalar = numpy.float64
     _defval = 0.0
     _reqRPCcon=False
+    _ptype = float
 addType(TypeReal64)#}}}
 
 class TypeReal32(TypeReal64, TypeComplex64):#{{{
@@ -1013,7 +1027,7 @@ class TypeInteger(TypeReal32):#{{{
     name = "long"
     _dtype = "object"
     _minmax = (-numpy.inf, numpy.inf)
-    
+    _ptype = int 
     @classmethod
     def getMinValue(cls):
         """Returns minimum integer that can be stored 

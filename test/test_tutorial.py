@@ -39,7 +39,6 @@ class TestTutorial(unittest.TestCase):
 
             res = Read(Fetch(url),dtype="[tftargets:*]<(trans_factor=bytes, target=bytes)")
             return res.Copy()
-
         Get.register(yeastract2)
 
 
@@ -58,7 +57,7 @@ class TestTutorial(unittest.TestCase):
         res = res.To(_.start, _.stop, Do=_.Cast("int?"))
         res = res.To(_.genetic_pos,   Do=_.Cast("real64?"))
         
-        resy = res.To(_.gene_aliases,  Do=_.Each(_.split('|')).Elem()[_ != ""])
+        resy = res.To(_.gene_aliases,  Do=_.Each(_.split('|')).Elems()[_ != ""])
 
 
         splitfunc = lambda x: x.split('|')

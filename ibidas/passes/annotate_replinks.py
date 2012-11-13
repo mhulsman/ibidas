@@ -33,8 +33,8 @@ class AnnotateRepLinks(VisitorFactory(prefixes=("link","distribute"),
     
     def linkProject(self,node):
         self.link(node._source)
-        if(node._project_sources):
-            for name, elem in node._project_sources:
+        if(node._req_sources):
+            for name, elem in node._req_sources:
                 if(isinstance(elem, representor.Representor)):
                     self.link(elem)
    

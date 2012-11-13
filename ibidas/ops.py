@@ -133,7 +133,12 @@ class DetectTypeOp(UnaryUnaryOp):#{{{
     __slots__ = []#}}}
 
 class DetectAndCastOp(DetectTypeOp):#{{{
-    __slots__ = []#}}}
+    __slots__ = ["allow_convert"]
+    
+    def __init__(self, source, name=None, rtype=None, dims=None, bookmarks=None, allow_convert=True):
+        self.allow_convert = allow_convert
+        UnaryUnaryOp.__init__(self, source,  name, rtype, dims, bookmarks)
+#}}}
 
 class DetectFixedShapesOp(UnaryUnaryOp):
     __slots__ = []

@@ -428,7 +428,7 @@ class TypeScanner(object):
     def getSubDetector(self, id=0):
         id = 'subdetector_' + str(id)
         if id not in self.__dict__:
-            d = Detector(self, self.detector.dim_eq)
+            d = Detector(self, self.detector.dim_eq, self.detector.allow_need_convert)
             setattr(self, id, d)
             if self.detector.count_elem:
                 d.processSeq([Missing] * self.detector.count_elem)
@@ -793,13 +793,13 @@ class StringRealScanner(StringScanner):
             for elem in seq.ravel():
                 try:
                     float(elem)
-                except ValueError:
+                except (ValueError, TypeError):
                     if elem.__class__ in missing_cls or elem in self.missing_str:
                         self.has_missing = True
                     else:
                         return False
         return res
-#registerTypeScanner(StringRealScanner)
+registerTypeScanner(StringRealScanner)
 
 class StringIntScanner(StringRealScanner):
     parentcls=StringRealScanner
@@ -819,13 +819,13 @@ class StringIntScanner(StringRealScanner):
             for elem in seq.ravel():
                 try:
                     int(elem)
-                except ValueError:
+                except (ValueError, TypeError):
                     if elem.__class__ in missing_cls or elem in self.missing_str:
                         self.has_missing = True
                     else:
                         return False
         return res
-#registerTypeScanner(StringIntScanner)
+registerTypeScanner(StringIntScanner)
 
 class SliceScanner(TypeScanner):
     __doc__ = 'Slice scanner'
