@@ -28,7 +28,7 @@ class PyRepresentor(wrapper.SourceRepresentor):
     def __init__(self, slices):
         self._initialize(slices)
 
-def Rep(data=None, dtype=None, unpack=True, name=None, cast=False):
+def Rep(data=None, dtype=None, unpack=True, name=None, allow_convert=False):
     """Packs python data structures into a :py:class:`ibidas.representor.Representor` object.
         
        :param data: any python object
@@ -103,7 +103,7 @@ def Rep(data=None, dtype=None, unpack=True, name=None, cast=False):
     if(unpack and isinstance(res.getType(), rtypes.TypeTuple)):
         res = repops_slice.UnpackTuple(res)
    
-    if cast:
+    if allow_convert:
         res = res.Detect()
     return res
 
