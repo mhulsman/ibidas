@@ -50,29 +50,47 @@ class DimRename(repops.UnaryOpRep):#{{{
 
 
 class Redim(repops.UnaryOpRep):
+    """Assign new dimensions
+
+       example: .Redim('new_dimname', _.f0)
+       Assign new dim with name 'new_dimname' to first
+       dimension of slice f0
+
+       example: .Redim('new_dimname', f0=1)
+       Assign new dim with name 'new_dimname' to second
+       dimension of slice f0
+
+       example: .Redim('new_dimname', _.Dd1.Without('f0')=0, f0=1)
+       Assign all slices with dimension d1 (except f0) as first dim
+       a new dim with name 'new_dimname'. Do the same to slice f0, 
+       but as second dimension. 
+    """
+
     def _sprocess(self, source, *args, **kwds):
         dimname = args[0]
         dimsel = []
         slicesel = []
+
         for arg in args[1:]:
-            dimsel.append(0)
-            slicesel.append(arg)
-        for k,v in kwds.iteritems():
-            dimsel.append(v)
-            slicesel.append(k)
-        
-        selslices = repops_slice.Project(source, *slicesel)._slices
+            tslices = source.__getattr__(arg)._slices
+            dimsel.extend([0] * len(tslices))
+            slicesel.extend(tslices)
        
+        for k,v in kwds.iteritems():
+            tslices = source.__getattr__(k)._slices
+            dimsel.extend([v] * len(tslices))
+            slicesel.extend(tslices)
+           
         nslices = list(source._slices)
         dims = set()
-        for slice,dim in zip(selslices,dimsel):
+        for slice,dim in zip(slicesel,dimsel):
             slice = nslices[nslices.index(slice)]
             dimidxs = slice.dims.getDimIndices(dim)
             for dimidx in dimidxs:
                 dims.add(slice.dims[dimidx])
 
         ndim = dimensions.toCommonDim(dimname, dims)
-        for slice,dim in zip(selslices,dimsel):
+        for slice,dim in zip(slicesel,dimsel):
             sliceidx = nslices.index(slice)
             slice = nslices[sliceidx]
             dimidxs = slice.dims.getDimIndices(dim)
