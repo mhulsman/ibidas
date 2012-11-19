@@ -257,6 +257,21 @@ class Representor(Node):
 
 
     def Redim(self, *args, **kwds):
+        """Assign new dimensions
+
+        example: .Redim('new_dimname', _.f0)
+        Assign new dim with name 'new_dimname' to first
+        dimension of slice f0
+
+        example: .Redim('new_dimname', f0=1)
+        Assign new dim with name 'new_dimname' to second
+        dimension of slice f0
+
+        example: .Redim('new_dimname', _.Dd1.Without('f0')=0, f0=1)
+        Assign all slices with dimension d1 (except f0) as first dim
+        a new dim with name 'new_dimname'. Do the same to slice f0, 
+        but as second dimension. 
+        """
         return repops_dim.Redim(self, *args, **kwds)
 
     def getSlices(self):

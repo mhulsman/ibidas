@@ -50,21 +50,6 @@ class DimRename(repops.UnaryOpRep):#{{{
 
 
 class Redim(repops.UnaryOpRep):
-    """Assign new dimensions
-
-       example: .Redim('new_dimname', _.f0)
-       Assign new dim with name 'new_dimname' to first
-       dimension of slice f0
-
-       example: .Redim('new_dimname', f0=1)
-       Assign new dim with name 'new_dimname' to second
-       dimension of slice f0
-
-       example: .Redim('new_dimname', _.Dd1.Without('f0')=0, f0=1)
-       Assign all slices with dimension d1 (except f0) as first dim
-       a new dim with name 'new_dimname'. Do the same to slice f0, 
-       but as second dimension. 
-    """
 
     def _sprocess(self, source, *args, **kwds):
         dimname = args[0]
