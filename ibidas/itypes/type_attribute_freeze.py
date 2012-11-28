@@ -1,4 +1,5 @@
 import operator
+import numpy
 
 from ..constants import *
 from ..utils.multi_visitor import VisitorFactory, NF_ERROR, NF_ELSE
@@ -175,7 +176,10 @@ class RTypeFreezeProtocol(VisitorFactory(prefixes=("needFreeze", "freeze","execF
                 return elem
         else:
             def subfreeze(elem):
-                elem = elem.view(util.farray)
+                try:
+                    elem = elem.view(util.farray)
+                except AttributeError, e:
+                    elem = numpy.array(elem).view(util.farray)
                 return elem
         seq = self.map(subfreeze, ptype, seq)
         return seq

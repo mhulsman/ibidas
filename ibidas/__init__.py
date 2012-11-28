@@ -13,10 +13,10 @@ __all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack', "Addformat"
            "Sum",
            "Count","Match",
            "Broadcast","CreateType","MatchType",
-           "newdim","Missing",
+           "newdim","NEWDIM","LCDIM","LASTCOMMONDIM","COMMON_NAME",'COMMON_POS', "Missing",
            "Corr","In","Contains",
            "Fetch","Serve","Get","Alg",
-           "Load","Save",'newdim',
+           "Load","Save",
            "Invert","Abs", "Negative",
            "Add","Subtract","Multiply","Modulo","Divide","FloorDivide","And","Or","Xor","Power","Equal","NotEqual","LessEqual","Less","GreaterEqual","Greater","Each"
            ]
@@ -28,7 +28,7 @@ from utils.missing import Missing
 from utils.infix import Infix
 from itypes import createType as CreateType, matchType as MatchType
 from wrappers.python import Rep
-from representor import newdim
+from constants import *
 from repops import Detect
 import repops_dim 
 from repops_multi import Broadcast, Combine, Sort
