@@ -1,5 +1,9 @@
 #!/bin/bash
-source ibidas_env.sh
-chmod 755 bin/ibidas
-bin/ibidas
+
+scriptloc=$(dirname "$0");
+
+
+source "$scriptloc/ibidas_env.sh"
+chmod 755 "$scriptloc/bin/ibidas"
+"$scriptloc/bin/ibidas"
 
