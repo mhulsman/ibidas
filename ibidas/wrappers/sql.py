@@ -1067,7 +1067,7 @@ class Table(object):#{{{
         self.source_descriptor = source_descriptor
         self.colids = range(len(list(column_names)))
         self.column_names = column_names
-        self.alias = self.getName() + str(alias_name_id.next()) 
+        self._alias = self.getName() + str(alias_name_id.next()) 
 
     def getSource(self):
         return self.source_descriptor
@@ -1091,24 +1091,24 @@ class Table(object):#{{{
         return set([self])
 
     def compile(self):
-        return self.source_descriptor.alias(self.alias)
+        return self.source_descriptor.alias(self._alias)
 
     def getName(self):
         return self.source_descriptor.name
 
     def getAlias(self):
-        return self.alias
+        return self._alias
 
     def __str__(self):
-        return str(self.compile().alias(self.alias))#}}}
+        return str(self.compile().alias(self._alias))#}}}
 
 class TableQuery(Table):
     def __init__(self, source_descriptor, columns):
         self.alias = 'query' + str(alias_name_id.next()) 
-        Table.__init__(self, source_descriptor.alias(self.alias), columns)
+        Table.__init__(self, source_descriptor.alias(self._alias), columns)
     
     def getName(self):
-        return self.alias
+        return self._alias
 
 class AliasSubQuery(TableQuery):#{{{
     def __init__(self, source):
@@ -1131,14 +1131,14 @@ class AliasSubQuery(TableQuery):#{{{
 
     def compile(self):
         if(self.cached is None):
-            self.cached = self.source_descriptor.compile().alias(self.alias)
+            self.cached = self.source_descriptor.compile().alias(self._alias)
         return self.cached#}}}
 
 class AliasTable(Table):#{{{
     def __init__(self, origtable):
         self.origtable = origtable
-        self.alias = origtable.getName() + str(alias_name_id.next())
-        Table.__init__(self,origtable.getSource().alias(self.alias))
+        self._alias = origtable.getName() + str(alias_name_id.next())
+        Table.__init__(self,origtable.getSource().alias(self._alias), origtable.column_names)
 
     def alias(self, realias_dict):
         return self.origtable.alias(realias_dict)#}}}
