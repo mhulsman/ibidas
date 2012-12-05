@@ -102,11 +102,18 @@ class Representor(Node):
         >>> x.Unique().Show() |Match| y 
 
         """
-        print self.__str__(table_length=table_length)
-        return self
+        nself = repops.NoOp(self)
+        nself._table_length = table_length
+        return nself
 
-    def __str__(self, print_data=True, table_length=15):
+    def __str__(self, print_data=True, table_length=None):
         self._checkState()
+
+        if table_length is None:
+            if '_table_length' in self.__dict__:
+                table_length = self._table_length
+            else:
+                table_length = 15
         
         names = ["Slices:"] + [s.name for s in self._slices]
         types = ["Type:"] + [str(s.type) for s in self._slices]

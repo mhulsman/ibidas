@@ -108,6 +108,10 @@ class PlusPrefix(UnaryOpRep):#{{{
     pass
 #}}}
 
+class NoOp(UnaryOpRep):#{{{
+    pass
+#}}}
+
 class ApplyFuncRep(UnaryOpRep):
     """Applies slice class in `slicecls` to every field in source.
 

@@ -29,6 +29,7 @@ class PrePeepHole(VisitorFactory(prefixes=("visit",), flags=NF_ERROR), manager.P
             assert isinstance(target_edge,query_graph.ParamEdge), "Unknown edge type encountered"
             target_edge.source = source
             self.graph.addEdge(target_edge)
+    visitNoOp=remove_unaryop
     visitChangeBookmarkOp=remove_unaryop
     visitChangeNameOp=remove_unaryop
     visitChangeDimPathOp=remove_unaryop
