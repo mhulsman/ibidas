@@ -100,7 +100,7 @@ def Rep(data=None, dtype=None, unpack=True, name=None, allow_convert=False):
     res = wrapper.SourceRepresentor()
     res._initialize((data_slice,)) 
 
-    if(unpack and isinstance(res.getType(), rtypes.TypeTuple)):
+    if(unpack and isinstance(res._getType(), rtypes.TypeTuple)):
         res = repops_slice.UnpackTuple(res)
    
     if allow_convert:
@@ -255,28 +255,25 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
         nslices = []
         for i in range(len(rtype.fieldnames)):
             tnnode = ops.UnpackTupleOp(nslice, i)
-            tonode = ops.UnpackTupleOp(oslice, i)
-            toslice = self.visitUnpackTupleOp(tonode, oslice)
+            toslice = self.visitUnpackTupleOp(tnnode, oslice)
             toslice = self.unpackCast(tnnode.type, toslice, tnnode)
             nslices.append(toslice)
         newnode = ops.PackTupleOp(tuple(nslices), nslice.name)
         return self.visitPackTupleOp(newnode, nslices)
 
     def unpackCastTypeArray(self, rtype, oslice, nslice):
-        onode = ops.UnpackArrayOp(oslice)
         nnode = ops.UnpackArrayOp(nslice)
 
-        toslice = self.visitUnpackArrayOp(onode, oslice)
+        toslice = self.visitUnpackArrayOp(nnode, oslice)
         toslice = self.unpackCast(nnode.type, toslice, nnode)
         
         onode = ops.PackArrayOp(toslice)
         return self.visitPackArrayOp(onode, toslice)
     
     def unpackCastTypeSet(self, rtype, oslice, nslice):
-        onode = ops.UnpackArrayOp(oslice)
         nnode = ops.UnpackArrayOp(nslice)
 
-        toslice = self.visitUnpackArrayOp(onode, oslice)
+        toslice = self.visitUnpackArrayOp(nnode, oslice)
         toslice = self.unpackCast(nnode.type, toslice, nnode)
         
         onode = ops.UnaryFuncAggregateOp('Set',repops_funcs.setsig, repops_funcs.Param(nslice.name, nslice.type), 1, toslice)

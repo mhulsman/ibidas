@@ -305,6 +305,138 @@ def uniqueDimPath(dimpaths,only_unique=True):#{{{
                 path.append(dimset)
     return path#}}}
 
+
+def orderAllDimPath(dimpaths):#{{{
+    """Returns topologically ordered dim path, i.e. uses multiple dimpaths
+    to maximally order dimensions. First uses order within slices, then
+    order of slices."""
+
+    if not dimpaths:
+        return []
+    fdims = set(dimpaths)
+    if(len(fdims) == 1):
+        path = fdims.pop()
+        return path
+    
+    #step 1: create pairs for order within slice
+    dimorder = toposort.StableTopoSortGraph()
+    done = set()
+    for dp in dimpaths:
+        if dp in done:
+            continue
+        done.add(dp)
+        dimorder.addNodesIfNotExist(*dp)
+        for pos, d in enumerate(dp[1:]):
+            if dp[pos] == d: #skip same dims after each other
+                continue
+            try:                
+                dimorder.addEdge(dp[pos],d)
+            except toposort.CycleError, e:
+                pass
+                
+    seen_nodes = set(dimpaths[0])
+    for dp in dimpaths[1:]:
+        for dim in dp:
+            if dim in seen_nodes:
+                continue
+            for ddim in seen_nodes:
+                try:
+                    dimorder.addEdge(ddim, dim)
+                except toposort.CycleError, e:
+                    pass
+            seen_nodes.add(dim)    
+                   
+    #step 2: perform ordering
+    path = []
+    for level in dimorder.fullOrder():
+        if len(level) == 1:
+            path.extend(level)
+        else:
+            util.warning('Cannot order dims?')
+            path.extend(ilevel)
+
+
+    return path#}}}
+
+def orderDimPath(dimpaths, keep_unordered=False):#{{{
+    """Returns topologically ordered dim path, i.e. uses multiple dimpaths
+    to maximally order dimensions. First uses order within slices, then
+    order of slices."""
+
+    if not dimpaths:
+        return []
+    fdims = set(dimpaths)
+    if(len(fdims) == 1):
+        path = fdims.pop()
+        return path
+    
+    try:
+        #step 1: create pairs for order within slice
+        dimorder = toposort.StableTopoSortGraph()
+        done = set()
+        for dp in dimpaths:
+            if dp in done:
+                continue
+            done.add(dp)
+            dimorder.addNodesIfNotExist(*dp)
+            for pos, d in enumerate(dp[1:]):
+                if dp[pos] == d: #skip same dims after each other
+                    continue
+                dimorder.addEdge(dp[pos],d)
+                    
+
+        #step 3: perform ordering
+        path = []
+        pathdims = set()
+        for level in dimorder.fullOrder():
+            if len(level) == 1:
+                path.extend(level)
+                pathdims.update(level)
+                continue
+            try:
+                #step 2: create pairs for order between slices
+                sliceorder = toposort.StableTopoSortGraph()
+                sliceorder.addNodesIfNotExist(*[d for d in dimpaths[0] if d in level])
+                for dp in dimpaths[1:]:
+                    for dim in dp:
+                        if not dim in level:
+                            continue
+                        if sliceorder.hasNode(dim):
+                            continue
+                        dorder = list(sliceorder.nodes)                            
+                        sliceorder.addNodeIfNotExist(dim)
+                        for ddim in dorder:
+                            sliceorder.addEdge(ddim, dim)
+
+                for ilevel in sliceorder.fullOrder():
+                    if len(ilevel) == 1:
+                        path.extend(ilevel)
+                        pathdims.update(ilevel)
+                    else:
+                        if keep_unordered:
+                            path.append(ilevel)
+                            pathdims.update(ilevel)
+                        else:                    
+                            util.warning('Cannot determine order of dimensions %s',str(ilevel))
+                            return None
+            except toposort.CycleError, e:
+                if keep_unordered:
+                    path.append([l for l in level if l not in path])
+                    pathdims.update(path[-1])
+                else:                    
+                    util.warning('Cannot determine order of dimensions. %s',str(e))
+                    return None
+                                
+    except toposort.CycleError, e:
+        if keep_unordered:
+            path.append([d for d in done_dims if d not in pathdims])
+            pathdims.update(path[-1])
+        else:
+            util.warning('Cannot determine order of dimensions. %s',str(e))
+            return None
+
+    return path#}}}
+
 def planBroadcastMatchPos(paths):#{{{
     """Matches dims in paths based on their position.
     Returns new set of dims and broadcast plan."""
@@ -623,10 +755,57 @@ def createDimParentDict(sourcepaths):#{{{
             parents[dimpath[pos]].append(dimpath[pos-1])
     return parents#}}}
 
+def convertDoubleDim(paths):
+    translate = {}
+    npaths = []
+    for path in paths:
+        already_seen = set()
+        npath = []
+        for dim in path:
+            while dim in already_seen:
+                if not dim in translate:
+                    translate[dim] = dim.copy(reid=True)
+                dim = translate[dim]
+            already_seen.add(dim)
+            npath.append(dim)
+        npaths.append(DimPath(*npath))
+    return (npaths,translate)
+
+def deconvertDoubleDim(paths, translate):
+    translate = dict([(v,k) for k,v in translate.iteritems()])
+    npaths = []
+    for path in paths:
+        npath = []
+        for dim in path:
+            while dim in translate:
+                dim = translate[dim]
+            npath.append(dim)
+        npaths.append(DimPath(*npath))
+    return npaths
+
+def selectOrderDim(paths, idx):
+    paths,translate = convertDoubleDim(paths)
+    opath = orderAllDimPath(paths)
+    try: 
+        dim = opath[idx]
+    except IndexError:
+        raise RuntimeError, "Dimension at depth " + str(dim_selector) + " does not exist"
+
+    selpath = extendParentDim(DimPath(dim), [DimPath(root, *p) for p in paths], -1)
+    selpaths = deconvertDoubleDim([selpath],translate)
+    return selpaths[0]
+
+def getOrderDim(paths):
+    paths,translate = convertDoubleDim(paths)
+    opath = orderAllDimPath(paths)
+    selpaths = deconvertDoubleDim([opath],translate)
+    return selpaths[0]
+
 def extendParentDim(path, sourcepaths, length=1):#{{{
-    length -= len(path.strip())   
-    if(length <= 0):
-        return path
+    if length >= 0:
+        length -= len(path.strip())   
+        if(length <= 0):
+            return path
     if path[0] is root:
         raise RuntimeError, "Could not get long enough dim path"
 
@@ -638,18 +817,18 @@ def extendParentDim(path, sourcepaths, length=1):#{{{
             r = spath[:(lastpos + 1 - len(path))]
             xpaths.add(r)
         
-    while(len(ndims) < length):
+    while(all([len(xpath) > 0 for xpath in xpaths])and (len(ndims) < length or length == -1)):
         xdims = set()
         nxpaths = set()
         for xpath in xpaths:
-           if(not xpath):
-               continue
            xdims.add(xpath[-1])
            nxpaths.add(xpath[:-1])
         
-            
         if(not xdims or len(xdims) > 1):
-            raise RuntimeError, "Cannot find unique parent for dim: " + str(path[0])
+            if length == -1:
+                break
+            else:
+               raise RuntimeError, "Cannot find unique parent for dim: " + str(path[0])
         xpaths = nxpaths
         ndims.append(xdims.pop())
 
@@ -709,7 +888,7 @@ def identifyDimPathSource(source,dim_selector):#{{{
     if(isinstance(dim_selector, representor.Representor)):
         return set([s.dims for s in dim_selector._slices])
 
-    return identifyDimPath(set([s.dims for s in source._slices]),dim_selector)#}}}
+    return identifyDimPath(list([s.dims for s in source._slices]),dim_selector)#}}}
 
 def identifyUniqueDimPath(source,dim_selector):#{{{
     res = identifyDimPath(source,dim_selector)
@@ -720,32 +899,26 @@ def identifyUniqueDimPath(source,dim_selector):#{{{
     return res.pop()#}}}
 
 def identifyDimPath(sourcepaths, dim_selector):#{{{
-   
     if(isinstance(dim_selector, int)):
-        udpath = uniqueDimPath(sourcepaths,only_unique=False)
-        try: 
-            dim_selector = udpath[dim_selector]
-        except IndexError:
-            raise RuntimeError, "Dimension at depth " + str(dim_selector) + " does not exist"
-
+        return set([selectOrderDim(sourcepaths, dim_selector)])
     elif(isinstance(dim_selector, long)):
-        udpath = uniqueDimPath(sourcepaths,only_unique=False)
-        if(dim_selector < 0):
-            dim_selector += len(udpath)
-        if not (dim_selector >= 0 and dim_selector < len(udpath)):
-            return set()
+        d = commonDimPath(sourcepaths)
 
-        res = set()
-        for spath in sourcepaths:
-            if(len(spath.dims) > dim_selector):
-                res.add((root,) + spath.dims[:(dim_selector + 1)])
-        return res
-    
+        try:
+            d[dim_selector]
+        except IndexError:
+            raise RuntimeError, 'Not enough  common dimensions shared by slices, but attempting to select such a dimension'
+
+        path = DimPath(* ((root,) + d[:dim_selector] + (d[dim_selector],)))
+        return set([path])
+
     if(isinstance(dim_selector, Dim)):
         #fixme: root/end
         return set([DimPath(dim_selector)])
     elif(dim_selector is None):
-        return set([commonDimPath(sourcepaths)])
+        v = selectOrderDim(sourcepaths, -1)
+        return set([selectOrderDim(sourcepaths, -1)])
+        #return set([commonDimPath(sourcepaths)])
     elif(isinstance(dim_selector, basestring)):
         return identifyDimPathParse(sourcepaths, dim_selector)
     elif(isinstance(dim_selector, DimPath)):

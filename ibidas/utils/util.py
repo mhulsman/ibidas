@@ -276,7 +276,7 @@ class farray(numpy.ndarray):
     def __eq__(self, other):
         return (self.__class__ is other.__class__ and
                    self.shape == other.shape and
-             numpy.equal(self.view(numpy.ndarray),other.view(numpy.ndarray)).all())
+             (self.view(numpy.ndarray) == other.view(numpy.ndarray)).all())
 
     def __ne__(self, other):
         return not self.__eq__(other)

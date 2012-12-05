@@ -401,6 +401,7 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
     while True:
         #determine filter dim
         lastpos = slice.dims.matchDimPath(seldimpath)
+
         for filterpos in lastpos[::-1]:
              if(not used_dims[filterpos]):
                 break
@@ -428,7 +429,7 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
         #FIXME: change dependent dims of slice.type
 
         if(not ndim is None):
-            if(isinstance(tconstraint.type,rtypes.TypeSlice)):
+            if(isinstance(tconstraint.type,rtypes.TypeSlice) and seldimpath[-1].dependent): #if variable, extend variability
                 ndep = dimpaths.applyPlan(dep[::-1],cplan,newvalue=True, copyvalue=True, ensurevalue=True)
             else:
                 ndep = dimpaths.applyPlan(dep[::-1],cplan,newvalue=False)
@@ -455,7 +456,12 @@ def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
         #unpack dims
         if(packdepth):
             slice = UnpackArrayOp(slice,packdepth)
-            
+
+        #break out of loop if there was only one dim match (necessary to prevent 
+        #bug in which a dimpath starting with root gets matched multiple times)
+        if len(lastpos) <= 1:
+            break
+
     return slice#}}}
 
 class FlatAllOp(UnaryUnaryOp):#{{{
@@ -498,8 +504,8 @@ class UnpackTupleOp(UnaryUnaryOp):#{{{
         assert isinstance(stype, rtypes.TypeTuple), "Cannot unpack slice " + \
                                 str(slice.name) + " as it is not a tuple"
         
-        assert 0 <= idx < len(slice.type.subtypes), \
-            "Tuple index invalid, outside range of available attributes"
+        if not 0 <= idx < len(slice.type.subtypes):
+            raise RuntimeError, "Tuple index invalid, outside range of available attributes"
 
         ntype = slice.type.subtypes[idx]
         
