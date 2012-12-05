@@ -156,12 +156,12 @@ class Group(repops.MultiOpRep):
 
 
 class Filter(repops.MultiOpRep):
-    def __init__(self,source,constraint,dim=LASTCOMMONDIM):
+    def __init__(self,source,constraint,dim=LASTCOMMONDIM,mode=None):
         if(not isinstance(constraint,representor.Representor)):
             constraint = repops.PlusPrefix(python.Rep(constraint,name="filter"))
-        repops.MultiOpRep.__init__(self,(source,constraint),dim=dim)
+        repops.MultiOpRep.__init__(self,(source,constraint),dim=dim,mode=mode)
 
-    def _process(self,sources,dim):
+    def _process(self,sources,dim,mode):
         source,constraint = sources
         if not source._slicesKnown() or not constraint._typesKnown():
             return
@@ -171,12 +171,13 @@ class Filter(repops.MultiOpRep):
         if(not seldimpath and not isinstance(cslice.type, rtypes.TypeBool)):
             raise RuntimeError, "Attempting to perform filter on non-existing dimension"
         
-        if(isinstance(constraint, repops.PlusPrefix)):
-            mode = "pos"
-        else:
-            mode = "dim"
+        if mode is None:
+            if(isinstance(constraint, repops.PlusPrefix)):
+                mode = "pos"
+            else:
+                mode = "dim"
+           
         nslices = self._apply(source._slices,cslice,seldimpath,mode)
-       
         return self._initialize(tuple(nslices))
 
     @classmethod

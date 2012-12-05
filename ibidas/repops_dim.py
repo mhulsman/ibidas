@@ -61,9 +61,12 @@ class Redim(repops.UnaryOpRep):
         slicesel = []
 
         for arg in args[1:]:
-            tslices = source.__getattr__(arg)._slices
-            dimsel.extend([0] * len(tslices))
-            slicesel.extend(tslices)
+            if isinstance(arg, dict):
+                kwds.update(arg)
+            else:
+                tslices = source.__getattr__(arg)._slices
+                dimsel.extend([0] * len(tslices))
+                slicesel.extend(tslices)
        
         for k,v in kwds.iteritems():
             tslices = source.__getattr__(k)._slices
@@ -76,6 +79,7 @@ class Redim(repops.UnaryOpRep):
             slice = nslices[nslices.index(slice)]
             dimidxs = slice.dims.getDimIndices(dim)
             for dimidx in dimidxs:
+                assert dimidx < len(slice.dims) and dimidx >= 0, 'Dim index should be >= 0 and < %d' % len(slice.dims)
                 dims.add(slice.dims[dimidx])
 
         ndim = dimensions.toCommonDim(dimname, dims)

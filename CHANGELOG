@@ -118,3 +118,10 @@
 - Allow user to add custom formats
 - Add Detect function, to determine unknown types, and cast e.g. string types to integers where possible
 - Add allow_convert option ([default] False) incorporating Detect functionality in Rep
+- Better error message for attribute access failure. 
+- Stack/Intersect/Union/Except/Difference allow now for dimension selection, slice selection.
+- Filtering of slices without common dimensions now possible using item select (i.e. []) 
+- Output dimension ordering
+- Improved documentation
+- Various fixes
+

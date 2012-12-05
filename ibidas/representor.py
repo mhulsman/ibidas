@@ -425,29 +425,29 @@ class Representor(Node):
         Assign new dim with name 'new_dimname' to second
         dimension of slice f0
 
-        example: .Redim('new_dimname', _.Dd1.Without('f0')=0, f0=1)
+        example: .Redim('new_dimname', {_.Dd1.Without('f0'):1, 'f0':1})
         Assign all slices with dimension d1 (except f0) as first dim
         a new dim with name 'new_dimname'. Do the same to slice f0, 
         but as second dimension. 
         """
         return repops_dim.Redim(self, *args, **kwds)
           
-    def Filter(self, condition, dim=None):
+    def Filter(self, condition, dim=LASTCOMMONDIM, mode=None):
         """Performs filtering on this dataset using ``condition``.
            
            :param condition: condition to filter on
 
-                * Non-representor values are converted using ``ibidas.rep`` function
+                * Non-representor values are converted using ``Rep`` function
 
-                * Representor should have single slice.
+                * condition should have only a single slice.
 
                 * Can be of type bool, integer, array or slice. 
 
                 Various data types can be used:
 
-                * Bool: last dim should be equal to dim in this representor. Is applied to that dim by default.
+                * Bool: last dim should be equal to a dim in this representor. Is applied to that dim by default.
 
-                * Integer: collapses dim it is applied on. 
+                * Integer: collapses the dimension it is applied on. 
 
                 * Array (of integers): selects positions indicated by integers in array.
 
@@ -456,10 +456,75 @@ class Representor(Node):
            :param dim: Dim to apply the filtering on. 
 
                 * If no dim given, applied to last common dimension of slices (except for bool types).
+
+                * Integer: identifies dimension according to dim order (printed at the end of a representor printout)
+
+                * Long: identifies dimension according to common dimensions shared by all slices (default: -1)
+
+                * String: dimension name
+
+                * Dim object: x.Slices[0].dims[2]
+
+                * Dimpath object: e.g. x.Slices[0].dims[:2]
+
+            :param mode: Determines broadcasting method. 
+
+                * "pos"  Postion-based broadcasting ('numpy'-like broadcasting)
+
+                * "dim"  Dimension-identity based broadcasting (normal 'ibidas' broadcasting)
+
+                * None:  (Default). Determined based on input. Non-representation objects use position-based broadcasting
+                         Representation objects by default use dimension-based, except if they are prepended by a '+' operator, 
+                         e.g::
+
+                         >>> x.Filter(+constraintrep)
+
+            What is done to dimensions in the constraint that are not in the data source? Here we follow
+            the default rules in Ibidas for broadcasting. 
+
+                * First, the dimension in the source that is going to be filtered is identified (according to dim param or constraint last dimension)
+                
+                * Secondly, we match this dimension to the last dimension in the constraint. 
+                
+                * All remaining dimensions are broadcasted against each other.
+
+            Examples::
+
+                >>> x = Rep([[1,2,3],[4,5,6]])                
+                Slices: | data     
+                -------------------
+                Type:   | int64    
+                Dims:   | d1:2<d2:3
+                Data:   |          
+                        | [1 2 3]  
+                        | [4 5 6]  
+                
+                Dim order: d1:2<d2:3
+                
+                >>> x.Filter(0) 
+                Slices: | data
+                ---------------
+                Type:   | int64
+                Dims:   | d1:2
+                Data:   |
+                        | 1
+                        | 4
+                
+                Dim order: d1:2
+
+            This example matches the last common dimension (d2), and selects the first element.
+            This collapses dimension d2.
+
+                >>> x.Filter(0, dim='d1')
+ 
+
+                            
+
+
         """
         if(isinstance(condition, context.Context)):
             condition = context._apply(condition, self)
-        return repops_multi.Filter(self, condition, dim) 
+        return repops_multi.Filter(self, condition, dim, mode) 
 
     def _getResultSlices(self, args={}, endpoint=True, log=False, debug=False):
         query = query_context.QueryContext(self, args, endpoint)
