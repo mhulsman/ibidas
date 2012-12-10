@@ -13,13 +13,15 @@ _delay_import_(globals(),"itypes","rtypes","dimpaths","casts")
 class ProjectDim(repops.UnaryOpRep):
     def _sprocess(self, source, name):
         nslices = [slice for slice in source._slices if slice.dims.hasName(name)]
-        assert nslices,  "Cannot find matching slices for dimension: " + str(name)
+        if not nslices:
+            raise AttributeError, "Cannot find matching slices for dimension '" + str(name) + "'"
         self._initialize(tuple(nslices))
 
 class ProjectBookmark(repops.UnaryOpRep):
     def _sprocess(self, source, name):
         nslices = [slice for slice in source._slices if name in slice.bookmarks]
-        assert nslices,  "Cannot find matching slices for bookmark: " + str(name)
+        if not nslices:
+            raise AttributeError, "Cannot find matching slices for bookmark '" + str(name) + "'"
         self._initialize(tuple(nslices))
 
 class RequestUnaryOpRep(repops.UnaryOpRep):
@@ -103,9 +105,9 @@ class Project(RequestUnaryOpRep):
                                nelem = UnpackTuple._apply(cur_slices[0],elem)
                             else:
                                nelem = [slice for slice in cur_slices if elem in slice.bookmarks]
-                               assert len(nelem) > 0, "Could not find (unique) matching slice/bookmark for name: " + elem
-                        else:
-                            assert len(nelem) > 0, "Could not find (unique) matching slice for name: " + elem
+                        
+                        if not nelem:
+                            raise AttributeError, "Cannot find attribute '" + elem + "'"
                     elem = nelem
                 elif(isinstance(elem, representor.Representor)):
                     pass
@@ -130,11 +132,14 @@ class Project(RequestUnaryOpRep):
                 elem = [slice for slice in elem._slices]
 
             if(name):
-                assert len(elem) == 1, "Could not find a (unique) matching slice for " + name
+                if not len(elem) == 1:
+                    raise AttributeError, "Cannot find unique slice for '" + name + "', found: " + str(elem)
                 nslices.append(ops.ChangeNameOp(elem[0],name))
             else:
                 nslices.extend(elem)
-        assert nslices, "No slices found with: " + str(args) + " and " + str(kwds)
+        
+        if not nslices:                
+            raise AttributeError,  "No slices found with: " + str(args) + " and " + str(kwds)
         
         return self._initialize(tuple(nslices)) 
     
@@ -169,8 +174,12 @@ class UnpackTuple(repops.UnaryOpRep):
         if not source._typesKnown():
             return
 
-        assert len(source._slices) == 1, \
-                "Unpacking tuples can only be done on single slices"
+        if not len(source._slices) == 1:                
+            if(name):
+                raise AttributeError, "Asked to unpack tuple attribute '" + \
+                    name + "', but cannot find a tuple."
+            else:
+                raise AttributeError, "No tuple to unpack"
         slice = source._slices[0]
         nslices = self._apply(slice,name,unpack=unpack)
         return self._initialize(tuple(nslices))
@@ -179,10 +188,10 @@ class UnpackTuple(repops.UnaryOpRep):
     def _apply(cls, slice, name=None, unpack=True):
         if(not isinstance(slice.type, rtypes.TypeTuple)):
             if(name):
-                raise RuntimeError, "Asked to unpack tuple attribute " + \
-                    name + " but cannot find a tuple."
+                raise AttributeError, "Asked to unpack tuple attribute '" + \
+                    name + "', but cannot find a tuple"
             else:
-                raise RuntimeError, "No tuple to unpack"
+                raise AttributeError, "No tuple to unpack"
 
         if(name is None):
             nslices = [ops.UnpackTupleOp(slice, idx) for idx in range(len(slice.type.subtypes))]
@@ -195,7 +204,7 @@ class UnpackTuple(repops.UnaryOpRep):
                 try:
                     idx = slice.type.fieldnames.index(name)
                 except ValueError:
-                    raise RuntimeError, "Name: " + str(name) + " not in tuple"
+                    raise AttributeError, "Cannot unpack, as tuple has no field '" + str(name) + "'"
             nslices = [ops.UnpackTupleOp(slice, idx)]
         
         if(unpack):

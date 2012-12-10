@@ -22,15 +22,50 @@ _delay_import_(globals(),"repops_funcs")
 _delay_import_(globals(),"ops")
 
 
-class NewDim(object):
-    def __init__(self,name=None):
-        self.name = name
-    def __call__(self,name=None):
-        return NewDim(name)
-newdim = NewDim()
 
 
 class Representor(Node):
+    """Representor is the primary object in Ibidas. It represents
+    a data set, accesible through slices.
+
+    Properties can be accessed to obtain information about this object:
+    
+        * Names: Slice names
+
+        * Type: Data type
+
+        * Slices: List of slices
+
+        * I: Info on slices/types/dims without executing the query
+
+        * Depth: Maximum number of dimensions in slices
+
+    Slices can be accessed as attributes, e.g: obj.slicename
+
+    Note that all slice names should follow the python syntax rules for variable
+    names, AND use only lower case letters (to distinguish them from method names, 
+    which start all with an uppercase letter). 
+
+    Special attribute access can be obtained through so-called axis specifiers:
+
+        * Bookmarks:  obj.Bbookmarkname   Access set of slices with certain bookmark (see Bookmark method)
+        
+        * Dimensions: obj.Ddimname        Access all slices with a certain dimension
+
+        * Elements:   obj.E[dimname]      Access Elements of packed arrays. Optional dimname specifies which dimensions to unpack.
+                                          Slices without that dimension as outermost dimension are not unpacked. 
+
+        * Fields:     obj.Ffieldname      Access Fields of packed tuples. obj should have only one slice. 
+
+        * Left/Right: obj.L, obj.R        Special nested bookmarks set by e.g. Match operation to allow 
+                                          backtracking to separate sources. eg::
+                                          
+                                          >>> ((x |Match| y) |Match| z).LR  
+                                          
+                                          gives all slices of y (first go Left (get xy), then R (get y)). 
+
+    """
+
     _state = 0                 #default value
     _slices = []               #default value
 
@@ -54,10 +89,31 @@ class Representor(Node):
             self._initialize(self._getResultSlices(endpoint=False))
 
     def Show(self,table_length=100):
-        print self.__str__(table_length=table_length)
+        """Prints table of contents.
 
-    def __str__(self, print_data=True, table_length=15):
+        :param table_length: Number of rows to show for each dimension (default: 100)
+
+        Show can be used to view a larger part of the table then the default output (15 rows)
+        you get in Ipython/Ibidas or by using str(). 
+
+        Show returns its representor object, allowing you to include it at any point in a query
+        to observe results, e.g.::
+
+        >>> x.Unique().Show() |Match| y 
+
+        """
+        nself = repops.NoOp(self)
+        nself._table_length = table_length
+        return nself
+
+    def __str__(self, print_data=True, table_length=None):
         self._checkState()
+
+        if table_length is None:
+            if '_table_length' in self.__dict__:
+                table_length = self._table_length
+            else:
+                table_length = 15
         
         names = ["Slices:"] + [s.name for s in self._slices]
         types = ["Type:"] + [str(s.type) for s in self._slices]
@@ -83,6 +139,9 @@ class Representor(Node):
             dims.append(dim_str)
         
         rows = [names, types, longdims]
+       
+        opath = dimpaths.getOrderDim([s.dims for s in self._slices])
+
 
         if(print_data):
             first_dims = set([s.dims[0] for s in self._slices if s.dims])
@@ -135,6 +194,14 @@ class Representor(Node):
             nwidths = tableprint.optimize_width(console_width, widths, 3)
             srows = tableprint.row_crop(nwidths, srows)
             res += tableprint.indent(srows,hasHeader=True) 
+        
+        if opath:
+            dim_str = []
+            for  dim in opath:
+                dim_str.append(str(dim))
+            dim_str = "<".join(dim_str)
+            res = res + '\nDim order: ' + dim_str 
+
         return res 
 
     def _getInfo(self):
@@ -151,10 +218,7 @@ class Representor(Node):
     #    return str(self.__class__)
     __repr__ = __str__
 
-    def _axisF(self, name):
-        return repops_slice.Project(self, name)
-
-    def _axisA(self, name):
+    def _axisF(self, name): 
         if(name == ""):
             name = None
         return repops_slice.UnpackTuple(self, name)
@@ -197,24 +261,31 @@ class Representor(Node):
         if(not name):
             return self
 
-        try:
-            axis_letter = name[0]
-            #should be upper case
-            if(not axis_letter.upper() == axis_letter or axis_letter == "_"):
+        axis_letter = name[0]
+        #should be upper case
+        if(not axis_letter.upper() == axis_letter or axis_letter == "_"):
+            try:
                 return repops_slice.Project(self,name)
-            else:
+            except AttributeError, error:
+                #reraise attribute error as runtime error, 
+                #so that python will not
+                #attempt to find attribute in another way
+                #(thereby raising a new exception)
+                exc_class, exc, traceback = sys.exc_info()
+                raise RuntimeError, RuntimeError(error.message), traceback
+        elif(hasattr(self, '_axis' + axis_letter)):
+            try:
                 name = name[1:]
                 return getattr(self, "_axis" + axis_letter)(name)
-
-        except AttributeError, error:
-            #reraise attribute error as runtime error, 
-            #so that python will not
-            #attempt to find attribute in another way
-            #(thereby raising a new exception)
-            exc_class, exc, traceback = sys.exc_info()
-            raise RuntimeError, RuntimeError(error.message), traceback
- 
-        raise AttributeError("No attribute with name: " + name + " found")
+            except AttributeError, error:
+                #reraise attribute error as runtime error, 
+                #so that python will not
+                #attempt to find attribute in another way
+                #(thereby raising a new exception)
+                exc_class, exc, traceback = sys.exc_info()
+                raise RuntimeError, RuntimeError(error.message + " (and there is also no method '" + axis_letter + name + "')"), traceback
+        else:
+            raise RuntimeError, 'No method with name: ' + name
 
     def _getAttributeNames(self):
         if not self._slicesKnown():
@@ -225,6 +296,40 @@ class Representor(Node):
             return [slice.name for slice in self._slices]
 
     def Copy(self, log=False, debug=False):
+        """Executes the current query.
+
+        Normally, query operations (e.g. obj + 3) are not executed immediately. Instead
+        these operations are performed simultaneously when output is requested. This allows
+        us to optimize these operations all together, or e.g. translate them into a SQL
+        query. 
+
+        However, this behaviour is not always what is needed, e.g::
+
+            >>> x = very expensive query
+            >>> print x[10:20]
+            >>> print x[10:30]
+            
+        would execute the query saved in x two times (as ibidas due to being part of an 
+        interpreted language cannot analyze the whole script to determine that the output is 
+        required twice). 
+
+        To prevent this, one can instead do::
+
+            >>> x = (very expensive query).Copy()
+
+        executing the expensive part of the only query once. 
+
+
+        :param log:  Setting this to true will print the amount of time that is spent in any of the passes of
+                     they query optimizer (default: False)
+
+        :param debug: Setting this to true will output the query tree at various stadio through XML-RPC for visualization
+                      in Cytoscape. This requires that Cytoscape is running, with an activated XML-RPC plugin listening
+                      at port 9000. 
+                     
+
+        """
+
         res = wrapper.SourceRepresentor()
         res._initialize(tuple(self._getResultSlices(endpoint=False, log=log, debug=debug)))
         return res
@@ -243,7 +348,8 @@ class Representor(Node):
         nself.__dict__ = self.__dict__.copy()
         return nself
 
-    def getType(self):
+   
+    def _getType(self):
         """Returns type of this object.
            If multiple slices, returns tuple type of slice types.
         """
@@ -253,31 +359,28 @@ class Representor(Node):
             return rtypes.TypeTuple(False, 
                     tuple([slice.type for slice in self._slices]), 
                     tuple([slice.name for slice in self._slices]))
-    Type=property(fget=getType)
+    Type=property(fget=_getType)
 
-
-    def Redim(self, *args, **kwds):
-        return repops_dim.Redim(self, *args, **kwds)
-
-    def getSlices(self):
+    def _getSlices(self):
         self._checkState()
         return list(self._slices)
-    Slices=property(fget=getSlices)
+    Slices=property(fget=_getSlices)
 
-    def getDepth(self):
+    def _getDepth(self):
         """Returns max dimension depth (number of dimensins) of
            slices in this representor. 
         """
         return max([len(slice.dims) for slice in self._slices])
-    Depth=property(fget=getDepth)
+    Depth=property(fget=_getDepth)
     
 
-    def getNames(self):
+    def _getNames(self):
         self._checkState()
         return [slice.name for slice in self._slices]
-    Names=property(fget=getNames)
+    Names=property(fget=_getNames)
 
     def __getitem__(self, condition):
+        self._checkState()
         if(not isinstance(condition, tuple)):
             condition = (condition,)
         
@@ -297,10 +400,10 @@ class Representor(Node):
         #note: cannot use Ellipsis in condition, will perform Ellipsis == elem,
         #which wille xecute as query and fail/be slow
         if(any([elem is Ellipsis for elem in condition])):  
-            ncond = len(dimpaths.uniqueDimPath([s.dims for s in self._slices]))- 1
+            ncond = len(dimpaths.getOrderDim([s.dims for s in self._slices]))
         else:
-            ncond = len(condition) - 1
-
+            ncond = len(condition)
+        
         for pos, cond in enumerate(condition[::-1]):
             if(isinstance(cond, context.Context)):
                 cond = context._apply(cond, self)
@@ -309,31 +412,49 @@ class Representor(Node):
                                                 cond.step is None):
                 pass
             elif(cond is Ellipsis):
-                ncond = len(condition) - 1
+                ncond = len(condition)
             elif(isinstance(cond,NewDim)):
                 pass
             elif(len(condition) == 1):
                 self = repops_multi.Filter(self, cond)
             else:
-                self = repops_multi.Filter(self, cond, ncond - pos)
+                self = repops_multi.Filter(self, cond, ncond - pos - 1)
         return self
-           
-    def Filter(self, condition, dim=None):
+     
+    def Redim(self, *args, **kwds):
+        """Assign new dimensions
+
+        example: .Redim('new_dimname', _.f0)
+        Assign new dim with name 'new_dimname' to first
+        dimension of slice f0
+
+        example: .Redim('new_dimname', f0=1)
+        Assign new dim with name 'new_dimname' to second
+        dimension of slice f0
+
+        example: .Redim('new_dimname', {_.Dd1.Without('f0'):1, 'f0':1})
+        Assign all slices with dimension d1 (except f0) as first dim
+        a new dim with name 'new_dimname'. Do the same to slice f0, 
+        but as second dimension. 
+        """
+        return repops_dim.Redim(self, *args, **kwds)
+          
+    def Filter(self, condition, dim=LASTCOMMONDIM, mode=None):
         """Performs filtering on this dataset using ``condition``.
            
            :param condition: condition to filter on
 
-                * Non-representor values are converted using ``ibidas.rep`` function
+                * Non-representor values are converted using ``Rep`` function
 
-                * Representor should have single slice.
+                * condition should have only a single slice.
 
                 * Can be of type bool, integer, array or slice. 
 
                 Various data types can be used:
 
-                * Bool: last dim should be equal to dim in this representor. Is applied to that dim by default.
+                * Bool: last dim should be equal to a dim in this representor. Is applied to that dim by default.
 
-                * Integer: collapses dim it is applied on. 
+                * Integer: collapses the dimension it is applied on. 
 
                 * Array (of integers): selects positions indicated by integers in array.
 
@@ -342,10 +463,75 @@ class Representor(Node):
            :param dim: Dim to apply the filtering on. 
 
                 * If no dim given, applied to last common dimension of slices (except for bool types).
+
+                * Integer: identifies dimension according to dim order (printed at the end of a representor printout)
+
+                * Long: identifies dimension according to common dimensions shared by all slices (default: -1)
+
+                * String: dimension name
+
+                * Dim object: x.Slices[0].dims[2]
+
+                * Dimpath object: e.g. x.Slices[0].dims[:2]
+
+            :param mode: Determines broadcasting method. 
+
+                * "pos"  Postion-based broadcasting ('numpy'-like broadcasting)
+
+                * "dim"  Dimension-identity based broadcasting (normal 'ibidas' broadcasting)
+
+                * None:  (Default). Determined based on input. Non-representation objects use position-based broadcasting
+                         Representation objects by default use dimension-based, except if they are prepended by a '+' operator, 
+                         e.g::
+
+                         >>> x.Filter(+constraintrep)
+
+            What is done to dimensions in the constraint that are not in the data source? Here we follow
+            the default rules in Ibidas for broadcasting. 
+
+                * First, the dimension in the source that is going to be filtered is identified (according to dim param or constraint last dimension)
+                
+                * Secondly, we match this dimension to the last dimension in the constraint. 
+                
+                * All remaining dimensions are broadcasted against each other.
+
+            Examples::
+
+                >>> x = Rep([[1,2,3],[4,5,6]])                
+                Slices: | data     
+                -------------------
+                Type:   | int64    
+                Dims:   | d1:2<d2:3
+                Data:   |          
+                        | [1 2 3]  
+                        | [4 5 6]  
+                
+                Dim order: d1:2<d2:3
+                
+                >>> x.Filter(0) 
+                Slices: | data
+                ---------------
+                Type:   | int64
+                Dims:   | d1:2
+                Data:   |
+                        | 1
+                        | 4
+                
+                Dim order: d1:2
+
+            This example matches the last common dimension (d2), and selects the first element.
+            This collapses dimension d2.
+
+                >>> x.Filter(0, dim='d1')
+ 
+
+                            
+
+
         """
         if(isinstance(condition, context.Context)):
             condition = context._apply(condition, self)
-        return repops_multi.Filter(self, condition, dim) 
+        return repops_multi.Filter(self, condition, dim, mode) 
 
     def _getResultSlices(self, args={}, endpoint=True, log=False, debug=False):
         query = query_context.QueryContext(self, args, endpoint)
@@ -632,6 +818,18 @@ class Representor(Node):
     
     def Match(self, other, lslice=None,rslice=None, jointype="inner"):
         return repops_multi.Match(self, other, lslice, rslice, jointype)
+    
+    def Intersect(self, other, slices=COMMON_POS, dims=LASTCOMMONDIM, mode='dim'):
+        return repops_multi.Intersect(self, other, slices=slices, dims=dims, mode=mode)
+    
+    def Except(self, other, slices=COMMON_POS, dims=LASTCOMMONDIM, mode='dim'):
+        return repops_multi.Intersect(self, other, slices=slices, dims=dims, mode=mode)
+    
+    def Difference(self, other, slices=COMMON_POS, dims=LASTCOMMONDIM, mode='dim'):
+        return repops_multi.Intersect(self, other, slices=slices, dims=dims, mode=mode)
+   
+    def Union(self, other, slices=COMMON_POS, dims=LASTCOMMONDIM, mode='dim'):
+        return repops_multi.Intersect(self, other, slices=slices, dims=dims, mode=mode)
 
     def Replace(self, slice, translator, fromslice=0, toslice=1):
         return repops_multi.Replace(self, slice, translator, fromslice, toslice) 

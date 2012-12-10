@@ -34,6 +34,7 @@ class TestScalar(TestData):
     def setUp(self):
         self.data = 1
 
+
 class TestArray(TestData):
     def setUp(self):
         self.data = numpy.array([1,2,3,4,5])
@@ -52,6 +53,10 @@ class TestArray(TestData):
         k = Rep(self.data)
         self.assertTrue(k[0] == self.fres0)
 
+    def test_intersect(self):
+        x = Rep(self.data)
+        str(x.Intersect(x))
+
 
 
 class TestMatrix(TestArray):
@@ -60,7 +65,7 @@ class TestMatrix(TestArray):
         self.fres0 = numpy.array([1,1])
         self.transpose_couples = [((1,0),(1,0))]
 
-    def test_tranpose(self):
+    def test_transpose(self):
         r = self.getRep()
         pidx = range(r.Depth)
         self.assertTrue(r.Transpose(pidx) ==+ r)
@@ -81,6 +86,7 @@ class TestMatrix(TestArray):
             f2 = f2.Flat(f2._slices[0].dims[1].name)
        #all
        f3 = Rep(self.data).FlatAll()
+       
        #compare
        self.assertTrue(f1 ==+ f2)
        self.assertTrue(f2 ==+ f3)
@@ -94,7 +100,6 @@ class TestMatrix(TestArray):
     def test_filter4(self):
         k = Rep(self.data)
         self.assertTrue(k[Rep([0],unpack=False)].Flat() ==+ k[0])
-       
 
 class TestNestedArray(TestMatrix):
     def setUp(self):
@@ -151,6 +156,20 @@ class TestArrayNestedNestedMatrix(TestMatrix):
     def test_filter2(self):
         k = Rep(self.data)
         self.assertRaises(Exception,k[3])
+    
+    def test_flat(self):
+       f1 = Rep(self.data)
+       #backward
+       while(f1.Depth >= 3):
+            f1 = f1.Flat(-1)
+       #forward
+       f2 = Rep(self.data)
+       while(f2.Depth >= 3):
+            f2 = f2.Flat(f2._slices[0].dims[2].name)
+       #all
+       
+       #compare
+       self.assertTrue(f1 ==+ f2)
 
 class TestNestedVarMatrix(TestMatrix):
     def setUp(self):

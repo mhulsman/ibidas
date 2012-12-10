@@ -101,11 +101,11 @@ def simSame(intype, outtypecls, dimdepth):
 
 
 #}}}
-addCasts(rtypes.TypeNumbers | set([rtypes.TypeAny]), rtypes.TypeNumbers, checkDefault, simDefault,"to_numbers")
-addCasts(rtypes.TypeAll, rtypes.TypeAny, checkDefault, simDefault,"to_any")
-addCasts(set([rtypes.TypeUnknown]) | rtypes.TypeStrings, rtypes.TypeIntegers, checkDefault, simDefault,"string_to_int")
-addCasts(set([rtypes.TypeUnknown]) | rtypes.TypeStrings, rtypes.TypeReals, checkDefault, simDefault,"string_to_real")
-addCasts(set([rtypes.TypeUnknown]) | rtypes.TypeStrings, rtypes.TypeStrings, checkDefault, simDefault,"string_to_string")
+addCasts(rtypes.TypeNumbers | set([rtypes.TypeAny, rtypes.TypeUnknown]), rtypes.TypeNumbers, checkDefault, simDefault,"to_numbers")
+addCasts(rtypes.TypeAll, set([rtypes.TypeAny, rtypes.TypeUnknown]), checkDefault, simDefault,"to_any")
+addCasts(set([rtypes.TypeUnknown, rtypes.TypeAny]) | rtypes.TypeStrings, rtypes.TypeIntegers, checkDefault, simDefault,"string_to_int")
+addCasts(set([rtypes.TypeUnknown, rtypes.TypeAny]) | rtypes.TypeStrings, rtypes.TypeReals, checkDefault, simDefault,"string_to_real")
+addCasts(set([rtypes.TypeUnknown, rtypes.TypeAny]) | rtypes.TypeStrings, rtypes.TypeStrings, checkDefault, simDefault,"string_to_string")
 
 
 def checkStringString(intype, outtype):#{{{

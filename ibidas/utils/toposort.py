@@ -1,6 +1,6 @@
 import copy
 
-class CycleError(Exception):
+class CycleError(RuntimeError):
     pass
 
 class StableTopoSortGraph(object):
@@ -8,6 +8,21 @@ class StableTopoSortGraph(object):
         self.nodes = []
         self.parents = {}
         self.ancestors = {}
+
+    def hasNode(self, node):
+        return node in self.parents
+
+    def getNodes(self):
+        return self.nodes
+
+    def keepNodes(self, nodes):
+        nodes = set(nodes)
+        
+        self.nodes = [n for n in self.nodes if n in nodes]
+        self.parents = dict([(k,v & nodes) for k,v in self.parents.iteritems() if k in nodes])
+        self.parents = dict([(k,v & nodes) for k,v in self.ancestors.iteritems() if k in nodes])
+
+
 
     def addNodeIfNotExist(self,node):
         if(node in self.parents):
@@ -17,6 +32,10 @@ class StableTopoSortGraph(object):
             self.parents[node] = set()
             self.ancestors[node] = set()
             return True
+
+    def addNodesIfNotExist(self, *nodes):
+        for node in nodes:
+            self.addNodeIfNotExist(node)
 
     def mergeNodes(self,nodeid1,nodeid2):
         if(nodeid1 in self.ancestors[nodeid2] or nodeid2 in self.ancestors[nodeid1]):
@@ -40,7 +59,7 @@ class StableTopoSortGraph(object):
         assert after in self.parents, "Target node not known"
 
         if after in self.ancestors[before] or after == before:
-            raise CycleError, "Edge introduces cycle!"
+            raise CycleError, "Edge (%s, %s) introduces cycle!" %(str(before), str(after))
 
         self.parents[after].add(before)
         self.ancestors[after].add(before)
@@ -60,6 +79,9 @@ class StableTopoSortGraph(object):
 
     def __iter__(self):
         return StableTopoSortIter(self)
+
+    def fullOrder(self):
+        return StableTopoSortFullOrderIter(self)
     
     def elem(self,n,after=None,exclude=None):
         i = self.__iter__()
@@ -107,6 +129,27 @@ class StableTopoSortIter(object):
             raise RuntimeError, "No viable next element during toposort, cycle?"
         self.visited.add(visit_node)
         return visit_node
+
+class StableTopoSortFullOrderIter(StableTopoSortIter):
+    def next(self):
+        nodes = self.sts_graph.nodes
+        visit_nodes = []
+        
+        if(len(self.visited) == len(self.sts_graph.nodes)):
+            raise StopIteration
+        
+        for node in nodes:
+            if(node in self.visited):
+                continue
+            parents = self.sts_graph.parents[node]
+            if(parents.issubset(self.visited)):
+                visit_nodes.append(node)
+        
+        if not visit_nodes:
+            raise CycleError, "No viable next element during toposort, cycle?"
+                    
+        self.visited.update(visit_nodes)
+        return visit_nodes
 
 class StableTopoSortCopyIter(StableTopoSortIter):
     def __init__(self,stable_topo_sort_graph):

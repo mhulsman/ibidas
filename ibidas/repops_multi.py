@@ -21,8 +21,9 @@ class Broadcast(repops.MultiOpRep):
 
 
 class Nest(repops.MultiOpRep):
-    def __init__(self, lsource, rsource, dim=None):
+    def __init__(self, lsource, rsource, dim=LASTCOMMONDIM):
         repops.MultiOpRep.__init__(self,(lsource,rsource),dim=dim)
+    
     def _sprocess(self, sources, dim=None):
         assert len(sources) == 2, "Nest expects two representor objects"
         lsource,rsource = sources
@@ -155,12 +156,12 @@ class Group(repops.MultiOpRep):
 
 
 class Filter(repops.MultiOpRep):
-    def __init__(self,source,constraint,dim=None):
+    def __init__(self,source,constraint,dim=LASTCOMMONDIM,mode=None):
         if(not isinstance(constraint,representor.Representor)):
             constraint = repops.PlusPrefix(python.Rep(constraint,name="filter"))
-        repops.MultiOpRep.__init__(self,(source,constraint),dim=dim)
+        repops.MultiOpRep.__init__(self,(source,constraint),dim=dim,mode=mode)
 
-    def _process(self,sources,dim):
+    def _process(self,sources,dim,mode):
         source,constraint = sources
         if not source._slicesKnown() or not constraint._typesKnown():
             return
@@ -170,12 +171,13 @@ class Filter(repops.MultiOpRep):
         if(not seldimpath and not isinstance(cslice.type, rtypes.TypeBool)):
             raise RuntimeError, "Attempting to perform filter on non-existing dimension"
         
-        if(isinstance(constraint, repops.PlusPrefix)):
-            mode = "pos"
-        else:
-            mode = "dim"
+        if mode is None:
+            if(isinstance(constraint, repops.PlusPrefix)):
+                mode = "pos"
+            else:
+                mode = "dim"
+           
         nslices = self._apply(source._slices,cslice,seldimpath,mode)
-       
         return self._initialize(tuple(nslices))
 
     @classmethod
@@ -264,7 +266,7 @@ class Unique(repops.MultiOpRep):
             constraint = constraint.Tuple()
         
         #fixme: make it slice-only (remove rep)
-        dpath = dimpaths.identifyUniqueDimPathSource(constraint,None)
+        dpath = dimpaths.identifyUniqueDimPathSource(constraint,LASTCOMMONDIM)
         uconstraint = repops_funcs.Argunique(constraint)
         cslice = uconstraint._slices[0]
         nslices = Filter._apply(source._slices, cslice, dpath[-1:],"dim")
@@ -307,7 +309,7 @@ class Join(repops.MultiOpRep):
         leftpos = repops_funcs.Pos._apply([cslice], ldimpath)[0]
         rightpos = repops_funcs.Pos._apply([cslice], rdimpath)[0]
         
-        filters = Filter._apply([leftpos,rightpos],cslice, None,"dim")
+        filters = Filter._apply([leftpos,rightpos],cslice, LASTCOMMONDIM,"dim")
         leftflat,rightflat = repops_dim.Flat._apply(filters, filters[0].dims[-1:])
 
         leftflat = ops.PackArrayOp(leftflat)
@@ -449,17 +451,36 @@ class Stack(repops.MultiOpRep):
     def __init__(self, *sources, **kwargs):
         repops.MultiOpRep.__init__(self,sources, **kwargs)
 
-    def _sprocess(self, sources, dim=None):
-        slicelens = set([len(source._slices) for source in sources])
-        assert len(slicelens) == 1, "Sources of stack should have same number of slices"
-        nslice = slicelens.pop()
+    def _sprocess(self, sources, slices=COMMON_POS, mode='dim', dims=LCDIM):
+        nslices = []
+        if slices == COMMON_POS:
+            slicelens = set([len(source._slices) for source in sources])
+            assert len(slicelens) == 1, ("Sources should have same number of slices in %s when matching based on COMMON_POS" % self.__class__.__name__ )
+        elif slices == COMMON_NAME:
+            nms = set(sources[0].Names)
+            assert len(sources[0].Names) == len(nms), ('Cannot have duplicate names in %s while matching slices on name' % self.__class__.__name__)
+            for source in sources[1:]:
+                xnms =  set(source.Names)
+                assert len(source.Names) == len(xnms), ('Cannot have duplicate names in %s while matching slices on name' % self.__class__.__name__)
+                nms &= xnms
+            assert nms, ('Cannot find shared names in %s while matching slices on name' % self.__class__.__name__)
 
+            nsources = []
+            for source in sources:
+                onms = set(source.Names) - nms
+                if onms:
+                    nslices.extend(source.Get(*onms)._slices)
+                nsources.append(source.Get(*nms))
+            sources = nsources
+        
         seldimpaths = [] 
-        for source in sources:
+        if not isinstance(dims,tuple):
+            dims = (dims,) * len(sources)
+        for source, dim  in zip(sources, dims):
             seldimpaths.append(dimpaths.identifyUniqueDimPathSource(source, dim))
 
-        nslices = []
         slicelists = [source._slices for source in sources]
+        ndim = None
         for slicecol in zip(*slicelists):
             packdepths = []
             ncol = []
@@ -471,15 +492,15 @@ class Stack(repops.MultiOpRep):
                     slice = ops.PackArrayOp(slice, packdepths[-1])
                 ncol.append(slice)
             
-            assert len(set([len(s.dims) for s in ncol])) == 1, "Dim depth mismatch between slices"
+            #assert len(set([len(s.dims) for s in ncol])) == 1, "Dim depth mismatch between slices"
 
             res = ncol[0]
             for slice in ncol[1:]:
-                res = repops_funcs.Add._apply((res,slice),"pos")
+                res = repops_funcs.Add._apply((res,slice),mode)
             dimdepth = min(packdepths)
             res = ops.UnpackArrayOp(res,dimdepth)
             
-            if(len(nslices) == 0):
+            if ndim is None:
                 ndim = res.dims[-dimdepth]
             else:
                 res = ops.ChangeDimOp(res, len(res.dims) - dimdepth, ndim)
@@ -488,35 +509,69 @@ class Stack(repops.MultiOpRep):
         return self._initialize(tuple(nslices))
 
 
-
-
 class Intersect(repops.MultiOpRep):
     opercls = repops_funcs.And
 
     def __init__(self, *sources, **kwargs):
         repops.MultiOpRep.__init__(self,sources, **kwargs)
 
-    def _sprocess(self, sources, dim=None):
+    def _sprocess(self, sources, slices=COMMON_POS, dims=LCDIM, mode='dim'):
         if any([not source._typesKnown() for source in sources]):
             return
-        slicelens = set([len(source._slices) for source in sources])
-        assert len(slicelens) == 1, "Sources of stack should have same number of slices"
-        nslice = slicelens.pop()
 
+        nslices = []
+        if slices == COMMON_POS:
+            slicelens = set([len(source._slices) for source in sources])
+            assert len(slicelens) == 1, ("Sources should have same number of slices in %s when matching based on COMMON_POS" % self.__class__.__name__ )
+        elif slices == COMMON_NAME:
+            nms = set(sources[0].Names)
+            assert len(sources[0].Names) == len(nms), ('Cannot have duplicate names in %s while matching slices on name' % self.__class__.__name__)
+            for source in sources[1:]:
+                xnms =  set(source.Names)
+                assert len(source.Names) == len(xnms), ('Cannot have duplicate names in %s while matching slices on name' % self.__class__.__name__)
+                nms &= xnms
+            assert nms, ('Cannot find shared names in %s while matching slices on name' % self.__class__.__name__)
+
+            nsources = []
+            for source in sources:
+                onms = set(source.Names) - nms
+                if onms:
+                    nslices.extend(source.Get(*onms)._slices)
+                nsources.append(source.Get(*nms))
+            sources = nsources
+        elif isinstance(slices, tuple):
+            assert len(slices) == len(sources), ('Slices tuple argument to %s should have same number of element as their are source datasets' % self.__class__.__name__)
+            
+            nsources = []
+            for source, xslice in zip(sources, slices):
+                if not isinstance(xslice, tuple):
+                    xslice = (xslice,)
+                selsource = source.Get(*xslice)                    
+                noselsource = source.Without(selsource)
+                nslices.extend(noselsource._slices)
+                nsources.append(selsource)
+            sources = nsources                
+            
         seldimpaths = [] 
         tupleslices = []
         packdepthslist = []
-        for source in sources:
+        if not isinstance(dims,tuple):
+            dims = (dims,) * len(sources)
+
+        for dim, source in zip(dims, sources):
             dpath = dimpaths.identifyUniqueDimPathSource(source, dim)
             pslices = []
             packdepths = []
             for slice in source._slices:
                 lastpos = slice.dims.matchDimPath(dpath)
-                packdepths.append(len(slice.dims) - lastpos[0] - 1)
-                assert len(lastpos) == 1, "Cannot choose between or find dims in slice: " + str(slice)
-                if(packdepths[-1] > 0):
-                    slice = ops.PackArrayOp(slice, packdepths[-1])
-                pslices.append(slice)
+                if not lastpos:
+                    nslices.append(slice)
+                else:
+                    packdepths.append(len(slice.dims) - lastpos[-1] - 1)
+                    assert len(lastpos) == 1, "Cannot find dims in slice: " + str(slice)
+                    if(packdepths[-1] > 0):
+                        slice = ops.PackArrayOp(slice, packdepths[-1])
+                    pslices.append(slice)
             assert len(set([len(s.dims) for s in pslices])) == 1, "Dim depth mismatch between slices in a source"
             if(len(pslices) > 1):
                 pslice = repops_slice.Tuple._apply(pslices)
@@ -528,7 +583,7 @@ class Intersect(repops.MultiOpRep):
         
         res = tupleslices[0]
         for slice in tupleslices[1:]:
-            res = self.opercls._apply((res,slice),"pos")
+            res = self.opercls._apply((res,slice),mode)
 
         tslice = ops.UnpackArrayOp(res,1)
         if(isinstance(tslice.type, rtypes.TypeTuple)):
@@ -536,7 +591,6 @@ class Intersect(repops.MultiOpRep):
         else:
             pslices = [tslice]
        
-        nslices = []
         for pos, pslice in enumerate(pslices):
             mpd = min([pd[pos] for pd in packdepthslist])
             if(mpd > 0):

@@ -31,7 +31,7 @@ def optimize_width(console_width, rows_width, border_width):
             nrows_width -= perrow
         else:
             next_maxval = rem_lengths.max()
-            nrows_width[nrows_width == maxval] -= min(perrow, maxval - next_maxval)
+            nrows_width[nrows_width == maxval] -= min(int(perrow), maxval - next_maxval)
     return nrows_width
 
 def perform_split(rows_width, border_width, consolewidth):

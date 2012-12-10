@@ -18,17 +18,21 @@ class UnpackArray(repops.UnaryOpRep):
             return
 
         nslices = []                       #new active slices
+        unpacked = False
         for slice in source._slices:
             #if name param, but does not match
             if(isinstance(slice.type,rtypes.TypeArray)):
                 if(not name is None):
                     dimindex = slice.type.dims.getDimIndexByName(name)
                     if(not dimindex is None):
-                        slice = ops.UnpackArrayOp(slice,ndim=dimindex)
+                        slice = ops.UnpackArrayOp(slice,ndim=dimindex+1)
+                        unpacked = True
                 else:
+                    unpacked = True
                     slice = ops.UnpackArrayOp(slice,ndim=ndim)
             nslices.append(slice)
-
+        if not unpacked:
+            raise AttributeError, 'No array-typed slice with outer dimension name "' + name + '" to unpack'
         return self._initialize(tuple(nslices))
 
 class DimRename(repops.UnaryOpRep):#{{{
@@ -50,29 +54,36 @@ class DimRename(repops.UnaryOpRep):#{{{
 
 
 class Redim(repops.UnaryOpRep):
+
     def _sprocess(self, source, *args, **kwds):
         dimname = args[0]
         dimsel = []
         slicesel = []
+
         for arg in args[1:]:
-            dimsel.append(0)
-            slicesel.append(arg)
-        for k,v in kwds.iteritems():
-            dimsel.append(v)
-            slicesel.append(k)
-        
-        selslices = repops_slice.Project(source, *slicesel)._slices
+            if isinstance(arg, dict):
+                kwds.update(arg)
+            else:
+                tslices = source.__getattr__(arg)._slices
+                dimsel.extend([0] * len(tslices))
+                slicesel.extend(tslices)
        
+        for k,v in kwds.iteritems():
+            tslices = source.__getattr__(k)._slices
+            dimsel.extend([v] * len(tslices))
+            slicesel.extend(tslices)
+           
         nslices = list(source._slices)
         dims = set()
-        for slice,dim in zip(selslices,dimsel):
+        for slice,dim in zip(slicesel,dimsel):
             slice = nslices[nslices.index(slice)]
             dimidxs = slice.dims.getDimIndices(dim)
             for dimidx in dimidxs:
+                assert dimidx < len(slice.dims) and dimidx >= 0, 'Dim index should be >= 0 and < %d' % len(slice.dims)
                 dims.add(slice.dims[dimidx])
 
         ndim = dimensions.toCommonDim(dimname, dims)
-        for slice,dim in zip(selslices,dimsel):
+        for slice,dim in zip(slicesel,dimsel):
             sliceidx = nslices.index(slice)
             slice = nslices[sliceidx]
             dimidxs = slice.dims.getDimIndices(dim)
@@ -232,12 +243,31 @@ class Flat(repops.UnaryOpRep):
 
         #find refslices
         refslices = [s for s in fslices if selpath[-1] in s.dims]
+        refslices2 = [s for s in fslices if selpath[-2] in s.dims]
 
         #process slices
         nslices = []
+
         for slice in fslices:
             sdims = slice.dims
-            lastpos = sdims.matchDimPath(selpath[:-1])
+            flatpos = sdims.matchDimPath(selpath[-1:])
+            while flatpos:
+                fpos = flatpos[-1]
+                if(fpos == 0 or sdims[fpos-1] != selpath[-2]):
+                    slice = ops.InsertDimOp(slice,fpos,bcdim)
+                    bcdims = slice.dims[:fpos] + (selpath[-2],) + slice.dims[fpos:]
+                    plan = [BCSOURCE] * len(slice.dims[:fpos]) + [BCEXIST] + [BCSOURCE] * len(slice.dims[fpos:])
+                    slice = ops.BroadcastOp(slice,[refslices2],plan,bcdims)
+                    fpos = fpos + 1
+                
+                slice = ops.FlatDimOp(slice,fpos,ndim)
+                if(len(flatpos) > 1):
+                    sdims = slice.dims
+                    flatpos = sdims.matchDimPath(selpath[-1:])
+                else:
+                    flatpos = []
+            sdims = slice.dims 
+            lastpos = sdims.matchDimPath(selpath[-2:-1])
             while(lastpos):
                 flatpos = lastpos[0] + 1
                 if(len(sdims) <= flatpos or sdims[flatpos] != selpath[-1]):
@@ -248,9 +278,10 @@ class Flat(repops.UnaryOpRep):
                 slice = ops.FlatDimOp(slice,flatpos,ndim)
                 if(len(lastpos) > 1):
                     sdims = slice.dims
-                    lastpos = sdims.matchDimPath(selpath[:-1])
+                    lastpos = sdims.matchDimPath(selpath[-2:-1])
                 else:
                     lastpos = []
+                    
             nslices.append(slice)
         return nslices
 

@@ -17,12 +17,14 @@ class TestBugs(unittest.TestCase):
         yeastract = Get.yeast.yeastract()
         yeastract = yeastract.GroupBy(_.trans_factor)[:10].Copy()
         res = yeastract |Match(_.target,mode="pos")| yeastract[:,newdim]
-
-        str(res[2])
-        str(res[:2])
-        str(res[Rep([2,3],unpack=False)])
+   
+        str(res[0,0,0])
+        str(res[:,:,0])
+        self.assertTrue(all(All((res[0,...] ==+ res[0,:,:]).FlatAll())()))
+        str(res[:2,...])
+        str(res[[0,1],...])
+        str(res[Rep([0,1]),...])
         str(res[_.target == "YGR258c"])
-        str(res[[2,3]])
 
     def test_posbroadcast(self):
         x = Rep([1,2,3])
