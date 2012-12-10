@@ -717,7 +717,7 @@ class SQLPlanner(VisitorFactory(prefixes=("eat","expressionEat"),
         else:
             if isinstance(clsource, Query):
                 lsource = clsource
-            elif(isnstance(clsource, Column) and clsource.ref_query):
+            elif(isinstance(clsource, Column) and clsource.ref_query):
                 lsource = clsource.ref_query
             else:
                 return
