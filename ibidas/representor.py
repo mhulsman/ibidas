@@ -448,8 +448,6 @@ class Representor(Node):
 
                 * condition should have only a single slice.
 
-                * Can be of type bool, integer, array or slice. 
-
                 Various data types can be used:
 
                 * Bool: last dim should be equal to a dim in this representor. Is applied to that dim by default.
@@ -497,7 +495,7 @@ class Representor(Node):
 
             Examples::
 
-                >>> x = Rep([[1,2,3],[4,5,6]])                
+                >>> x = Rep([[1,2,3],[4,5,6]]) 
                 Slices: | data     
                 -------------------
                 Type:   | int64    
@@ -520,14 +518,19 @@ class Representor(Node):
                 Dim order: d1:2
 
             This example matches the last common dimension (d2), and selects the first element.
-            This collapses dimension d2.
+            This collapses dimension d2. Instead we can also filter on dimension d1::
 
                 >>> x.Filter(0, dim='d1')
- 
+                Slices: | data 
+                ---------------
+                Type:   | int64
+                Dims:   | d2:3 
+                Data:   |      
+                        | 1    
+                        | 2    
+                        | 3    
 
-                            
-
-
+                Dim order: d2:3
         """
         if(isinstance(condition, context.Context)):
             condition = context._apply(condition, self)
