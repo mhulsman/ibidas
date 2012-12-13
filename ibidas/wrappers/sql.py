@@ -173,11 +173,11 @@ mysqlid_toibidas = {0:'real64',1:'int8',2:'int16',3:'int32',4:'real32',5:'real64
 
 def convert(col_descriptor, type, engine, tablename=None):#{{{
     if(type == 'postgres' or type == 'postgresql'):
-        fieldnames, subtypes = convert_postgres(col_descriptor, engine)
+        fieldnames, sqlnames, subtypes = convert_postgres(col_descriptor, engine)
     elif(type == 'sqlalchemy'):
-        fieldnames, subtypes = convert_sqlalchemy(col_descriptor, engine)
+        fieldnames, sqlnames, subtypes = convert_sqlalchemy(col_descriptor, engine)
     elif(type == 'mysql'):
-        fieldnames, subtypes = convert_mysql(col_descriptor, engine)
+        fieldnames, sqlnames, subtypes = convert_mysql(col_descriptor, engine)
     else:
         raise RuntimeError, "Unimplemented dialect"
     
@@ -193,10 +193,11 @@ def convert(col_descriptor, type, engine, tablename=None):#{{{
 
     table_type = rtypes.TypeArray(dims=ndims,
                                     subtypes=(table_type,))
-    return (fieldnames, table_type)#}}}
+    return (fieldnames, sqlnames, table_type)#}}}
 
 def convert_mysql(col_descriptor, engine):#{{{
     fieldnames = []
+    sqlnames = []
     subtypes = []
     for col in col_descriptor:
         name, type_code, display_size, internal_size, precision, scale, null_ok = col
@@ -207,12 +208,13 @@ def convert_mysql(col_descriptor, engine):#{{{
             d = d.setHasMissing(True)
         subtypes.append(d)
         fieldnames.append(util.valid_name(name))
-    return (fieldnames, subtypes)#}}}
+        sqlnames.append(name)
+    return (fieldnames, sqlnames, subtypes)#}}}
 
 def convert_postgres(col_descriptor, engine):#{{{
     fieldnames = []
+    sqlnames = []
     subtypes = []
-    util.debug_here()
     for col in col_descriptor:
         name, type_code, display_size, internal_size, precision, scale, null_ok = col
         r = _getPostgresTypes(engine)
@@ -252,16 +254,19 @@ def convert_postgres(col_descriptor, engine):#{{{
             d = d.setHasMissing(True)
         subtypes.append(d)
         fieldnames.append(util.valid_name(name))
-    return (fieldnames, subtypes)#}}}
+        sqlnames.append(name)
+    return (fieldnames, sqlnames, subtypes)#}}}
 
 def convert_sqlalchemy(col_descriptor, engine):
     fieldnames = []
+    sqlnames = []
     subtypes = []
     for column in col_descriptor:
         fieldnames.append(util.valid_name(column.name))
+        sqlnames.append(column.name)
         subtypes.append(sa_typemapper.convert(column.type, column))
 
-    return fieldnames, subtypes
+    return fieldnames, sqlnames, subtypes
 
 def open_db(*args, **kwargs):
     con = sqlalchemy.create_engine(*args, **kwargs)
@@ -282,6 +287,7 @@ class Connection(object):
 
         info_tables = [table for table in tables.values() if "__info__" in table.name]
         tabledict = {}
+        
         for info_table in info_tables:
             name = info_table.name.split('__info__')[0]
             del tables[info_table.name]
@@ -496,8 +502,8 @@ class CombineRepresentor(wrapper.SourceRepresentor):#{{{
 class TableRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, table):
         self._tablename = table.name
-        fieldnames, table_type = convert(table.columns,'sqlalchemy',engine, table.name)
-        nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, table, fieldnames, table_type, util.valid_name(table.name))))
+        fieldnames, sqlnames, table_type = convert(table.columns,'sqlalchemy',engine, table.name)
+        nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, table, sqlnames, table_type, util.valid_name(table.name))))
         nnslices = []
         for slice in nslices:
             if slice.type.hasMissing():
@@ -510,9 +516,9 @@ class QueryRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, query):
         res = engine.execute('select * from (%s) table_alias_33 limit 0;' %query)
         try:
-            fieldnames, query_type = convert(res.context.compiled.statement.columns, "sqlalchemy", engine)
+            fieldnames, sqlnames, query_type = convert(res.context.compiled.statement.columns, "sqlalchemy", engine)
         except AttributeError:
-            fieldnames, query_type = convert(res.cursor.description, res.dialect.name, engine)
+            fieldnames, sqlnames, query_type = convert(res.cursor.description, res.dialect.name, engine)
         res.close()            
         
 
@@ -520,7 +526,7 @@ class QueryRepresentor(wrapper.SourceRepresentor):#{{{
             error('Query should start with SELECT')
         query = query[7:] #drop select, as it is added again by sql.expression.select
         query = sqlalchemy.sql.expression.select([sqlalchemy.sql.expression.text(query)])
-        nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, query, fieldnames,  query_type, "query_result")))
+        nslices = repops_slice.UnpackTuple._apply(ops.UnpackArrayOp(SQLOp(engine, query, sqlnames,  query_type, "query_result")))
         nnslices = []
         for slice in nslices:
             if slice.type.has_missing:
