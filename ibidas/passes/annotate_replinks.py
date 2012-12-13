@@ -43,7 +43,6 @@ class AnnotateRepLinks(VisitorFactory(prefixes=("link","distribute"),
             self.link(source)
         self.linkRepresentor(node)
 
-
     def distributeOp(self, node, lastlink=None):
         if(node in self.links):
             selflink = self.links[node]
