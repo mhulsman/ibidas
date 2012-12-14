@@ -368,7 +368,7 @@ class Match(repops.MultiOpRep):
         assert len(rslice._slices) == 1, "rslice parameter in match should have only one slice"
         assert len(lslice._slices) == 1, "lslice parameter in match should have only one slice"
         
-        assert merge_same in set(['equi','all',True]) or isinstance(merge_same,tuple), 'merge_same should be "equi", "all"/True or a tuple of names, or a tuple of tuple of name pairs'
+        assert merge_same in set([False, 'equi','all',True]) or isinstance(merge_same,tuple), 'merge_same should be "equi", "all"/True or a tuple of names, or a tuple of tuple of name pairs'
 
         self._sources = (lsource, rsource, lslice, rslice)
         if not lslice._typesKnown() or not rslice._typesKnown():
