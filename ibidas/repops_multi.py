@@ -167,7 +167,12 @@ class Filter(repops.MultiOpRep):
             return
         assert len(constraint._slices) == 1, "Filter constraint should have 1 slice"
         cslice = constraint._slices[0]
-        seldimpath = dimpaths.identifyUniqueDimPathSource(source, dim)
+
+        if(not isinstance(cslice.type, rtypes.TypeBool)):
+            seldimpath = dimpaths.identifyUniqueDimPathSource(source, dim)
+        else:
+            seldimpath = dimpaths.identifyUniqueDimPathSource(source, cslice.dims[-1])
+            
         if(not seldimpath and not isinstance(cslice.type, rtypes.TypeBool)):
             raise RuntimeError, "Attempting to perform filter on non-existing dimension"
         
@@ -362,6 +367,9 @@ class Match(repops.MultiOpRep):
             return
         assert len(rslice._slices) == 1, "rslice parameter in match should have only one slice"
         assert len(lslice._slices) == 1, "lslice parameter in match should have only one slice"
+        
+        assert merge_same in set([False, 'equi','all',True]) or isinstance(merge_same,tuple), 'merge_same should be "equi", "all"/True or a tuple of names, or a tuple of tuple of name pairs'
+
         self._sources = (lsource, rsource, lslice, rslice)
         if not lslice._typesKnown() or not rslice._typesKnown():
             return
@@ -369,7 +377,8 @@ class Match(repops.MultiOpRep):
         rslice = rslice._slices[0]
         nslices = self._apply(lsource, rsource, lslice, rslice, jointype, merge_same, mode)
         return self._initialize(tuple(nslices))
-   
+
+
     @classmethod
     def _apply(cls,lsource, rsource, lslice,rslice, jointype="inner", merge_same=False, mode="dim"):
         lslice = ops.ensure_frozen(lslice)
@@ -384,24 +393,62 @@ class Match(repops.MultiOpRep):
 
         lslices = list(lsource._slices)
         rslices = list(rsource._slices)
-        if(lslice.name == rslice.name and jointype=="inner" and lslice in lslices and rslice in rslices):
-            rslices.pop(rslices.index(rslice))
+        
+        if isinstance(merge_same, tuple):
+            nms = dict()
+            for ms in merge_same:
+                if not isinstance(ms,tuple):
+                    nms[ms] = ms
+                else:
+                    nms[ms[0]] = ms[1]
+            merge_same = nms
+
+        collapse_equi = (merge_same == 'equi' or merge_same == 'all' or merge_same is True) or (isinstance(merge_same, dict) and lslice.name in merge_same and rslice.name in merge_same[lslice.name])
+
+        if((lslice.name == rslice.name or collapse_equi) and lslice in lslices and rslice in rslices):
+            if jointype== 'inner':                
+                rslices.pop(rslices.index(rslice))
+            if collapse_equi:
+                if jointype == 'left':
+                    rslices.pop(rslices.index(rslice))
+                elif jointype == 'right':
+                    lslices.pop(lslices.index(lslice))
+                else:
+                    lidx = lslices.index(lslice)
+                    ridx = rslices.index(rslice)
 
         lslices = [ops.broadcastParentsFromPlan(tslice, lslice.dims[-1:], leftplan, leftslice.dims, bleftslice.dims, [rightslice], True) for tslice in lslices]
         rslices = [ops.broadcastParentsFromPlan(tslice, rslice.dims[-1:], rightplan, rightslice.dims, brightslice.dims, [leftslice], True) for tslice in rslices]
 
         lslices = list(Filter._apply(lslices, lindex, lslice.dims[-1:], "dim"))
         rslices = list(Filter._apply(rslices, rindex, rslice.dims[-1:], "dim"))
-        if merge_same:
+
+        if collapse_equi and jointype == 'full':
+            lslice = lslices[lidx]
+            rslice = rslices[ridx]
+            lslices[lidx] = repops_funcs.Merge._apply([lslice,rslice], "dim")
+            del rslices[ridx]
+
+        
+        if merge_same == 'all' or merge_same is True:
+            ms = dict()
             lnames = [lslice.name for lslice in lslices]
             for rslice in list(rslices):
                 if not rslice.name in lnames:
                     continue
-                lpos = lnames.index(rslice.name)
-                lslice = lslices[lpos]
-                lslices[lpos] = repops_funcs.Merge._apply([lslice,rslice], "dim")
-                del rslices[rslices.index(rslice)]
-        
+                ms[rslice.name] = rslice.name                    
+            merge_same = ms
+
+        if isinstance(merge_same, dict):
+            lnames = [lslice.name for lslice in lslices]
+            rnames = [rslice.name for rslice in rslices]
+            for lname, rname in merge_same.iteritems():
+                if lname in lnames and rname in rnames:
+                    lpos = lnames.index(lname)
+                    rpos = rnames.index(rname)
+                    lslices[lpos] = repops_funcs.Merge._apply([lslices[lpos],rslices[rpos]], "dim")
+                    del rslices[rpos]
+
         return Combine._apply(lslices,rslices)
 
 class Replace(repops.MultiOpRep):

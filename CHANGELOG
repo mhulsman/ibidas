@@ -126,4 +126,5 @@
 - Various fixes
 
 0.1.20
-- Various fixes
+- Fixed bug introduced in filtering
+- Fixed bug where easy_install prevents start

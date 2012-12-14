@@ -26,19 +26,22 @@ class Expression(object):
             edge = graph.getDataEdge(edge.source)
         return edge
     
-    def targetDataNode(self, node, graph):
+    def targetDataNode(self, node, graph, opfilter = set()):
         links = graph.node_attributes['links']
-        
-        edges = [edge for edge in graph.edge_source[node] if isinstance(edge,query_graph.ParamEdge)]
-        edge = edges[0]
-        if len(edges) > 1:
-            assert all([links[edge.target] != self for edge in edges]), "Cannot decide on target data node"
-
-        while(links[edge.target] == self):
-            edges = [edge for edge in graph.edge_source[edge.target] if isinstance(edge,query_graph.ParamEdge)]
+       
+        nsource = node
+        while True:
+            edges = [edge for edge in graph.edge_source[nsource] if isinstance(edge,query_graph.ParamEdge)]
             edge = edges[0]
             if len(edges) > 1:
                 assert all([links[edge.target] != self for edge in edges]), "Cannot decide on target data node"
+            nsource = edge.target
+
+            if opfilter and not nsource.__class__ in opfilter:
+                break
+            
+            if links[nsource] != self:
+                break
 
         return edge.source
    
@@ -124,7 +127,7 @@ class MatchExpression(Expression):
         sop = self.getSop(index)
         filters = [edge.target for edge in graph.edge_source[sop]]
         edges = [self.sourceDataEdge(graph.getDataEdge(filter,0),graph) for filter in filters]
-        onodes = [self.targetDataNode(filter,graph) for filter in filters]
+        onodes = [self.targetDataNode(filter,graph,set([ops.FilterOp, ops.UnpackArrayOp])) for filter in filters]
 
         return (edges,onodes)
 

@@ -54,3 +54,10 @@ class TestBugs(unittest.TestCase):
         str(z.f1 + z.f0)
         str(z.f0.Transpose() + z.f1)
         str(z.f1 + z.f0.Transpose())
+
+    def test_add_nothing(self):
+        data = [(163818, 159108, 455, [[  9, 455]]), (181601, 159108, 748, [[  2, 559],  [  7, 212],  [ 13, 364]])];
+        z    = Rep(data);
+        db   = Get.in_memory_db();
+        db.Store('t', z[:0]);
+
