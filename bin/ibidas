@@ -37,8 +37,16 @@ try:
 except:
     current_path = os.path.abspath(os.path.dirname(os.path.realpath(sys.argv[0])))
 
+ishellpath = os.path.join(current_path, 'ibidas_shell.py')
+
+if not os.path.exists(ishellpath):
+    ipath =  which(ibidas_shell.py)
+    if not ipath is None:
+        ishellpath = ipath
+    
+
 if hasattr(os, "execv"):
-    os.execv(interpreter, [interpreter, os.path.join(current_path, 'ibidas_shell.py')] + sys.argv[1:])
+    os.execv(interpreter, [interpreter, ishellpath] + sys.argv[1:])
 else:
     import subprocess
-    sys.exit(subprocess.Popen([interpreter, os.path.join(current_path, 'ibidas_shell.py')] + sys.argv[1:]).wait())
+    sys.exit(subprocess.Popen([interpreter, ishellpath] + sys.argv[1:]).wait())
