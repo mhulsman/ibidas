@@ -34,7 +34,7 @@ class Expression(object):
             edges = [edge for edge in graph.edge_source[nsource] if isinstance(edge,query_graph.ParamEdge)]
             edge = edges[0]
             if len(edges) > 1:
-                assert all([links[nsource] != self for edge in edges]), "Cannot decide on target data node"
+                assert all([links[edge.target] != self for edge in edges]), "Cannot decide on target data node"
             nsource = edge.target
 
             if opfilter and not nsource.__class__ in opfilter:
