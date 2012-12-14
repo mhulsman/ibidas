@@ -40,7 +40,7 @@ except:
 ishellpath = os.path.join(current_path, 'ibidas_shell.py')
 
 if not os.path.exists(ishellpath):
-    ipath =  which(ibidas_shell.py)
+    ipath =  which('ibidas_shell.py')
     if not ipath is None:
         ishellpath = ipath
     
