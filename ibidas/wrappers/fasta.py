@@ -8,7 +8,8 @@ def read_fasta(fname, sep='auto', split=1, fieldnames=()):
     
 
     f = util.open_file(fname,mode='rU');
-    fas = [];
+    fas  = [];
+    seqs = []
 
     seqid = "";
     seq   = "";
@@ -17,7 +18,8 @@ def read_fasta(fname, sep='auto', split=1, fieldnames=()):
         line = line.strip('\n\r');
         if not line or line[0] == ">":
             if seqid:
-                fas.append((seqid, seq))
+                fas.append(seqid);
+		seqs.append(seq);
             seqid = line[1:];
             seq = "";
             continue;
@@ -27,11 +29,13 @@ def read_fasta(fname, sep='auto', split=1, fieldnames=()):
 
       # check for one last sequence
     if seq:
-        fas.append((seqid,seq))
+        fas.append(seqid);
+	seqs.append(seq);
 
+    maxf = 0;
     if split:
         if sep == 'auto':
-            sep_search = ['\t','|',',']
+            sep_search = ['\t','|',', ',',']
             for sep in sep_search:
                 if all([sep in fas[i][0] for i in xrange(min(len(fas),100))]):
                     break
@@ -40,7 +44,11 @@ def read_fasta(fname, sep='auto', split=1, fieldnames=()):
                 sep = ''
 
         if sep:
-            fas = [tuple(x.strip() for x in row[0].split(sep)) + row[1:] for row in fas]
+	    fsid = [ tuple(x.strip() for x in row.split(sep)) for row in fas ];
+	    maxf = max([ len(x) for x in fsid]);
+	    fas = [ tuple([ fsid[i][j] if j < len(fsid[i]) else '' for j in xrange(maxf)]) + (seqs[i],) for i in xrange(len(fas)) ]
+	else:
+	    fas = [ (fas[i], seqs[i]) for i in xrange(len(fas)) ];
             
     return Rep(fas)/fieldnames;
 
