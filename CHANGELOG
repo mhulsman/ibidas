@@ -128,3 +128,6 @@
 0.1.20
 - Fixed bug introduced in filtering
 - Fixed bug where easy_install prevents start
+
+0.1.21
+- Hopefully final fix to support active python3 interpreter next to python2

@@ -32,10 +32,10 @@ if not os.path.isdir('docs/_build'):
 
 setup(
     name="Ibidas",
-    version="0.1.20",
+    version="0.1.21",
     packages = find_packages(),
     test_suite = "test",
-    scripts = ['bin/ibidas','bin/ibidas_shell.py'],
+    scripts = ['bin/ibidas','bin/ibidas_shell.py','bin/python_2_please'],
     ext_modules = [
         Extension(
     		'closure', 

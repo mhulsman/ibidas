@@ -114,26 +114,25 @@ def rep_completer(self,event, line = None):
         raise TryNext
 
 
-if(__name__ == '__main__'):
-    if oldip:
-        ipshell = IPShellEmbed(argv=sys.argv[1:],banner='Welcome to the IBIDAS system',exit_msg='IBIDAS shutting down ...',rc_override={'cache_size':0, 'readline_omit__names':2})
-        del ipshell.IP.user_ns['_']
-        ipshell()
-    else:
-        #Hack to get 'In' to show in Ipython, instead of the builtin 'In' history.
-        #Requires a) setting builtin In, b) user_ns to globals(), c) del ipshell.user_ns['In']
-        #Probably a bit fragile..
-        import __builtin__
-        __builtin__.__dict__['In'] = In
-        cfg = Config()
-        cfg.InteractiveShellEmbed.cache_size = 0
-        #rc_override={'cache_size':0, 'readline_omit__names':2}
-        ipshell = InteractiveShellEmbed(config=cfg, user_ns=globals(), banner2='Welcome to the IBIDAS system', exit_msg='IBIDAS shutting down ...')
-        del ipshell.user_ns['_']
-        del ipshell.user_ns['In']
-        ipshell()
+if oldip:
+    ipshell = IPShellEmbed(argv=sys.argv[1:],banner='Welcome to the IBIDAS system',exit_msg='IBIDAS shutting down ...',rc_override={'cache_size':0, 'readline_omit__names':2})
+    del ipshell.IP.user_ns['_']
+    ipshell()
+else:
+    #Hack to get 'In' to show in Ipython, instead of the builtin 'In' history.
+    #Requires a) setting builtin In, b) user_ns to globals(), c) del ipshell.user_ns['In']
+    #Probably a bit fragile..
+    import __builtin__
+    __builtin__.__dict__['In'] = In
+    cfg = Config()
+    cfg.InteractiveShellEmbed.cache_size = 0
+    #rc_override={'cache_size':0, 'readline_omit__names':2}
+    ipshell = InteractiveShellEmbed(config=cfg, user_ns=globals(), banner2='Welcome to the IBIDAS system', exit_msg='IBIDAS shutting down ...')
+    del ipshell.user_ns['_']
+    del ipshell.user_ns['In']
+    ipshell()
 
-    #ipshell.IP.set_hook('complete_command', rep_completer, re_key = '.*')
-    
-    #if(ipshell.IP.has_readline):
-    #    readline.set_completion_display_matches_hook(complete_show)
+#ipshell.IP.set_hook('complete_command', rep_completer, re_key = '.*')
+
+#if(ipshell.IP.has_readline):
+#    readline.set_completion_display_matches_hook(complete_show)

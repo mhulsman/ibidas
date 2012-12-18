@@ -20,18 +20,6 @@ def which(program):
 
     return None
 
-
-cur_version = sys.version_info
-if cur_version[0] >= 3:
-    interpreter = which('python2')
-else:
-    interpreter = None
-
-if interpreter is None:
-    interpreter = which('python')
-if interpreter is None:
-    interpreter = sys.executable
-
 try:
     current_path = os.path.abspath(os.path.dirname(os.path.realpath(__file__)))
 except:
@@ -43,10 +31,19 @@ if not os.path.exists(ishellpath):
     ipath =  which('ibidas_shell.py')
     if not ipath is None:
         ishellpath = ipath
-    
 
-if hasattr(os, "execv"):
-    os.execv(interpreter, [interpreter, ishellpath] + sys.argv[1:])
-else:
-    import subprocess
-    sys.exit(subprocess.Popen([interpreter, ishellpath] + sys.argv[1:]).wait())
+cur_version = sys.version_info
+if cur_version[0] == 2:
+    execfile(ishellpath)
+else:    
+    interpreter = which('python2')
+    if interpreter is None:
+        interpreter = which('python')
+    if interpreter is None:
+        interpreter = sys.executable
+
+    if hasattr(os, "execv"):
+        os.execv(interpreter, [interpreter, ishellpath] + sys.argv[1:])
+    else:
+        import subprocess
+        sys.exit(subprocess.Popen([interpreter, ishellpath] + sys.argv[1:]).wait())
