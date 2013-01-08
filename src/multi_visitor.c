@@ -76,7 +76,6 @@ static PyObject * _findmethod(PyObject *self, PyObject *prefix, PyObject *visitk
     return visit_method; 
 }/*}}}*/
 
-
 static PyObject * _direct_findmethod(PyObject *self, PyObject *prefix, PyObject *visitkey)/*{{{*/
 {
     PyObject * curkey;
