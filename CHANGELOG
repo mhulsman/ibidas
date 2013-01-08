@@ -131,3 +131,7 @@
 
 0.1.21
 - Hopefully final fix to support active python3 interpreter next to python2
+
+0.1.22
+- Replace C modules with pure Python to further simplify installation
+
