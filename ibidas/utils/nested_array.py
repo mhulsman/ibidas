@@ -1,7 +1,7 @@
 import numpy
 import copy
 
-_delay_import_(globals(),"..utils","cutils","sparse_arrays","util")
+_delay_import_(globals(),"..utils","sparse_arrays","util")
 _delay_import_(globals(),"..utils.missing","Missing")
 _delay_import_(globals(),"..itypes","dimpaths","rtypes","dimensions")
 class NestedArray(object):

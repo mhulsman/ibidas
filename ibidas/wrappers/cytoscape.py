@@ -1,6 +1,6 @@
 import numpy
 import xmlrpclib
-from ibidas.utils import util,cutils
+from ibidas.utils import util
 
 _delay_import_(globals(),"ibidas","*")
 _delay_import_(globals(),"..itypes","rtypes","dimpaths","dimensions")

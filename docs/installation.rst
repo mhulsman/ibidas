@@ -1,17 +1,11 @@
 Installation and Use
 ====================
 
-If one has the ``setuptools`` package installed, one can simply perform::
-
-    easy_install ibidas
-
-One needs to have root access to do this (see `Execute from source` if this is not available).
-This will download and install ibidas and its necessary dependencies.
-The ``setuptools`` package is available in nearly all Linux distributions. 
-
 To install, Ibidas needs some dependencies. Most are automatically installed.
 The following packages need to be installed manually (i.e. using the package manager of your distribution) if they are not 
 yet available (an error will be returned in this case):
+
+    * python (development) files 
 
     * numpy (development) files
 
@@ -20,10 +14,20 @@ yet available (an error will be returned in this case):
     * MySQLDB (only if access is required to mysql databases)
 
     * other databases are also supported. An error will be returned once you try to connect, with the package that needs to be installed.
+
+Next, if one has the ``setuptools`` package installed, one can simply perform::
+
+    easy_install -U ibidas
+
+One needs to have root access to do this (see `Execute from source` if this is not available).
+
+This will download and install ibidas and its necessary dependencies.
+The ``setuptools`` package is available in nearly all Linux distributions. 
     
 
-Ibidas has currently only been tested on the Linux platform, and probably will 
-not work out of the box on Windows. We will look into this in the near future.
+Ibidas has currently only been tested on the Linux platform, and probably will not work 
+out of the box on Windows. Installation on Mac is probably possible, but is untested. We will 
+look into this in the near future.
 
 
 Starting ibidas
@@ -48,11 +52,11 @@ Execute from source
 One can also directly execute ibidas from the source package. Download the source from pypi,
 then execute::
 
-    tar -xzvf ibidas-0.1.13.tar.gz 
+    tar -xzvf ibidas-0.1.22.tar.gz 
 
 to extract the source (version can differ). Enter the source directory using::
 
-    cd ibidas-0.1.13
+    cd ibidas-0.1.22
 
 then start ibidas using::
 
@@ -96,7 +100,7 @@ Ibidas dependencies include:
 
  * sphinx >= 1.0.5 [only to build documentation]
 
-Also, installing database client libraries such as `sqlite`, `postgres` and `mysql`,
-will alow one to use the sql wrapper to connect to these various databases. 
+Also, installing Python database client libraries for `sqlite`, `postgres` or `mysql`,
+will alow one to use the sql wrapper to connect to these databases. 
 
 

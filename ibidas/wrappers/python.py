@@ -16,7 +16,7 @@ from .. import ops
 from ..utils.multi_visitor import VisitorFactory, DirectVisitorFactory, NF_ELSE
 
 _delay_import_(globals(),"..representor")
-_delay_import_(globals(),"..utils","util","cutils","nested_array","context")
+_delay_import_(globals(),"..utils","util","nested_array","context")
 _delay_import_(globals(),"..itypes","detector","type_attribute_freeze","convertors","dimensions")
 _delay_import_(globals(),"..repops_slice")
 _delay_import_(globals(),"..repops_dim")

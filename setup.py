@@ -47,12 +47,6 @@ setup(
 		    ['src/multi_visitor.c'],
 		    extra_compile_args=["-Wall"]
 	    ),
-        Extension(
-            'ibidas.utils.cutils', 
-            ['src/cutils.c'], 
-            include_dirs=[include_dir],
-            extra_compile_args=["-Wall"]
-        ),
      ],
      install_requires=['numpy>=1.4.1','numpy!=1.6.0','sqlalchemy>=0.6.4','ipython>=0.10.1','sphinx>=1.0.5'],
      author = "M. Hulsman & J.J.Bot",

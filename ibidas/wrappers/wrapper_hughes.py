@@ -6,7 +6,7 @@ _delay_import_(globals(),"..itypes","rtypes")
 _delay_import_(globals(),"..slices")
 _delay_import_(globals(),"wrapper_py","Result","rep")
 _delay_improt_(globals(),"wrapper_tsv","read_tsv")
-_delay_import_(globals(),"..utils","cutils","util")
+_delay_import_(globals(),"..utils","util")
 
 def read_hughes(path):
     experiments = read_tsv(path + "/experiment_list.txt", skiprows=2)

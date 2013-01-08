@@ -8,7 +8,6 @@ from itertools import izip_longest
 
 from missing import Missing
 import util
-_delay_import_(globals(),"cutils")
 #_delay_import_(globals(),"ibidas.itypes","Missing")
 
 

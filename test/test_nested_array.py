@@ -2,7 +2,7 @@ import unittest
 import numpy
 
 from ibidas.utils import nested_array
-from ibidas.utils import cutils,util
+from ibidas.utils import util
 from ibidas.itypes import detector
 from ibidas import *
 

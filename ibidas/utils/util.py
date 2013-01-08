@@ -17,7 +17,6 @@ import os.path
 import gc, sys
 import itertools
 import csv
-import cutils
 from logging import error,warning,info,debug
 
 #objs: objs to find names for
@@ -443,7 +442,7 @@ class memoized(object):
        return functools.partial(self.__call__, obj)
 
 def check_realseq(data):
-    return isinstance(data,collections.Sequence) and not isinstance(data, basestring)
+    return isinstance(data,(collections.Sequence, numpy.ndarray)) and not isinstance(data, basestring)
 
 def get_shape(data, lengths, pos=0):
     if check_realseq(data):
@@ -464,6 +463,9 @@ def fill(data, x, pos):
         x[:] = data
 
 def replace_darray(data, type=object, maxdim=1, mindim=0):
+    if isinstance(data,numpy.ndarray) and len(data.shape) >= mindim and len(data.shape) <= maxdim:
+        return data
+
     if maxdim == 1 and type == object:
         if not check_realseq(data):
             if mindim == 0:  return data
@@ -475,38 +477,31 @@ def replace_darray(data, type=object, maxdim=1, mindim=0):
                 x[pos] = e
             return x
        
-    try:
-        return cutils.darray(data,type,maxdim,mindim)
-    except ValueError:
-        if maxdim == 1:
-            if not check_realseq(data):
-                if mindim == 0:  return data
-                else: raise ValueError, "Object not deep enough"
-            else:
-                nlen = len(data)
-                x = numpy.zeros((nlen,),dtype=type)
-                x[:] = data
-                return x
-        #maxdim > 1        
-        lengths = [set() for i in range(maxdim)]
-        get_shape(data, lengths)
-        cusedim = 0
-        for lg in lengths:
-            if len(lg) == 1:
-                cusedim = cusedim + 1
-        if cusedim < mindim:
-            raise ValueError, "Object not deep enough"
-        shape = [lengths[i].pop() for i in range(cusedim)]
-        x = numpy.zeros(tuple(shape),dtype=type)
-        fill(data,x, len(x.shape))
-        return x
-        
+    if maxdim == 1:
+        if not check_realseq(data):
+            if mindim == 0:  return data
+            else: raise ValueError, "Object not deep enough"
+        else:
+            nlen = len(data)
+            x = numpy.zeros((nlen,),dtype=type)
+            x[:] = data
+            return x
+    #maxdim > 1        
+    lengths = [set() for i in range(maxdim)]
+    get_shape(data, lengths)
+    cusedim = 0
+    for lg in lengths:
+        if len(lg) == 1:
+            cusedim = cusedim + 1
+    if cusedim < mindim:
+        raise ValueError, "Object not deep enough"
+    shape = [lengths[i].pop() for i in range(cusedim)]
+    x = numpy.zeros(tuple(shape),dtype=type)
+    fill(data,x, len(x.shape))
+    return x
 
 nversion = numpy.__version__.split('.')    
 numpy16up = int(nversion[0]) >= 1 and int(nversion[1]) >= 6
 
-if numpy16up:
-    darray = replace_darray
-else:
-    darray = cutils.darray
+darray = replace_darray
     

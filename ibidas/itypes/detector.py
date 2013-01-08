@@ -79,7 +79,7 @@ import re
 
 _delay_import_(globals(),"dimensions")
 _delay_import_(globals(),"dimpaths")
-_delay_import_(globals(),"..utils","cutils","util")
+_delay_import_(globals(),"..utils","util")
 
 _scanchildren = defaultdict(list)
 def registerTypeScanner(newscancls):

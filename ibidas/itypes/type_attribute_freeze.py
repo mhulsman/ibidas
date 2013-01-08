@@ -5,7 +5,7 @@ from ..constants import *
 from ..utils.multi_visitor import VisitorFactory, NF_ERROR, NF_ELSE
 from ..utils.missing import Missing
 
-_delay_import_(globals(),"..utils","cutils","util","sparse_arrays")
+_delay_import_(globals(),"..utils","util","sparse_arrays")
 
 class slicetuple(tuple):
     def __new__(self,s):

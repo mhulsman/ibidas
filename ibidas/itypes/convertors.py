@@ -5,7 +5,7 @@ import collections
 from ..constants import *
 from ..utils.multi_visitor import VisitorFactory, NF_ERROR, NF_ELSE
 
-_delay_import_(globals(), "..utils","sparse_arrays","cutils","missing","util")
+_delay_import_(globals(), "..utils","sparse_arrays","missing","util")
 _delay_import_(globals(), "..utils.missing","Missing")
 _delay_import_(globals(), "rtypes")
 _delay_import_(globals(), "dimpaths")

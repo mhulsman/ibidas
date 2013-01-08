@@ -6,7 +6,7 @@ import rtypes
 
 _delay_import_(globals(),"dimensions")
 _delay_import_(globals(),"casts")
-_delay_import_(globals(),"..utils","util","cutils","sparse_arrays")
+_delay_import_(globals(),"..utils","util","sparse_arrays")
 _delay_import_(globals(),"..utils.missing","Missing")
 
 
