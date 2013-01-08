@@ -941,6 +941,22 @@ class TypeBytes(TypeString):#{{{
     _ptype = bytes
 addType(TypeBytes)#}}}
 
+class TypeSequence(TypeBytes):#{{{
+    """Sequence (DNA/protein) type (only byte/ascii characters)"""
+    name = "sequence"
+addType(TypeSequence)#}}}
+
+class TypeDNASequence(TypeSequence):#{{{
+    """Sequence (DNA/protein) type (only byte/ascii characters)"""
+    name = "DNA"
+addType(TypeDNASequence)#}}}
+
+class TypeProteinSequence(TypeSequence):#{{{
+    """Sequence (DNA/protein) type (only byte/ascii characters)"""
+    name = "protein"
+addType(TypeProteinSequence)#}}}
+
+
 class TypePickle(TypeBytes):#{{{
     name = "pickle"
 addType(TypePickle)#}}}

@@ -881,9 +881,9 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())
         dtype = type_out.toNumpy()
         if(packdepth > 1):
-           return util.darray([[numpy.unique(subrow,return_index=True)[1] for subrow in row.transpose()] for row in data],dtype,2,2)
+           return util.darray([[util.numpy_unique(subrow,return_index=True)[1] for subrow in row.transpose()] for row in data],dtype,2,2)
         else:
-           return util.darray([numpy.unique(row, return_index=True)[1] for row in data],dtype)
+           return util.darray([util.numpy_unique(row, return_index=True)[1] for row in data],dtype)
    
     def arrayarraySum(self, data, type_in, type_out, op, packdepth):
         data = ensure_fixeddims(data,packdepth,type_in.toNumpy())

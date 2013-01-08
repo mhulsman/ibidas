@@ -1,4 +1,5 @@
 import numpy
+import numpy as np
 import hashlib
 from itertools import izip
 import operator
@@ -102,6 +103,47 @@ def seqgen(start=0):
     while True:
         start += 1
         yield start
+
+def numpy_unique(ar, return_index=False, return_inverse=False):
+    """
+    Numpy unique with mergesort (works on strings too)
+    """
+    try:
+        ar = ar.flatten()
+    except AttributeError:
+        if not return_inverse and not return_index:
+            items = sorted(set(ar))
+            return np.asarray(items)
+        else:
+            ar = np.asanyarray(ar).flatten()
+
+    if ar.size == 0:
+        if return_inverse and return_index:
+            return ar, np.empty(0, np.bool), np.empty(0, np.bool)
+        elif return_inverse or return_index:
+            return ar, np.empty(0, np.bool)
+        else:
+            return ar
+
+    if return_inverse or return_index:
+        perm = ar.argsort()
+        aux = ar[perm]
+        flag = np.concatenate(([True], aux[1:] != aux[:-1]))
+        if return_inverse:
+            iflag = np.cumsum(flag) - 1
+            iperm = perm.argsort()
+            if return_index:
+                return aux[flag], perm[flag], iflag[iperm]
+            else:
+                return aux[flag], iflag[iperm]
+        else:
+            return aux[flag], perm[flag]
+
+    else:
+        ar.sort()
+        flag = np.concatenate(([True], ar[1:] != ar[:-1]))
+        return ar[flag]
+
 
 
 def unique(seq):

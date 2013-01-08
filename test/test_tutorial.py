@@ -163,7 +163,7 @@ class TestTutorial(unittest.TestCase):
         d1 = Rep([1,2,3,3])
         d2 = Rep([1,3,3])
         d1 |Match| d2
-
+    
         str(yeast_feats.feat_name[_ != ""].Get(_.Count() == _.Unique().Count()))
         str((yeastract |Except| tf_feat.Get(_.trans_factor, _.target)).Count())
         str((yeastract |Except| tf_feat.Get(*yeastract.Names)).Count())

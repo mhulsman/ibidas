@@ -75,6 +75,7 @@ import rtypes
 from ..constants import *
 from ..utils import sparse_arrays, module_types
 from ..utils.missing import *
+import re
 
 _delay_import_(globals(),"dimensions")
 _delay_import_(globals(),"dimpaths")
@@ -826,6 +827,37 @@ class StringIntScanner(StringRealScanner):
                         return False
         return res
 registerTypeScanner(StringIntScanner)
+
+class StringDNAScanner(StringScanner):
+    need_convert=False
+    parentcls=StringScanner
+    regmatch = re.compile('^[acgtnACGTN]+$')
+    
+    def unregister(self, create_parent=False):
+        res = super(StringDNAScanner,self).unregister(create_parent)
+        if create_parent:
+            res.max_nchars = self.max_nchars
+        return res
+
+    def getType(self):
+        ntype = rtypes.TypeDNASequence
+        d = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
+        dims = dimpaths.DimPath(d)
+        return ntype(self.detector.hasMissing(), dims)
+
+
+    def scan(self, seq):
+        res = StringScanner.scan(self, seq)
+        rm = self.regmatch
+        if res:
+            for elem in seq.ravel():
+                if not elem:
+                    continue
+                if rm.match(elem) is None:
+                    return False
+        return res
+#registerTypeScanner(StringDNAScanner)
+
 
 class SliceScanner(TypeScanner):
     __doc__ = 'Slice scanner'

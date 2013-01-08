@@ -28,11 +28,12 @@ def Serve(portnumber=9889):
            >>> z = Rep([1,2,3,4])
       
        Connecting to ibidas (python, but can be any other application supporting xml-rpc)::
+
            $ipython
            >>> import xmlrpclib
            >>> s = xmlrpclib.ServerProxy("http://localhost:9889")
            >>> s.query("z + 4")
-           [4,5,6,7]
+           [5,6,7,8]
 
        """
 
@@ -97,15 +98,22 @@ class LocalRequestHandler(object):
 
 
 def getGlobals():
-    if '__IPYTHON__active' in globals()['__builtins__']:
-        return globals()['__builtins__']['__IPYTHON__'].user_global_ns
+    if '__IPYTHON__active' in globals()['__builtins__'] or '__IPYTHON__' in globals()['__builtins__']:
+        if 'get_ipython' in globals()['__builtins__']:
+            session = globals()['__builtins__']['get_ipython']().user_global_ns
+        else:
+            session = globals()['__builtins__']['__IPYTHON__'].user_global_ns
+        return session
     else:
         return globals()
 
 def getSession(rh, sessionid):
     if(sessionid == -1):
-        assert '__IPYTHON__active' in globals()['__builtins__'], "Ipython not active, cannot find shell session"
-        session = globals()['__builtins__']['__IPYTHON__'].user_ns
+        assert '__IPYTHON__' in globals()['__builtins__'], "Ipython not active, cannot find shell session"
+        if 'get_ipython' in globals()['__builtins__']:
+            session = globals()['__builtins__']['get_ipython']().user_ns
+        else:
+            session = globals()['__builtins__']['__IPYTHON__'].user_ns
     else:
         session = rh.sessions[sessionid]
     return session
