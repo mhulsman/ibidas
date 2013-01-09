@@ -21,9 +21,6 @@ _delay_import_(globals(),"repops_slice")
 _delay_import_(globals(),"repops_funcs")
 _delay_import_(globals(),"ops")
 
-
-
-
 class Representor(Node):
     """Representor is the primary object in Ibidas. It represents
     a data set, accesible through slices.
@@ -63,6 +60,11 @@ class Representor(Node):
                                           >>> ((x |Match| y) |Match| z).LR  
                                           
                                           gives all slices of y (first go Left (get xy), then R (get y)). 
+
+
+    Representor objects can be created from python data objects using the 'Rep' function, e.g.::
+
+        >>> Rep([('a',3),('b',4)])
 
     """
 
@@ -323,9 +325,9 @@ class Representor(Node):
         :param log:  Setting this to true will print the amount of time that is spent in any of the passes of
                      they query optimizer (default: False)
 
-        :param debug: Setting this to true will output the query tree at various stadio through XML-RPC for visualization
-                      in Cytoscape. This requires that Cytoscape is running, with an activated XML-RPC plugin listening
-                      at port 9000. 
+        :param debug: Setting this to true will output the query tree before optimization and after processing, through XML-RPC 
+                      for visualization in Cytoscape. This requires that Cytoscape is running, with an activated XML-RPC plugin 
+                      listening at port 9000. 
                      
 
         """
@@ -375,6 +377,7 @@ class Representor(Node):
     
 
     def _getNames(self):
+        """Returns names of all slices"""
         self._checkState()
         return [slice.name for slice in self._slices]
     Names=property(fget=_getNames)
@@ -444,27 +447,25 @@ class Representor(Node):
            
            :param condition: condition to filter on
 
-                * Non-representor values are converted using ``Rep`` function
-
                 * condition should have only a single slice.
 
                 Various data types can be used:
 
-                * Bool: last dim should be equal to a dim in this representor. Is applied to that dim by default.
+                * Bool: last dim of condition should be equal to a dim in this representor. Filtering occurs on the matching dim. 
 
-                * Integer: collapses the dimension it is applied on. 
+                * Integer: selects element from a dimension (see below how this is specified). Collapses the dimension it is applied on. 
 
-                * Array (of integers): selects positions indicated by integers in array.
+                * Array (of integers): selects positions from a dimension indicated by integers in array.
 
-                * Slice: selects slice from array.
+                * Slice: selects slice of elements from dimension (note that we refer here to the Python slice object, e.g. slice(0,3), not the Ibidas slice concept). 
 
            :param dim: Dim to apply the filtering on. 
 
-                * If no dim given, applied to last common dimension of slices (except for bool types).
+                * If no dim given, filtering is performed on the last common dimension of the slices (except for bool types, where the dimension of the condition specifies the filtered dimension).
 
                 * Integer: identifies dimension according to dim order (printed at the end of a representor printout)
 
-                * Long: identifies dimension according to common dimensions shared by all slices (default: -1)
+                * Long: identifies dimension according to common dimensions shared by all slices (default: -1L)
 
                 * String: dimension name
 
@@ -474,7 +475,7 @@ class Representor(Node):
 
             :param mode: Determines broadcasting method. 
 
-                * "pos"  Postion-based broadcasting ('numpy'-like broadcasting)
+                * "pos"  Postion-based broadcasting ('numpy'-like broadcasting), not based on dimension identity. 
 
                 * "dim"  Dimension-identity based broadcasting (normal 'ibidas' broadcasting)
 
@@ -482,14 +483,14 @@ class Representor(Node):
                          Representation objects by default use dimension-based, except if they are prepended by a '+' operator, 
                          e.g::
 
-                         >>> x.Filter(+constraintrep)
+                         >>> x.Filter(+conditionrep)
 
-            What is done to dimensions in the constraint that are not in the data source? Here we follow
+            What is done to dimensions in the conditions that are not in the data source? Here we follow
             the default rules in Ibidas for broadcasting. 
 
-                * First, the dimension in the source that is going to be filtered is identified (according to dim param or constraint last dimension)
+                * First, the dimension in the source that is going to be filtered is identified (see previous sections)
                 
-                * Secondly, we match this dimension to the last dimension in the constraint. 
+                * Secondly, we match this dimension to the last dimension in the condition. 
                 
                 * All remaining dimensions are broadcasted against each other.
 
@@ -531,6 +532,8 @@ class Representor(Node):
                         | 3    
 
                 Dim order: d2:3
+
+            
         """
         if(isinstance(condition, context.Context)):
             condition = context._apply(condition, self)
