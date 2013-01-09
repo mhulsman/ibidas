@@ -382,6 +382,13 @@ class Representor(Node):
         return [slice.name for slice in self._slices]
     Names=property(fget=_getNames)
 
+
+    def _getDims(self):
+        """Returns dims, ordered according to the rules used by the dim selection procedure"""
+        opath = dimpaths.getOrderDim([s.dims for s in self._slices])
+        return opath
+    Dims=property(fget=_getDims)
+
     def __getitem__(self, condition):
         self._checkState()
         if(not isinstance(condition, tuple)):
@@ -532,8 +539,23 @@ class Representor(Node):
                         | 3    
 
                 Dim order: d2:3
+            
+            Filtering on boolean constraint::
+
+                >>> x.Filter(_ > 2)
+                Slices: | data      
+                --------------------
+                Type:   | int64     
+                Dims:   | d1:2<fd2:~
+                Data:   |           
+                        | [3]       
+                        | [4 5 6]   
+
+                Dim order: d1:2<fd2:~
 
             
+            Filtering 
+
         """
         if(isinstance(condition, context.Context)):
             condition = context._apply(condition, self)

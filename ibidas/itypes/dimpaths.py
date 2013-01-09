@@ -902,7 +902,7 @@ def identifyDimPath(sourcepaths, dim_selector):#{{{
     if(isinstance(dim_selector, int)):
         return set([selectOrderDim(sourcepaths, dim_selector)])
     elif(isinstance(dim_selector, long)):
-        d = commonDimPath(sourcepaths)
+        d = commonDimPath([spath for spath in sourcepaths if spath])
 
         try:
             d[dim_selector]

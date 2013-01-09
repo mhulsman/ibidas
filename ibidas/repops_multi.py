@@ -158,7 +158,8 @@ class Group(repops.MultiOpRep):
 class Filter(repops.MultiOpRep):
     def __init__(self,source,constraint,dim=LASTCOMMONDIM,mode=None):
         if(not isinstance(constraint,representor.Representor)):
-            constraint = repops.PlusPrefix(python.Rep(constraint,name="filter"))
+            data = python.Rep(constraint, name='filter')
+            constraint = repops.PlusPrefix(data)
         repops.MultiOpRep.__init__(self,(source,constraint),dim=dim,mode=mode)
 
     def _process(self,sources,dim,mode):
