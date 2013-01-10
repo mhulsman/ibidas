@@ -44,7 +44,7 @@ def read_fasta(fname, sep='auto', split=1, fieldnames=()):
                 sep = ''
 
         if sep:
-	    fsid = [ tuple(x.strip() for x in row.split(sep)) for row in fas ];
+	    fsid = [ tuple(x.strip() for x in util.resplit(row, sep, "\"'")) for row in fas ];
 	    maxf = max([ len(x) for x in fsid]);
 	    fas = [ tuple([ fsid[i][j] if j < len(fsid[i]) else '' for j in xrange(maxf)]) + (seqs[i],) for i in xrange(len(fas)) ]
 	else:

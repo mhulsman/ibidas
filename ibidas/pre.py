@@ -411,3 +411,35 @@ def extract_info(vals):
         res = ""
     return res
 
+#########################BIOGRID########################################
+
+def biogrid(orgs=[]):
+    """
+      Download the biogrid dataset.
+      orgs is an array which specifies which organism(s) you want.
+      e.g.
+        bg = Get.biogrid(['Saccharomyces cerevisiae'])
+      Returns the biogrid data for Yeast only.
+    """
+
+    url = "http://thebiogrid.org/downloads/archives/Release%20Archive/BIOGRID-3.2.96/BIOGRID-ORGANISM-3.2.96.tab2.zip";
+
+    files = Unpack(Fetch(url));
+
+    bg = None;
+    obgl = [];
+
+    for f in files:
+        orgn = f.split('/')[-1].split('-')[2].replace('_', ' ');
+        if (orgs == []) or  (not orgn in orgs):
+          continue;
+        #fi
+        print "Loading file: '%s'" % (f);
+        obg  = Read(f, skiprows=0);
+        obg  = obg.AddSlice('organism', orgn);
+        obg  = obg.FlatAll();
+        obgl.append(obg);
+    bg = Stack(*obgl) % "interactions";
+    return bg.Copy();
+predefined_sources.register(biogrid)
+
