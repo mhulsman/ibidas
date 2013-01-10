@@ -352,14 +352,6 @@ class SplitDimOp(UnaryUnaryOp):#{{{
 
         UnaryUnaryOp.__init__(self,slice,dims=npath,rtype=ntype)#}}}
 
-class ShapeOp(UnaryUnaryOp):#{{{
-    __slots__ = ["pos"]
-    def __init__(self,slice,pos):
-        d = slice.dims[pos]
-        ntype = rtypes.unknown
-        self.pos = pos
-        UnaryUnaryOp.__init__(self,slice, name=d.name,rtype=ntype,dims=dimpaths.DimPath())#}}}
-
 class FilterOp(UnaryUnaryOp):#{{{
     __slots__ = ["constraint","has_missing"]
 

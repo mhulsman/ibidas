@@ -403,11 +403,6 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
 
         return slice.modify(rtype=node.type,dims=node.dims)
 
-    def visitShapeOp(self, node, slice):
-        d = slice.data.getDimShape(node.pos)
-        ndata = nested_array.NestedArray(d,node.type)
-        return slice.modify(ndata,rtype=node.type,dims=node.dims,name=node.name)
-
     def visitFreezeOp(self, node, slice):
         func = lambda x: type_attribute_freeze.freeze_protocol.execFreeze(slice.type,x)
         ndata = slice.data.mapseq(func,res_type=node.type)

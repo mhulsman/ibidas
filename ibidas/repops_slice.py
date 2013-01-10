@@ -351,6 +351,9 @@ class HArray(repops.UnaryOpRep):
                 slice = ops.CastOp(slice,ntype)
             nnslices.append(slice)
     
+        if name is None:
+            name = util.seq_names(1, exclude=set([d.name for d in source.DimsUnique]))[0]
+    
         nslice = ops.HArrayOp(nnslices,name=name)
         nslice = ops.UnpackArrayOp(nslice)
 

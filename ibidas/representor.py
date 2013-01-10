@@ -384,10 +384,21 @@ class Representor(Node):
 
 
     def _getDims(self):
-        """Returns dims, ordered according to the rules used by the dim selection procedure"""
+        """Returns dims, ordered according to the order shown below a dataset printout. 
+
+           Note that dimensions that occur multiple times in the same slice will be repeated (if this is not what is needed, use DimsUnique).
+        
+        """
         opath = dimpaths.getOrderDim([s.dims for s in self._slices])
         return opath
     Dims=property(fget=_getDims)
+    
+    def _getDimsUnique(self):
+        """Returns list of unique dims, ordered as used by DimRename.
+        """
+        unique_dimpath = util.unique(sum([slice.dims for slice in self._slices],dimpaths.DimPath())) 
+        return unique_dimpath
+    DimsUnique=property(fget=_getDimsUnique)
 
     def __getitem__(self, condition):
         self._checkState()
@@ -480,7 +491,7 @@ class Representor(Node):
 
                 * Dimpath object: e.g. x.Slices[0].dims[:2]
 
-            :param mode: Determines broadcasting method. 
+           :param mode: Determines broadcasting method. 
 
                 * "pos"  Postion-based broadcasting ('numpy'-like broadcasting), not based on dimension identity. 
 
@@ -492,69 +503,215 @@ class Representor(Node):
 
                          >>> x.Filter(+conditionrep)
 
-            What is done to dimensions in the conditions that are not in the data source? Here we follow
-            the default rules in Ibidas for broadcasting. 
+           What is done to dimensions in the conditions that are not in the data source? Here we follow
+           the default rules in Ibidas for broadcasting. 
 
-                * First, the dimension in the source that is going to be filtered is identified (see previous sections)
+               * First, the dimension in the source that is going to be filtered is identified (see previous sections)
+               
+               * Secondly, we match this dimension to the last dimension in the condition. 
+               
+               * All remaining dimensions are broadcasted against each other.
+
+           The examples use the following dataset::
+
+               >>> x = Rep([[1,2,3],[4,5,6]]) 
+               Slices: | data     
+               -------------------
+               Type:   | int64    
+               Dims:   | d1:2<d2:3
+               Data:   |          
+                       | [1 2 3]  
+                       | [4 5 6]  
+               
+               Dim order: d1:2<d2:3
+
+           * Example: integer filtering
+           
+             Filtering the first element::   
+             
+                 >>> x.Filter(0) 
+                 Slices: | data
+                 ---------------
+                 Type:   | int64
+                 Dims:   | d1:2
+                 Data:   |
+                         | 1
+                         | 4
+                 
+                 Dim order: d1:2
+
+             This example matches the last common dimension (d2), and selects the first element.
+             This collapses dimension d2.
+
+             Note that if no special keywords are required, one can also use brackets to specify the filter operation::
+
+                 >>> x[0]
+
+             is equivalent to the previous filtering operation.  
+
+             Using the Filter command, we can however also specify that we want to filter a specific dimension::
+
+                 >>> x.Filter(0, dim='d1')
+                 Slices: | data 
+                 ---------------
+                 Type:   | int64
+                 Dims:   | d2:3 
+                 Data:   |      
+                         | 1    
+                         | 2    
+                         | 3    
+
+                 Dim order: d2:3
+
+             One can also use positional indices for the dimension (according to Dim order in the printout)::
+                 
+                 >>> x.Filter(0, dim=0)
+           
+
+           * Example: Boolean filtering
+ 
+             Filtering on boolean constraints::
+
+                 >>> x.Filter(_ > 2)
+                 Slices: | data      
+                 --------------------
+                 Type:   | int64     
+                 Dims:   | d1:2<fd2:~
+                 Data:   |           
+                         | [3]       
+                         | [4 5 6]   
+
+                 Dim order: d1:2<fd2:~
+
+             Here, the _ operator refers to the enclosing scope, i.e. 'x'.  Equivalent is::
+                 
+                 >>> x[_ > 2]
+
+           * Example: Slice filtering
+             
+             One can also filter using  Python slices::
+             
+                 >>> x.Filter(slice(0,2))
+
+                 Slices: | data      
+                 --------------------
+                 Type:   | int64     
+                 Dims:   | d1:2<fd2:*
+                 Data:   |           
+                         | [1 2]     
+                         | [4 5]     
+
+                 Dim order: d1:2<fd2:*
+
+             Note that this is equivalent to::
+                 
+                 >>> x[0:2]
+
+             (here we do not have to explicitly construct the slice object, as python accepts for this the x:y syntax. Unfortunately, this syntax is not allowed outside brackets).
+
+           * Integer filtering (with arrays)
+           
+             Filtering on array::
+
+                 >>> x.Filter([0,1])
+                 Slices: | data
+                 ---------------
+                 Type:   | int64
+                 Dims:   | d1:2
+                 Data:   |
+                         | 1
+                         | 5
+
+                 Dim order: d1:2
+                 
+             This is maybe not what most expected. Note that the filtering is applied on dimension 'd2'. The dimension of the [0,1] array is mapped
+             to dimension 'd1'. Thus, from the first position along 'd1' (first row), we select the 0th element from dim d2,
+             and from the second position along 'd1', we select the 1th element along dim d2. 
+
+             We used here positional broadcasting, as the input was not an Ibidas object. That is, the dimension of [0,1] was mapped to the dimension 'd1', even though
+             these do not have the same identity. We can however also specify that we want to do identity based broadcasting::
+
+                     >>> x.Filter([0,1],mode='dim')
+
+                     Slices: | data            
+                     --------------------------
+                     Type:   | int64           
+                     Dims:   | d1:2<d3:2
+                     Data:   |                 
+                             | [1 2]           
+                             | [4 5]           
+
+                     Dim order: d1:2<d3:2
+
+             
+             This applies the [0,1] array as filter on the d2 dimension, transforming it into dimension d3. 
+
+             What actually happens is slightly more complicated however: the integers in the [0,1] list are mapped as filters to dimension 'd2'. 
+             This filtering is however done for each element in the [0,1] list, which has dimension 'd3'. As this dimension is not equal to dimension 'd1', it is broadcasted: virtually, 
+             the dataset is converted into one with dimensionds d1:2<d3:2<d2:2. Upon applying the filter, dimension 'd2' collapses, resulting in a dataset with dimension  'd1:2<d3:2'. 
+             Of course, in practice, we optimize this broadcasting step away. 
+
+             Such broadcasting can also happen when using position-based broadcasting, e.g.::
+
+                     >>> x.Filter([[0,1],[0,2]])
+                     
+                     Slices: | data
+                     -------------------
+                     Type:   | int64
+                     Dims:   | d3:2<d1:2
+                     Data:   |
+                             | [1 5]
+                             | [1 6]
+
+                     Dim order: d3:2<d1:2
+
+             First, we do the same positional broadcasting, filtering dimension 'd2', and mapping the second dimension of [[0,1],[0,2]] to dimension 'd1'. But then we are left with the
+             extra first dimension of [[0,1],[0,2]], which is called 'd3'. This dimension is next broadcasted. As 'd1' is already mapped to, the dimension is put in front of 'd1'.
+
+             We can make this quite complicated, e.g.::
+                 
+                 x.Filter([[0,1],[0,2,1]],mode='dim')
+
+                 Slices: | data           
+                 -------------------------
+                 Type:   | int64          
+                 Dims:   | d1:2<d4:2<d3:~ 
+                 Data:   |                
+                         | [[1 2] [1 3 2]]
+                         | [[4 5] [4 6 5]]
+
+                 Dim order: d1:2<d4:2<d3:~
+
+             or::
+
+                 x.Filter([[0,1],[0,1,1]],mode='dim',dim='d1')
+
+                 Slices: | data
+                 ---------------------------------------
+                 Type:   | int64
+                 Dims:   | d4:2<d3:~<d2:3
+                 Data:   |
+                         | [[1 2 3];  [4 5 6]]
+                         | [[1 2 3];  [4 5 6];  [4 5 6]]
+
+                 Dim order: d4:2<d3:~<d2:3
+
+          
+          .. note::
+         
+             According to the rules, these two operations should be equivalent::
                 
-                * Secondly, we match this dimension to the last dimension in the condition. 
+                 x.Filter([0,1],mode='dim')
+                 x.Filter(Rep([0,1]))
                 
-                * All remaining dimensions are broadcasted against each other.
+             However, the second version will return this error: RuntimeError: Cannot broadcast, there are different dimensions with same name: d1. Please rename (DimRename) or state their equivalence.
+             
+             The reason for this is that Rep([0,1]) will just assign dimension 'd1' to [0,1], which then conflicts with dimension 'd1' in 'x'. In contrast, Filter assigns dimension names to [0,1] such that no conflict
+             can arise.  The second version can be made to work by simply renaming the dimension::
 
-            Examples::
-
-                >>> x = Rep([[1,2,3],[4,5,6]]) 
-                Slices: | data     
-                -------------------
-                Type:   | int64    
-                Dims:   | d1:2<d2:3
-                Data:   |          
-                        | [1 2 3]  
-                        | [4 5 6]  
-                
-                Dim order: d1:2<d2:3
-                
-                >>> x.Filter(0) 
-                Slices: | data
-                ---------------
-                Type:   | int64
-                Dims:   | d1:2
-                Data:   |
-                        | 1
-                        | 4
-                
-                Dim order: d1:2
-
-            This example matches the last common dimension (d2), and selects the first element.
-            This collapses dimension d2. Instead we can also filter on dimension d1::
-
-                >>> x.Filter(0, dim='d1')
-                Slices: | data 
-                ---------------
-                Type:   | int64
-                Dims:   | d2:3 
-                Data:   |      
-                        | 1    
-                        | 2    
-                        | 3    
-
-                Dim order: d2:3
+                 x.Filter(Rep([0,1])%'d3')
+          
             
-            Filtering on boolean constraint::
-
-                >>> x.Filter(_ > 2)
-                Slices: | data      
-                --------------------
-                Type:   | int64     
-                Dims:   | d1:2<fd2:~
-                Data:   |           
-                        | [3]       
-                        | [4 5 6]   
-
-                Dim order: d1:2<fd2:~
-
-            
-            Filtering 
 
         """
         if(isinstance(condition, context.Context)):
@@ -577,11 +734,11 @@ class Representor(Node):
             return tuple([slice.data for slice in res])
 
     def Detect(self, *args, **kwargs):
-        """Detects types fo slices, and casts result to this type
+        """Detects types of slices, and casts result to this type
             
             :param only_unknown: Only detect slices with unknown types [default: False]
 
-            :param allow_convert: Convert also types (e.g. bytes to integers/floats where possible) [default: True]
+            :param allow_convert: Converts also types (e.g. bytes to integers/floats where possible) [default: True]
 
         """
         return repops.Detect(self, *args, **kwargs).Copy()
@@ -805,6 +962,56 @@ class Representor(Node):
         """Flattens all dimensions into one dimension.
 
         :param name: name of new merged dimension. By default, merged names of all dimensions.
+
+        Note that this operation is slightly different from flat, in that it converts all slices
+        to have 1 dimension, even those which have 0 dimensions. 
+
+        Example::
+            >>> x = Rep(([[1,2,3],[4,5,6]],'a'))
+            
+            Slices: | f0        | f1
+            ------------------------------
+            Type:   | int64     | bytes[1]
+            Dims:   | d1:2<d2:3 |
+            Data:   |           |
+                    | [1 2 3]   | a
+                    | [4 5 6]   |
+
+            Dim order: d1:2<d2:3
+            
+            >>> x.Flat()
+                     
+            Slices: | f0      | f1
+            ----------------------------
+            Type:   | int64   | bytes[1]
+            Dims:   | d1_d2:6 |
+            Data:   |         |
+                    | 1       | a
+                    | 2       |
+                    | 3       |
+                    | 4       |
+                    | 5       |
+                    | 6       |
+
+            Dim order: d1_d2:6
+
+            >>> x.FlatAll()
+
+            Slices: | f0      | f1      
+            ----------------------------
+            Type:   | int64   | bytes[1]
+            Dims:   | d1_d2:6 | d1_d2:6 
+            Data:   |         |         
+                    | 1       | a       
+                    | 2       | a       
+                    | 3       | a       
+                    | 4       | a       
+                    | 5       | a       
+                    | 6       | a       
+
+            Dim order: d1_d2:6
+   
+
         """
         return repops_dim.FlatAll(self,name=name)
 
@@ -816,16 +1023,108 @@ class Representor(Node):
         :param lname: New name of left dimension (default:autogenerated).
         :param rname: New name of right dimension (default:autogenerated).
         :param dimsel: Dim to split (default: last common dimension).
+
+        Example::
+        
+            >>> x = Rep([1,2,3,4,5,6])
+            
+            Slices: | data
+            ---------------
+            Type:   | int64
+            Dims:   | d1:6
+            Data:   |
+                    | 1
+                    | 2
+                    | 3
+                    | 4
+                    | 5
+                    | 6
+
+            Dim order: d1:6
+            
+            >>> x.SplitDim(3,2)
+            
+            Slices: | data
+            -----------------------
+            Type:   | int64
+            Dims:   | d2:3<d3:2
+            Data:   |
+                    | [1 2]
+                    | [3 4]
+                    | [5 6]
+
+            Dim order: d2:3<d3:2
+        
         """
         return repops_dim.SplitDim(self,lshape,rshape,lname,rname,dimsel)
 
     def Harray(self, name=None):
         """Combines slices into array.
+
+           Example::
+           
+                >>> x = Rep([(1,2),(3,4),(5,6)])
+                
+                Slices: | f0    | f1
+                -----------------------
+                Type:   | int64 | int64
+                Dims:   | d1:3  | d1:3
+                Data:   |       |
+                        | 1     | 2
+                        | 3     | 4
+                        | 5     | 6
+
+                Dim order: d1:3
+       
+                >>> x.HArray()
+                
+                Slices: | f0_f1
+                -------------------
+                Type:   | int64
+                Dims:   | d1:3<d2:2
+                Data:   |
+                        | [1 2]
+                        | [3 4]
+                        | [5 6]
+
+                Dim order: d1:3<d2:2 
+
+            Which is equivalent to this::
+
+                >>> x.Get(HArray(_.f0, _.f1)) 
+
         """
         return repops_slice.HArray(self, name=name)
 
-    def getShape(self):
-        """Returns shape of all dimensions as slices in a representor object"""
+    def Shape(self):
+        """Returns shape of all dimensions as slices in a representor object.
+            
+           Example::
+                >>> x = Rep([[1,2,3],[4,5,6]])
+                
+                Slices: | data     
+                -------------------
+                Type:   | int64    
+                Dims:   | d1:2<d2:3
+                Data:   |          
+                        | [1 2 3]  
+                        | [4 5 6]  
+
+                Dim order: d1:2<d2:3
+                
+                >>> x.Shape()
+
+                Slices: | d1    | d2   
+                -----------------------
+                Type:   | int64 | int64
+                Dims:   |       | d1:2 
+                Data:   |       |      
+                        | 2     | 3    
+                        |       | 3    
+
+                Dim order: d1:2
+
+        """
         return repops_dim.Shape(self)
 
     def GroupBy(self, *args, **kwargs):
