@@ -1062,20 +1062,19 @@ def speedfilter(seqs,has_missing, ctype, stype):
                     else:
                         res.append(data[elem])
                 res = util.darray(res,object)
+            return res                
         else:
             if(constraint is Missing):
                 missing = stype.toMissingval()
                 res = missing
-            else:
-                try:
-                    res = data[constraint]
-                except Exception:
-                    res = util.darray(data)[constraint]
-    else:
-        try:
-            res = data[constraint]
-        except Exception:
-            res = util.darray(data)[constraint]
+                return res
+    #will not be catched by exception check below if constraint is of shape 1
+    if not isinstance(data,numpy.ndarray) and isinstance(constraint, numpy.ndarray):
+        data = util.darray(data)
+    try:
+        res = data[constraint]
+    except Exception:
+        res = util.darray(data)[constraint]
     return res
 
 def ensure_fixeddims(seqs,packdepth,dtype):
