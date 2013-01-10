@@ -18,6 +18,21 @@ import gc, sys
 import itertools
 import csv
 from logging import error,warning,info,debug
+import re
+
+def resplit(str, sep=' ', sc=[]):
+    if sc == []:
+       return str.split(sep);
+  
+    containers = "";
+    for c in sc:
+        containers = containers + "|%s[^%s]*%s" %(c, c, c) ;
+  
+    pat = "%s(?=(?:[^%s]%s)*$)" % (sep, sc, containers);
+  
+    return re.split(pat, str);
+
+
 
 #objs: objs to find names for
 #req_objs: objs which should be in same frame
