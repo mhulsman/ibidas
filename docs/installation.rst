@@ -7,6 +7,7 @@ If one has the ``setuptools`` package installed, one can simply perform::
 
 This will download and install ibidas and some required dependencies. Root/administrator access is required to do this (see `Execute from source` or `Install in a virtualenv` if this is not available). 
 
+
 .. note::
    Some distributions might have multiple versions of python installed (both a 3.x and a 2.x version). Ibidas only supports Python 2.x currently. To specify that the python 2.x version should be used, one can often use e.g. 'easy_install-2.7' 
    instead of 'easy_install' (use tab-completion on the command line to find the available easy_install versions).
@@ -21,7 +22,11 @@ This will download and install ibidas and some required dependencies. Root/admin
    For more documentation, see http://pypi.python.org/pypi/setuptools
 
 .. note::
-   If numpy (an ibidas depencency) fails to install, use the version supplied by your package manager before installing ibidas. For further installation instructions for numpy (and scipy), see http://www.scipy.org/Installing_SciPy/Linux
+   If sudo is not available, use 'su' to switch to the administrator account
+
+.. note::
+   If numpy (an ibidas depencency) fails to install, use the version supplied by your package manager before installing ibidas. Also, we found that sometimes the numpy installation succeeds (albeit with an error at the end) when installing it separately using e.g. 'easy_install numpy'. Afterwards, one can continue installing ibidas.   
+   For further installation instructions for numpy (and scipy), see http://www.scipy.org/Installing_SciPy/Linux
 
 .. warning::
    Ibidas is currently only tested on the Linux platform, and might will not work out of the box on Windows. Installation on Mac is probably possible (using e.g. macports to install numpy/setuptools, then using easy_install to install ibidas), but is untested. 
@@ -128,6 +133,9 @@ Manual installation
 Alternatively, one can download the source package, and execute in the unpacked source directory::
 
     python setup.py install
+
+.. note::
+    If 'python' is a python 3.x version, search for a python 2.x version, named e.g. 'python2' or 'python2.7' (use tab-completion to find the available options)
 
 This requires that any dependencies are installed beforehand. 
 

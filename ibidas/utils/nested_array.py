@@ -6,7 +6,7 @@ _delay_import_(globals(),"..utils.missing","Missing")
 _delay_import_(globals(),"..itypes","dimpaths","rtypes","dimensions")
 class NestedArray(object):
     def __init__(self,data,cur_type):
-        self.data = util.darray([data],object)
+        self.data = util.darray([data],cur_type.toNumpy())
         self.cur_type = cur_type
         self.idxs = [0]
         

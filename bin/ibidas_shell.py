@@ -2,6 +2,13 @@ import sys
 import getopt
 import os
 
+req_version = (2,6)
+cur_version = sys.version_info
+
+if not ((cur_version[0] > req_version[0]) or (cur_version[0] == req_version[0] and cur_version[1] >= req_version[1])):
+    sys.stderr.write("Your python interpreter is too old. Ibidas needs at least Python 2.6. Please consider upgrading.\n")
+    sys.exit(-1)
+
 #make sure we import the development version
 try:
     sys.path = [os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..'))] + sys.path

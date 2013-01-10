@@ -156,8 +156,14 @@ class AddSlice(repops.UnaryOpRep):
         if not dtype is None:
             refdims = sum([slice.dims for slice in source._slices],tuple())
             dtype = rtypes.createType(dtype,refdims=refdims)
-            
-        data = python.Rep(data, dtype=dtype, name=name)
+            if isinstance(data, representor.Representor):
+                data = data()
+            data = python.Rep(data, dtype=dtype, name=name)
+        else: 
+            if not isinstance(data, representor.Representor):
+                data = python.Rep(data, name=name)
+            else:
+                data = data / name
 
         nslices = list(source._slices)
         nslices.extend(data._slices)
@@ -344,6 +350,9 @@ class HArray(repops.UnaryOpRep):
             if(ntype != slice.type):
                 slice = ops.CastOp(slice,ntype)
             nnslices.append(slice)
+    
+        if name is None:
+            name = util.seq_names(1, exclude=set([d.name for d in source.DimsUnique]))[0]
     
         nslice = ops.HArrayOp(nnslices,name=name)
         nslice = ops.UnpackArrayOp(nslice)

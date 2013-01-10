@@ -403,11 +403,6 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
 
         return slice.modify(rtype=node.type,dims=node.dims)
 
-    def visitShapeOp(self, node, slice):
-        d = slice.data.getDimShape(node.pos)
-        ndata = nested_array.NestedArray(d,node.type)
-        return slice.modify(ndata,rtype=node.type,dims=node.dims,name=node.name)
-
     def visitFreezeOp(self, node, slice):
         func = lambda x: type_attribute_freeze.freeze_protocol.execFreeze(slice.type,x)
         ndata = slice.data.mapseq(func,res_type=node.type)
@@ -1062,20 +1057,19 @@ def speedfilter(seqs,has_missing, ctype, stype):
                     else:
                         res.append(data[elem])
                 res = util.darray(res,object)
+            return res                
         else:
             if(constraint is Missing):
                 missing = stype.toMissingval()
                 res = missing
-            else:
-                try:
-                    res = data[constraint]
-                except Exception:
-                    res = util.darray(data)[constraint]
-    else:
-        try:
-            res = data[constraint]
-        except Exception:
-            res = util.darray(data)[constraint]
+                return res
+    #will not be catched by exception check below if constraint is of shape 1
+    if not isinstance(data,numpy.ndarray) and isinstance(constraint, numpy.ndarray):
+        data = util.darray(data)
+    try:
+        res = data[constraint]
+    except Exception:
+        res = util.darray(data)[constraint]
     return res
 
 def ensure_fixeddims(seqs,packdepth,dtype):

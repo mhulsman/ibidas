@@ -3,7 +3,7 @@ import sys
 req_version = (2,6)
 cur_version = sys.version_info
 
-if not ((cur_version[0] >= req_version[0]) or (cur_version[0] == req_version[0] and cur_version[1] >= req_version[1])):
+if not ((cur_version[0] > req_version[0]) or (cur_version[0] == req_version[0] and cur_version[1] >= req_version[1])):
     sys.stderr.write("Your python interpreter is too old. Ibidas needs at least Python 2.6. Please consider upgrading.\n")
     sys.exit(-1)
 
@@ -34,7 +34,7 @@ if not os.path.isdir('docs/_build'):
 
 setup(
     name="Ibidas",
-    version="0.1.22",
+    version="0.1.23",
     packages = find_packages(),
     test_suite = "test",
     scripts = ['bin/ibidas','bin/ibidas_shell.py','bin/python_2_please'],

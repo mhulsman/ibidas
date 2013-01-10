@@ -18,6 +18,7 @@ import gc, sys
 import itertools
 import csv
 from logging import error,warning,info,debug
+import random
 import re
 
 def resplit(str, sep=' ', sc=[]):
@@ -31,7 +32,6 @@ def resplit(str, sep=' ', sc=[]):
     pat = "%s(?=(?:[^%s]%s)*$)" % (sep, sc, containers);
   
     return re.split(pat, str);
-
 
 
 #objs: objs to find names for
@@ -519,4 +519,33 @@ nversion = numpy.__version__.split('.')
 numpy16up = int(nversion[0]) >= 1 and int(nversion[1]) >= 6
 
 darray = replace_darray
-    
+
+
+def random_names(n, exclude=set()):
+    rn = set()
+    while len(rn) < n:
+        z = 'd' + str(random.randrange(100000000))
+        if not z in exclude:
+            rn.add(z)
+    return list(rn)        
+
+def seq_names(n, exclude=set()):
+    rn = []
+    for i in seqgen():
+        z = 'd' + str(i)
+        if not z in exclude:
+            rn.append(z)
+        if len(rn) >= n:
+            break
+    return rn
+
+def uniqify_names(names, exclude=set()):
+    rn = seq_names(len(names), exclude=exclude)
+
+    for i in range(len(names)):
+        if names[i] in exclude:
+            names[i] = rn.pop()
+    return names
+
+
+

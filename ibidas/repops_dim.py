@@ -5,6 +5,7 @@ from itertools import izip_longest
 _delay_import_(globals(),"itypes","rtypes","dimpaths","dimensions")
 _delay_import_(globals(),"ops")
 _delay_import_(globals(),"repops_slice")
+_delay_import_(globals(),"repops_funcs")
 _delay_import_(globals(),"utils","util")
 
 class UnpackArray(repops.UnaryOpRep):
@@ -101,9 +102,14 @@ class Shape(repops.UnaryOpRep):
             for pos, dim in enumerate(slice.dims):
                 if dim.name in dimnames:
                     continue
-                nslice = ops.ShapeOp(slice,pos)
+                packdepth = len(slice.dims) - pos - 1
+                nslice = slice
+                if packdepth:        
+                    nslice = ops.PackArrayOp(nslice, packdepth)
+                nslice = ops.ChangeNameOp(nslice, dim.name)  
                 nslices.append(nslice)
                 dimnames.add(dim.name)
+        nslices = repops_funcs.Count._apply(nslices, -1)
         return self._initialize(tuple(nslices))
        
 
@@ -121,6 +127,13 @@ class SplitDim(repops.UnaryOpRep):
     def _sprocess(self,source,lshape,rshape,lname=None,rname=None,dimsel=None):
         selpath = dimpaths.identifyUniqueDimPathSource(source,dimsel)
         nslices = []
+
+        if not lname or not rname:
+            dimnames = util.seq_names(2, exclude=set([d.name for d in source.DimsUnique]))
+            if not lname:
+                lname = dimnames[0]
+            if not rname:
+                rname = dimnames[1]
 
         if(isinstance(lshape,int)):
             ldim = dimensions.Dim(lshape,name=lname)
