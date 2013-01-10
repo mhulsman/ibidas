@@ -5,6 +5,7 @@ from itypes import rtypes
 import ops
 _delay_import_(globals(),"utils","util")
 _delay_import_(globals(),"representor")
+_delay_import_(globals(),"repops_dim")
 _delay_import_(globals(),"wrappers","python")
 _delay_import_(globals(),"itypes", "casts","dimpaths","dimensions")
 
@@ -188,7 +189,7 @@ class BinaryFuncOp(repops.MultiOpRep, Func):
 class BinaryFuncElemOp(BinaryFuncOp):
     _allow_partial_bc = False
     def _process(self, sources, **kwargs):
-        lsource,rsource = sources
+        lsource,rsource = repops_dim.makeDimNamesUnique(*sources)
         if not lsource._typesKnown() or not rsource._typesKnown():
             return
 
