@@ -697,22 +697,6 @@ class Representor(Node):
                  Dim order: d4:2<d3:~<d2:3
 
           
-          .. note::
-         
-             According to the rules, these two operations should be equivalent::
-                
-                 x.Filter([0,1],mode='dim')
-                 x.Filter(Rep([0,1]))
-                
-             However, the second version will return this error: RuntimeError: Cannot broadcast, there are different dimensions with same name: d1. Please rename (DimRename) or state their equivalence.
-             
-             The reason for this is that Rep([0,1]) will just assign dimension 'd1' to [0,1], which then conflicts with dimension 'd1' in 'x'. In contrast, Filter assigns dimension names to [0,1] such that no conflict
-             can arise.  The second version can be made to work by simply renaming the dimension::
-
-                 x.Filter(Rep([0,1])%'d3')
-          
-            
-
         """
         if(isinstance(condition, context.Context)):
             condition = context._apply(condition, self)
@@ -967,6 +951,7 @@ class Representor(Node):
         to have 1 dimension, even those which have 0 dimensions. 
 
         Example::
+
             >>> x = Rep(([[1,2,3],[4,5,6]],'a'))
             
             Slices: | f0        | f1
@@ -1100,6 +1085,7 @@ class Representor(Node):
         """Returns shape of all dimensions as slices in a representor object.
             
            Example::
+    
                 >>> x = Rep([[1,2,3],[4,5,6]])
                 
                 Slices: | data     
@@ -1128,19 +1114,288 @@ class Representor(Node):
         return repops_dim.Shape(self)
 
     def GroupBy(self, *args, **kwargs):
+        """Groups data on the content of one or more slices.
+        
+        :param flat: Allows one to indicate which slices should not be grouped. 
+        
+        Example::
+
+            >>> x = Rep(([1,1,2,2,3,3,4,4],[1,2,1,2,1,2,1,2],[1,2,3,4,1,2,3,4]))
+
+            Slices: | f0    | f1    | f2
+            -------------------------------
+            Type:   | int64 | int64 | int64
+            Dims:   | d1:8  | d1:8  | d1:8
+            Data:   |       |       |
+                    | 1     | 1     | 1
+                    | 1     | 2     | 2
+                    | 2     | 1     | 3
+                    | 2     | 2     | 4
+                    | 3     | 1     | 1
+                    | 3     | 2     | 2
+                    | 4     | 1     | 3
+                    | 4     | 2     | 4
+
+            Dim order: d1:8
+
+            >>> x.GroupBy(_.f0)
+            
+            Slices: | f0    | f1          | f2
+            -------------------------------------------
+            Type:   | int64 | int64       | int64
+            Dims:   | gf0:* | gf0:*<gd1:~ | gf0:*<gd1:~
+            Data:   |       |             |
+                    | 1     | [1 2]       | [1 2]
+                    | 2     | [1 2]       | [3 4]
+                    | 3     | [1 2]       | [1 2]
+                    | 4     | [1 2]       | [3 4]
+
+            Dim order: gf0:*<gd1:~            
+
+        Note how slice f0 has now only unique values, and how slices f1 and f2 have now two dimensions, grouped per unique value in f0. 
+        One can also group on multiple slices at once::
+            
+            >>> x.GroupBy((_.f1, _.f2))
+
+            Slices: | f0            | f1            | f2           
+            -------------------------------------------------------
+            Type:   | int64         | int64         | int64        
+            Dims:   | gdata:*<gd1:~ | gdata:*<gd1:~ | gdata:*<gd1:~
+            Data:   |               |               |              
+                    | [2 4]         | [2 2]         | [4 4]        
+                    | [2 4]         | [1 1]         | [3 3]        
+                    | [1 3]         | [1 1]         | [1 1]        
+                    | [1 3]         | [2 2]         | [2 2]        
+
+            Dim order: gdata:*<gd1:~
+
+        This groups the data such that the combination of f1 and f2 is unique. 
+        This actually equivalent to::
+        
+            >>> x.GroupBy(_.Get(_.f1, _.f2).Tuple())
+        
+        That is, '(_.f1, _.f2)' signifies that one wants to get the tuple of f1 and f2, which looks like this::
+
+            >>> x.Get((_.f1, _.f2))
+
+            Slices: | data                
+            ------------------------------
+            Type:   | (f1=int64, f2=int64)
+            Dims:   | d1:8                
+            Data:   |                     
+                    | (1, 1)              
+                    | (2, 2)              
+                    | (1, 3)              
+                    | (2, 4)              
+                    | (1, 1)              
+                    | (2, 2)              
+                    | (1, 3)              
+                    | (2, 4)              
+
+            Dim order: d1:8
+        
+        Instead of grouping on combinations of slices, one can also group on multiple slices individually::
+        
+            >>> x.GroupBy(_.f0, _.f1)
+        
+            Slices: | f0    | f1    | f2               
+            -------------------------------------------
+            Type:   | int64 | int64 | int64            
+            Dims:   | gf0:* | gf1:* | gf0:*<gf1:*<gd1:~
+            Data:   |       |       |                  
+                    | 1     | 1     | [[1] [2]]        
+                    | 2     | 2     | [[3] [4]]        
+                    | 3     |       | [[1] [2]]        
+                    | 4     |       | [[3] [4]]        
+
+            Dim order: gf0:*<gf1:*<gd1:~
+
+
+        Note that f0 and f1 now have two separate dimensions, while f2 has both these dimensions, and an extra 'group' dimension (like before). In this 
+        case, the gd1 dimensions is always of length 1, as there are only unique values in f2 for every pair of f0, f1. 
+
+        
+        Of course, one remove such an extra dim using filtering, e.g.::
+
+            >>> x.GroupBy(_.f0, _.f1)[...,0]
+
+            Slices: | f0    | f1    | f2
+            -------------------------------------
+            Type:   | int64 | int64 | int64
+            Dims:   | gf0:* | gf1:* | gf0:*<gf1:*
+            Data:   |       |       |
+                    | 1     | 1     | [1 2]
+                    | 2     | 2     | [3 4]
+                    | 3     |       | [1 2]
+                    | 4     |       | [3 4]
+
+            Dim order: gf0:*<gf1:*
+
+        However, one can also already indicate to groupby that some slices do not have to be grouped, using the 'flat' parameter. Note for example,
+        how for this case, values in f1 and f2 are for every group the same::
+
+            >>> x.GroupBy((_.f1, _.f2))
+
+        We can prevent te grouping of f1 and f2 using flat::
+
+            >>> x.GroupBy((_.f1, _.f2),flat=['f1','f2'])
+
+            Slices: | f0            | f1      | f2     
+            -------------------------------------------
+            Type:   | int64         | int64   | int64  
+            Dims:   | gdata:*<gd1:~ | gdata:* | gdata:*
+            Data:   |               |         |        
+                    | [2 4]         | 2       | 4      
+                    | [2 4]         | 1       | 3      
+                    | [1 3]         | 1       | 1      
+                    | [1 3]         | 2       | 2      
+
+       
+        Or in case of the multi-dimensional group::
+
+            >>> x.GroupBy(_.f0, _.f1, flat='f2') 
+
+            Slices: | f0    | f1    | f2         
+            -------------------------------------
+            Type:   | int64 | int64 | int64      
+            Dims:   | gf0:* | gf1:* | gf0:*<gf1:*
+            Data:   |       |       |            
+                    | 1     | 1     | [1 2]      
+                    | 2     | 2     | [3 4]      
+                    | 3     |       | [1 2]      
+                    | 4     |       | [3 4]      
+
+            Dim order: gf0:*<gf1:*
+                            
+        Note that f2 is now along every dimension non-unique.
+
+        However, one might also have a case in which a slice is non-unique for just a single slice in a multi-dimensional group, e.g.::
+
+
+            >>> x.Get(_.f0, _.f1, _.f2, _.f1/'f3').GroupBy(_.f0, _.f1, flat=['f2','f3'])        
+
+        Here, we copied slice f1, calling it 'f3'. Next, we specified that it should be flat. But note that this slice is still unique along dimension gf0...
+        Here, we can use a more advanced format for the flat parameter, in which one can specify w.r.t. to which slices a slice should be grouped::
+
+            >>> x.Get(_.f0, _.f1, _.f2, _.f1/'f3').GroupBy(_.f0, _.f1, flat={('f0','f1'):'f2','f1':'f3'})
+
+            Slices: | f0    | f1    | f2          | f3
+            ---------------------------------------------
+            Type:   | int64 | int64 | int64       | int64
+            Dims:   | gf0:* | gf1:* | gf0:*<gf1:* | gf1:*
+            Data:   |       |       |             |
+                    | 1     | 1     | [1 2]       | 1
+                    | 2     | 2     | [3 4]       | 2
+                    | 3     |       | [1 2]       |
+                    | 4     |       | [3 4]       |
+
+
+        This specifies that f2 should be flat, while keeping the group for both grouping slices, and 'f3' should be flat, while keeping the group only for the second group slice. 
+        It is equivalent to::
+
+            >>> x.Get(_.f0, _.f1, _.f2, _.f1/'f3').GroupBy(_.f0, _.f1, flat={(0,1):'f2',1:'f3'})        
+
+        """
+
         flat = kwargs.pop("flat", {})
         group_source = self.Get(*args, **kwargs)
+
+        default_dim = tuple(range(len(args)))
         
         if(isinstance(flat,dict)):
             pass
         elif(isinstance(flat, (list,tuple))):
-            flat = {0:flat}
+            flat = {default_dim:flat}
         else:
-            flat = {0:[flat]}
+            flat = {default_dim:[flat]}
             
         return repops_multi.Group(self, group_source, flat)
    
     def Join(self, other, cond):
+        """Join allows you to take the cartesian product of two dimensions, and 
+        filter them on some condition.
+        
+        Example::
+        
+            >>> x = Rep([1,2,3,4,5])
+            >>> y = Rep([3,4,5,6,7,8])
+
+            >>> x.Join(y, x >= y)
+       
+            Slices: | data       | data      
+            ---------------------------------
+            Type:   | int64      | int64     
+            Dims:   | d1a_fd1b:* | d1a_fd1b:*
+            Data:   |            |           
+                    | 3          | 3         
+                    | 4          | 3         
+                    | 4          | 4         
+                    | 5          | 3         
+                    | 5          | 4         
+                    | 5          | 5         
+
+            Dim order: d1a_fd1b:*
+        
+        The join operation generates all possible pairs of values out of x and y, and then filters them on x >= y. 
+        One can also make this condition also more complex, eg::
+
+            >>> x = Rep([[1,2,3],[4,5,6]])
+            >>> x.Join(y, x <= y)
+
+            Slices: | data                                  | data                                 
+            ---------------------------------------------------------------------------------------
+            Type:   | int64                                 | int64                                
+            Dims:   | d1:2<d2_fd1a:~                        | d1b:2<d2_fd1a:~                      
+            Data:   |                                       |                                      
+                    | [1 1 1 1 1 1 2 2 2 2 2 2 3 3 3 3 3 3] | [3 4 5 6 7 8 3 4 5 6 7 8 3 4 5 6 7 8]
+                    | [4 4 4 4 4 5 5 5 5 6 6 6]             | [4 5 6 7 8 5 6 7 8 6 7 8]            
+
+            Dim order: d1:2<d2_fd1a:~
+
+            >>> x.Join(y, x.Sum() <= y * y)
+            
+            Slices: | data            | data
+            --------------------------------------
+            Type:   | int64           | int64
+            Dims:   | d1b_fd1a:*<d2:3 | d1b_fd1a:*
+            Data:   |                 |
+                    | [1 2 3]         | 3
+                    | [1 2 3]         | 4
+                    | [1 2 3]         | 5
+                    | [1 2 3]         | 6
+                    | [1 2 3]         | 7
+                    | [1 2 3]         | 8
+                    | [4 5 6]         | 4
+                    | [4 5 6]         | 5
+                    | [4 5 6]         | 6
+                    | [4 5 6]         | 7
+                    | [4 5 6]         | 8
+
+
+        The use of context operators is a bit more complex with Join operations, as the context can refer to both sources. 
+        The context operator therefore refers to the combination of both. If there is a conflict in slice names (like in the previous examples), one can 
+        refer to both slices using the 'L' and 'R' bookmark (see Combine operation)::
+        
+            >>> x.Join(y, _.L == _.R)
+
+            Slices: | data           | data           
+            ------------------------------------------
+            Type:   | int64          | int64          
+            Dims:   | d1:2<d2_fd1a:~ | d1b:2<d2_fd1a:~
+            Data:   |                |                
+                    | [3]            | [3]            
+                    | [4 5 6]        | [4 5 6]        
+
+            Dim order: d1:2<d2_fd1a:~
+          
+        .. warning:
+            
+            The current implementation of Join is not very efficient, and will cause problems if the dataset is very large. For equi-joins 
+            (where the condition is an equality condition between slices in both sources), use the "Match" operation.
+     
+        """
+
+        
         return repops_multi.Join(self, other, cond)
     
     def Match(self, other, lslice=None,rslice=None, jointype="inner"):

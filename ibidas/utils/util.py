@@ -547,5 +547,20 @@ def uniqify_names(names, exclude=set()):
             names[i] = rn.pop()
     return names
 
-
-
+def convert_base(number, base):
+    res = []
+    if number == 0:
+        return [0]
+    while number:
+        remains = number % base
+        number = number // base
+        res.append(remains)
+    return res
+        
+def append_name(name, exclude):
+    for i in seqgen(start=-1):
+        z = name + "".join([chr(elem + ord('a')) for elem in convert_base(i,26)])
+        if not z in exclude:
+            return z
+        
+   

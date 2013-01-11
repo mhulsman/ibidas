@@ -1,6 +1,6 @@
 from constants import *
 import repops
-from itertools import izip_longest
+from itertools import izip_longest, chain
 
 _delay_import_(globals(),"itypes","rtypes","dimpaths","dimensions")
 _delay_import_(globals(),"ops")
@@ -307,6 +307,49 @@ class GroupIndex(repops.UnaryOpRep):
         nslice = ops.GroupIndexOp(nslices)
         nslice = ops.UnpackArrayOp(nslice, len(nslices))
         return self._initialize((nslice,))
+
+
+
+def makeDimNamesUnique(*sources):
+    alldims = [source.DimsUnique if not source is None else [] for source in sources]
+    udims = set(chain(*alldims))
+    if len(udims) == len(set([udim.name for udim in udims])):
+        return sources
+    res = {}
+    translate = []
+    for dim in udims:
+        if dim.name in res:
+            translate.append(dim)
+        else:
+            res[dim.name] = dim
+    
+    ntrans = {}
+    for dim in translate:
+        if dim.name in res:
+            odim = res[dim.name]
+            newname = util.append_name(odim.name, exclude=res)
+            res[newname] = odim
+            del res[dim.name]
+            ntrans[odim] = newname
+        
+        newname = util.append_name(dim.name, exclude=res)
+        res[newname] = dim
+        ntrans[dim] = newname
+        
+    nsources = []
+    for dims, source in zip(alldims, sources):
+        if not source is None:
+            rename = [ntrans[dim] if dim in ntrans else dim.name for dim in dims]
+            nsources.append(DimRename(source,*rename))
+        else:
+            nsources.append(None)
+
+    return nsources
+        
+                
+        
+
+
 
 
 

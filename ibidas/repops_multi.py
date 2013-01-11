@@ -57,7 +57,9 @@ class Nest(repops.MultiOpRep):
 class Combine(repops.MultiOpRep):
     def __init__(self, *sources):
         repops.MultiOpRep.__init__(self, sources)
+    
     def _sprocess(self,sources):
+        sources = repops_dim.makeDimNamesUnique(*sources)
         nslices = self._apply(*[source._slices for source in sources])
         return self._initialize(nslices)
 
@@ -168,7 +170,8 @@ class Filter(repops.MultiOpRep):
         repops.MultiOpRep.__init__(self,(source,constraint),dim=dim,mode=mode)
 
     def _process(self,sources,dim,mode):
-        source,constraint = sources
+        source,constraint = repops_dim.makeDimNamesUnique(*sources)
+        
         if not source._slicesKnown() or not constraint._typesKnown():
             return
         assert len(constraint._slices) == 1, "Filter constraint should have 1 slice"
@@ -354,7 +357,7 @@ class Match(repops.MultiOpRep):
         repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice),jointype=jointype, merge_same=merge_same,mode=mode)
 
     def _process(self, sources, jointype, merge_same,mode):
-        lsource, rsource, lslice,rslice = sources
+        lsource, rsource, lslice,rslice = repops_dim.makeDimNamesUnique(*sources)
         if not lsource._slicesKnown() or not rsource._slicesKnown():
             return
         if(lslice is None):
