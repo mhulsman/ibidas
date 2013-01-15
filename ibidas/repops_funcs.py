@@ -189,14 +189,14 @@ class BinaryFuncOp(repops.MultiOpRep, Func):
 class BinaryFuncElemOp(BinaryFuncOp):
     _allow_partial_bc = False
     def _process(self, sources, **kwargs):
-        lsource,rsource = repops_dim.makeDimNamesUnique(*sources)
+        lsource, rsource = sources
         if not lsource._typesKnown() or not rsource._typesKnown():
             return
-
         if(isinstance(lsource,repops.PlusPrefix) or isinstance(rsource,repops.PlusPrefix)):
             mode = "pos"
         else:
             mode = "dim"
+        lsource,rsource = repops_dim.makeDimNamesUnique(lsource,rsource)
         
         nslices = []
         nslice = max(len(lsource._slices), len(rsource._slices))
