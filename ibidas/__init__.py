@@ -11,7 +11,7 @@ __all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack', "Addformat"
            "Argmin","Argmax",
            "Mean","Median",
            "Sum",
-           "Count","Match",
+           "Count","Match","Join",
            "Broadcast","CreateType","MatchType",
            "newdim","NEWDIM","LCDIM","LASTCOMMONDIM","COMMON_NAME",'COMMON_POS', "Missing",
            "Corr","In","Contains",
@@ -44,6 +44,7 @@ from constants import *
 Fetch = DownloadCache()
 In = Infix(repops_funcs.Within)
 Contains = Infix(repops_funcs.Contains)
+Join = Infix(repops_multi.Join)
 Match = Infix(repops_multi.Match)
 Stack = Infix(repops_multi.Stack)
 Intersect = Infix(repops_multi.Intersect)

@@ -1335,11 +1335,28 @@ class Representor(Node):
                     | 5          | 5         
 
             Dim order: d1a_fd1b:*
-        
+
         The join operation generates all possible pairs of values out of x and y, and then filters them on x >= y. 
+        Note that you can also use the following equivalent forms::
+            
+            >>> Join(x, y, x >= y)
+
+            >>> x |Join(x >= y)| y
+        
         One can also make this condition also more complex, eg::
 
             >>> x = Rep([[1,2,3],[4,5,6]])
+
+            Slices: | data     
+            -------------------
+            Type:   | int64    
+            Dims:   | d1:2<d2:3
+            Data:   |          
+                    | [1 2 3]  
+                    | [4 5 6]  
+
+            Dim order: d1:2<d2:3
+
             >>> x.Join(y, x <= y)
 
             Slices: | data                                  | data                                 
@@ -1371,6 +1388,19 @@ class Representor(Node):
                     | [4 5 6]         | 7
                     | [4 5 6]         | 8
 
+            >>> x.Join(y, y |In| x)
+
+            Slices: | data            | data      
+            --------------------------------------
+            Type:   | int64           | int64     
+            Dims:   | d1b_fd1a:*<d2:3 | d1b_fd1a:*
+            Data:   |                 |           
+                    | [1 2 3]         | 3         
+                    | [4 5 6]         | 4         
+                    | [4 5 6]         | 5         
+                    | [4 5 6]         | 6         
+
+            Dim order: d1b_fd1a:*<d2:3
 
         The use of context operators is a bit more complex with Join operations, as the context can refer to both sources. 
         The context operator therefore refers to the combination of both. If there is a conflict in slice names (like in the previous examples), one can 
@@ -1390,27 +1420,249 @@ class Representor(Node):
           
         .. warning:
             
-            The current implementation of Join is not very efficient, and will cause problems if the dataset is very large. For equi-joins 
+            The current implementation of Join is not very efficient, and thus can cause problems if the dataset is very large. For equi-joins 
             (where the condition is an equality condition between slices in both sources), use the "Match" operation.
      
         """
-
         
         return repops_multi.Join(self, other, cond)
     
-    def Match(self, other, lslice=None,rslice=None, jointype="inner"):
-        return repops_multi.Match(self, other, lslice, rslice, jointype)
+    def Match(self, other, lslice=None, rslice=None, jointype="inner", merge_same=False, mode="dim"):
+        """Match allows you to take the cartesian product of two dimensions, and 
+        filter them on an equality condtion.
+
+        :param other:  ibidas representor to match with
+        :param lslice: slice in self to perform equality condition on (see .Get for allowed parameter values). Default: use a slice which has same name in both sources (there should be only 1 slice pair with this property). 
+        :param rslice: slice in other to perform equality condition on (see .Get for allowed parameter values). Default: use same name as lslice. 
+        :param jointype: choose between 'inner', 'left','right', or 'full' equijoin. Default: inner
+        :param merge_same: False, 'equi' or 'all'. Default: False
+        :param mode: Type of broadcasting, 'dim' or 'pos', i.e. respectively on identity or position. Default: 'dim'. 
+
+        Examples::
+            
+            >>> x = Rep([('a',1), ('b', 2), ('c',3), ('c', 4)])
+
+            Slices: | f0       | f1
+            --------------------------
+            Type:   | bytes[1] | int64
+            Dims:   | d1:4     | d1:4
+            Data:   |          |
+                    | a        | 1
+                    | b        | 2
+                    | c        | 3
+                    | c        | 4
+
+            Dim order: d1:4
+
+            >>>  y = Rep([('a','test1'),('d','test2'), ('c', 'test3')])
+            
+            Slices: | f0       | f1
+            -----------------------------
+            Type:   | bytes[1] | bytes[5]
+            Dims:   | d1:3     | d1:3
+            Data:   |          |
+                    | a        | test1
+                    | d        | test2
+                    | c        | test3
+
+            Dim order: d1:3
+
+           
+            >>> x.Match(y, _.f0, _.f0) 
+
+            Slices: | f0       | f1    | f1      
+            -------------------------------------
+            Type:   | bytes[1] | int64 | bytes[5]
+            Dims:   | d1:*     | d1:*  | d1:*    
+            Data:   |          |       |         
+                    | a        | 1     | test1   
+                    | c        | 3     | test3   
+                    | c        | 4     | test3   
+
+            Dim order: d1:*
+
+        The f0 slices of the 'x' and 'y' have been collapsed into a single slice, as they had the same name and content (as imposed bui
+        the equality condition). 
+        
+        Note that this call is equivalent to::
+            
+            >>> x |Match(_.f0, _.f0)| y
+
+        Or, because both slices are named similarly::
+            
+            >>> x |Match(_.f0)| y
+
+        To access similarly named slices from the left or right operand, use the bookmarks as defined by the Combine operation (see documentation there)::
+        
+            >>> (x |Match(_.f0)| y).R.f1
+
+            Slices: | f1      
+            ------------------
+            Type:   | bytes[5]
+            Dims:   | d1:*    
+            Data:   |         
+                    | test1   
+                    | test3   
+                    | test3   
+
+            Dim order: d1:*  
+
+        
+        The join type by default is 'inner', which means that only rows which are similar in both slices are kept. One can also
+        use the 'left', 'right' or 'full' join types. In these cases, unmatched rows in respectively the left, right and both source(s) are also kept::
+
+            >>> x |Match(_.f0, join_type=='left')| y          
+    
+            Slices: | f0       | f1    | f0        | f1       
+            --------------------------------------------------
+            Type:   | bytes[1] | int64 | bytes?[1] | bytes?[5]
+            Dims:   | d1:*     | d1:*  | d1:*      | d1:*     
+            Data:   |          |       |           |          
+                    | a        | 1     | a         | test1    
+                    | c        | 3     | c         | test3    
+                    | c        | 4     | c         | test3    
+                    | b        | 2     | --        | --       
+
+            Dim order: d1:*
+
+            >>> x |Match(_.f0, join_type=='full')| y         
+     
+            Slices: | f0        | f1     | f0        | f1       
+            ----------------------------------------------------
+            Type:   | bytes?[1] | int64? | bytes?[1] | bytes?[5]
+            Dims:   | d1:*      | d1:*   | d1:*      | d1:*     
+            Data:   |           |        |           |          
+                    | a         | 1      | a         | test1    
+                    | c         | 3      | c         | test3    
+                    | c         | 4      | c         | test3    
+                    | b         | 2      | --        | --       
+                    | --        | --     | d         | test2    
+
+            Dim order: d1:*
+
+        Sometimes in these cases, it is usefull to merge the slices that have similar information, in this case both 'f0' slices. This
+        can be accomplished using the 'merge_same' parameter::
+
+            >>> x |Match(_.f0, join_type=='full', merge_same='equi')| y
+
+            Slices: | f0        | f1     | f1
+            ----------------------------------------
+            Type:   | bytes?[1] | int64? | bytes?[5]
+            Dims:   | d1:*      | d1:*   | d1:*
+            Data:   |           |        |
+                    | a         | 1      | test1
+                    | c         | 3      | test3
+                    | c         | 4      | test3
+                    | b         | 2      | --
+                    | d         | --     | test2
+
+            Dim order: d1:*
+        
+        The value 'equi' selects the slices used for the equality condition. An alternative is to call with 
+        a tuple of the slice names that should be merged::
+            
+            >>> x |Match(_.f0, jointype='full', merge_same =('f0',))| y 
+        
+        Another case is when one wants to merge slices with dissimilar names. This can be accomplished by using a nested tuple::
+            
+            >>> x |Match(_.f0, jointype='full', merge_same =(('f0','f0'),))| y 
+                    
+        Finally, one can also merge on all slices with the same names, by setting merge_same to 'all' or True. For the current example,
+        this would generate an error, because slices 'f1' and 'f1' have conflicting content for the same rows::
+
+            >>> x |Match(_.f0, jointype='full', merge_same =True)| y
+            RuntimeError: Found unequal values during merge: 1 != test1
+        
+        The final parameter, 'mode', can only be illustrated with a slightly more complicated example, in which we have multiple dimensions::
+
+            >>> x = Rep([[1,2],[1,2,3]])    
+            
+            Slices: | data     
+            -------------------
+            Type:   | int64    
+            Dims:   | d1:2<d2:~
+            Data:   |          
+                    | [1 2]    
+                    | [1 2 3]  
+
+            Dim order: d1:2<d2:~ 
+
+
+            >>> y = Rep([[2,3,4],[1,3,4]])
+
+            Slices: | data
+            -------------------
+            Type:   | int64
+            Dims:   | d1:2<d2:3
+            Data:   |
+                    | [2 3 4]
+                    | [1 3 4]
+
+            Dim order: d1:2<d2:3
+
+        Matching these datasets to each other, will match them on dimensions 'd2' in both datasets (which get renamed to d2a and d2b)::
+
+            >>> x |Match| y
+            Slices: | data
+            -------------------------------
+            Type:   | int64
+            Dims:   | d1a:2<d1b:2<d2a_d2b:~
+            Data:   |
+                    | [[2] [1]]
+                    | [[2 3] [1 3]]
+
+            Dim order: d1a:2<d1b:2<d2a_d2b:~
+        
+        Note that the dataset has three dimensions, a two by two matrix of the dimensions 'd1' in both datasets, with nested lists of the Match results of each pair of rows
+        of both datasets. 
+
+        But, maybe we intended for dimensions 'd1' in both datasets to be matched to each other, although they have not the same identity. With 'positional' broadcasting,
+        we match dimensions on position, which for this case is both the same (1 dimension before the matching dimension). 
+
+            >>> x |Match(mode='pos')| y
+
+            slices: | data
+            -------------------------
+            Type:   | int64
+            Dims:   | d1a:2<d2a_d2b:~
+            Data:   |
+                    | [2]
+                    | [1 3]
+
+            Dim order: d1a:2<d2a_d2b:~
+
+        Note that both d1 dimensions have now be matched to each other, and a Match is done between only [1,2] and [2,3,4], and [1,2,3] and [1,3,4], instead of all possible pairs of rows. 
+        """
+
+        return repops_multi.Match(self, other, lslice, rslice, jointype, merge_same, mode)
     
     def Intersect(self, other, slices=COMMON_POS, dims=LASTCOMMONDIM, mode='dim'):
+        """Intersect compares dataset A and B, given only rows from A that occur also in B. 
+            
+           :param other: Other dataset to compare with
+           :param slices: Specify on which slices an intersection should be performed. COMMON_POS (pair slices with common position), COMMON_NAME (pair slices with common names) or a tuple with for each
+                source a (tuple of) slice name(s).  Default: COMMON_POS. 
+           :param dims: Specify across which dimensions an intersection should be performed. Default: last common dim (-1L). . 
+           :param mode: 'dim' or 'pos'. Type of broadcasting (dimension identity or positional). Default: 'dim'
+
+
+        """        
+        
         return repops_multi.Intersect(self, other, slices=slices, dims=dims, mode=mode)
     
     def Except(self, other, slices=COMMON_POS, dims=LASTCOMMONDIM, mode='dim'):
+        """Except compares dataset A and B, given only rows from A that occur not in B. For further documentation,
+           see 'Intersect'"""
         return repops_multi.Intersect(self, other, slices=slices, dims=dims, mode=mode)
     
     def Difference(self, other, slices=COMMON_POS, dims=LASTCOMMONDIM, mode='dim'):
+        """Difference compares dataset A and B, given only rows that occur not in both. For further documentation, 
+            see 'Intersect'"""
         return repops_multi.Intersect(self, other, slices=slices, dims=dims, mode=mode)
    
     def Union(self, other, slices=COMMON_POS, dims=LASTCOMMONDIM, mode='dim'):
+        """Union compares dataset A and B, given all unique rows that occur in either or both datasets. For further
+            documentation, see 'Intersect'"""
         return repops_multi.Intersect(self, other, slices=slices, dims=dims, mode=mode)
 
     def Replace(self, slice, translator, fromslice=0, toslice=1):
@@ -1468,7 +1720,7 @@ class Representor(Node):
         Example:
             >>> x = x.Bookmark("myslices")
             >>> x.myslices  
-            >>> x.Bmyslices   #in case of possible conflicts with slice names
+            >>> x.Bmyslices   #in case there is also a slice named 'myslices'
         """
         return repops_slice.Bookmark(self, *names, **kwds)
 
@@ -1678,6 +1930,7 @@ class Representor(Node):
         """Unpacks array type into dimension"""
         return repops_dim.UnpackArray(self, name)
     Elem = Elems
+
     def Fields(self, name=None):
         """Unpacks tuple type into slices"""
         return repops_slice.UnpackTuple(self, name)

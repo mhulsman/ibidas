@@ -17,9 +17,12 @@ class Infix:
     def __call__(self, *params, **kwargs):
         kwargs.update(self.kwargs)
         params = self.params + params
-        
+       
         if(params and isinstance(params[0],representor.Representor)):
-            return self.function(*params, **kwargs)
+            try:
+                return self.function(*params, **kwargs)
+            except TypeError, e:
+                return Infix(self.function,params,kwargs)
         else:
             return Infix(self.function,params,kwargs)
             

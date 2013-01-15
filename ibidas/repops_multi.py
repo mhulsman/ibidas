@@ -171,9 +171,9 @@ class Filter(repops.MultiOpRep):
 
     def _process(self,sources,dim,mode):
         source,constraint = repops_dim.makeDimNamesUnique(*sources)
-        
         if not source._slicesKnown() or not constraint._typesKnown():
             return
+        
         assert len(constraint._slices) == 1, "Filter constraint should have 1 slice"
         cslice = constraint._slices[0]
 
@@ -346,6 +346,9 @@ class Match(repops.MultiOpRep):
         assert (not isinstance(lslice,representor.Representor)), "Representor objects not allowed as lslice. Use context, string or int to indicate slice in lsource"
         assert (not isinstance(rslice,representor.Representor)), "Representor objects not allowed as rslice. Use context, string or int to indicate slice in rsource"
         
+        if rslice is None and lslice is None:
+            lsource,rsource = repops_dim.makeDimNamesUnique(lsource, rsource) 
+ 
         if not rslice is None:
             rslice = rsource.Get(rslice)
         elif not lslice is None:
@@ -357,7 +360,7 @@ class Match(repops.MultiOpRep):
         repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice),jointype=jointype, merge_same=merge_same,mode=mode)
 
     def _process(self, sources, jointype, merge_same,mode):
-        lsource, rsource, lslice,rslice = repops_dim.makeDimNamesUnique(*sources)
+        lsource, rsource, lslice, rslice = sources
         if not lsource._slicesKnown() or not rsource._slicesKnown():
             return
         if(lslice is None):
