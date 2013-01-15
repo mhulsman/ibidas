@@ -413,7 +413,7 @@ def extract_info(vals):
 
 #########################BIOGRID########################################
 
-def biogrid(orgs=[]):
+def biogrid(orgs=None):
     """
       Download the biogrid dataset.
       orgs is an array which specifies which organism(s) you want.
@@ -431,7 +431,7 @@ def biogrid(orgs=[]):
 
     for f in files:
         orgn = f.split('/')[-1].split('-')[2].replace('_', ' ');
-        if (orgs == []) or  (not orgn in orgs):
+        if orgs and  (not orgn in orgs):
           continue;
         #fi
         print "Loading file: '%s'" % (f);

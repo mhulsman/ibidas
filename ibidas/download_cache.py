@@ -26,7 +26,10 @@ class DownloadCache(object):
 
         file_path = self.get_filename(dbname, filename) 
         if not path.exists(file_path):
-            self.download(url, file_path)
+            import os;
+            tempfilename = "%s.tmp" % file_path;
+            self.download(url, tempfilename);
+            os.rename(tempfilename, file_path);
         
         return file_path
 
