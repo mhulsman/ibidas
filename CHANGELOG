@@ -143,3 +143,4 @@
 - getShape renamed to Shape. Shape types know not unknown
 - changed default dim of flat parameter of GroupBy for multi-dimensional groups
 - automatic renaming of dims when conflicts occur
+- added more documentation
