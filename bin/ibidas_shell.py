@@ -11,7 +11,7 @@ if not ((cur_version[0] > req_version[0]) or (cur_version[0] == req_version[0] a
 
 #make sure we import the development version
 try:
-    sys.path = [os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..'))] + sys.path
+    sys.path = [os.path.normpath(os.path.join(os.path.dirname(os.path.realpath(__file__)),'..')), '.'] + sys.path
 except:
     pass
 
