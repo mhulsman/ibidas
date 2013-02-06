@@ -144,3 +144,8 @@
 - changed default dim of flat parameter of GroupBy for multi-dimensional groups
 - automatic renaming of dims when conflicts occur
 - added more documentation
+
+0.1.24
+- Each does not apply its function to each slice separately anymore, but uses each slice as a separate parameter for its function
+- Each supports named parameters (named_params=True)
+- Each support extra parameters (e.g. foo = 4)

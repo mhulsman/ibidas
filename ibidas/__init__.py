@@ -89,7 +89,7 @@ LessEqual = repops.delayable()(repops_funcs.LessEqual)
 Less = repops.delayable()(repops_funcs.Less)
 GreaterEqual = repops.delayable()(repops_funcs.GreaterEqual)
 Greater = repops.delayable()(repops_funcs.Greater)
-Each = repops.delayable()(repops_funcs.Each)
+Each = repops.delayable()(repops_slice.Each)
 
 
 HArray = repops.delayable(nsources=UNDEFINED)(repops_slice.HArray)

@@ -124,7 +124,7 @@ class UnaryFuncElemOp(UnaryFuncOp):
         for slice in source._slices:
             slice = self._prepareSlice(slice)
             sig, nkwargs, outparam = self._findSignature(slice=slice,**kwargs)
-            s = ops.UnaryFuncElemOp(self.__class__.__name__, sig, outparam, **nkwargs)
+            s = ops.UnaryFuncElemOp(self.__class__.__name__, sig, outparam.name, outparam.type, **nkwargs)
             s = self._finishSlice(s)
             nslices.append(s)
         return self._initialize(tuple(nslices))
@@ -157,7 +157,7 @@ class UnaryFuncDimOp(UnaryFuncOp):
             for lastpos in lastposs:
                 packdepth = len(slice.dims) - lastpos
                 sig, nkwargs, outparam = cls._findSignature(slice=slice, packdepth=packdepth, **kwargs)
-                slice = cls._slicecls(cls.__name__, sig, outparam, **nkwargs)
+                slice = cls._slicecls(cls.__name__, sig, outparam.name, outparam.type, **nkwargs)
             if(lastposs):
                 slice = cls._finishSlice(slice)
             nslices.append(slice)
@@ -443,17 +443,6 @@ mergesig = MergeSignature("merge")
 
 class Merge(BinaryFuncElemOp):
     _sigs = [mergesig]
-
-class EachSignature(FuncSignature):
-    def check(self, slice, eachfunc, dtype=rtypes.unknown):#{{{
-        if(not isinstance(dtype,rtypes.TypeUnknown)):
-            dtype = rtypes.createType(dtype,len(slice.dims)) 
-        nkwargs = {'eachfunc': eachfunc, 'slice':slice}
-        return (nkwargs, Param(slice.name, dtype))#}}}
-eachsig = EachSignature("each")
-
-class Each(UnaryFuncElemOp):
-    _sigs = [eachsig]
 
 
 class UnaryArithSignature(FuncSignature):

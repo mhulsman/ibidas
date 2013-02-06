@@ -3,7 +3,7 @@ from itertools import chain
 from constants import *
 import repops
 import ops
-
+from itypes import rtypes
 
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","python")
@@ -383,6 +383,17 @@ class ToPythonRep(repops.UnaryOpRep):
 
         return self._initialize((nslice,))
 
+class Each(repops.UnaryOpRep):
+    _ocls = ops.PackTupleOp
 
+    def _sprocess(self, source, **kwargs):
+        nslice = self._apply(source._slices, **kwargs)
+        return self._initialize((nslice,))
 
-        
+    @classmethod
+    def _apply(cls, slices, eachfunc, dtype=rtypes.unknown, named_params=False, **kwargs):
+        slices,plans = ops.broadcast(slices, mode='dim', partial=False)
+        if(not isinstance(dtype,rtypes.TypeUnknown)):
+            dtype = rtypes.createType(dtype,len(slices[0].dims)) 
+        return ops.EachOp(slices, eachfunc, dtype, named_params, kwargs)
+

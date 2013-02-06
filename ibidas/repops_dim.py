@@ -39,7 +39,7 @@ class UnpackArray(repops.UnaryOpRep):
 class DimRename(repops.UnaryOpRep):#{{{
     def _sprocess(self, source, *names, **kwds):
         if(names):
-            unique_dimpath = util.unique(sum([slice.dims for slice in source._slices],dimpaths.DimPath())) 
+            unique_dimpath = util.unique(sum([slice.dims for slice in source._slices], dimpaths.DimPath())) 
             assert (len(names) <= len(unique_dimpath)),\
                     "Number of new dim names larger than number of dims"
             
@@ -312,9 +312,42 @@ class GroupIndex(repops.UnaryOpRep):
 
 def makeDimNamesUnique(*sources):
     alldims = [source.DimsUnique if not source is None else [] for source in sources]
+    ntrans = _getTransDims(alldims)
+    if not ntrans:
+        return sources
+        
+    nsources = []
+    for dims, source in zip(alldims, sources):
+        if not source is None:
+            rename = [ntrans[dim] if dim in ntrans else dim.name for dim in dims]
+            nsources.append(DimRename(source,*rename))
+        else:
+            nsources.append(None)
+
+    return nsources
+        
+        
+def makeDimNamesUniqueSlices(*sources):
+    alldims = [source.dims if not source is None else [] for source in sources]
+
+    ntrans = _getTransDims(alldims)
+    if not ntrans:
+        return sources
+
+    nsources = []
+    for dims, source in zip(alldims, sources):
+        if not source is None:
+            rename = dict([(dim.name,ntrans[dim]) if dim in ntrans else dim.name for dim in dims])
+            nsources.append(ops.ChangeDimPathOp(source, source.dims.changeNames(rename)))
+        else:
+            nsources.append(None)
+    return nsources
+
+
+def _getTransDims(alldims):
     udims = set(chain(*alldims))
     if len(udims) == len(set([udim.name for udim in udims])):
-        return sources
+        return {}
     res = {}
     translate = []
     for dim in udims:
@@ -335,21 +368,6 @@ def makeDimNamesUnique(*sources):
         newname = util.append_name(dim.name, exclude=res)
         res[newname] = dim
         ntrans[dim] = newname
-        
-    nsources = []
-    for dims, source in zip(alldims, sources):
-        if not source is None:
-            rename = [ntrans[dim] if dim in ntrans else dim.name for dim in dims]
-            nsources.append(DimRename(source,*rename))
-        else:
-            nsources.append(None)
 
-    return nsources
-        
-                
-        
-
-
-
-
+    return ntrans
 

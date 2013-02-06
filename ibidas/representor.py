@@ -666,7 +666,7 @@ class Representor(Node):
                      Dim order: d3:2<d1:2
 
              First, we do the same positional broadcasting, filtering dimension 'd2', and mapping the second dimension of [[0,1],[0,2]] to dimension 'd1'. But then we are left with the
-             extra first dimension of [[0,1],[0,2]], which is called 'd3'. This dimension is next broadcasted. As 'd1' is already mapped to, the dimension is put in front of 'd1'.
+             extra first dimension of [[0,1],[0,2]], which is called 'd3'. This dimension is broadcasted. As 'd1' is already mapped to, the dimension is put in front of 'd1'.
 
              We can make this quite complicated, e.g.::
                  
@@ -1194,6 +1194,8 @@ class Representor(Node):
 
             Dim order: d1:8
         
+        Note that, as one does not directly group on slices f1 or f2, these slices are also grouped.
+
         Instead of grouping on combinations of slices, one can also group on multiple slices individually::
         
             >>> x.GroupBy(_.f0, _.f1)
@@ -1215,7 +1217,7 @@ class Representor(Node):
         case, the gd1 dimensions is always of length 1, as there are only unique values in f2 for every pair of f0, f1. 
 
         
-        Of course, one remove such an extra dim using filtering, e.g.::
+        Of course, one can remove such an extra dim using filtering, e.g.::
 
             >>> x.GroupBy(_.f0, _.f1)[...,0]
 
@@ -1231,8 +1233,8 @@ class Representor(Node):
 
             Dim order: gf0:*<gf1:*
 
-        However, one can also already indicate to groupby that some slices do not have to be grouped, using the 'flat' parameter. Note for example,
-        how for this case, values in f1 and f2 are for every group the same::
+        However, it is better to already indicate to groupby that some slices do not have to be grouped, using the 'flat' parameter. 
+        We already saw a case before where grouping of certain slices was not necessary, namely the one where we grouped on the tuple of f1 and f2::
 
             >>> x.GroupBy((_.f1, _.f2))
 
@@ -1251,7 +1253,7 @@ class Representor(Node):
                     | [1 3]         | 2       | 2      
 
        
-        Or in case of the multi-dimensional group::
+        In the case of the multi-dimensional group, we can do the same::
 
             >>> x.GroupBy(_.f0, _.f1, flat='f2') 
 
@@ -1267,7 +1269,7 @@ class Representor(Node):
 
             Dim order: gf0:*<gf1:*
                             
-        Note that f2 is now along every dimension non-unique.
+        Note that f2 is now non-unique along every dimension.
 
         However, one might also have a case in which a slice is non-unique for just a single slice in a multi-dimensional group, e.g.::
 
@@ -1275,7 +1277,7 @@ class Representor(Node):
             >>> x.Get(_.f0, _.f1, _.f2, _.f1/'f3').GroupBy(_.f0, _.f1, flat=['f2','f3'])        
 
         Here, we copied slice f1, calling it 'f3'. Next, we specified that it should be flat. But note that this slice is still unique along dimension gf0...
-        Here, we can use a more advanced format for the flat parameter, in which one can specify w.r.t. to which slices a slice should be grouped::
+        For these situations, a more advanced format for the flat parameter can be used, in which one can specify w.r.t. to which slices a slice should be grouped::
 
             >>> x.Get(_.f0, _.f1, _.f2, _.f1/'f3').GroupBy(_.f0, _.f1, flat={('f0','f1'):'f2','f1':'f3'})
 
@@ -1343,7 +1345,7 @@ class Representor(Node):
 
             >>> x |Join(x >= y)| y
         
-        One can also make this condition also more complex, eg::
+        One can also make this condition more complex, eg::
 
             >>> x = Rep([[1,2,3],[4,5,6]])
 
@@ -1481,7 +1483,7 @@ class Representor(Node):
 
             Dim order: d1:*
 
-        The f0 slices of the 'x' and 'y' have been collapsed into a single slice, as they had the same name and content (as imposed bui
+        The f0 slices of the 'x' and 'y' have been collapsed into a single slice, as they had the same name and content (as imposed by
         the equality condition). 
         
         Note that this call is equivalent to::
@@ -1491,6 +1493,12 @@ class Representor(Node):
         Or, because both slices are named similarly::
             
             >>> x |Match(_.f0)| y
+
+        If there would have been only a single common named slice in x and y, one could also have used::
+
+            >>> x |Match| y
+
+        This is however not the case here, as also 'f1' is shared by both x and y. 
 
         To access similarly named slices from the left or right operand, use the bookmarks as defined by the Combine operation (see documentation there)::
         
@@ -1540,7 +1548,7 @@ class Representor(Node):
 
             Dim order: d1:*
 
-        Sometimes in these cases, it is usefull to merge the slices that have similar information, in this case both 'f0' slices. This
+        Sometimes in these cases, it is useful to merge the slices that have similar information, in this case both 'f0' slices. This
         can be accomplished using the 'merge_same' parameter::
 
             >>> x |Match(_.f0, join_type=='full', merge_same='equi')| y
@@ -1616,8 +1624,11 @@ class Representor(Node):
         Note that the dataset has three dimensions, a two by two matrix of the dimensions 'd1' in both datasets, with nested lists of the Match results of each pair of rows
         of both datasets. 
 
-        But, maybe we intended for dimensions 'd1' in both datasets to be matched to each other, although they have not the same identity. With 'positional' broadcasting,
-        we match dimensions on position, which for this case is both the same (1 dimension before the matching dimension). 
+        But, maybe we intended for dimensions 'd1' in both datasets to be matched to each other, although they have not the same identity (meaning that while similarly named, Ibidas
+        assumes that they refer to different data). With 'positional' broadcasting, we match dimensions on position. 
+        
+        In this case, we have dimensions 'd2' in both datasets used for the matching, so those need no broadcasting. Directly before these dimensions 'd2', we have in both datasets 
+        a dimension 'd1'. When using positional broadcasting, these will be matched to each other (while with dimensional broadcasting they will only be matched if they have the same identity)::
 
             >>> x |Match(mode='pos')| y
 
@@ -1631,7 +1642,7 @@ class Representor(Node):
 
             Dim order: d1a:2<d2a_d2b:~
 
-        Note that both d1 dimensions have now be matched to each other, and a Match is done between only [1,2] and [2,3,4], and [1,2,3] and [1,3,4], instead of all possible pairs of rows. 
+        Note that both d1 dimensions are now matched to each other, and a Match is done between only [1,2] and [2,3,4], and [1,2,3] and [1,3,4], instead of all possible pairs of rows. 
         """
 
         return repops_multi.Match(self, other, lslice, rslice, jointype, merge_same, mode)
@@ -1642,8 +1653,10 @@ class Representor(Node):
            :param other: Other dataset to compare with
            :param slices: Specify on which slices an intersection should be performed. COMMON_POS (pair slices with common position), COMMON_NAME (pair slices with common names) or a tuple with for each
                 source a (tuple of) slice name(s).  Default: COMMON_POS. 
-           :param dims: Specify across which dimensions an intersection should be performed. Default: last common dim (-1L). . 
-           :param mode: 'dim' or 'pos'. Type of broadcasting (dimension identity or positional). Default: 'dim'
+           :param dims: Specify across which dimensions an intersection should be performed. Default: last common dim (-1L) in both datasets. Can also be a tuple, allowing one to specify the dim for each source separately. 
+           :param mode: 'dim' or 'pos'. Type of broadcasting (dimension identity or positional) for the dimensions that are not used in the intersection. Default: 'dim'
+
+            
 
 
         """        
@@ -1708,6 +1721,10 @@ class Representor(Node):
     def DimRename(self, *names, **kwds):
         """Rename dimensions. Similar to ``Rename`` for slices.
 
+        When using a tuple to supply names for the dimensions, we keep the ordering as given
+        by the DimUnique parameter of a representor object. For clarity, it might be better to
+        supply a dictionary with a name mapping however. 
+
         Shortcut: use % operator
         """
         return repops_dim.DimRename(self, *names, **kwds)
@@ -1720,12 +1737,17 @@ class Representor(Node):
         Example:
             >>> x = x.Bookmark("myslices")
             >>> x.myslices  
-            >>> x.Bmyslices   #in case there is also a slice named 'myslices'
+            >>> x.Bmyslices   #only necessary to use the 'B' prefix in case there is also a slice named 'myslices'
         """
         return repops_slice.Bookmark(self, *names, **kwds)
 
-    def Each(self, eachfunc, dtype=rtypes.unknown):
-        return repops_funcs.Each(self, eachfunc=eachfunc, dtype=dtype)
+    def Each(self, eachfunc, named_params=False, dtype=rtypes.unknown, **kwargs):
+        """Applies 'eachfunc' to each element in this representor. 
+        :param eachfunc: can be any (self-defined) python (lambda) function, or a context operation (e.g. _ + 3). 
+        :param dtype: expected output type. If not given, this type is automatically detected if necessary for subsequent operations (which is slower). 
+
+        """        
+        return repops_slice.Each(self, eachfunc=eachfunc, dtype=dtype, named_params=named_params, **kwargs)
     
     def Pos(self, dim=None):
         return repops_funcs.Pos(self, dim)

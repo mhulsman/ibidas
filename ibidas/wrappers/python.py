@@ -345,7 +345,12 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
     def visitPackTupleOp(self,node, slices):
         ndata = nested_array.co_mapseq(speedtuplify,[slice.data for slice in slices],res_type=node.type)
         return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
-   
+    
+    def visitEachOp(self,node, slices):
+        ndata = nested_array.co_mapseq(speedeach,[slice.data for slice in slices],res_type=node.type, dtype=node.type.toNumpy(), 
+                                       eachfunc=node.eachfunc, extra_params=node.extra_params, named_params=node.named_params)
+        return slices[0].modify(data=ndata,name=node.name,rtype=node.type,dims=node.dims,bookmarks=node.bookmarks)
+  
     def visitPackIndexDictOp(self, node, slices):
         names = node.type.fieldnames
         def speed_index_dictify(x):
@@ -462,7 +467,7 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
         ndata = slice.data.mapseq(func,type_in=slice.type,type_out=node.type,
                                   res_type=node.type,op=node.funcname, **node.kwargs)
         return slice.modify(data=ndata,rtype=node.type)
-    
+   
     def visitNoneToMissingOp(self, node, slice):
         ndata = slice.data.mapseq(none_to_missing,res_type=node.type, stype=node.type)
         return slice.modify(data=ndata)
@@ -1017,6 +1022,50 @@ def speedtuplify(seqs):
     nseq = util.darray(zip(*seqs))
     return nseq
 
+def speedeach(seqs, dtype, eachfunc, extra_params, named_params):
+    if extra_params:
+        assert not isinstance(eachfunc, context.Context), 'Cannot give extra params to Each when using context operation'
+        if named_params is False:
+            nseq = util.darray([eachfunc(*args, **extra_params) for args in zip(*seqs)],dtype)
+        else:
+            res = []
+            for args in zip(*seqs):
+                args = dict(zip(named_params, args))
+                args.update(extra_params)
+                res.append(eachfunc(**args))
+            nseq = util.darray(res,dtype)
+    else:
+        if named_params is False:
+            if(isinstance(eachfunc,context.Context)):
+                if len(seqs) == 1:
+                    nseq = util.darray([context._apply(eachfunc, arg) for arg in seqs[0]],dtype)
+                else:                    
+                    nseq = util.darray([context._apply(eachfunc, args) for args in zip(*seqs)],dtype)
+            else:
+                if len(seqs) == 1:
+                    nseq = util.darray([eachfunc(arg) for arg in seqs[0]],dtype)
+                else:                    
+                    nseq = util.darray([eachfunc(*args) for args in zip(*seqs)],dtype)
+        else:
+            res = []
+            if(isinstance(eachfunc,context.Context)):
+                if len(seqs) == 1:
+                    res = [context._apply(eachfunc,arg) for arg in seqs[0]]
+                else:
+                    for args in zip(*seqs):
+                        args = dict(zip(named_params, args))
+                        res.append(context._apply(eachfunc,args))
+            else:
+                if len(seqs) == 1:
+                    for arg in seqs[0]:
+                        args = {named_params[0]:arg}
+                        res.append(eachfunc(**args))
+                else:
+                    for args in zip(*seqs):
+                        args = dict(zip(named_params, args))
+                        res.append(eachfunc(**args))
+            nseq = util.darray(res,dtype)
+    return nseq
 
 def speedarrayify(seqs,dtype):
     nseq = numpy.array(seqs,dtype).T

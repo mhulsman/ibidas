@@ -640,6 +640,7 @@ class Intersect(repops.MultiOpRep):
             tupleslices.append(pslice)
             packdepthslist.append(packdepths)
         
+        tupleslices = repops_dim.makeDimNamesUniqueSlices(*tupleslices) 
         res = tupleslices[0]
         for slice in tupleslices[1:]:
             res = self.opercls._apply((res,slice),mode)
@@ -668,4 +669,5 @@ class Except(Intersect):
 
 class Difference(Intersect):
     opercls = repops_funcs.Xor
+
 

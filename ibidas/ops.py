@@ -1,9 +1,9 @@
 import copy
 from collections import defaultdict
 from itertools import izip_longest
-
+import operator
 from constants import *
-from utils import util
+from utils import util, context
 from itypes import rtypes,dimpaths
 from ops import *
 from query_graph import Node
@@ -552,39 +552,39 @@ def ensure_frozen(slice):#{{{
 
 class UnaryFuncOp(UnaryUnaryOp):#{{{
     __slots__ = ["funcname","sig", "kwargs"]
-    def __init__(self, slice, funcname, sig, outparam, dims=None, **kwargs):
+    def __init__(self, slice, funcname, sig, name, dtype, dims=None, **kwargs):
         self.funcname = funcname
         self.sig = sig
         self.kwargs = kwargs
 
         if(dims is None):
             dims = slice.dims
-        UnaryUnaryOp.__init__(self, slice, name=outparam.name, rtype=outparam.type, dims=dims)#}}}
+        UnaryUnaryOp.__init__(self, slice, name=name, rtype=dtype, dims=dims)#}}}
 
 class UnaryFuncElemOp(UnaryFuncOp):#{{{
     __slots__ = []
     
-    def __init__(self, funcname, sig, outparam, slice, **kwargs):
-        UnaryFuncOp.__init__(self, slice, funcname, sig, outparam, **kwargs)
+    def __init__(self, funcname, sig, name, dtype, slice, **kwargs):
+        UnaryFuncOp.__init__(self, slice, funcname, sig, name, dtype, **kwargs)
         #}}}
 
 class UnaryFuncSeqOp(UnaryFuncOp):#{{{
     __slots__ = ["packdepth"]
 
     
-    def __init__(self, funcname, sig, outparam, packdepth, slice, **kwargs):
+    def __init__(self, funcname, sig, name, dtype, packdepth, slice, **kwargs):
         self.packdepth = packdepth
-        UnaryFuncOp.__init__(self, slice, funcname, sig, outparam, **kwargs)
+        UnaryFuncOp.__init__(self, slice, funcname, sig, name, dtype, **kwargs)
         #}}}
 
 class UnaryFuncAggregateOp(UnaryFuncOp):#{{{
     __slots__ = ["packdepth"]
     
-    def __init__(self, funcname, sig, outparam, packdepth, slice, **kwargs):
+    def __init__(self, funcname, sig, name, dtype, packdepth, slice, **kwargs):
         self.packdepth = packdepth
-        sdims, ntype = slice.dims.removeDim(len(slice.dims) - packdepth, (funcname,outparam), outparam.type)
+        sdims, ntype = slice.dims.removeDim(len(slice.dims) - packdepth, (funcname,name,dtype, len(slice.dims) - packdepth), dtype)
 
-        UnaryFuncOp.__init__(self, slice, funcname, sig, outparam, dims=sdims, **kwargs)
+        UnaryFuncOp.__init__(self, slice, funcname, sig, name, dtype, dims=sdims, **kwargs)
         self.type = ntype
         #}}}
 
@@ -594,6 +594,28 @@ class MultiUnaryOp(UnaryOp):#{{{
                             dims=dimpaths.DimPath(), bookmarks=set()):
         self.sources = tuple(source_slices)
         UnaryOp.__init__(self, name, rtype, dims, bookmarks)#}}}
+
+
+class EachOp(MultiUnaryOp):
+    __slots__ = ['named_params', 'eachfunc','extra_params']
+    def __init__(self, source_slices, eachfunc, rtype=rtypes.unknown, named_params=False, extra_params={}):
+        nbookmarks = reduce(operator.__or__, [s.bookmarks for s in source_slices])
+        for slice in source_slices[1:]:
+            assert slice.dims == source_slices[0].dims, 'Unequal dims'
+        dims = source_slices[0].dims
+
+        if not isinstance(eachfunc, context.Context) and hasattr(eachfunc,'func_name') and not eachfunc.func_name=='<lambda>':
+            name = util.valid_name(eachfunc.func_name)
+        else:
+            name = '_'.join([s.name for s in source_slices])
+
+        MultiUnaryOp.__init__(self, source_slices, name, rtype, dims, nbookmarks)
+        self.eachfunc = eachfunc
+        self.extra_params = extra_params
+        if named_params:
+            self.named_params = [slice.name for slice in source_slices]
+        else:
+            self.named_params = False
 
 class BinFuncOp(MultiUnaryOp):#{{{
     __slots__ = ["funcname","sig"]
@@ -732,7 +754,7 @@ class MultiOp(Op):
 class SelectOp(UnaryUnaryOp):#{{{
     __slots__ = ["index"]
     def __init__(self, slice, index, name, rtype, ndims, bookmarks):
-        assert isinstance(slice, MultiOp), "Source lice of SelectOp should be a multiop"
+        assert isinstance(slice, MultiOp), "Source slice of SelectOp should be a multiop"
         self.index = index
         UnaryUnaryOp.__init__(self, slice, name=name, rtype=rtype, dims=ndims, bookmarks=bookmarks)#}}}
 
