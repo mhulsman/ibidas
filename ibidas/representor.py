@@ -1829,7 +1829,11 @@ class Representor(Node):
     def Dict(self, with_missing=False):
         """Combines slices into a tuple type"""
         return repops_slice.Dict(self, with_missing=with_missing)
-    
+    def IsMissing(self):
+        """Checks if elements in a slice are missing"""
+        return repops_funcs.IsMissing(self)
+
+
     def IndexDict(self):
         """Combines slices into a tuple type"""
         return repops_slice.IndexDict(self)

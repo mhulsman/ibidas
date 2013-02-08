@@ -133,6 +133,23 @@ def yeastract(translator=None, url="http://www.yeastract.com/download/Regulation
     return (res%"yeastract").Copy()
 predefined_sources.register(yeastract,category="yeast")
 
+
+def yeast_collins_physical():
+    url = 'http://interactome-cmp.ucsf.edu/scores/combined_scores.txt';
+    sln = ('sysname1', 'genename1', 'sysname2', 'genename2', 'pe', 'conf', 'direct', 'indirect');
+    res = Read(Fetch(url)) / sln;
+
+    return (res%"pint").Copy();
+predefined_sources.register(yeast_collins_physical, name="interactome_physical", category="yeast");
+
+def yeast_collins_genetic():
+    url = 'http://interactome-cmp.ucsf.edu/sgi/collins_chr.txt';
+    sln = ('sysname1', 'genename1', 'allele1', 'sysname2', 'genename2', 'allele2', 'score', 'corr', 'dataset');
+    res = Read(Fetch(url)) / sln;
+
+    return (res%"gint").Copy();
+predefined_sources.register(yeast_collins_genetic, name="interactome_genetic", category="yeast");
+
 ################################ HUMAN ##################################
 
 def omim_genemap():
