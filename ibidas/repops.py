@@ -7,6 +7,15 @@ _delay_import_(globals(),"itypes","dimpaths")
 _delay_import_(globals(),"utils","context")
 _delay_import_(globals(),"repops_multi")
 
+
+class ExtendGet(object):
+    def __init__(self, sel, funccontext):
+        self.sel = sel
+        self.funccontext = funccontext
+    def __repr__(self):
+        return 'Error: should be used as parameter within Get function'
+        
+
 def delayable(default_params=["*"], nsources=1):
     """Function to enable the delay of single source operations.
 
@@ -46,7 +55,10 @@ def delayable(default_params=["*"], nsources=1):
                 if(not isinstance(params[i], representor.Representor)):
                     need_get = True
             if(need_get):
-                return _.Get(*params[:xnsources])._call(func, *params[xnsources:], **kwds)
+                if any([isinstance(elem, basestring) and elem == '~' for elem in params[:xnsources]]):
+                    return ExtendGet(params[:xnsources], _._call(func, *params[xnsources:], **kwds))
+                else:
+                    return _.Get(*params[:xnsources])._call(func, *params[xnsources:], **kwds)
             else:
                 if(xnsources > 1):
                     return func(repops_multi.Combine(*params[:xnsources]), *params[xnsources:], **kwds)

@@ -10,6 +10,11 @@ _delay_import_(globals(),"wrappers","python")
 _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"itypes","rtypes","dimpaths","casts")
 
+
+class ProjectSimple(repops.UnaryOpRep):
+    def _sprocess(self, source, slices):
+        self._initialize(tuple(slices))
+
 class ProjectDim(repops.UnaryOpRep):
     def _sprocess(self, source, name):
         nslices = [slice for slice in source._slices if slice.dims.hasName(name)]
@@ -77,55 +82,64 @@ class Project(RequestUnaryOpRep):
                 nslices.extend(elem)
         return nslices
 
-    def _sprocess(self, source, *args, **kwds):
-        cur_slices = self._source._slices
-        
+    def _select(self, cur_slices, req_sources, name, elem):
+        if(isinstance(elem, basestring)):
+            if(elem == "~"):
+                used_slices = set([slice.name for slice in self._getUsedSourceSlicesSet(req_sources)])
+                nelem = [slice for slice in cur_slices if slice.name not in used_slices]
+            elif(elem == "#"):
+                common_dims = set([slice.dims for slice in cur_slices])
+                if len(common_dims) != 1:
+                    raise RuntimeError, "Cannot use # selector as fields do not have a common dimension"
+                nelem = cur_slices[:1]
+            elif(elem == "*"):
+                nelem = cur_slices
+            else:
+                nelem = [slice for slice in cur_slices if slice.name == elem]
+                if(not nelem):
+                    if len(cur_slices) == 1 and isinstance(cur_slices[0].type,rtypes.TypeTuple) \
+                        and (elem in cur_slices[0].type.fieldnames or (isinstance(elem,int) and elem >= 0 and elem < len(cur_slices[0].type.fieldnames))):
+                        nelem = UnpackTuple._apply(cur_slices[0],elem)
+                    else:
+                        nelem = [slice for slice in cur_slices if elem in slice.bookmarks]
+                
+                if not nelem:
+                    raise AttributeError, "Cannot find attribute '" + elem + "'"
+            elem = nelem
+        elif(isinstance(elem, representor.Representor)):
+            pass
+        elif(isinstance(elem, tuple)):
+            elem = Tuple(self._source.Get(*elem))
+        elif(isinstance(elem, list)):
+            if(len(elem) == 1):
+                elem = self._source.Get(*elem).Array()
+            else:
+                elem = self._source.Get(*elem).Array()
+        else:
+            elem = util.select(cur_slices, elem)
+        return (name, elem)
+
+
+    def _getSliceList(self, nameelems, req_sources, cur_slices):
+        for name, elem in nameelems:
+            if(isinstance(elem, context.Context)):
+                elem = context._apply(elem, self._source)
+            elif(isinstance(elem, repops.ExtendGet)):
+                util.debug_here()
+                r = list(req_sources)
+                s = self._getSliceList(zip([None] * len(elem.sel), elem.sel), r, cur_slices)
+                s = s[len(req_sources):]
+                nslices = self._toSlices(s)
+                t = ProjectSimple(self._source, tuple(nslices))
+                elem = context._apply(elem.funccontext, t)
+            else:
+                name, elem = self._select(cur_slices, req_sources, name, elem)
+            req_sources.append((name,elem))
+        return req_sources
+
+    def _toSlices(self, req_sources):
         nslices = []
-        if(not self._req_sources):
-            req_sources = []
-            for name, elem in chain(zip([None] * len(args),args),kwds.iteritems()):
-                if(isinstance(elem, context.Context)):
-                    elem = context._apply(elem, self._source)
-                elif(isinstance(elem, basestring)):
-                    if(elem == "~"):
-                        used_slices = set([slice.name for slice in self._getUsedSourceSlicesSet(req_sources)])
-                        nelem = [slice for slice in cur_slices if slice.name not in used_slices]
-                    elif(elem == "#"):
-                        common_dims = set([slice.dims for slice in cur_slices])
-                        if len(common_dims) != 1:
-                            raise RuntimeError, "Cannot use # selector as fields do not have a common dimension"
-                        nelem = cur_slices[:1]
-                    elif(elem == "*"):
-                        nelem = cur_slices
-                    else:
-                        nelem = [slice for slice in cur_slices if slice.name == elem]
-                        if(not nelem):
-                            if len(cur_slices) == 1 and isinstance(cur_slices[0].type,rtypes.TypeTuple) \
-                               and (elem in cur_slices[0].type.fieldnames or (isinstance(elem,int) and elem >= 0 and elem < len(cur_slices[0].type.fieldnames))):
-                               nelem = UnpackTuple._apply(cur_slices[0],elem)
-                            else:
-                               nelem = [slice for slice in cur_slices if elem in slice.bookmarks]
-                        
-                        if not nelem:
-                            raise AttributeError, "Cannot find attribute '" + elem + "'"
-                    elem = nelem
-                elif(isinstance(elem, representor.Representor)):
-                    pass
-                elif(isinstance(elem, tuple)):
-                    elem = Tuple(self._source.Get(*elem))
-                elif(isinstance(elem, list)):
-                    if(len(elem) == 1):
-                        elem = self._source.Get(*elem).Array()
-                    else:
-                        elem = self._source.Get(*elem).Array()
-                else:
-                    elem = util.select(cur_slices, elem)
-                   
-                req_sources.append((name,elem))
-            self._req_sources = req_sources
-     
-        
-        for name,elem in self._req_sources:
+        for name,elem in req_sources:
             if(isinstance(elem, representor.Representor)):
                 if not elem._slicesKnown():
                     return 
@@ -137,12 +151,19 @@ class Project(RequestUnaryOpRep):
                 nslices.append(ops.ChangeNameOp(elem[0],name))
             else:
                 nslices.extend(elem)
+        return nslices
+
+    def _sprocess(self, source, *args, **kwds):
+        cur_slices = self._source._slices
         
+        if(not self._req_sources):
+            self._req_sources = self._getSliceList(chain(zip([None] * len(args),args),kwds.iteritems()), [], cur_slices)
+       
+        nslices = self._toSlices(self._req_sources)
         if not nslices:                
             raise AttributeError,  "No slices found with: " + str(args) + " and " + str(kwds)
         
         return self._initialize(tuple(nslices)) 
-    
 
 class Unproject(Project):
     def _sprocess(self, source, *args, **kwds):
@@ -350,15 +371,26 @@ class HArray(repops.UnaryOpRep):
             if(ntype != slice.type):
                 slice = ops.CastOp(slice,ntype)
             nnslices.append(slice)
-    
+  
+
+        
+
         if name is None:
-            name = util.seq_names(1, exclude=set([d.name for d in source.DimsUnique]))[0]
-    
-        nslice = ops.HArrayOp(nnslices,name=name)
+            dimname = util.seq_names(1, exclude=set([d.name for d in source.DimsUnique]))[0]
+            name = 'names'
+        else:
+            dimname=name
+        
+        nslice = ops.HArrayOp(nnslices,dimname=dimname,slicename='values')
         nslice = ops.UnpackArrayOp(nslice)
+        dim = nslice.dims[-1]
+
+        rtype = rtypes.TypeArray(dims=dimpaths.DimPath(dim),subtypes=(rtypes.createType(str),))
+        oslice = ops.DataOp(source.Names, name=name, rtype=rtype)
+        oslice = ops.UnpackArrayOp(oslice)
 
         #initialize object attributes
-        return self._initialize((nslice,))
+        return self._initialize((oslice,nslice))
 
 
 

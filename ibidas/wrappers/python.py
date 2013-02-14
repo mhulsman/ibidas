@@ -276,7 +276,7 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
         toslice = self.visitUnpackArrayOp(nnode, oslice)
         toslice = self.unpackCast(nnode.type, toslice, nnode)
         
-        onode = ops.UnaryFuncAggregateOp('Set',repops_funcs.setsig, repops_funcs.Param(nslice.name, nslice.type), 1, toslice)
+        onode = ops.UnaryFuncAggregateOp('Set',repops_funcs.setsig, nslice.name, nslice.type, 1, toslice)
         return self.visitUnaryFuncAggregateOp(onode, toslice)
     
     

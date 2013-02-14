@@ -161,7 +161,7 @@ def omim_genemap():
     warning('OMIM FTP is not up to date. See ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/README.txt')
     res = Read(Fetch("ftp://ftp.ncbi.nih.gov/repository/OMIM/ARCHIVE/genemap"),dtype=rtype)
     
-    res = res.Get(HArray(_.disease1, _.disease2, _.disease3)[_ != " "]/"disease", "~")
+    res = res.Get(HArray(_.disease1, _.disease2, _.disease3).values[_ != " "]/"disease", "~")
     splitfunc = lambda x: x.split(", ")
     res = res.To(_.gene_alias,  Do=_.Each(splitfunc, dtype="[symbols:~]<string").Elem()[_ != ""])
     res = res.To(_.method,      Do=_.Each(splitfunc, dtype="[methods:~]<string").Elem()[_ != ""])
