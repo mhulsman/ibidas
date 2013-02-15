@@ -4,7 +4,7 @@ from collections import defaultdict
 import numpy
 import sys
 import cPickle
-import time
+import time, re
 
 import wrapper
 from ..constants import *
@@ -467,7 +467,7 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
         ndata = slice.data.mapseq(func,type_in=slice.type,type_out=node.type,
                                   res_type=node.type,op=node.funcname, **node.kwargs)
         return slice.modify(data=ndata,rtype=node.type)
-   
+    
     def visitNoneToMissingOp(self, node, slice):
         ndata = slice.data.mapseq(none_to_missing,res_type=node.type, stype=node.type)
         return slice.modify(data=ndata)
@@ -732,11 +732,72 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
                                             + str(op) + " and " + str(type1) + ", " + str(type2)
         return res
 
+
+    def stringboolLike(self, data,type_in, type_out, op, pattern, ignore_case=False):
+        p = re.compile(r"([\\]*[%_])")
+        res = re.split(p, pattern)
+        nres = []
+        for elem in res:
+            if elem.endswith('%') or elem.endswith('_'):
+                while len(elem) > 2:
+                    nres.append(re.escape("\\"))
+                    elem = elem[2:]
+                if len(elem) == 2:
+                    nres.append(re.escape(elem[-1]))
+                elif elem == '%':
+                    nres.append(r".*")
+                else:
+                    nres.append(r".")
+            else:
+                nres.append(re.escape(elem))
+        pattern = '^' + "".join(nres) + '$'
+        return self.stringboolHasPattern(data, type_in, type_out, op, pattern, ignore_case)
+        
+    def stringboolHasPattern(self, data,type_in, type_out, op, pattern, ignore_case=False):
+        p = re.compile(pattern)
+        res = []
+        if ignore_case:
+            flags = re.IGNORE_CASE
+        else:
+            flags = 0
+
+        for elem in data:
+            if elem is Missing:
+                res.append(elem)
+            else:
+                res.append(not re.search(p, elem, flags) is None)
+        return util.darray(res, type_out.toNumpy())                
+    
+    def stringarraySplitOnPattern(self, data,type_in, type_out, op, pattern, ignore_case=False, max_splits=0):
+        p = re.compile(pattern)
+        res = []
+        if ignore_case:
+            flags = re.IGNORE_CASE
+        else:
+            flags = 0
+
+        for elem in data:
+            if elem is Missing:
+                res.append(elem)
+            else:
+                res.append(re.split(p, elem, max_splits, flags))
+        return util.darray(res, type_out.toNumpy())                
+
     def numberGeneral(self, data, type_in, type_out, op):
         if util.numpy16up:
             return numpy_unary_arith[op](data, dtype=type_out.toNumpy())
         else:
             return numpy_unary_arith[op](data, sig=type_out.toNumpy())
+    
+    def numberLog(self, data, type_in, type_out, op):
+        if not type_in.has_missing:
+            return self.numberGeneral(data,type_in,type_out, op)
+        func = numpy_unary_arith[op]
+        return util.darray([func(elem) for elem in data], type_out.toNumpy())
+
+
+    numberLog10 = numberLog
+    numberLog2 = numberLog
     
     def boolInvert(self, data, type_in, type_out, op):
         res = []
@@ -960,6 +1021,7 @@ numpy_dimfuncs = {
     'Any':numpy.any,
     'All':numpy.all,
     'Sum':numpy.sum,
+    'Prod':numpy.prod,
     'Median':numpy.median,
     'Argmin':numpy.argmin,
     'Argmax':numpy.argmax,
@@ -986,7 +1048,10 @@ python_op = {'Equal':'__eq__',
 numpy_unary_arith = {
     "Invert":numpy.invert,
     "Negative":numpy.negative,
-    "Abs":numpy.abs
+    "Abs":numpy.abs,
+    "Log":numpy.log,
+    "Log2":numpy.log2,
+    "Log10":numpy.log10,
     }
 
 reverse_op = {'__eq__':'__eq__',

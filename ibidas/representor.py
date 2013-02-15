@@ -881,9 +881,28 @@ class Representor(Node):
        
     def __abs__(self):
         return repops_funcs.Abs(self)
-    
+
     def __neg__(self):
         return repops_funcs.Negative(self)
+
+
+    def Log(self):
+        return repops_funcs.Log(self)
+
+    def Log2(self):
+        return repops_funcs.Log2(self)
+
+    def Log10(self):
+        return repops_funcs.Log10(self)
+    
+    def HasPattern(self, value, ignore_case=False):
+        return repops_funcs.HasPattern(self, pattern=value, ignore_case=ignore_case)
+    
+    def SplitOnPattern(self, value, max_splits=0, ignore_case=False):
+        return repops_funcs.SplitOnPattern(self, pattern=value, ignore_case=ignore_case, max_splits=0)
+
+    def Like(self, value, ignore_case=False):
+        return repops_funcs.Like(self, pattern=value, ignore_case=ignore_case)
 
     def __nonzero__(self):
         self._checkState()
@@ -1766,6 +1785,9 @@ class Representor(Node):
 
     def Sum(self, dim=None):
         return repops_funcs.Sum(self, dim)
+    
+    def Prod(self, dim=None):
+        return repops_funcs.Prod(self, dim)
 
     def Max(self, dim=None):
         return repops_funcs.Max(self, dim)

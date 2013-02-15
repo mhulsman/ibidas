@@ -128,6 +128,15 @@ class MissingType(object):#{{{
     def __abs__(self):
         return self
 
+    def log(self):
+        return self
+    
+    def log2(self):
+        return self
+
+    def log10(self):
+        return self
+
     def __nonzero__(self):
         return False
     

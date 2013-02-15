@@ -117,6 +117,8 @@ class UnaryFuncOp(repops.UnaryOpRep, Func):
         repops.UnaryOpRep.__init__(self,source, *params,**kwargs)
 
 class UnaryFuncElemOp(UnaryFuncOp):
+    _slicecls = ops.UnaryFuncElemOp
+
     def _process(self, source, **kwargs):
         if not source._typesKnown():
             return
@@ -124,7 +126,7 @@ class UnaryFuncElemOp(UnaryFuncOp):
         for slice in source._slices:
             slice = self._prepareSlice(slice)
             sig, nkwargs, outparam = self._findSignature(slice=slice,**kwargs)
-            s = ops.UnaryFuncElemOp(self.__class__.__name__, sig, outparam.name, outparam.type, **nkwargs)
+            s = self.__class__._slicecls(self.__class__.__name__, sig, outparam.name, outparam.type, **nkwargs)
             s = self._finishSlice(s)
             nslices.append(s)
         return self._initialize(tuple(nslices))
@@ -176,6 +178,23 @@ class UnaryFuncDimOp(UnaryFuncOp):
 
 class UnaryFuncAggregateOp(UnaryFuncDimOp):
     _slicecls = ops.UnaryFuncAggregateOp
+
+class UnaryFuncSegregateOp(UnaryFuncElemOp):
+    def _process(self, source, **kwargs):
+        if not source._typesKnown():
+            return
+        exclude_dimnames = [dim.name for dim in source.DimsUnique]
+        nslices = []
+        for slice in source._slices:
+            slice = self._prepareSlice(slice)
+            sig, nkwargs, outparam = self._findSignature(slice=slice,exclude_dimnames=exclude_dimnames,**kwargs)
+            nkwargs.pop('exclude_dimnames')
+            s = self.__class__._slicecls(self.__class__.__name__, sig, outparam.name, outparam.type, **nkwargs)
+            for i in range(self._unpackdepth):
+                s = ops.UnpackArrayOp(s)
+            s = self._finishSlice(s)
+            nslices.append(s)
+        return self._initialize(tuple(nslices))
 
 class BinaryFuncOp(repops.MultiOpRep, Func):
     def __init__(self, lsource, rsource, **kwargs):
@@ -406,8 +425,6 @@ class Xor(BinaryFuncElemOp):
 class Power(BinaryFuncElemOp):
    _sigs = [bin_arithsig]
 
-
-       
 compareanysig = BoolOutSignature("simple_cmp",rtypes.TypeAny)
 comparesetsig = BoolOutSignature("simple_cmp",rtypes.TypeSet)
 comparestringsig = BoolOutSignature("string_cmp",rtypes.TypeString)
@@ -455,6 +472,18 @@ class UnaryArithSignature(FuncSignature):
 
 unary_arithsig = UnaryArithSignature("number")
 
+class UnaryArithFloatSignature(FuncSignature):
+    def check(self, slice):#{{{
+        in_type = slice.type
+        if(not isinstance(in_type, rtypes.TypeNumber)):
+            return False
+        out_type = rtypes.TypeReal64(has_missing=in_type.has_missing)
+
+        return Param(slice.name, out_type)#}}}
+
+unary_arithfloatsig = UnaryArithFloatSignature("number")
+
+
 class UnaryBoolSignature(FuncSignature):
     def check(self, slice):#{{{
         in_type = slice.type
@@ -471,9 +500,57 @@ class Invert(UnaryFuncElemOp):
 class Abs(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 
+class Log(UnaryFuncElemOp):
+    _sigs = [unary_arithfloatsig]
+
+class Log2(UnaryFuncElemOp):
+    _sigs = [unary_arithfloatsig]
+
+class Log10(UnaryFuncElemOp):
+    _sigs = [unary_arithfloatsig]
+
 class Negative(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 
+
+class UnaryStringBoolSignature(FuncSignature):
+    def check(self, slice, **kwargs):#{{{
+        in_type = slice.type
+        if(not isinstance(in_type, rtypes.TypeString)):
+            return False
+        out_type = rtypes.TypeBool(has_missing=in_type.has_missing)
+        return Param(slice.name, out_type)#}}}
+unary_stringboolsig = UnaryStringBoolSignature('stringbool')
+
+class UnaryFuncElemPatternOp(UnaryFuncElemOp):
+    def __init__(self, source, pattern, **kwargs):
+        UnaryFuncElemOp.__init__(self,source, pattern=pattern, **kwargs)
+
+class Like(UnaryFuncElemPatternOp):
+    _sigs = [unary_stringboolsig]
+
+class HasPattern(UnaryFuncElemPatternOp):
+    _sigs = [unary_stringboolsig]
+        
+class StringToStringArraySignature(FuncSignature):#{{{
+    def check(self, slice, exclude_dimnames, **kwargs):
+        in_type = slice.type
+        if(not isinstance(in_type, rtypes.TypeString)):
+            return False
+        dimnames = util.seq_names(2, exclude=exclude_dimnames)
+        sdim = dimensions.Dim(UNDEFINED, dependent=(True,), name=dimnames[1])
+        ndim = dimensions.Dim(UNDEFINED, dependent=(True,) * len(slice.dims), name=dimnames[0])
+        subout_type = rtypes.TypeString(has_missing=in_type.has_missing, dims=dimpaths.DimPath(sdim))
+        out_type = rtypes.TypeArray(dims=dimpaths.DimPath(ndim),subtypes=(subout_type,))
+        return Param(slice.name, out_type)#}}}
+string_tostringarraysig = StringToStringArraySignature("stringarray")
+
+class SplitOnPattern(UnaryFuncSegregateOp):
+    _unpackdepth=1
+    _sigs = [string_tostringarraysig]
+    
+    def __init__(self, source, pattern, **kwargs):
+        UnaryFuncSegregateOp.__init__(self,source, pattern=pattern, **kwargs)
 
 class ReplaceMissingSig(FuncSignature):
     def check(self, slice, def_value=NOVAL):#{{{
@@ -637,6 +714,9 @@ strconcatenate_sig = UnaryStringConcatenateSignature("stringstring")
 
 class Sum(UnaryFuncAggregateOp):
     _sigs = [int_tointsig, float_tofloatsig, concatenate_sig, strconcatenate_sig]
+
+class Prod(UnaryFuncAggregateOp):
+    _sigs = [int_tointsig, float_tofloatsig]
 
 class Mean(UnaryFuncAggregateOp):
     _sigs = [number_tofloatsig]

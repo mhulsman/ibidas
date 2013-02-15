@@ -10,15 +10,16 @@ __all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack', "Addformat"
            "Max","Min",
            "Argmin","Argmax",
            "Mean","Median",
-           "Sum",
+           "Sum","Prod",
            "Count","Match","Join",
            "Broadcast","CreateType","MatchType",
            "newdim","NEWDIM","LCDIM","LASTCOMMONDIM","COMMON_NAME",'COMMON_POS', "Missing",
            "Corr","In","Contains",
            "Fetch","Serve","Get","Alg",
            "Load","Save",
-           "Invert","Abs", "Negative",
-           "Add","Subtract","Multiply","Modulo","Divide","FloorDivide","And","Or","Xor","Power","Equal","NotEqual","LessEqual","Less","GreaterEqual","Greater","Each"
+           "Invert","Abs", "Negative","Log","Log2","Log10",
+           "Add","Subtract","Multiply","Modulo","Divide","FloorDivide","And","Or","Xor","Power","Equal","NotEqual","LessEqual","Less","GreaterEqual","Greater","Each",
+           "Like","SplitOnPattern","HasPattern"
            ]
 
 from utils import delay_import
@@ -60,6 +61,7 @@ CumSum = repops.delayable()(repops_funcs.CumSum)
 Argmax = repops.delayable()(repops_funcs.Argmin)
 Argmin = repops.delayable()(repops_funcs.Argmax)
 Sum = repops.delayable()(repops_funcs.Sum)
+Prod = repops.delayable()(repops_funcs.Prod)
 Any = repops.delayable()(repops_funcs.Any)
 All = repops.delayable()(repops_funcs.All)
 Max = repops.delayable()(repops_funcs.Max)
@@ -71,6 +73,13 @@ Corr = repops.delayable()(repops_funcs.Corr)
 Invert = repops.delayable()(repops_funcs.Invert)
 Abs = repops.delayable()(repops_funcs.Abs)
 Negative = repops.delayable()(repops_funcs.Negative)
+Log = repops.delayable()(repops_funcs.Log)
+Log2 = repops.delayable()(repops_funcs.Log2)
+Log10 = repops.delayable()(repops_funcs.Log10)
+
+Like = repops.delayable()(repops_funcs.Like)
+SplitOnPattern = repops.delayable()(repops_funcs.SplitOnPattern)
+HasPattern = repops.delayable()(repops_funcs.HasPattern)
 
 
 Add = repops.delayable()(repops_funcs.Add)
