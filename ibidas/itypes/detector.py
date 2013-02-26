@@ -856,7 +856,7 @@ class StringDNAScanner(StringScanner):
                 if rm.match(elem) is None:
                     return False
         return res
-#registerTypeScanner(StringDNAScanner)
+registerTypeScanner(StringDNAScanner)
 
 
 class SliceScanner(TypeScanner):
