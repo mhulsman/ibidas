@@ -153,5 +153,6 @@
 0.1.25
 - HArray now also returns slice names
 - Use of '~' in functions nested in Get now works
-- Add HasPattern, Like and SplitOnPattern functions for (regexp) based string matching
-- Add Log, Log10, Log and Prod functions
+- Added HasPattern, Like and SplitOnPattern functions for (regexp) based string matching
+- Added Log, Log10, Log and Prod functions
+- Added Upper, Lower to change strings to uppercase or lowercase

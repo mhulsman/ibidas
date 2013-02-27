@@ -782,6 +782,19 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
             else:
                 res.append(re.split(p, elem, max_splits, flags))
         return util.darray(res, type_out.toNumpy())                
+    
+    def stringtostringGeneral(self, data, type_in, type_out, op):
+        func = string_tostring[op]
+        if type_in.has_missing:
+            res = []
+            for elem in data:
+                if elem is Missing:
+                    res.append(elem)
+                else:
+                    res.append(func(elem))
+        else:
+            res = [func(elem) for elem in data]
+        return util.darray(res, type_out.toNumpy())
 
     def numberGeneral(self, data, type_in, type_out, op):
         if util.numpy16up:
@@ -798,6 +811,7 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
 
     numberLog10 = numberLog
     numberLog2 = numberLog
+    numberSqrt = numberLog
     
     def boolInvert(self, data, type_in, type_out, op):
         res = []
@@ -987,7 +1001,14 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
         func = numpy_dimfuncs[op]
         dtype = type_out.toNumpy()
         if type_in.has_missing:                
-            return util.darray([func([elem for elem in row if not elem is Missing],axis=0) for row in data],dtype)
+            res = []
+            for row in data:
+                felems = [elem for elem in row if not elem is Missing]
+                if felems:
+                    res.append(func(felems,axis=0))
+                else:
+                    res.append(Missing)
+            return util.darray(res,dtype)
         else:            
             if(len(data.shape) < 2):
                 if(packdepth > 1):
@@ -995,7 +1016,11 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
                 return util.darray([func(row,axis=0) for row in data],dtype)
             else:
                 return func(data,axis=1)
-      
+
+
+string_tostring = {'Upper':str.upper, 
+                   'Lower':str.lower}
+
 numpy_cmp = {'Equal':numpy.equal,#{{{
             'NotEqual':numpy.not_equal,
             'LessEqual':numpy.less_equal,
@@ -1028,6 +1053,7 @@ numpy_dimfuncs = {
     'Std':numpy.std
     }
 
+
 python_op = {'Equal':'__eq__',
              'NotEqual':'__ne__',
              'LessEqual':'__le__',
@@ -1052,6 +1078,7 @@ numpy_unary_arith = {
     "Log":numpy.log,
     "Log2":numpy.log2,
     "Log10":numpy.log10,
+    "Sqrt":numpy.sqrt,
     }
 
 reverse_op = {'__eq__':'__eq__',

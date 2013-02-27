@@ -17,7 +17,7 @@ __all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack', "Addformat"
            "Corr","In","Contains",
            "Fetch","Serve","Get","Alg",
            "Load","Save",
-           "Invert","Abs", "Negative","Log","Log2","Log10",
+           "Invert","Abs", "Negative","Log","Log2","Log10","Sqrt","Upper","Lower",
            "Add","Subtract","Multiply","Modulo","Divide","FloorDivide","And","Or","Xor","Power","Equal","NotEqual","LessEqual","Less","GreaterEqual","Greater","Each",
            "Like","SplitOnPattern","HasPattern"
            ]
@@ -76,6 +76,10 @@ Negative = repops.delayable()(repops_funcs.Negative)
 Log = repops.delayable()(repops_funcs.Log)
 Log2 = repops.delayable()(repops_funcs.Log2)
 Log10 = repops.delayable()(repops_funcs.Log10)
+Sqrt = repops.delayable()(repops_funcs.Sqrt)
+
+Upper = repops.delayable()(repops_funcs.Upper)
+Lower = repops.delayable()(repops_funcs.Lower)
 
 Like = repops.delayable()(repops_funcs.Like)
 SplitOnPattern = repops.delayable()(repops_funcs.SplitOnPattern)

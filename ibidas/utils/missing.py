@@ -98,6 +98,9 @@ class MissingType(object):#{{{
     def __rxor__(self, other):
         return self
 
+    def __pow__(self, value):
+        return self
+
     def __eq__(self, other):
         return self
 

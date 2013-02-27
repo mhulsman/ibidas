@@ -125,7 +125,6 @@ class Project(RequestUnaryOpRep):
             if(isinstance(elem, context.Context)):
                 elem = context._apply(elem, self._source)
             elif(isinstance(elem, repops.ExtendGet)):
-                util.debug_here()
                 r = list(req_sources)
                 s = self._getSliceList(zip([None] * len(elem.sel), elem.sel), r, cur_slices)
                 s = s[len(req_sources):]
@@ -160,6 +159,8 @@ class Project(RequestUnaryOpRep):
             self._req_sources = self._getSliceList(chain(zip([None] * len(args),args),kwds.iteritems()), [], cur_slices)
        
         nslices = self._toSlices(self._req_sources)
+        if nslices is None:
+            return None
         if not nslices:                
             raise AttributeError,  "No slices found with: " + str(args) + " and " + str(kwds)
         

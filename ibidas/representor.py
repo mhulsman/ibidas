@@ -895,6 +895,12 @@ class Representor(Node):
     def Log10(self):
         return repops_funcs.Log10(self)
     
+    def Upper(self):
+        return repops_funcs.Upper(self)
+
+    def Lower(self):
+        return repops_funcs.Lower(self)
+   
     def HasPattern(self, value, ignore_case=False):
         return repops_funcs.HasPattern(self, pattern=value, ignore_case=ignore_case)
     

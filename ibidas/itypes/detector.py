@@ -301,7 +301,10 @@ class FixedDimRep(DimRep):
             self.lengths = [] 
         else:
             self.length_type = LENGTH_FIXED
-            self.lengths = dim.shape
+            if isinstance(dim.shape,int):
+                self.lengths = dim.shape
+            else:
+                self.lengths = UNDEFINED
             #FIXME: give lengths of variable dimensions from data, will also enable repeat var dimensions
         
         self.nparents = 0
@@ -328,7 +331,7 @@ class DimEqualizer(object):
                 self._attachDim(parent)
         
         pos = len(cur_parents)
-        repeat_length = 1
+        repeat_length = 2
         while pos:
             pos -= 1
             parent = cur_parents[pos]

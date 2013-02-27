@@ -509,6 +509,9 @@ class Log2(UnaryFuncElemOp):
 class Log10(UnaryFuncElemOp):
     _sigs = [unary_arithfloatsig]
 
+class Sqrt(UnaryFuncElemOp):
+    _sigs = [unary_arithfloatsig]
+
 class Negative(UnaryFuncElemOp):
     _sigs = [unary_arithsig]
 
@@ -531,7 +534,22 @@ class Like(UnaryFuncElemPatternOp):
 
 class HasPattern(UnaryFuncElemPatternOp):
     _sigs = [unary_stringboolsig]
-        
+ 
+
+class StringToStringSignature(FuncSignature):#{{{
+    def check(self, slice, **kwargs):
+        in_type = slice.type
+        if(not isinstance(in_type, rtypes.TypeString)):
+            return False
+        return Param(slice.name, in_type)#}}}
+string_tostringsig = StringToStringSignature("stringtostring")
+
+class Upper(UnaryFuncElemOp):
+    _sigs = [string_tostringsig]
+
+class Lower(UnaryFuncElemOp):
+    _sigs = [string_tostringsig]
+      
 class StringToStringArraySignature(FuncSignature):#{{{
     def check(self, slice, exclude_dimnames, **kwargs):
         in_type = slice.type
