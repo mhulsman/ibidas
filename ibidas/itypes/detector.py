@@ -331,7 +331,7 @@ class DimEqualizer(object):
                 self._attachDim(parent)
         
         pos = len(cur_parents)
-        repeat_length = 2
+        repeat_length = 1
         while pos:
             pos -= 1
             parent = cur_parents[pos]
