@@ -153,7 +153,10 @@ class Detector(object):
         assert not len(restypes) == 0,'BUG: no valid type could be detected'
 
         if len(restypes) > 1:
-            raise RuntimeError, 'Could not decide between types: ' + str(restypes)
+            if not all([r.has_missing for r in restypes]):
+                raise RuntimeError, 'Could not decide between types: ' + str(restypes)
+            else:
+                return rtypes.TypeAny(has_missing=True);
         return restypes[0]
 
     def _findAcceptableDescendants(self, seq, scanner=None):
@@ -832,7 +835,11 @@ class StringDNAScanner(StringScanner):
     need_convert=False
     parentcls=StringScanner
     regmatch = re.compile('^[acgtnACGTN]+$')
-    
+
+    def __init__(self, detector):
+        StringScanner.__init__(self, detector);
+        self.has_missing = False;
+
     def unregister(self, create_parent=False):
         res = super(StringDNAScanner,self).unregister(create_parent)
         if create_parent:
@@ -843,7 +850,7 @@ class StringDNAScanner(StringScanner):
         ntype = rtypes.TypeDNASequence
         d = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
         dims = dimpaths.DimPath(d)
-        return ntype(self.detector.hasMissing(), dims)
+        return ntype(self.detector.hasMissing() or self.has_missing, dims)
 
 
     def scan(self, seq):
@@ -852,6 +859,7 @@ class StringDNAScanner(StringScanner):
         if res:
             for elem in seq.ravel():
                 if not elem:
+                    self.has_missing = True;
                     continue
                 if rm.match(elem) is None:
                     return False
