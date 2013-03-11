@@ -2,7 +2,7 @@
 The ibidas module contains all main functions for working with ibidas objects.
 """
 
-__all__ = ["Rep","Read","Import","Connect","_","CyNetwork",'Unpack', "Addformat",
+__all__ = ["Rep","Read", "Write", "Import", "Export", "Connect","_","CyNetwork",'Unpack', "Addformat",
            "Array","Tuple","Combine","HArray",
            "Stack","Intersect","Union","Except","Difference",
            "Pos","Argsort","Rank","IsMissing","CumSum",
@@ -109,7 +109,7 @@ HArray = repops.delayable(nsources=UNDEFINED)(repops_slice.HArray)
 Tuple = repops.delayable(nsources=UNDEFINED)(repops_slice.Tuple)
 Array = repops.delayable()(repops_dim.Array)
 
-
+##########################################################################
 
 def fimport_tsv(url, **kwargs):
     from wrappers.tsv import TSVRepresentor
@@ -131,16 +131,49 @@ def fimport_fasta(url, **kwargs):
     from wrappers.fasta import read_fasta;
     return read_fasta(url, **kwargs);
 
+##########################################################################
 
-formats = { 'tsv' : fimport_tsv, 'csv' : fimport_tsv,
-            'tsv_matrix' : fimport_matrixtsv,
-	    'xml' : fimport_xml,
-	    'psimi' : fimport_psimi,
-	    'fasta' : fimport_fasta, 'fa' : fimport_fasta, 'fas' : fimport_fasta
-	  };
+def fexport_tsv(data, url, **kwargs):
+    #from wrappers.tsv import TSVRepresentor
+    return save_csv(data, url, **kwargs)
 
-def Addformat(ext, read_fn):
-    formats[ext] = read_fn;
+def fexport_matrixtsv(data, url, **kwargs):
+    from wrappers.matrix_tsv import MatrixTSVRepresentor
+    return MatrixTSVRepresentor(data, url, **kwargs)
+
+def fexport_xml(data, url, **kwargs):
+    from wrappers.xml_wrapper import XMLRepresentor
+    return XMLRepresentor(data, url, **kwargs)
+
+def fexport_psimi(data, url, **kwargs):
+    from wrappers.psimi import write_psimi
+    return write_psimi(data, url, **kwargs)
+
+def fexport_fasta(data, url, **kwargs):
+    from wrappers.fasta import write_fasta;
+    return write_fasta(data, url, **kwargs);
+
+##########################################################################
+
+
+formats_import = { 'tsv' : fimport_tsv, 'csv' : fimport_tsv,
+                   'tsv_matrix' : fimport_matrixtsv,
+                   'xml' : fimport_xml,
+                   'psimi' : fimport_psimi,
+                   'fasta' : fimport_fasta, 'fa' : fimport_fasta, 'fas' : fimport_fasta
+                 };
+
+formats_export = { 'tsv' : fexport_tsv, 'csv' : fexport_tsv,
+                   'tsv_matrix' : fexport_matrixtsv,
+                   'xml' : fexport_xml,
+                   'psimi' : fexport_psimi,
+                   'fasta' : fexport_fasta, 'fa' : fexport_fasta, 'fas' : fexport_fasta
+                 };
+
+
+def Addformat(ext, read_fn, write_fn=None):
+    formats_import[ext] = read_fn;
+    formats_export[ext] = write_fn;
 
 def Import(url, **kwargs):
 
@@ -150,19 +183,37 @@ def Import(url, **kwargs):
   base = url;
 
   while True:
-    (base, ext) = splitext(base);
-    ext = ext.split('.')[1] if ext else 'tsv';
-    format = kwargs.pop('format', ext).lower();
+      (base, ext) = splitext(base);
+      ext = ext.split('.')[1] if ext else 'tsv';
+      format = kwargs.pop('format', ext).lower();
 
-    if not format:
-        raise RuntimeError("Unknown format specified")
-    if format not in formats:
-        continue;
-    else:
-        data = formats[format](url, **kwargs);
-        return data.Detect() if detect else data;
+      if not format:
+          raise RuntimeError("Unknown format specified")
+      if format not in formats_import:
+          continue;
+      else:
+          data = formats_import[format](url, **kwargs);
+          return data.Detect() if detect else data;
 
 Read = Import
+
+def Export(r, url, **kwargs):
+  from os.path import splitext;
+  base = url;
+
+  while True:
+      (base, ext) = splitext(base);
+      ext = ext.split('.')[1] if ext else 'tsv';
+      format = kwargs.pop('format', ext).lower();
+
+      if not format:
+          raise RuntimeError("Unknown format specified")
+      if format not in formats_export:
+          continue;
+      else:
+          return formats_export[format](r, url, **kwargs);
+Write = Export;
+
 
 def Connect(url, **kwargs):
     format = kwargs.pop('format','db')

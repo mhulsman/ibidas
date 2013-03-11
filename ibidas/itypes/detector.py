@@ -834,27 +834,57 @@ class StringIntScanner(StringRealScanner):
         return res
 registerTypeScanner(StringIntScanner)
 
-class StringDNAScanner(StringScanner):
+class StringProteinScanner(StringScanner):
     need_convert=False
     parentcls=StringScanner
-    regmatch = re.compile('^[acgtnACGTN]+$')
+    regmatch = re.compile('^[AaBbCcDdEeFfGgHhIiKkLlMmNnOoPpQqRrSsTtUuVvWwYyZzXx*-]+$')
+    ntype = rtypes.TypeProteinSequence
 
     def __init__(self, detector):
         StringScanner.__init__(self, detector);
         self.has_missing = False;
 
     def unregister(self, create_parent=False):
-        res = super(StringDNAScanner,self).unregister(create_parent)
+        res = super(StringProteinScanner,self).unregister(create_parent)
         if create_parent:
             res.max_nchars = self.max_nchars
         return res
 
     def getType(self):
-        ntype = rtypes.TypeDNASequence
+        ntype = self.ntype
         d = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
         dims = dimpaths.DimPath(d)
         return ntype(self.detector.hasMissing() or self.has_missing, dims)
 
+
+    def scan(self, seq):
+        res = StringScanner.scan(self, seq)
+        rm = self.regmatch
+        if res:
+            minsize = numpy.inf
+            minseq  = ""
+            for elem in seq.ravel():
+                size = len(elem)
+                if not elem:
+                    self.has_missing = True;
+                    continue
+                if rm.match(elem) is None:
+                    return False
+                if size < minsize and size > 0:
+                    minsize = size
+                    minseq  = elem
+        if minsize < 25:
+            util.warning('Detecting possible protein sequence as string due to short length (%d). Use Cast to change type as Cast("protein").\n%s' %(minsize, minseq))
+            return False
+        return res
+registerTypeScanner(StringProteinScanner);
+
+
+class StringDNAScanner(StringProteinScanner):
+    need_convert=False
+    parentcls=StringProteinScanner
+    regmatch = re.compile('^[acgtnACGTN]+$')
+    ntype = rtypes.TypeDNASequence
 
     def scan(self, seq):
         res = StringScanner.scan(self, seq)
@@ -868,6 +898,7 @@ class StringDNAScanner(StringScanner):
                     return False
         return res
 registerTypeScanner(StringDNAScanner)
+
 
 
 class SliceScanner(TypeScanner):
