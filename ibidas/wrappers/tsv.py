@@ -12,10 +12,10 @@ from ..itypes import detector
 from ..utils import nested_array, util
 
 class TSVRepresentor(wrapper.SourceRepresentor):
-    def __init__(self, filename, dialect=False, skiprows=-1, dtype=rtypes.unknown, fieldnames=None, delimiter=None):
+    def __init__(self, filename, dialect=False, skiprows=-1, dtype=rtypes.unknown, fieldnames=None, delimiter=None, quotechar=None):
         file = util.open_file(filename,mode='rU')
   
-        reader, dialect = self.getReader(file, dialect, delimiter=delimiter)
+        reader, dialect = self.getReader(file, dialect, delimiter=delimiter, quotechar=quotechar)
         
         #determine number of rows to skip (e.g. comments)
         if(skiprows == -1):
@@ -79,7 +79,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         file.close()
         self._initialize(tuple(nslices))
 
-    def getReader(self, file, dialect=False, delimiter=None):
+    def getReader(self, file, dialect=False, delimiter=None, quotechar=None):
         #determine dialect, create csv parser
         if(dialect is False):
             lines = []
@@ -91,6 +91,13 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             #sniff last 20 lines
             lines = lines[-20:]
             dialect = csv.Sniffer().sniff("\n".join(lines),delimiters=delimiter)
+            if not quotechar is None:
+                if quotechar == '':
+                    dialect.quoting = csv.QUOTE_NONE
+                else:
+                    dialect.quotechar = quotechar
+                    dialect.quoting = csv.QUOTE_MINIMAL
+
             file.seek(0)
             reader = csv.reader(file, dialect)
         else:
