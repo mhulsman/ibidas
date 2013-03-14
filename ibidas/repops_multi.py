@@ -3,8 +3,9 @@ import operator
 from constants import *
 import repops
 import repops_funcs
+import os
 
-_delay_import_(globals(),"utils","util","context")
+_delay_import_(globals(),"utils","util","context","config")
 _delay_import_(globals(),"ops")
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","python")
@@ -65,13 +66,13 @@ class Combine(repops.MultiOpRep):
 
     @classmethod
     def _apply(cls, *xslicelists):
-        if(len(xslicelists) == 2):
-            lslices,rslices = xslicelists
+        if len(xslicelists) > 1:
+            lslices,rslices = (xslicelists[0], xslicelists[-1])
             lslices = [ops.ChangeBookmarkOp(lslice,add_bookmark="!L",update_auto_bookmarks="L") for lslice in lslices]
             rslices = [ops.ChangeBookmarkOp(rslice,add_bookmark="!R",update_auto_bookmarks="R") for rslice in rslices]
-            return tuple(lslices + rslices)
+            return tuple(lslices) + sum([tuple(xslices) for xslices in xslicelists[1:-1]],tuple()) + tuple(rslices)
         else:
-            return sum([tuple(xslices) for xslices in xslicelists],tuple())
+            return xslicelists[0]
 
 class Group(repops.MultiOpRep):
     def __init__(self,source,constraint,flat={}):
@@ -338,8 +339,6 @@ class Join(repops.MultiOpRep):
             nslices = Combine._apply(lslices,rslices)
         return self._initialize(tuple(nslices))
 
-
-
 class Match(repops.MultiOpRep):
     def __init__(self, lsource, rsource, lslice=None, rslice=None, jointype="inner", merge_same=False, mode="dim"):
         assert jointype in set(["inner","left","right","full"]), "Jointype should be inner, left, right or full"
@@ -462,6 +461,96 @@ class Match(repops.MultiOpRep):
                     del rslices[rpos]
 
         return Combine._apply(lslices,rslices)
+
+
+
+class Blast(repops.MultiOpRep):
+    def __init__(self, lsource, rsource, lslice=None, rslice=None, blast_type = None, folder = None, reciprocal = True, normalize = False, overwrite = False, blastopts='', mode="dim"):
+        assert blast_type in set(["nucl","prot", None]), "blast_type should be nucl or prot"
+        assert (not isinstance(lslice,representor.Representor)), "Representor objects not allowed as lslice. Use context, string or int to indicate slice in lsource"
+        assert (not isinstance(rslice,representor.Representor)), "Representor objects not allowed as rslice. Use context, string or int to indicate slice in rsource"
+        
+        if rslice is None and lslice is None:
+            lsource,rsource = repops_dim.makeDimNamesUnique(lsource, rsource) 
+
+        repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice), blast_type=blast_type, folder=folder, reciprocal=reciprocal, normalize=normalize, overwrite=overwrite, blastopts=blastopts, mode=mode)
+
+    def _process(self, sources, blast_type, folder, reciprocal, normalize, overwrite, blastopts, mode):
+        lsource, rsource, lslice, rslice = sources
+        if not lsource._slicesKnown() or not rsource._slicesKnown():
+            return
+
+        lslice = self.find_seqslice(lsource, lslice)
+        rslice = self.find_seqslice(rsource, rslice)
+
+        if not lslice._typesKnown() or not rslice._typesKnown():
+            return
+
+        assert lslice.Type == rslice.Type, "Can not perform BLAST on different types of sequences, convert one to the other and try, try again."
+        if blast_type is None:
+            blast_type = "nucl" if (isinstance(lslice.Type, rtypes.TypeDNASequence)) else "prot"
+        assert (isinstance(lslice.Type , rtypes.TypeDNASequence) and blast_type == 'nucl' ) or (isinstance(lslice.Type , rtypes.TypeProteinSequence) and blast_type == 'prot' ), "Can not perform this BLAST with this sequence type."
+        
+        self._sources = (lsource, rsource, lslice, rslice)
+        lslice = lslice._slices[0]
+        rslice = rslice._slices[0]
+        nslices = self._apply(lsource, rsource, lslice, rslice, blast_type, folder, reciprocal, normalize, overwrite, blastopts, mode)
+        return self._initialize(tuple(nslices))
+
+
+    @classmethod
+    def _apply(cls,lsource, rsource, lslice, rslice, blast_type = None, folder = None, reciprocal = True, normalize = False, overwrite = False, blastopts='', mode="dim"):
+        leftslice = ops.PackArrayOp(lslice)
+        rightslice = ops.PackArrayOp(rslice)
+
+        if folder is None:
+          folder = config.config["blast_dir"]
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+       
+        ((bleftslice,brightslice),(leftplan,rightplan))= ops.broadcast((leftslice,rightslice),mode=mode)
+
+        r = ops.BlastIndexOp(bleftslice,brightslice, blast_type=blast_type, folder=folder, reciprocal=reciprocal, normalize=normalize, overwrite=overwrite, blastopts=blastopts).results
+        blastres = [ ops.UnpackArrayOp(s,1) for s in r[2:] ]
+        lindex = r[0]
+        rindex = r[1]
+
+        lslices = list(lsource._slices)
+        rslices = list(rsource._slices)
+        
+        lslices = [ops.broadcastParentsFromPlan(tslice, lslice.dims[-1:], leftplan, leftslice.dims, bleftslice.dims, [rightslice], True) for tslice in lslices]
+        rslices = [ops.broadcastParentsFromPlan(tslice, rslice.dims[-1:], rightplan, rightslice.dims, brightslice.dims, [leftslice], True) for tslice in rslices]
+
+        lslices = list(Filter._apply(lslices, lindex, lslice.dims[-1:], "dim"))
+        rslices = list(Filter._apply(rslices, rindex, rslice.dims[-1:], "dim"))
+
+        return Combine._apply(tuple(lslices),tuple(blastres),tuple(rslices))
+
+    def find_seqslice(self, source, seqslice, blast_type=None):
+        if seqslice is None:
+            seqslice = [ i for i in xrange(len(source._slices)) if isinstance(source._slices[i].type, rtypes.TypeSequence) ];
+        else:
+            seqslice = set(source.Get(seqslice)._slices)
+            seqslice = [ i for i in xrange(len(source._slices)) if source._slices[i] in seqslice ];
+
+        if len(seqslice) > 1:
+            seqslice = seqslice[-1];
+            util.warning("More than one sequence slice, using slice '%s'." % source._slices[seqslice].name);
+        if len(seqslice) == 0:
+            seqslice = len(names) - 1;
+            util.warning("No sequence slice specified, using last slice: '%s'." % source._slices[seqslice].name);
+        else:
+            seqslice = seqslice[-1];
+        ss = source.Get(seqslice);
+
+        if not isinstance(ss.Type, rtypes.TypeSequence):
+            if blast_type == 'nucl':
+                ss = ss.Cast("DNA");
+            elif blast_type == 'prot':
+                ss = ss.Cast("protein");
+            else:
+                raise RunTimeError, "Selected slice not of type sequence type, pass blast_type parameter."
+        return ss
 
 class Replace(repops.MultiOpRep):
     def __init__(self, source, slice, translator, fromslice=0, toslice=1):

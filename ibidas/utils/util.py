@@ -21,6 +21,8 @@ from logging import error,warning,info,debug
 import random
 import re
 
+import shlex, subprocess, os;
+
 def resplit(str, sep=' ', sc=[]):
     if sc == []:
        return str.split(sep);
@@ -563,4 +565,15 @@ def append_name(name, exclude):
         if not z in exclude:
             return z
         
-   
+
+def run_par_cmds(cmd_list):
+  
+    for cmd in [ x for x in cmd_list if x ]:
+        subprocess.Popen(shlex.split(cmd));
+    for cmd in [ x for x in cmd_list if x ]:
+        os.wait();
+
+def run_seq_cmds(cmd_list):
+    for cmd in [ x for x in cmd_list if x ]:
+        subprocess.call(shlex.split(cmd));
+

@@ -1,5 +1,5 @@
-from .. import Rep;
-from .. utils import util;
+from python import Rep;
+from ..utils import util;
 
 ################################################################################
 

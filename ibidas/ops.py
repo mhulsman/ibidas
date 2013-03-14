@@ -794,5 +794,31 @@ class EquiJoinIndexOp(MultiMultiOp):#{{{
         MultiMultiOp.__init__(self, (leftslice,rightslice),(r1,r2))#}}}
 
 
+class BlastIndexOp(MultiMultiOp):#{{{
+    __slots__ = ["blast_type", "folder", "reciprocal", "normalize", "overwrite", "blastopts"]
+
+    def __init__(self, leftslice, rightslice,  blast_type, folder, reciprocal = True, normalize = False, overwrite = False, blastopts='' ):
+        assert leftslice.dims == rightslice.dims, "Parent dims of join fields should be equal"
+        if leftslice.type.dims[0].name == rightslice.type.dims[0].name:
+            name= leftslice.type.dims[0].name
+        else:
+            name= leftslice.type.dims[0].name + "_" + rightslice.type.dims[0].name
+        ndim = dimensions.Dim(UNDEFINED, (True,) * len(leftslice.dims), name=name)
+
+        types = (rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(),  rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypeReal64(), rtypes.TypeReal64(), rtypes.TypeReal64())
+        names = ("qseqid", "sseqid", "qlen", "qstart", "qend", "slen", "sstart", "send", "length", "mismatch", "gapopen", "pident", "evalue", "bitscore" ) 
+        slice_types = [ rtypes.TypeArray(subtypes=(t,), dims=dimpaths.DimPath(ndim)) for t in types ];
+
+        r = tuple([ SelectOp(self, i, names[i], slice_types[i] ,leftslice.dims, set([])) for i in xrange(len(slice_types)) ]);
+        
+        self.blast_type = blast_type
+        self.folder = folder
+        self.reciprocal = reciprocal
+        self.normalize = normalize
+        self.overwrite = overwrite
+        self.blastopts= blastopts
+
+        MultiMultiOp.__init__(self, (leftslice,rightslice),r)#}}}
+
 
 
