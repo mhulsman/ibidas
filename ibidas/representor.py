@@ -1825,6 +1825,9 @@ class Representor(Node):
     def Count(self):
         return repops_funcs.Count(self)
 
+    def Len(self):
+        return self.Elems().Count()
+
     def __len__(self):
         self._checkState()
         assert len(set([s.dims[0] for s in self._slices])) == 1, "To execute len, there should be only one root dimension"

@@ -121,15 +121,15 @@ class DimPath(tuple):
             newpath.append(dim)
         return DimPath(*newpath)#}}}
     
-    def removeDim(self, pos, elem_specifier=None, subtype=None):#{{{
+    def removeDim(self, pos, elem_specifier=None, subtype=None, has_missing=False):#{{{
         ndims = []
         for p in xrange(max(pos + 1,0), len(self)):
-            r = self[p].removeDepDim(p - pos - 1, elem_specifier)
+            r = self[p].removeDepDim(p - pos - 1, elem_specifier, has_missing)
             ndims.append(r)
 
         res = self[:max(pos,0)] + DimPath(*ndims)
         if(not subtype is None):
-            subtype = subtype._removeDepDim(pos=pos - len(self), elem_specifier=elem_specifier)
+            subtype = subtype._removeDepDim(pos=pos - len(self), elem_specifier=elem_specifier, has_missing=has_missing)
             return (res,subtype)
         else:
             return res#}}}

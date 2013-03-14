@@ -137,8 +137,8 @@ class Type(object):#{{{
         return self
 
     #dim changes
-    def _removeDepDim(self, pos, elem_specifier):
-        return self._callSubtypes("_removeDepDim",pos, elem_specifier)
+    def _removeDepDim(self, pos, elem_specifier, has_missing=False):
+        return self._callSubtypes("_removeDepDim",pos, elem_specifier, has_missing=has_missing)
 
     def _updateDepDim(self, pos, ndim):
         return self._callSubtypes("_updateDepDim",pos, ndim)
@@ -784,9 +784,9 @@ class TypeArray(TypeAny):#{{{
             nself.subtypes = nsubtypes
         return nself
    
-    def _removeDepDim(self, pos, elem_specifier):
-        nself = self._callSubtypes("_removeDepDim",pos - len(self.dims), elem_specifier)
-        ndims = self.dims.removeDim(pos,elem_specifier)
+    def _removeDepDim(self, pos, elem_specifier, has_missing=False):
+        nself = self._callSubtypes("_removeDepDim",pos - len(self.dims), elem_specifier, has_missing=has_missing)
+        ndims = self.dims.removeDim(pos,elem_specifier, has_missing=has_missing)
         if(not ndims is self.dims):
             if(self is nself):
                 nself = self.copy()
@@ -1158,12 +1158,14 @@ class TypeBool(TypeUInt8, TypeInt8):#{{{
     _scalar = numpy.bool
     _defval = False
     _reqRPCcon=True
+    _ptype = bool
     
 addType(TypeBool)#}}}
 
 
 #maps numpy type to internal type
 __objtype_map__ = {
+numpy.dtype('bool'):TypeBool,
 numpy.dtype("object"):TypeAny,
 numpy.dtype("int8"):TypeInt8,
 numpy.dtype("int16"):TypeInt16,
