@@ -843,6 +843,8 @@ class StringProteinScanner(StringScanner):
     def __init__(self, detector):
         StringScanner.__init__(self, detector);
         self.has_missing = False;
+        self.evidence = 0
+        self.nelem = 0
 
     def unregister(self, create_parent=False):
         res = super(StringProteinScanner,self).unregister(create_parent)
@@ -851,6 +853,11 @@ class StringProteinScanner(StringScanner):
         return res
 
     def getType(self):
+        if not self.nelem or self.evidence / self.nelem <= 25:
+            if self.nelem:
+                util.info('Detecting possible protein sequences as string type due to short averaged length (%d).\n' % (self.evidence / self.nelem))
+            return StringScanner.getType(self)
+
         ntype = self.ntype
         d = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
         dims = dimpaths.DimPath(d)
@@ -864,17 +871,18 @@ class StringProteinScanner(StringScanner):
             minsize = numpy.inf
             minseq  = ""
             for elem in seq.ravel():
-                size = len(elem)
                 if not elem:
                     self.has_missing = True;
                     continue
                 if rm.match(elem) is None:
                     return False
-                if size < minsize and size > 0:
-                    minsize = size
-                    minseq  = elem
+                
+                size = len(elem)
+                if size:
+                    self.evidence += size
+                    self.nelem += 1
+
         if minsize < 25:
-            util.warning('Detecting possible protein sequence as string due to short length (%d). Use Cast to change type as Cast("protein").\n%s' %(minsize, minseq))
             return False
         return res
 registerTypeScanner(StringProteinScanner);
@@ -885,6 +893,23 @@ class StringDNAScanner(StringProteinScanner):
     parentcls=StringProteinScanner
     regmatch = re.compile('^[acgtnACGTN]+$')
     ntype = rtypes.TypeDNASequence
+    
+    def unregister(self, create_parent=False):
+        res = super(StringDNAScanner,self).unregister(create_parent)
+        if create_parent:
+            res.has_missing = self.has_missing
+            res.evidence = self.evidence
+            res.nelem = self.nelem
+        return res
+   
+    def getType(self):
+        if not self.nelem:
+            return StringScanner.getType(self)
+
+        ntype = self.ntype
+        d = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
+        dims = dimpaths.DimPath(d)
+        return ntype(self.detector.hasMissing() or self.has_missing, dims)
 
     def scan(self, seq):
         res = StringScanner.scan(self, seq)
@@ -896,6 +921,11 @@ class StringDNAScanner(StringProteinScanner):
                     continue
                 if rm.match(elem) is None:
                     return False
+                
+                size = len(elem)
+                if size:
+                    self.evidence += size
+                    self.nelem += 1
         return res
 registerTypeScanner(StringDNAScanner)
 

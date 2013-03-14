@@ -370,7 +370,7 @@ class FilterOp(UnaryUnaryOp):#{{{
 
         sdims = stype.dims
         if(ndim is None):
-            sdims, subtype = sdims.removeDim(0, refconstraint, stype.subtypes[0])
+            sdims, subtype = sdims.removeDim(0, refconstraint, stype.subtypes[0], sdims[0].has_missing)
         else:
             sdims, subtype = sdims.updateDim(0, ndim, stype.subtypes[0])
         
@@ -475,7 +475,7 @@ class FlatDimOp(UnaryUnaryOp):#{{{
     def __init__(self,slice,flatpos, ndim):
         stype = slice.type
         sdims = slice.dims
-        sdims,stype = sdims.removeDim(flatpos,None,stype)
+        sdims,stype = sdims.removeDim(flatpos,None,stype,sdims[flatpos].has_missing)
         sdims,stype = sdims.updateDim(flatpos-1,ndim,stype)
 
         self.flatpos = flatpos
@@ -582,7 +582,8 @@ class UnaryFuncAggregateOp(UnaryFuncOp):#{{{
     
     def __init__(self, funcname, sig, name, dtype, packdepth, slice, **kwargs):
         self.packdepth = packdepth
-        sdims, ntype = slice.dims.removeDim(len(slice.dims) - packdepth, (funcname,name,dtype, len(slice.dims) - packdepth), dtype)
+        remdimpos = len(slice.dims) - packdepth
+        sdims, ntype = slice.dims.removeDim(remdimpos, (funcname,name,dtype, remdimpos), dtype, slice.dims[remdimpos].has_missing)
 
         UnaryFuncOp.__init__(self, slice, funcname, sig, name, dtype, dims=sdims, **kwargs)
         self.type = ntype

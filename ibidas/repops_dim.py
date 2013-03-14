@@ -33,7 +33,7 @@ class UnpackArray(repops.UnaryOpRep):
                     slice = ops.UnpackArrayOp(slice,ndim=ndim)
             nslices.append(slice)
         if not unpacked:
-            raise AttributeError, 'No array-typed slice with outer dimension name "' + name + '" to unpack'
+            raise AttributeError, 'No array-typed slice with outer dimension name "' + str(name) + '" to unpack'
         return self._initialize(tuple(nslices))
 
 class DimRename(repops.UnaryOpRep):#{{{

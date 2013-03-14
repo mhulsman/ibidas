@@ -66,15 +66,16 @@ class Dim(object):
             return self.redim_cache
             
 
-    def removeDepDim(self, pos, elem_specifier):
+    def removeDepDim(self, pos, elem_specifier, has_missing=False):
         assert pos >= 0, "Position should not be smaller than 0"
-        if(pos >= len(self.dependent)):
+        if(pos >= len(self.dependent) and (not has_missing or pos >= 1)):
             return self
 
         key = (0, pos, elem_specifier)
         redim_cache = self._getRedimCache()
         if(not key in redim_cache):
             nself = self.copy(reid=self.dependent[pos])
+            nself.has_missing = nself.has_missing or ( pos == 0 and has_missing)
             ndependent = self.dependent[:pos] + self.dependent[(pos + 1):]
             while(ndependent and ndependent[-1] is False):
                 ndependent = ndependent[:-1]

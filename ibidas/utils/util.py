@@ -539,6 +539,12 @@ def seq_names(n, exclude=set()):
             break
     return rn
 
+def gen_seq_names(exclude=set()):
+    for i in seqgen():
+        z = 'd' + str(i)
+        if not z in exclude:
+            yield z
+
 def uniqify_names(names, exclude=set()):
     rn = seq_names(len(names), exclude=exclude)
 
