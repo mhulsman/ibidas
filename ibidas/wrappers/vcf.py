@@ -22,7 +22,7 @@ class VCFRepresentor(wrapper.SourceRepresentor):
         subtypes = []
         for hasmissing, shape, type in zip(hasmissing, shapes,types):
             subtype = rtypes.createType(type)
-            if hasmissing and shape == 1:
+            if hasmissing:
                 subtype.has_missing = True
 
             if not isinstance(shape,tuple):
@@ -32,12 +32,12 @@ class VCFRepresentor(wrapper.SourceRepresentor):
                 if isinstance(s, int):
                     if s <= 1:
                         continue
-                    dim = dimensions.Dim(shape=s, has_missing=hasmissing, name=dimnames.next())
+                    dim = dimensions.Dim(shape=s, name=dimnames.next())
                 else:
                     if not s in cdimensions:
                         cdimensions[s] = dimensions.Dim(shape=UNDEFINED, dependent=(True,) * (pos + 1), name=s)
                     dim = cdimensions[s]
-                subtype = rtypes.TypeArray(dims=dimpaths.DimPath(dim),subtypes=(subtype,), has_missing=hasmissing)
+                subtype = rtypes.TypeArray(dims=dimpaths.DimPath(dim),subtypes=(subtype,))
             subtypes.append(subtype)
         rtype = rtypes.TypeTuple(subtypes=tuple(subtypes), fieldnames=tuple(fieldnames))
         dim = dimensions.Dim(shape=UNDEFINED, name='variants')
@@ -89,12 +89,12 @@ class VCFParser(object):
                 res = info_pattern.match(line)
                 if res is None:
                     raise RuntimeError, 'INFO line does not conform to specification: %s' % line
-                info_fields.append((res.group('name'), res.group('number'), self._toType(res.group('type')), res.group('description')))
+                info_fields.append((res.group('name'), self._numberConvert(res.group('name'),res.group('number')), self._toType(res.group('type')), res.group('description')))
             elif line.startswith('##FORMAT'):
                 res = format_pattern.match(line)
                 if res is None:
                     raise RuntimeError, 'FORMAT line does not conform to specification: %s' % line
-                format_fields.append((res.group('name'), res.group('number'), self._toType(res.group('type')), res.group('description')))
+                format_fields.append((res.group('name'), self._numberConvert(res.group('name'), res.group('number')), self._toType(res.group('type')), res.group('description')))
             elif not line.startswith('#'):
                 break
         file.close()                
@@ -125,8 +125,8 @@ class VCFParser(object):
     def shapes(self):
         shapes = (1,1,'ids',1,'alt_alleles',1,'filters',)
 
-        ishapes = [self._numberConvert(name, number) for name, number, type, description in self.info_fields]
-        fshapes = [('samples', self._numberConvert(name, number)) for name, number, type, description in self.format_fields]
+        ishapes = [number for name, number, type, description in self.info_fields]
+        fshapes = [('samples', number) for name, number, type, description in self.format_fields]
        
         return shapes + tuple(ishapes) + tuple(fshapes)
 
@@ -182,15 +182,12 @@ class VCFParser(object):
         xinfo = []
         for name, number, type, description in self.info_fields:
             if name in dinfo:
-                if number == '1' or number == '0':
+                if number == 1 or number == 0:
                     xinfo.append(type(dinfo[name]))
                 else:
                     xinfo.append([type(elem) for elem in dinfo[name].split(',')])
             else:
-                if number == '0' and type is bool:
-                    xinfo.append(False)
-                else:
-                    xinfo.append(Missing)
+                xinfo.append(self._genMissing(number, alt))
                 
         format = zip(*[elem.split(':') for elem in format])
         dformat = dict([(ffield,list(values)) for ffield, values in zip(format_fields, format)])
@@ -199,14 +196,30 @@ class VCFParser(object):
         xformat = []
         for name, number, type, description in self.format_fields:
             if name in dformat:
-                if number == '1':
-                    xinfo.append([type(elem) for elem in dformat[name]])
+                if number == 1:
+                    xformat.append([type(elem) for elem in dformat[name]])
                 else:
-                    xinfo.append([[type(elem) for elem in xelem.split(',')] for xelem in dformat[name]])
+                    xformat.append([[type(elem) for elem in xelem.split(',')] for xelem in dformat[name]])
             else:
-                xinfo.append(Missing)
+                xformat.append([self._genMissing(number, alt)] * len(elems[9:]))
 
         return (chrom, pos, id, ref, alt, qual, filter,) + tuple(xinfo) + tuple(xformat)
+
+    def _genMissing(self, number, alt):
+        if number == 0 and type is bool:
+            res = False
+        elif number == 1:
+            res = Missing
+        elif isinstance(number,int):
+            res = [Missing] * number
+        elif number == 'alt_alleles':
+            res = [Missing] * len(alt)
+        elif number == 'genotypes':
+            res = [Missing] * (((len(alt) + 1) * (len(alt) + 2)) / 2)
+        else:
+            res = []
+        return res
+
 
     def __iter__(self):
         file = util.open_file(self.filename, mode='rU')

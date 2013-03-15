@@ -248,8 +248,12 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
         det = detector.Detector(allow_need_convert=node.allow_convert)
         det.setParentDimensions(node.dims)
         det.processSeq(slice.data.flat())
-        nslice = slice.modify(rtype=det.getType())
-        return self.unpackCast(nslice.type, slice, nslice)
+        ntype = det.getType()
+        if ntype == slice.type:
+            return slice
+        else:
+            nslice = slice.modify(rtype=det.getType())
+            return self.unpackCast(nslice.type, slice, nslice)
 
     def unpackCastTypeTuple(self, rtype, oslice, nslice):
         nslices = []

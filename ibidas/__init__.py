@@ -131,6 +131,10 @@ def fimport_fasta(url, **kwargs):
     from wrappers.fasta import read_fasta;
     return read_fasta(url, **kwargs);
 
+def fimport_vcf(url, **kwargs):
+    from wrappers.vcf import VCFRepresentor
+    return VCFRepresentor(url, **kwargs)
+
 ##########################################################################
 
 def fexport_tsv(data, url, **kwargs):
@@ -160,7 +164,8 @@ formats_import = { 'tsv' : fimport_tsv, 'csv' : fimport_tsv,
                    'tsv_matrix' : fimport_matrixtsv,
                    'xml' : fimport_xml,
                    'psimi' : fimport_psimi,
-                   'fasta' : fimport_fasta, 'fa' : fimport_fasta, 'fas' : fimport_fasta
+                   'fasta' : fimport_fasta, 'fa' : fimport_fasta, 'fas' : fimport_fasta,
+                   'vcf': fimport_vcf
                  };
 
 formats_export = { 'tsv' : fexport_tsv, 'csv' : fexport_tsv,
@@ -178,7 +183,7 @@ def Addformat(ext, read_fn, write_fn=None):
 def Import(url, **kwargs):
 
   from os.path import splitext;
-  detect=kwargs.pop('detect', True);
+  detect=kwargs.pop('detect', False);
 
   base = url;
 
