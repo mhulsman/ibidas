@@ -9,6 +9,19 @@ import fnmatch
 
 ###############################################################################
 
+r_qlen   = lambda x: x[0]
+r_qstart = lambda x: x[1]
+r_qend   = lambda x: x[2] 
+r_slen   = lambda x: x[3] 
+r_sstart = lambda x: x[4] 
+r_send   = lambda x: x[5]
+r_length = lambda x: x[6] 
+r_mismatch = lambda x: x[7] 
+r_gapopen = lambda x: x[8]
+r_pident = lambda x: x[9] 
+r_evalue = lambda x: x[10] 
+r_bitscore = lambda x: x[11];
+
 def blast(data, type, folder, reciprocal = True, normalize = False, overwrite = False, blastopts=''):
 
   seq_1 = data[0];
@@ -55,11 +68,16 @@ def blast(data, type, folder, reciprocal = True, normalize = False, overwrite = 
   util.run_par_cmds(mkdb_CMDs);
   util.run_par_cmds(blst_CMDs);
 
-  del_CMDs = [ "rm -r '/tmp/%s'" % f for f in os.listdir('/tmp') if (fnmatch.fnmatch(f, "*%s*" % fas_1.name.split('/')[1])) or  (fnmatch.fnmatch(f, "*%s*" % fas_2.name.split('/')[1])) ];
+  del_CMDs = [ "rm -f '/tmp/%s'" % f for f in os.listdir('/tmp') if (fnmatch.fnmatch(f, "*%s*" % fas_1.name.split('/')[2])) or  (fnmatch.fnmatch(f, "*%s*" % fas_2.name.split('/')[2])) ];
   util.run_seq_cmds(del_CMDs);
-  print del_CMDs
 
   ab = blast_res_to_dict(file_12); # if reciprocal blast_reciprocal(file_12.name, file_21.name) else blast_res_to_dict(file_12.name)
+
+  if reciprocal:
+    ba = blast_res_to_dict(file_21);
+    ab = blast_reciprocal(ab, ba);
+  #fi
+
   if normalize:
     aa = blast_res_to_dict(file_11, max=True);
     bb = blast_res_to_dict(file_22, max=True);
@@ -68,11 +86,10 @@ def blast(data, type, folder, reciprocal = True, normalize = False, overwrite = 
 
     #         qseqid  sseqid qlen qstart qend slen sstart send length mismatch gapopen pident evalue bitscore
   sp_types = (int,    int,    int,  int, int, int,  int,    int,  int,   int,      int,     float,  float,  float)
-  types = lambda x: map(int, x[0:-3]) + map(float, x[-3:]);
   ab = [ [ list(p[0]) + h for h in p[1] ] for p in ab.items() ];
-  ab = [ types(item) for sublist in ab for item in sublist];
+  ab = [ item for sublist in ab for item in sublist];
 
-  return  tuple([ util.darray(row,type) for (type,row) in zip( sp_types, map(lambda *row: list(row), *ab)) ] );
+  return tuple([ util.darray(row,type) for (type,row) in zip( sp_types, map(lambda *row: list(row), *ab)) ] );
 
 #edef
 
@@ -83,8 +100,12 @@ def blast_res_to_dict(blast_res, max=False):
   bm = {};
   br = open(blast_res, 'r');
 
+    #         qseqid  sseqid qlen qstart qend slen sstart send length mismatch gapopen pident evalue bitscore
+  sp_types = (int,    int,    int,  int, int, int,  int,    int,  int,   int,      int,     float,  float,  float)
+
   rdr = csv.reader(br, delimiter='\t', quotechar='"');
   for row in rdr:
+    row = [ sp_types[i](row[i]) for i in xrange(len(row)) ];
     k = (row[0], row[1]);
     if max == True:
       if k in bm:
@@ -106,9 +127,71 @@ def blast_res_to_dict(blast_res, max=False):
 
 ###############################################################################
 
-def blast_reciprocal(query, db):
+def blast_reciprocal(ab, ba):
 
-   return query;
+  rab = {}
+
+  for kab in ab.keys():
+    if  not(kab[::-1] in ba):
+      continue;
+    #fi
+    m = blast_reciprocal_match(ab[kab], ba[kab[::-1]]);
+    if m:
+      rab[kab] = m;
+    #fi
+
+  return rab;
+#edef
+
+###############################################################################
+
+def blast_reciprocal_match(ab, ba):
+
+  m = [];
+
+  ab = sorted(ab, key=r_qstart)
+  ba = sorted(ba, key=r_sstart)
+
+  i = 0;
+  j = 0;
+
+  while i < len(ab) and j < len(ba):
+    if r_qstart(ab[i]) > r_send(ba[j]):
+      j = j + 1
+    elif r_sstart(ba[j]) > r_qend(ab[i]):
+      i = i + 1
+    elif (r_qstart(ab[i]) == r_sstart(ba[j]) and r_qend(ab[i]) == r_send(ba[j])) or \
+         (blast_hit_overlap(r_qstart(ab[i]), r_qend(ab[i]), 
+                            r_sstart(ba[j]), r_send(ba[j]), 
+                            r_length(ab[i]), r_length(ba[j])) > 0.6):
+      m = m + [ab[i]]
+      i = i + 1
+      j = j + 1
+    else:
+      j = j + 1
+    #fi
+  #efor
+
+  return m;
+#edef
+
+###############################################################################
+
+def blast_hit_overlap(s1,e1, s2, e2, l1, l2):
+  ov = 0
+  if (s2 > e1) or (s1 > e2):
+    ov = 0;
+  elif (s2 >= s1) and (e2 >= e1):
+    ov = e1 - s2
+  elif (s1 >= s2) and (e1 >= e2):
+    ov = e2 - s1
+  elif (s1 >= s2) and (e2 >= e1):
+    ov = e1 - s1
+  elif (s2 >= s1) and (e1 >= e2):
+    ov = e2 - s2
+  #fi
+
+  return float(ov) / float(min(l1, l2));
 #edef
 
 ###############################################################################

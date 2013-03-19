@@ -579,9 +579,12 @@ def run_par_cmds(cmd_list):
     for cmd in [ x for x in cmd_list if x ]:
         os.wait();
 
+def run_cmd(cmd):
+    subprocess.call(shlex.split(cmd))
+
 def run_seq_cmds(cmd_list):
     for cmd in [ x for x in cmd_list if x ]:
-        subprocess.call(shlex.split(cmd));
+        run_cmd(cmd);
 
 
 class PeekAheadFileReader(object):

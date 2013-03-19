@@ -183,8 +183,10 @@ def in_memory_db():
     return Connect("sqlite:///:memory:");
 predefined_sources.register(in_memory_db)
 
-def file_db(filename):
+def file_db(filename, new=False):
     """Returns an empty in memory database"""
+    if new:
+        util.run_cmd("rm -f %s" % filename);
     return Connect("sqlite:///%s" % filename);
 predefined_sources.register(file_db)
 
