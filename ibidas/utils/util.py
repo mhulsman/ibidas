@@ -586,3 +586,59 @@ def run_seq_cmds(cmd_list):
     for cmd in [ x for x in cmd_list if x ]:
         run_cmd(cmd);
 
+
+class PeekAheadFileReader(object):
+    def __init__(self, filename):
+        self.f = open_file(filename)
+        self.lines = []
+        self.fill_stack()
+        self.curLine = None
+        self.lineNr = 0
+  
+    def tell(self):
+        return self.f.tell()
+
+    def reset(self, pos):
+        self.f.seek(pos)
+        self.lines = []
+        self.lineNr = 0 #fixme for positions > 0
+        self.curLine = None
+        self.fill_stack()
+
+    def __iter__(self):
+        return self
+
+    def fill_stack(self):
+        nlines = []
+        for i in range(100):
+            line = self.f.readline()
+            if(len(line) == 0):
+                break
+            nlines.append(line)
+        self.lines = nlines[::-1] + self.lines
+        return self.lines
+
+    def peekAhead(self):
+        if self.lines:
+            return self.lines[-1]
+        else:
+            return ''
+
+    def pushBack(self):
+        self.lines.append(self.curLine)
+        self.lineNr -= 1
+        self.curLine = None
+
+    def next(self):
+        if self.lines:
+            self.curLine =  self.lines.pop()
+            self.lineNr += 1
+            self.fill_stack()
+            return self.curLine
+        else:
+            raise StopIteration
+
+        
+        
+
+
