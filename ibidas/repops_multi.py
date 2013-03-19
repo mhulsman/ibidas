@@ -537,7 +537,7 @@ class Blast(repops.MultiOpRep):
             seqslice = seqslice[-1];
             util.warning("More than one sequence slice, using slice '%s'." % source._slices[seqslice].name);
         if len(seqslice) == 0:
-            seqslice = len(names) - 1;
+            seqslice = len(source._slices) - 1;
             util.warning("No sequence slice specified, using last slice: '%s'." % source._slices[seqslice].name);
         else:
             seqslice = seqslice[-1];
@@ -549,7 +549,7 @@ class Blast(repops.MultiOpRep):
             elif blast_type == 'prot':
                 ss = ss.Cast("protein");
             else:
-                raise RunTimeError, "Selected slice not of type sequence type, pass blast_type parameter."
+                raise RuntimeError, "Selected slice not of type sequence type, pass blast_type parameter."
         return ss
 
 class Replace(repops.MultiOpRep):

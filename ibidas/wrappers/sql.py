@@ -15,6 +15,7 @@ from .. import query_graph
 
 
 from ..utils import nested_array
+from ..utils import util
 from ..utils.missing import Missing
 from ..itypes import rtypes, dimensions, dimpaths
 import python
@@ -337,7 +338,7 @@ class Connection(object):
             res += "Schemas: " + ", ".join(self._schemas)
         return res
 
-    def Store(self, name, rep):#{{{
+    def Store(self, name, rep, NeedInfo=True):#{{{
         if(not name in self._tabledict):
             columns = defaultdict(list)
             rowinfo = []
@@ -357,12 +358,12 @@ class Connection(object):
                     nullable = slice.type.has_missing
                     columns[slice.dims[0]].append(sqlalchemy.Column(slice.name, stype, nullable = nullable))
                     dimname = str(slice.dims[0].name)
-                    rowinfo.append({'spos':pos, 'name':slice.name, 'pickle':pickled, 'type':str(slice.type), 'packdepth': packdepth, 'dimname':dimname,'val':""})
+                    rowinfo.append({'spos':pos, 'name':slice.name, 'pickle':pickled, 'type':str(slice.type), 'packdepth': packdepth, 'dimname':dimname,'val':"",'bookmarks':':'.join(slice.bookmarks)})
                 else:
                     dimname = Missing
                     pickled = True
                     val = rep.Get(slice.name).Cast("pickle").Each(buffer,dtype="pickle").ToPython()
-                    rowinfo.append({'spos':pos, 'name':slice.name, 'pickle':pickled, 'type':str(slice.type), 'packdepth': packdepth, 'dimname':dimname, 'val':val})
+                    rowinfo.append({'spos':pos, 'name':slice.name, 'pickle':pickled, 'type':str(slice.type), 'packdepth': packdepth, 'dimname':dimname, 'val':val, 'bookmarks':':'.join(slice.bookmarks)})
             
             tables = {}
             for key, value in columns.iteritems():
@@ -374,8 +375,8 @@ class Connection(object):
                 newtable.create(bind=self._engine, checkfirst=True)
                 tables[key] = newtable
             
-            if(len(columns) > 1 or any([row['pickle'] or row['dimname'] is None for row in rowinfo])):
-                self.Store(name + "__info__",python.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes?,packdepth=int,val=bytes}"))
+            if NeedInfo: #(len(columns) > 1 or any([row['pickle'] or row['dimname'] is None for row in rowinfo])):
+                self.Store(name + "__info__",python.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes?,packdepth=int,val=bytes,bookmarks=bytes}"), NeedInfo=False)
                
                 tablelist = []
                 for t in tables.values():
@@ -491,6 +492,9 @@ class CombineRepresentor(wrapper.SourceRepresentor):#{{{
                
             if not res_slice.type == rtype:
                 res_slice = ops.CastOp(res_slice,rtype)
+            if ('bookmarks' in row) and (row['bookmarks']):
+                for bname in row['bookmarks'].split(':'):
+                    res_slice = ops.ChangeBookmarkOp(res_slice, bname)
 
             if row['pickle']:
                 res_slice = ops.CastOp(res_slice,ctype)
