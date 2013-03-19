@@ -591,7 +591,13 @@ class PeekAheadFileReader(object):
         self.fill_stack()
         self.curLine = None
         self.lineNr = 0
-  
+ 
+    def eof(self):
+        if not self.lines:
+            self.fill_stack()
+            return len(self.lines) == 0
+        return False
+          
     def tell(self):
         return self.f.tell()
 
@@ -630,12 +636,17 @@ class PeekAheadFileReader(object):
         if self.lines:
             self.curLine =  self.lines.pop()
             self.lineNr += 1
-            self.fill_stack()
+            if not self.lines:
+               self.fill_stack()
             return self.curLine
         else:
             raise StopIteration
 
         
         
+
+
+getNumber = re.compile('^([\d]+)')
+
 
 
