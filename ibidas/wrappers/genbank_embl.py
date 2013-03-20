@@ -38,10 +38,7 @@ class GenbankRepresentor(wrapper.SourceRepresentor):
         self.parser = GenbankParser(filename)
 
 
-featrec = ZeroOrMore(Group((LineStart() | Word('\n')) +  Suppress('/') + Word(alphas + '_') + Suppress('=') + \
-          Word(nums).setParseAction(lambda x: map(int,x)) | QuotedString(quoteChar='"', multiline=True).setParseAction(lambda x: [e.replace('\n',' ') for e in x])))
-
-featrec = ZeroOrMore(Group((LineStart() | Word('\n')) +  Suppress('/') + Word(alphas + '_') + Suppress('=') + (Word(nums).setParseAction(lambda x: map(int,x)) | QuotedString(quoteChar='"', multiline=True).setParseAction(lambda x: [e.replace('\n',' ') for e in x]))))
+featrec = ZeroOrMore(Group((LineStart() | Word('\n')) +  Suppress('/') + Word(alphas + '_') + Suppress('=') + (Word(nums).setParseAction(lambda x: map(int,x)) | QuotedString(quoteChar='"', escChar='"', multiline=True).setParseAction(lambda x: [e.replace('\n',' ') for e in x]))))
 
 num = Word(nums)
 date = num + Suppress('-') + Word(alphas) + Suppress('-') + num 
@@ -49,31 +46,38 @@ date_created = date + Suppress('(Rel.') + num + Suppress(', Created)')
 date_updated = date + Suppress('(Rel.') + num + Suppress(', Last updated, Version') + num + Suppress(')')
 organism = Group(OneOrMore(Word(alphas))) + Group(Optional('(' + OneOrMore(Word(alphas)) + ')'))
 
-class GenbankParser(object):
+
+#location
+number = Word(nums).setParseAction(lambda x: map(int,x))
+name = CharsNotIn(':')
+identifier1 =  (Optional('<').setResultsName('fuzzybefore') + number.setResultsName('start'))
+identifier2 = (Optional('>').setResultsName('fuzzyafter') + number.setResultsName('stop'))
+loc = Group(Optional(name.setResultsName('name') + ':') + (identifier1 + oneOf('.. . ^').setResultsName('operator') + identifier2 | number.setResultsName('start')))
+
+loc_expression = Forward()
+lparen = Literal("(").suppress()
+rparen = Literal(")").suppress()
+
+arg = loc | loc_expression
+args = delimitedList(arg)
+functor = (Literal('complement') | Literal('join') | Literal('order')).setResultsName('function')
+loc_expression << (Group(functor + Group(lparen + Optional(args) + rparen)) | loc)
+
+
+
+class GEParser(object):
     types = {}
     dims = {}
 
-    def __init__(self, filename, format='EMBL'):
+    def __init__(self, filename):
         self.reader = util.PeekAheadFileReader(filename)
         self.skipcache = set()
-        self.format = format
 
     def __iter__(self):
         return self
     
     def next(self): 
         return self.parseRecord()
-
-    def parseRecord(self):
-        if self.reader.eof():
-            return None
-
-        if self.format == 'EMBL':
-            return self.parseEMBL()
-        elif self.format == 'Genbank':
-            return self.parseGenbank()
-        else:
-            util.error('Unknown file format: %s' % self.format)
 
     def startRecord(self):
         self.record = {}
@@ -82,7 +86,129 @@ class GenbankParser(object):
     def finishRecord(self):
         return self.record
 
-    def parseEMBL(self):
+    def parseFeatures(self, format='embl'):
+        if format == 'embl':
+            check = set(['FT','XX'])
+        else:
+            check == set([''])
+        rc = self.record
+
+        feat_key = []
+        feat_loc_type = []
+        feat_locs = []
+        feat_attr = []
+        valid_name = util.valid_name
+
+        for line in self.reader:
+            lineNr = self.reader.lineNr
+            if not line[:5].strip() in check:
+                self.reader.pushBack()
+                break
+            key = line[5:20].rstrip()
+            data = [line[21:].rstrip()]
+            
+            while(self.reader.peekAhead()[:20].strip() in check):
+                data.append(self.reader.next()[21:].rstrip())
+            
+            
+            loc = data[0]
+            try:
+                loc_results = loc_expression.parseString(loc)
+                outer, inner = self._loc_process(loc_results)
+                if outer is None:
+                    if len(inner) > 1:
+                        util.warning('Order/join attribute not specified at line %d for list of locations "%s", assuming join.' %(lineNr, loc))
+                    outer = 'join'
+                feat_loc_type.append(outer)
+                feat_locs.append(inner)
+            except ParseException, e:
+                util.warning('Failed to parse location "%s" for record starting at line number: %d\n' % (loc, lineNr))
+                continue
+
+            attributes = '\n'.join(data[1:])
+            try:
+                results = featrec.parseString(attributes)
+                nresults = []
+                for e in results:
+                    name = valid_name(e[0])
+                    func = getattr(self, 'attr' + name, None)
+                    if func is None:
+                        if not name in self.skipcache:
+                            util.warning('Skipping unknown attribute "%s" with value "%s" at line %d (subsequent occurences will not be reported).' % (name, e[1], self.reader.lineNr))
+                            self.skipcache.add(name)
+                    else:
+                        nresults.append(func(name, e[1]))
+                results = dict(nresults)
+            except ParseException, e:
+                feature = key + ' @ ' + loc + '\n'  +  attributes
+                util.warning('Failed to parse attributes for record starting at line number: %d\nFeature:\n%s\n' % (lineNr, feature))
+                continue
+           
+            feat_key.append(key)
+            feat_attr.append(results)
+
+        rc['feat_key'] = feat_key
+        rc['feat_loc_type'] = feat_loc_type
+        rc['feat_locs'] = feat_locs
+        rc['feat_attr'] = feat_attr
+
+    def attrnote(self, key, value):
+        return (key,value)
+
+    def _loc_process(self, loc_results):
+        if len(loc_results) == 1:
+            loc_results = loc_results[0]
+        if 'function' in loc_results:
+            res = [self._loc_process(e) for e in loc_results[1]]
+            
+            if not res:
+                util.warning('Location function without argument at line %d, skipping.', self.reader.lineNr)
+                return ('join',[])
+           
+            ninners= []
+            nouters = []
+            for outer, inner in res:
+                ninners.extend(inner)
+                nouters.append(outer)
+           
+            if loc_results['function'] == 'complement':
+                for inner in ninners:
+                    inner['complement'] = not inner['complement']
+            elif loc_results['function'] == 'join':
+                nouters.append('join')
+            elif loc_results['function'] == 'order':
+                nouters.append('order')
+            else:
+                util.warning('Unknown function used at line %d, skipping.', self.reader.lineNr)
+            
+            nouters = set(nouters)
+            if len(nouters) > 1:
+                nouters.discard(None)
+            if len(nouters) > 1:
+                util.warning('Both join and order attributes are used simultaneously for record on line %d. This is illegal, assuming "join".', self.reader.lineNr)
+                nouters = set(['join'])
+            outer = nouters.pop()
+            
+
+            return (outer, ninners)
+        else:
+           nres = {}
+           nres['start'] = loc_results['start']
+           nres['stop'] = loc_results.get('start', nres['start'])
+           nres['complement'] = False
+           nres['between'] = loc_results.get('operator','') == '^'
+           nres['single_base'] = nres['start'] == nres['stop'] or loc_results.get('operator','') == '.'
+           nres['fuzzy_before'] = loc_results.get('fuzzybefore', '') == '<'
+           nres['fuzzy_after'] = loc_results.get('fuzzyafter', '') == '>'
+           return (None, [nres])
+        
+
+
+class EMBLParser(GEParser):
+    def parseRecord(self):
+        if self.reader.eof():
+            return None
+
         self.startRecord()
         pos = self.reader.tell()
 
@@ -264,7 +390,13 @@ class GenbankParser(object):
         else:
             util.warning('SQ record without sequence?! Will attempt to go on.')
 
+
+
+
+class GenbankParser(GEParser):
     def parseGenbank(self):
+        if self.reader.eof():
+            return None
         self.startRecord()
 
         #skip possible header comments
@@ -295,7 +427,10 @@ class GenbankParser(object):
 
         return self.finishRecord()
            
-    genbankElse = emblElse
+    def genbankElse(self, code, line):
+        if not code in self.skipcache:
+            util.warning('Skipping unknown header code "%s" at line %d (subsequent occurences will not be reported). Line:\n%s\n' % (code, self.reader.lineNr, self.reader.curLine.strip()))
+            self.skipcache.add(code)
 
     def genbankFEATURES(self, code, line):
         self.parseFeatures(format='genbank')
@@ -303,41 +438,6 @@ class GenbankParser(object):
     def genbankLOCUS(self, code, line):
         pass
 
-    def parseFeatures(self, format='embl'):
-        if format == 'embl':
-            check = set(['FT','XX'])
-        else:
-            check == set([''])
-
-        for line in self.reader:
-            lineNr = self.reader.lineNr
-            if not line[:5].strip() in check:
-                self.reader.pushBack()
-                break
-            key = line[5:20].rstrip()
-            data = [line[21:].rstrip()]
-            
-            while(self.reader.peekAhead()[:20].strip() in check):
-                data.append(self.reader.next()[21:].rstrip())
-            
-            
-            loc = data[0]
-            attributes = '\n'.join(data[1:])
-            try:
-                results = featrec.parseString(attributes)
-            except ParsingError, e:
-                feature = key + ' @ ' + loc + '\n'  +  attributes
-                util.warning('Failed to parse attributes for record starting at line number: %d\nFeature:\n%s\n' % (lineNr, feature))
-                continue
-            
-            getattr(self, 'feat' + key, self.featElse)(key, loc, results, lineNr)
-
-
-    def featElse(self, key, loc, attributes, lineNr):
-        if not key in self.skipcache:
-            feature = key + ' @ ' + loc + '\n'  +  '\n'.join([e[0] + '=' + str(e[1]) for e in attributes])
-            util.warning('Skipping unknown feature key "%s" at line %d (subsequent occurences will not be reported).\nFeature:\n%s\n' % (key, lineNr, feature))
-            self.skipcache.add(key)
 
 
 
