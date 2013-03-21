@@ -11,7 +11,7 @@ __all__ = ["Rep","Read", "Write", "Import", "Export", "Connect","_","CyNetwork",
            "Argmin","Argmax",
            "Mean","Median",
            "Sum","Prod",
-           "Count","Match","Join",
+           "Count","Match", "Blast", "Join",
            "Broadcast","CreateType","MatchType",
            "newdim","NEWDIM","LCDIM","LASTCOMMONDIM","COMMON_NAME",'COMMON_POS', "Missing",
            "Corr","In","Contains",
@@ -47,6 +47,7 @@ In = Infix(repops_funcs.Within)
 Contains = Infix(repops_funcs.Contains)
 Join = Infix(repops_multi.Join)
 Match = Infix(repops_multi.Match)
+Blast = Infix(repops_multi.Blast)
 Stack = Infix(repops_multi.Stack)
 Intersect = Infix(repops_multi.Intersect)
 Union = Infix(repops_multi.Union)

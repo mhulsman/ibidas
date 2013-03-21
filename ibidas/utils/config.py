@@ -49,7 +49,9 @@ def getValue(file, config, value):
 
 
 _ConfigDefault = {
-    "system.tmp_dir":"/tmp"
+    "system.tmp_dir":"/tmp",
+    "data_dir":"~/.ibidas/data",
+    "blast_dir":"~/.ibidas/blast"
 }
 
 config = loadConfig(os.path.expanduser('~/.ibidas/ibidas.cfg'), _ConfigDefault)

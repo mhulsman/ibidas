@@ -43,10 +43,8 @@ class To(RequestUnaryOpRep):
         if not self._req_sources:
             for ssel in slicesel:
                 r = source.Get(ssel) 
-                #assert len(r._slices) == 1, "To action can only be applied to single slices"
                 all_pos = []
                 for slice in r._slices:
-                    #slice = r._slices[0]
                     assert slice in source._slices, "Selected slice in to should not be operated upon"
                     pos = source._slices.index(slice)
                     all_pos.append(pos)
@@ -59,13 +57,25 @@ class To(RequestUnaryOpRep):
                 self._req_sources.append((all_pos, r))
 
         nslices = list(source._slices)
-        for all_pos, r in self._req_sources:
-            if not r._slicesKnown():
-                return 
-            for slice,pos in zip(r._slices, all_pos):
-                nslices[pos] = slice
 
-        self._initialize(tuple(nslices))
+        index = {}
+        for all_pos, r in self._req_sources:
+            for p in all_pos:
+                index[p] = (all_pos, r._slices)
+
+        nnslices = []
+        for pos, nslice in enumerate(nslices):
+            if pos in index:
+                all_pos, r = index[pos]
+                if len(all_pos) == 1:
+                    nnslices.extend(r)
+                else:
+                    assert len(all_pos) == len(r), 'Number of source and result slices in a To/Do operation should match when number of source slices > 1'
+                    nnslices.append(r[all_pos.index(pos)])
+            else:
+                nnslices.append(nslice)
+
+        self._initialize(tuple(nnslices))
        
 
 class Project(RequestUnaryOpRep):

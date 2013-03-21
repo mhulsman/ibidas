@@ -15,6 +15,7 @@ from .. import ops
 
 from ..utils.multi_visitor import VisitorFactory, DirectVisitorFactory, NF_ELSE
 
+_delay_import_(globals(),"..wrappers","blast")
 _delay_import_(globals(),"..representor")
 _delay_import_(globals(),"..utils","util","nested_array","context")
 _delay_import_(globals(),"..itypes","detector","type_attribute_freeze","convertors","dimensions")
@@ -544,6 +545,17 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
         ndatas = nested_array.co_map(joinindex,[slice.data for slice in slices],
                                        jointype=node.jointype,
                                        res_type=(node.results[0].type,node.results[1].type))
+        return slices[0].modify(data=ndatas,name=None,rtype=None,dims=None, bookmarks=None)
+
+    def visitBlastIndexOp(self, node, slices):
+        ndatas = nested_array.co_map(blast.blast,[slice.data for slice in slices],
+                                       type=node.blast_type,
+                                       folder=node.folder,
+                                       reciprocal=node.reciprocal,
+                                       normalize=node.normalize,
+                                       overwrite=node.overwrite,
+                                       blastopts=node.blastopts,
+                                       res_type=tuple([ res.type for res in node.results ]))
         return slices[0].modify(data=ndatas,name=None,rtype=None,dims=None, bookmarks=None)
 
     def visitSelectOp(self, node, slice):
