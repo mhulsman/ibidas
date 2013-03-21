@@ -1,9 +1,10 @@
+from itertools import chain
 import re
 from ..constants import *
 from .. utils import util, nested_array
 from .. utils.missing import Missing
 from ..itypes import detector, rtypes, dimpaths, dimensions
-
+from .. import repops_multi
 import wrapper
 from .. import ops
 import python
@@ -33,12 +34,91 @@ taxonomy = {'PHG':'Bacteriophage',
             'VRL':'Viral'}               
 
 
-class GenbankRepresentor(wrapper.SourceRepresentor):
-    def __init__(self, filename):
-        self.parser = GenbankParser(filename)
+class GERepresentor(wrapper.SourceRepresentor):
+    def __init__(self, filename, type):
+        if type == 'embl':
+            parser = EMBLParser(filename)
+        elif type == 'genbank':
+            parser = GenbankParser(filename)
+        
+        feats_dim = dimensions.Dim(name='feats',shape=UNDEFINED, dependent=(True,))    
+        records_dim = dimensions.Dim(name='records',shape=UNDEFINED)
+
+        records = [r for r in parser]
+
+        seq = self._getSequenceRep([r.get('sequence',Missing) for r in records], records_dim)
+        loc_type = self._getLocTypeRep([r.get('feat_loc_type') for r in records], feats_dim, records_dim)
+        loc = self._getLocsRep([r.get('feat_locs') for r in records], feats_dim, records_dim)
+        rec = self._getRecordRep([r.get('record') for r in records], records_dim)
+        attr = self._getAttrRep([r.get('feat_attr') for r in records], feats_dim, records_dim)
+
+        res = repops_multi.Combine(rec, loc_type, loc, attr, seq)
+
+        self._initialize(tuple(res._slices))
+
+    rectypes = {'length':int, 'alt_accessions':('alt_accessions',str), 'keywords':('keywords',str), 'organism_class':('organism_class',str), 'database':('references',str), 'database_identifier':('references',str)}
+
+    def _getRecordRep(self, records, records_dim):
+        keys = list(set(chain(*[r.keys() for r in records])))
+        keys.sort()
+        types = []
+        dims = {}
+        for key in keys:
+            if key in self.rectypes:
+                t = self.rectypes[key]
+                if isinstance(t, tuple):
+                    s = rtypes.createType(t[-1])
+                    for d in t[::-1][1:]:
+                        if not d in dims:
+                            dim = dimensions.Dim(name=d,shape=UNDEFINED, dependent=(True,))
+                            dims[d] = dim
+                        s = rtypes.TypeArray(dims=dimpaths.DimPath(dims[d]), subtypes=(s,))
+                    t = s
+                else:
+                    t = rtypes.createType(t)
+            else:
+                t = rtypes.createType(str)
+            types.append(t)
+
+        rectype = rtypes.TypeRecordDict(fieldnames=tuple(keys), subtypes=tuple(types))
+        rectype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(rectype,))
+        return python.Rep(records, dtype=rectype)
+
+    attrtypes = {'transl_table':int, 'xref_database': ('feat_ref',str), 'xref_identifier' : ('feat_ref', str),
+                'codon_start': int, 'environmental_sample':bool}
+                
+    def _getAttrRep(self, records, feats_dim, records_dim):
+        types = python.Rep(records,unpack=False).Type
+        attrtype = types.subtypes[0].subtypes[0]
+        attrtype = rtypes.TypeArray(dims=dimpaths.DimPath(feats_dim), subtypes=(attrtype,))
+        attrtype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(attrtype,))
+        return python.Rep(records, dtype=attrtype)
+
+    def _getSequenceRep(self, seq, records_dim):
+        dna = rtypes.createType('DNA')
+        seqtype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(dna,))
+        return python.Rep(seq,dtype=seqtype, name='sequence')
+
+    def _getLocsRep(self, data, feats_dim, records_dim):
+        names = ['name','start','stop','complement','type','fuzzy_before','fuzzy_after']
+        types = [str, int, int, bool, str, bool, bool]
+        types = [rtypes.createType(t) for t in types]
+        loctype = rtypes.TypeRecordDict(fieldnames=tuple(names), subtypes=tuple(types))
+        dim = dimensions.Dim(name='loc_elems',shape=UNDEFINED, dependent=(True,))
+        loctype = rtypes.TypeArray(dims=dimpaths.DimPath(dim), subtypes=(loctype,))
+        loctype = rtypes.TypeArray(dims=dimpaths.DimPath(feats_dim), subtypes=(loctype,))
+        loctype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(loctype,))
+        return python.Rep(data,dtype=loctype)
+
+    def _getLocTypeRep(self, data, feats_dim, records_dim):
+        loctype = rtypes.createType(str)
+        loctype = rtypes.TypeArray(dims=dimpaths.DimPath(feats_dim), subtypes=(loctype,))
+        loctype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(loctype,))
+        return python.Rep(data,dtype=loctype,name='loc_type')
+       
 
 
-featrec = ZeroOrMore(Group((LineStart() | Word('\n')) +  Suppress('/') + Word(alphas + '_') + Suppress('=') + (Word(nums).setParseAction(lambda x: map(int,x)) | QuotedString(quoteChar='"', escChar='"', multiline=True).setParseAction(lambda x: [e.replace('\n',' ') for e in x]))))
+featrec = ZeroOrMore(Group((LineStart() | Word('\n')) +  Suppress('/') + Word(alphas + '_') + Optional(Suppress('=') + (Word(nums).setParseAction(lambda x: map(int,x)) | QuotedString(quoteChar='"',  escQuote='""', multiline=True).setParseAction(lambda x: [e.replace('\n','') for e in x])))))
 
 num = Word(nums)
 date = num + Suppress('-') + Word(alphas) + Suppress('-') + num 
@@ -86,6 +166,18 @@ class GEParser(object):
     def finishRecord(self):
         return self.record
 
+    def parseRecord(self):
+        raise NotImplementedError
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        r = self.parseRecord()
+        if r is None:
+            raise StopIteration
+        return r
+
     def parseFeatures(self, format='embl'):
         if format == 'embl':
             check = set(['FT','XX'])
@@ -110,7 +202,6 @@ class GEParser(object):
             while(self.reader.peekAhead()[:20].strip() in check):
                 data.append(self.reader.next()[21:].rstrip())
             
-            
             loc = data[0]
             try:
                 loc_results = loc_expression.parseString(loc)
@@ -128,17 +219,16 @@ class GEParser(object):
             attributes = '\n'.join(data[1:])
             try:
                 results = featrec.parseString(attributes)
-                nresults = []
+                nresults = {}
                 for e in results:
                     name = valid_name(e[0])
-                    func = getattr(self, 'attr' + name, None)
-                    if func is None:
-                        if not name in self.skipcache:
-                            util.warning('Skipping unknown attribute "%s" with value "%s" at line %d (subsequent occurences will not be reported).' % (name, e[1], self.reader.lineNr))
-                            self.skipcache.add(name)
+                    func = getattr(self, 'attr' + name, self.attrElse)
+                    if len(e) > 1:
+                        value = e[1]
                     else:
-                        nresults.append(func(name, e[1]))
-                results = dict(nresults)
+                        value = True
+                    func(nresults, name, value)
+                results = nresults
             except ParseException, e:
                 feature = key + ' @ ' + loc + '\n'  +  attributes
                 util.warning('Failed to parse attributes for record starting at line number: %d\nFeature:\n%s\n' % (lineNr, feature))
@@ -152,8 +242,34 @@ class GEParser(object):
         rc['feat_locs'] = feat_locs
         rc['feat_attr'] = feat_attr
 
-    def attrnote(self, key, value):
-        return (key,value)
+    def attrElse(self, res, key, value):
+        res[key] = value
+
+    def attrMulti(self, res, key, value):
+        if key in res:
+            res[key].append(value)
+        else:
+            res[key] = [value]
+
+    def attrdb_xref(self, res, key, value):
+        if ',' in value:
+            values = [e.strip().split(':') for e in value.split(',')]
+            databases = [e[0] for e in values]
+            identifiers = [e[1] for e in values]
+            if 'xref_database' in res:
+                res['xref_database'].extend(databases)
+                res['xref_identifier'].extend(identifiers)
+            else:
+                res['xref_database'] = databases
+                res['xref_identifier'] = identifiers
+        else:
+            database, identifier = value.split(':')
+            if 'xref_database' in res:
+                res['xref_database'].append(database)
+                res['xref_identifier'].append(identifier)
+            else:
+                res['xref_database'] = [database]
+                res['xref_identifier'] = [identifier]
 
     def _loc_process(self, loc_results):
         if len(loc_results) == 1:
@@ -193,11 +309,21 @@ class GEParser(object):
             return (outer, ninners)
         else:
            nres = {}
+           nres['name'] = loc_results.get('name', '')
            nres['start'] = loc_results['start']
-           nres['stop'] = loc_results.get('start', nres['start'])
+           nres['stop'] = loc_results.get('stop', nres['start'])
            nres['complement'] = False
-           nres['between'] = loc_results.get('operator','') == '^'
-           nres['single_base'] = nres['start'] == nres['stop'] or loc_results.get('operator','') == '.'
+           
+           between = loc_results.get('operator','') == '^'
+           single_base = nres['start'] == nres['stop'] or loc_results.get('operator','') == '.'
+           if between:
+               t = 'between_base'
+           elif single_base:
+               t = 'single_base'
+           else:
+               t = 'region'
+           nres['type'] = t
+
            nres['fuzzy_before'] = loc_results.get('fuzzybefore', '') == '<'
            nres['fuzzy_after'] = loc_results.get('fuzzyafter', '') == '>'
            return (None, [nres])
@@ -252,8 +378,8 @@ class EMBLParser(GEParser):
             r['version'] = cols[1] if cols[1] else Missing
             r['topology'] = cols[2] if cols[2] else Missing
             r['mol_type'] = cols[3] if cols[3] else Missing
-            r['data_class'] = data_class.get(cols[4],cols[4]) if cols[4] else Missing
-            r['taxonomy'] = taxonomy.get(cols[5],cols[5]) if cols[5] else Missing
+            r['data_class'] = data_class.get(str.upper(cols[4]),cols[4]) if cols[4] else Missing
+            r['taxonomy'] = taxonomy.get(str.upper(cols[5]),cols[5]) if cols[5] else Missing
             length = util.getNumber.match(cols[6])
             if cols[6] and length is None:
                 util.warning('Unable to parse length: %s', cols[6])
@@ -262,13 +388,13 @@ class EMBLParser(GEParser):
                 accession = cols[0].split()
                 if len(accession) == 2:
                     r['accession'] = accession[0] if accession[0] else Missing
-                    r['data_class'] = data_class.get(accession[1],accession[1]) if accession[1] else Missing
+                    r['data_class'] = data_class.get(str.upper(accession[1]),accession[1]) if accession[1] else Missing
                 else:
                     r['accession'] = accession[0] if accession[0] else Missing
             
             if len(cols) == 4:
                 r['molecule_type'] = cols[1] if cols[1] else Missing
-                r['taxonomy'] = taxonomy.get(cols[2],cols[2]) if cols[2] else Missing
+                r['taxonomy'] = taxonomy.get(str.upper(cols[2]),cols[2]) if cols[2] else Missing
                 length = util.getNumber.match(cols[3])
                 if cols[3] and length is None:
                     util.warning('Unable to parse length: %s', cols[3])
