@@ -100,7 +100,7 @@ class GERepresentor(wrapper.SourceRepresentor):
         return python.Rep(seq,dtype=seqtype, name='sequence')
 
     def _getLocsRep(self, data, feats_dim, records_dim):
-        names = ['name','start','stop','complement','type','fuzzy_before','fuzzy_after']
+        names = ['loc_name','start','stop','complement','type','fuzzy_before','fuzzy_after']
         types = [str, int, int, bool, str, bool, bool]
         types = [rtypes.createType(t) for t in types]
         loctype = rtypes.TypeRecordDict(fieldnames=tuple(names), subtypes=tuple(types))
@@ -309,7 +309,7 @@ class GEParser(object):
             return (outer, ninners)
         else:
            nres = {}
-           nres['name'] = loc_results.get('name', '')
+           nres['loc_name'] = loc_results.get('name', '')
            nres['start'] = loc_results['start']
            nres['stop'] = loc_results.get('stop', nres['start'])
            nres['complement'] = False
