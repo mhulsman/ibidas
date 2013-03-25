@@ -2,6 +2,7 @@ from ibidas.utils import util
 from ibidas.utils.config import config
 import os.path
 import os
+import sys
 from logging import warning
 _delay_import_(globals(),"ibidas","*")
 
@@ -60,6 +61,30 @@ def yeast_aliases(feats, remove_multi=True):
     return res.Copy()
 predefined_sources.register(yeast_aliases,name="name_aliases",category="yeast")  
 
+
+def genbank(identifier, only_download=False, update=False):
+    """Returns a parsed genbank file.
+
+    :param only_download: Only returns a path to a local copy of the genbank record [default: False].
+    """
+    dbname= 'genbank'
+    filename = identifier + '.gb'
+
+    if update or not Fetch.check_exists(dbname, filename):
+        from Bio import Entrez
+        # replace with your real email (optional):
+        Entrez.email = 'whatever@mail.com'
+        # accession id works, returns genbank format, looks in the 'nucleotide' database:
+        handle=Entrez.efetch(db='nucleotide',id=identifier,rettype='gb')
+        Fetch.from_handle(dbname, filename, handle)
+    
+    
+    filepath = Fetch.get_filename(dbname, filename)
+    if only_download:
+        return filepath
+    else:
+        return Read(filepath)
+predefined_sources.register(genbank,name="genbank")  
 
 def yeast_phosphogrid():
     url = "http://www.phosphogrid.org/downloads/phosphosites.txt"

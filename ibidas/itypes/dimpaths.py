@@ -68,6 +68,12 @@ class DimPath(tuple):
     def __add__(self, other):
         return DimPath(*tuple.__add__(self,other))
 
+    def startsWithRoot(self):
+        return self and self[0] is root
+
+    def endsWithEnd(self):
+        return self and self[-1] is end
+
     def strip(self):
         if(self and self[0] is root):
             if(self[-1] is end):
@@ -835,6 +841,23 @@ def extendParentDim(path, sourcepaths, length=1):#{{{
     path = DimPath(*(ndims[::-1])) + path
     return path
     #}}}
+
+
+def appendChildDim(path, sourcepaths):
+    xdims = set()
+    util.debug_here()
+    for spath in sourcepaths:
+        lastposs = spath.matchDimPath(path)
+        for lastpos in lastposs:
+            if len(spath) > (lastpos+1):
+                xdims.add(spath[lastpos+1])
+    print xdims 
+    if len(xdims) != 1:
+        return False
+
+    npath = list(path)
+    npath.append(xdims.pop)
+    return DimPath(*npath)
 
 def getArrayDimPathFromType(rtype):
     if(rtype.__class__ is rtypes.TypeArray):

@@ -8,6 +8,7 @@ import tarfile
 import zipfile
 import gzip
 import bz2
+import sys
 
 class DownloadCache(object):
     def __init__(self, folder=None):
@@ -32,6 +33,22 @@ class DownloadCache(object):
             os.rename(tempfilename, file_path);
         
         return file_path
+
+    def check_exists(self,  dbname, filename):
+        file_path = self.get_filename(dbname, filename) 
+        return path.exists(file_path)
+
+    def from_handle(self, dbname, filename, handle):
+        file_path = self.get_filename(dbname, filename) 
+        if path.exists(file_path):
+            os.remove(file_path)
+
+        local_file=open(file_path, 'w')
+        local_file.write(handle.read())
+        local_file.close()
+        handle.close()
+        return file_path
+       
 
     def set_download_folder(self, folder):
         self.folder = folder

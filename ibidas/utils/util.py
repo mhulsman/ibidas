@@ -595,10 +595,15 @@ class PeekAheadFileReader(object):
         self.curLine = None
         self.lineNr = 0
  
+    def skipWhite(self):
+        while(self.peekAhead().strip() == ''):
+            self.next()
+
     def eof(self):
         if not self.lines:
             self.fill_stack()
             return len(self.lines) == 0
+        
         return False
           
     def tell(self):

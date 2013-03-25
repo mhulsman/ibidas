@@ -229,6 +229,7 @@ class FlatAll(repops.UnaryOpRep):
 class Flat(repops.UnaryOpRep):
     def _sprocess(self,source,name=None,dim=-1):
         selpath = dimpaths.identifyUniqueDimPathSource(source,dim)
+
         nslices = self._apply(source._slices, selpath, name)
 
         return self._initialize(tuple(nslices))

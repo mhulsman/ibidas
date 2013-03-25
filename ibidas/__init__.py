@@ -136,6 +136,13 @@ def fimport_vcf(url, **kwargs):
     from wrappers.vcf import VCFRepresentor
     return VCFRepresentor(url, **kwargs)
 
+def fimport_genbank(url, **kwargs):
+    from wrappers.genbank_embl import GERepresentor
+    return GERepresentor(url, type='genbank', **kwargs)
+
+def fimport_embl(url, **kwargs):
+    from wrappers.genbank_embl import GERepresentor
+    return GERepresentor(url, type='embl', **kwargs)
 ##########################################################################
 
 def fexport_tsv(data, url, **kwargs):
@@ -166,7 +173,8 @@ formats_import = { 'tsv' : fimport_tsv, 'csv' : fimport_tsv,
                    'xml' : fimport_xml,
                    'psimi' : fimport_psimi,
                    'fasta' : fimport_fasta, 'fa' : fimport_fasta, 'fas' : fimport_fasta,
-                   'vcf': fimport_vcf
+                   'vcf': fimport_vcf,
+                   'gbff':fimport_genbank, 'gb': fimport_genbank, 'genbank': fimport_genbank, 'gbk':fimport_genbank,  'embl':fimport_embl,
                  };
 
 formats_export = { 'tsv' : fexport_tsv, 'csv' : fexport_tsv,

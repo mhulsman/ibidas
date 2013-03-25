@@ -41,18 +41,24 @@ class GERepresentor(wrapper.SourceRepresentor):
         elif type == 'genbank':
             parser = GenbankParser(filename)
         
-        feats_dim = dimensions.Dim(name='feats',shape=UNDEFINED, dependent=(True,))    
-        records_dim = dimensions.Dim(name='records',shape=UNDEFINED)
-
         records = [r for r in parser]
 
+        feats_dim = dimensions.Dim(name='feats',shape=UNDEFINED, dependent=(True,))    
+        records_dim = dimensions.Dim(name='records',shape=len(records))
+
+
         seq = self._getSequenceRep([r.get('sequence',Missing) for r in records], records_dim)
-        loc_type = self._getLocTypeRep([r.get('feat_loc_type') for r in records], feats_dim, records_dim)
+        loc_type = self._getFeatRep([r.get('feat_loc_type') for r in records], feats_dim, records_dim, name='loc_type')
+        feat_key = self._getFeatRep([r.get('feat_key') for r in records], feats_dim, records_dim, name='feat_key')
         loc = self._getLocsRep([r.get('feat_locs') for r in records], feats_dim, records_dim)
         rec = self._getRecordRep([r.get('record') for r in records], records_dim)
         attr = self._getAttrRep([r.get('feat_attr') for r in records], feats_dim, records_dim)
 
-        res = repops_multi.Combine(rec, loc_type, loc, attr, seq)
+        if any(['contig' in r for r in records]):
+            clocs = self._getContigsRep([r.get('contig', Missing) for r in records], records_dim)
+            res = repops_multi.Combine(rec, clocs, loc_type, loc, feat_key, attr, seq).Copy()
+        else:
+            res = repops_multi.Combine(rec, loc_type, loc, feat_key, attr, seq).Copy()
 
         self._initialize(tuple(res._slices))
 
@@ -68,9 +74,9 @@ class GERepresentor(wrapper.SourceRepresentor):
                 t = self.rectypes[key]
                 if isinstance(t, tuple):
                     s = rtypes.createType(t[-1])
-                    for d in t[::-1][1:]:
+                    for pos, d in enumerate(t[::-1][1:]):
                         if not d in dims:
-                            dim = dimensions.Dim(name=d,shape=UNDEFINED, dependent=(True,))
+                            dim = dimensions.Dim(name=d,shape=UNDEFINED, dependent=(True,) * (len(t) - 1 - pos) )
                             dims[d] = dim
                         s = rtypes.TypeArray(dims=dimpaths.DimPath(dims[d]), subtypes=(s,))
                     t = s
@@ -85,36 +91,73 @@ class GERepresentor(wrapper.SourceRepresentor):
         return python.Rep(records, dtype=rectype)
 
     attrtypes = {'transl_table':int, 'xref_database': ('feat_ref',str), 'xref_identifier' : ('feat_ref', str),
-                'codon_start': int, 'environmental_sample':bool}
+                'codon_start': int, 'environmental_sample':bool,'note':str, 'locus_tag':str, 'id':str,'gene':str,
+                'organism': str, 'product':str, 'protein_id':str, 'mol_type':str, 'virion': bool, 'translation':'protein'}
                 
     def _getAttrRep(self, records, feats_dim, records_dim):
-        types = python.Rep(records,unpack=False).Type
-        attrtype = types.subtypes[0].subtypes[0]
+        keys = set()
+        for feats in records:
+            for attr in feats:
+                keys.update(attr)
+        keys = list(keys)
+        keys.sort()
+        
+        types = []
+        dims = {}
+        for key in keys:
+            if not key in self.attrtypes:
+                t = rtypes.createType('any')
+            else:
+                t = self.attrtypes[key]
+                if isinstance(t, tuple):
+                    s = rtypes.createType(t[-1])
+                    for pos, d in enumerate(t[::-1][1:]):
+                        if not d in dims:
+                            dim = dimensions.Dim(name=d,shape=UNDEFINED, dependent=(True,) * (len(t) - pos) )
+                            dims[d] = dim
+                        s = rtypes.TypeArray(dims=dimpaths.DimPath(dims[d]), subtypes=(s,))
+                    s.dims[0].has_missing=True
+                    t = s
+                else:
+                    t = rtypes.createType(t)
+            t.has_missing=True
+            types.append(t)
+         
+        attrtype = rtypes.TypeRecordDict(fieldnames=tuple(keys), subtypes=tuple(types))
         attrtype = rtypes.TypeArray(dims=dimpaths.DimPath(feats_dim), subtypes=(attrtype,))
         attrtype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(attrtype,))
-        return python.Rep(records, dtype=attrtype)
+        return python.Rep(records, dtype=attrtype, unpack=False, name='attr').Elems().Elems()
+       
 
     def _getSequenceRep(self, seq, records_dim):
         dna = rtypes.createType('DNA')
         seqtype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(dna,))
         return python.Rep(seq,dtype=seqtype, name='sequence')
 
+    locnames = ['loc_name','start','stop','complement','type','fuzzy_before','fuzzy_after']
+    loctypes = [str, int, int, bool, str, bool, bool]
     def _getLocsRep(self, data, feats_dim, records_dim):
-        names = ['loc_name','start','stop','complement','type','fuzzy_before','fuzzy_after']
-        types = [str, int, int, bool, str, bool, bool]
-        types = [rtypes.createType(t) for t in types]
-        loctype = rtypes.TypeRecordDict(fieldnames=tuple(names), subtypes=tuple(types))
-        dim = dimensions.Dim(name='loc_elems',shape=UNDEFINED, dependent=(True,))
+        types = [rtypes.createType(t) for t in self.loctypes]
+        loctype = rtypes.TypeRecordDict(fieldnames=tuple(self.locnames), subtypes=tuple(types))
+        dim = dimensions.Dim(name='loc_elems',shape=UNDEFINED, dependent=(True,True))
         loctype = rtypes.TypeArray(dims=dimpaths.DimPath(dim), subtypes=(loctype,))
         loctype = rtypes.TypeArray(dims=dimpaths.DimPath(feats_dim), subtypes=(loctype,))
         loctype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(loctype,))
         return python.Rep(data,dtype=loctype)
+    
+    def _getContigsRep(self, data, records_dim):
+        types = [rtypes.createType(t) for t in self.loctypes]
+        loctype = rtypes.TypeRecordDict(fieldnames=tuple(self.locnames), subtypes=tuple(types))
+        dim = dimensions.Dim(name='contig_elems',shape=UNDEFINED, dependent=(True,),  has_missing=True)
+        loctype = rtypes.TypeArray(dims=dimpaths.DimPath(dim), subtypes=(loctype,), has_missing=True)
+        loctype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(loctype,))
+        return python.Rep(data,dtype=loctype, name='contigs',unpack=False).Elems().Elems()
 
-    def _getLocTypeRep(self, data, feats_dim, records_dim):
+    def _getFeatRep(self, data, feats_dim, records_dim, name):
         loctype = rtypes.createType(str)
         loctype = rtypes.TypeArray(dims=dimpaths.DimPath(feats_dim), subtypes=(loctype,))
         loctype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(loctype,))
-        return python.Rep(data,dtype=loctype,name='loc_type')
+        return python.Rep(data,dtype=loctype,name=name)
        
 
 
@@ -129,10 +172,14 @@ organism = Group(OneOrMore(Word(alphas))) + Group(Optional('(' + OneOrMore(Word(
 
 #location
 number = Word(nums).setParseAction(lambda x: map(int,x))
-name = CharsNotIn(':')
+start_number = Optional(Literal('<').setResultsName('fuzzybefore')) + number.setResultsName('start')
+stop_number = Literal('>').setResultsName('fuzzyafter') + number.setResultsName('stop')
+gap = Literal('gap(unk100)').setResultsName('gap')
+
+name = CharsNotIn(':,')
 identifier1 =  (Optional('<').setResultsName('fuzzybefore') + number.setResultsName('start'))
 identifier2 = (Optional('>').setResultsName('fuzzyafter') + number.setResultsName('stop'))
-loc = Group(Optional(name.setResultsName('name') + ':') + (identifier1 + oneOf('.. . ^').setResultsName('operator') + identifier2 | number.setResultsName('start')))
+loc = Group(Optional(name.setResultsName('name') + ':') + (identifier1 + oneOf('.. . ^').setResultsName('operator') + identifier2 | start_number | stop_number | gap))
 
 loc_expression = Forward()
 lparen = Literal("(").suppress()
@@ -182,7 +229,7 @@ class GEParser(object):
         if format == 'embl':
             check = set(['FT','XX'])
         else:
-            check == set([''])
+            check = set([''])
         rc = self.record
 
         feat_key = []
@@ -201,8 +248,11 @@ class GEParser(object):
             
             while(self.reader.peekAhead()[:20].strip() in check):
                 data.append(self.reader.next()[21:].rstrip())
-            
-            loc = data[0]
+           
+            end_loc = 0
+            while len(data) > end_loc and not data[end_loc].lstrip().startswith('/'):
+                end_loc= end_loc + 1
+            loc = ''.join(data[:end_loc])
             try:
                 loc_results = loc_expression.parseString(loc)
                 outer, inner = self._loc_process(loc_results)
@@ -216,7 +266,7 @@ class GEParser(object):
                 util.warning('Failed to parse location "%s" for record starting at line number: %d\n' % (loc, lineNr))
                 continue
 
-            attributes = '\n'.join(data[1:])
+            attributes = '\n'.join(data[end_loc:])
             try:
                 results = featrec.parseString(attributes)
                 nresults = {}
@@ -251,6 +301,14 @@ class GEParser(object):
         else:
             res[key] = [value]
 
+    def attrconcat(self, res, key, value):
+        if key in res:
+            res[key] = res[key] + '; ' + value
+        else:
+            res[key] = value
+    attrnote = attrconcat
+    attrinference = attrconcat
+
     def attrdb_xref(self, res, key, value):
         if ',' in value:
             values = [e.strip().split(':') for e in value.split(',')]
@@ -272,7 +330,7 @@ class GEParser(object):
                 res['xref_identifier'] = [identifier]
 
     def _loc_process(self, loc_results):
-        if len(loc_results) == 1:
+        if len(loc_results) == 1 and isinstance(loc_results[0], ParseResults):
             loc_results = loc_results[0]
         if 'function' in loc_results:
             res = [self._loc_process(e) for e in loc_results[1]]
@@ -309,32 +367,43 @@ class GEParser(object):
             return (outer, ninners)
         else:
            nres = {}
-           nres['loc_name'] = loc_results.get('name', '')
-           nres['start'] = loc_results['start']
-           nres['stop'] = loc_results.get('stop', nres['start'])
-           nres['complement'] = False
-           
-           between = loc_results.get('operator','') == '^'
-           single_base = nres['start'] == nres['stop'] or loc_results.get('operator','') == '.'
-           if between:
-               t = 'between_base'
-           elif single_base:
-               t = 'single_base'
+           if 'gap' in loc_results:
+                nres['start'] = 1
+                nres['stop'] = 100
+                nres['complement'] = False
+                nres['type'] = 'gap'
+                nres['fuzzy_before'] = False
+                nres['fuzzy_after'] = False
            else:
-               t = 'region'
-           nres['type'] = t
+                nres['loc_name'] = loc_results.get('name', '')
+                nres['start'] = loc_results.get('start', loc_results.get('stop',Missing))
+                if isinstance(nres['start'], ParseResults): #FIXME: weird bug
+                    nres['start'] = nres['start'][0]
+                    print 'WEIRD'
+                nres['stop'] = loc_results.get('stop', nres['start'])
+                nres['complement'] = False
+                
+                between = loc_results.get('operator','') == '^'
+                single_base = nres['start'] == nres['stop'] or loc_results.get('operator','') == '.'
+                if between:
+                    t = 'between_base'
+                elif single_base:
+                    t = 'single_base'
+                else:
+                    t = 'region'
+                nres['type'] = t
 
-           nres['fuzzy_before'] = loc_results.get('fuzzybefore', '') == '<'
-           nres['fuzzy_after'] = loc_results.get('fuzzyafter', '') == '>'
+                nres['fuzzy_before'] = loc_results.get('fuzzybefore', '') == '<'
+                nres['fuzzy_after'] = loc_results.get('fuzzyafter', '') == '>'
            return (None, [nres])
         
 
 
 class EMBLParser(GEParser):
     def parseRecord(self):
+        self.reader.skipWhite()
         if self.reader.eof():
             return None
-
         self.startRecord()
         pos = self.reader.tell()
 
@@ -403,6 +472,8 @@ class EMBLParser(GEParser):
 
         if not length is None and len(length.groups()) > 0:
             r['length'] = int(length.groups()[0])
+        
+        print "Parsing record %s" % r['accession']
 
     def emblAC(self, code, line):
         rc = self.record['record']
@@ -520,7 +591,8 @@ class EMBLParser(GEParser):
 
 
 class GenbankParser(GEParser):
-    def parseGenbank(self):
+    def parseRecord(self):
+        self.reader.skipWhite()
         if self.reader.eof():
             return None
         self.startRecord()
@@ -528,11 +600,11 @@ class GenbankParser(GEParser):
         #skip possible header comments
         pos = self.reader.tell()
         try:
-            while not self.reader.peekAhead()[:12] == 'LOCUS':
+            while not self.reader.peekAhead()[:12].strip() == 'LOCUS':
                 self.reader.next() 
         except StopIteration,e:
             util.warning('Arrived at end of file without ever seeing an LOCUS record. Restarting parsing attempt without looking for LOCUS record.')
-            self.reader.reset()
+            self.reader.reset(pos)
 
         for line in self.reader:
             if not line.strip():
@@ -541,16 +613,20 @@ class GenbankParser(GEParser):
             if line[:2] == '//': #end of record
                 return self.finishRecord()
                 
-            code = line[:12].rstrip()
-            if code[0] == ' ': #continuation
-                if len(code[:6]).lstrip() == 1: #sudden start of feature table?
+            code = line[:12]
+            if code and code[0] == ' ': #continuation
+                if len(code[:6].lstrip()) == 1: #sudden start of feature table?
                      util.warning('Unexpected start of feature table at line %d: %s. Will attempt parsing.', self.reader.lineNr, line)
                      self.reader.pushBack()
                      self.parseFeatures()
                 continue
-            line = line[12:].rstrip()
-            getattr(self, 'genbank' + code, self.genbankElse)(code, line)
-
+            elif code[:2] == '//':
+                return self.finishRecord()
+            else:
+                line = line[12:].rstrip()
+                getattr(self, 'genbank' + code.rstrip(), self.genbankElse)(code, line)
+        
+        util.warning('Unexpected end of file. Record not closed by '//'')
         return self.finishRecord()
            
     def genbankElse(self, code, line):
@@ -562,9 +638,74 @@ class GenbankParser(GEParser):
         self.parseFeatures(format='genbank')
 
     def genbankLOCUS(self, code, line):
+        locus = line[0:16].rstrip()
+        baselength = int(line[16:28].lstrip())
+        #baselengthunit = line[41:43].rstrip()
+        #strand = line[44:47].lstrip()
+        mol_type = line[35:41].strip()
+        topology = line[43:51].rstrip()
+        division = line[52:55].rstrip()
+        date = line[56:67].rstrip()   #fixme: parse to datetime
+        r = self.record['record'] 
+        r['accession'] = locus
+        r['topology'] = topology
+        r['taxonomy'] = taxonomy.get(str.upper(division),division) if division else Missing
+        r['length'] = baselength
+        r['mol_type'] = mol_type
+            
+        print "Parsing record %s" % r['accession']
+
+    def genbankORIGIN(self, code, line):
+        seq = []
+        for line in self.reader:
+            if line[:2] == '//':
+                self.reader.pushBack()
+                break
+            seq.append(line[10:].strip().replace(' ',''))
+        if seq:
+            self.record['sequence'] = ''.join(seq)
+        else:
+            util.warning('SQ record without sequence?! Will attempt to go on.')
+
+    def genbankDEFINITION(self, code, line):
+        d = self._getRemainingLines(line)
+        self.record['record']['description'] = ''.join(d)
+    
+    def genbankKEYWORDS(self, code, line):
+        if line.endswith('.'):
+            line = line[:-1]
+        self.record['record']['keywords'] = [e.strip() for e in line.split(';')]
+
+    def _getRemainingLines(self, line):
+        d = [line]
+        for line in self.reader:
+            if line[:12].strip() == '':
+                d.append(line[12:].strip())
+            else:
+                self.reader.pushBack()
+                break
+        return d
+
+    def genbankSOURCE(self, code, line):
+        self.record['record']['source'] = line.strip()
+
+    def genbankCOMMENT(self, code, line):
+        d = self._getRemainingLines(line)
+        self.record['record']['comment'] = ''.join(d)
+
+    def genbankREFERENCE(self, code, line):
         pass
 
-
-
-
-
+    def genbankCONTIG(self, code, line):
+        d = self._getRemainingLines(line)
+        loc = ''.join(d)
+        try:
+            loc_results = loc_expression.parseString(loc)
+            outer, inner = self._loc_process(loc_results)
+            if outer is None:
+                if len(inner) > 1:
+                    util.warning('Order/join attribute not specified at line %d for list of locations "%s", assuming join.' %(lineNr, loc))
+                outer = 'join'
+        except ParseException, e:
+            util.warning('Failed to parse location "%s" for contig record starting at line number: %d\n' % (loc, self.reader.lineNr))
+        self.record['contig'] = inner
