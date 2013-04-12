@@ -599,13 +599,13 @@ class MultiUnaryOp(UnaryOp):#{{{
 
 class EachOp(MultiUnaryOp):
     __slots__ = ['named_params', 'eachfunc','extra_params']
-    def __init__(self, source_slices, eachfunc, rtype=rtypes.unknown, named_params=False, extra_params={}):
+    def __init__(self, source_slices, eachfunc, rtype=rtypes.unknown, named_params=False, keep_name=False, extra_params={}):
         nbookmarks = reduce(operator.__or__, [s.bookmarks for s in source_slices])
         for slice in source_slices[1:]:
             assert slice.dims == source_slices[0].dims, 'Unequal dims'
         dims = source_slices[0].dims
 
-        if not isinstance(eachfunc, context.Context) and hasattr(eachfunc,'func_name') and not eachfunc.func_name=='<lambda>':
+        if not keep_name and not isinstance(eachfunc, context.Context) and hasattr(eachfunc,'func_name') and not eachfunc.func_name=='<lambda>':
             name = util.valid_name(eachfunc.func_name)
         else:
             name = '_'.join([s.name for s in source_slices])

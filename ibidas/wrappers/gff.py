@@ -75,10 +75,15 @@ def to_row(record):
     gid = locus_tag
     if gene is None: #no gene found, generate from min/max pos
         if mrnas or cdss or exons:
-            gene_strand = '+' if strand[(mrnas + cdss + exons + other)[0]][0] else '-'
-            result.append(('gene', record['min_start'], record['max_stop'], '.', gene_strand, '.', {'ID':gid}))
+            gene_strand = '+' if strand[(mrnas + cdss + exons + others)[0]][0] else '-'
+            result.append(('gene', record['min_start'], record['max_stop'], '.', gene_strand, '.', 'ID=' + gid))
     else:
         gene_strand = '+' if strand[gene][0] else '-'
+        if mrnas or cdss or exons:
+            gene_strand_other = '+' if strand[(mrnas + cdss + exons + others)[0]][0] else '-'
+            if gene_strand != gene_strand_other:
+                util.warning('Strand of gene %s does not match strand of mRNA/CDS/exons' % gid)
+                gene_strand = gene_strand_other
         attr = {'ID':gid}
         attr = process_attr('gene', attr, rattr[gene])
         result.append(('gene', start[gene][0], stop[gene][0], score[gene], gene_strand, '.', attr))

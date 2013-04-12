@@ -237,7 +237,8 @@ class Flat(repops.UnaryOpRep):
     @classmethod
     def _apply(cls, fslices, selpath, name=None):
         #create new merged dimension
-        selpath = dimpaths.extendParentDim(selpath,[s.dims for s in fslices],max(2,1 + len(selpath[-1].dependent)))
+        selpath = dimpaths.extendParentDim(selpath, [s.dims for s in fslices], max(2,1 + len(selpath[-1].dependent)))
+        assert len(selpath) >= 2, 'Could not find unique parent dimension for %s. Please specify one of the slices that needs to be flattened.' % str(selpath)
         
         #determine new dim
         if(selpath[-1].shape != UNDEFINED and selpath[-2].shape != UNDEFINED):

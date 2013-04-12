@@ -38,23 +38,36 @@ class RequestUnaryOpRep(repops.UnaryOpRep):
 class To(RequestUnaryOpRep):
     def _sprocess(self, source, *slicesel, **kwargs):
         do = kwargs.pop("Do")
-        assert not kwargs, "Unknown parameters: " + str(kwargs)
+        separate = kwargs.pop('separate',False)
 
+        assert not kwargs, "Unknown parameters: " + str(kwargs)
+    
         if not self._req_sources:
             for ssel in slicesel:
                 r = source.Get(ssel) 
                 all_pos = []
                 for slice in r._slices:
-                    assert slice in source._slices, "Selected slice in to should not be operated upon"
+                    assert slice in source._slices, "Selected slice in To operation should only be operated on using Do argument"
                     pos = source._slices.index(slice)
                     all_pos.append(pos)
-
-                if(isinstance(do, context.Context)):
-                    r = context._apply(do, r)
+                if separate:
+                    for i in range(len(r._slices)):
+                        z = r.Get(i)
+                        if(isinstance(do, context.Context)):
+                            z = context._apply(do, z)
+                        else:
+                            z = do(z)
+                        self._req_sources.append(([all_pos[i]],z))
                 else:
-                    r = do(r)
+                    if(isinstance(do, context.Context)):
+                        r = context._apply(do, r)
+                    else:
+                        r = do(r)
 
-                self._req_sources.append((all_pos, r))
+                    self._req_sources.append((all_pos, r))
+        
+        if not all([elem[1]._slicesKnown() for elem in self._req_sources]):
+            return
 
         nslices = list(source._slices)
 
@@ -167,7 +180,7 @@ class Project(RequestUnaryOpRep):
         
         if(not self._req_sources):
             self._req_sources = self._getSliceList(chain(zip([None] * len(args),args),kwds.iteritems()), [], cur_slices)
-       
+        
         nslices = self._toSlices(self._req_sources)
         if nslices is None:
             return None
@@ -434,9 +447,9 @@ class Each(repops.UnaryOpRep):
         return self._initialize((nslice,))
 
     @classmethod
-    def _apply(cls, slices, eachfunc, dtype=rtypes.unknown, named_params=False, **kwargs):
+    def _apply(cls, slices, eachfunc, dtype=rtypes.unknown, named_params=False, keep_name=False, **kwargs):
         slices,plans = ops.broadcast(slices, mode='dim', partial=False)
         if(not isinstance(dtype,rtypes.TypeUnknown)):
             dtype = rtypes.createType(dtype,len(slices[0].dims)) 
-        return ops.EachOp(slices, eachfunc, dtype, named_params, kwargs)
+        return ops.EachOp(slices, eachfunc, dtype, named_params, keep_name, kwargs)
 

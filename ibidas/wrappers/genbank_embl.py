@@ -48,11 +48,11 @@ class GERepresentor(wrapper.SourceRepresentor):
 
 
         seq = self._getSequenceRep([r.get('sequence',Missing) for r in records], records_dim)
-        loc_type = self._getFeatRep([r.get('feat_loc_type') for r in records], feats_dim, records_dim, name='loc_type')
-        feat_key = self._getFeatRep([r.get('feat_key') for r in records], feats_dim, records_dim, name='feat_key')
-        loc = self._getLocsRep([r.get('feat_locs') for r in records], feats_dim, records_dim)
+        loc_type = self._getFeatRep([r.get('feat_loc_type',[]) for r in records], feats_dim, records_dim, name='loc_type')
+        feat_key = self._getFeatRep([r.get('feat_key',[]) for r in records], feats_dim, records_dim, name='feat_key')
+        loc = self._getLocsRep([r.get('feat_locs',[]) for r in records], feats_dim, records_dim)
         rec = self._getRecordRep([r.get('record') for r in records], records_dim)
-        attr = self._getAttrRep([r.get('feat_attr') for r in records], feats_dim, records_dim)
+        attr = self._getAttrRep([r.get('feat_attr',[]) for r in records], feats_dim, records_dim)
 
         if any(['contig' in r for r in records]):
             clocs = self._getContigsRep([r.get('contig', Missing) for r in records], records_dim)
@@ -90,8 +90,8 @@ class GERepresentor(wrapper.SourceRepresentor):
         rectype = rtypes.TypeArray(dims=dimpaths.DimPath(records_dim), subtypes=(rectype,))
         return python.Rep(records, dtype=rectype)
 
-    attrtypes = {'transl_table':int, 'xref_database': ('feat_ref',str), 'xref_identifier' : ('feat_ref', str),
-                'codon_start': int, 'environmental_sample':bool,'note':str, 'locus_tag':str, 'id':str,'gene':str,
+    attrtypes = {'transl_table':int, 'xref_database': ('feat_ref',str), 'xref_identifier' : ('feat_ref', str),'note' : ('notes', str),
+                'codon_start': int, 'environmental_sample':bool, 'locus_tag':str, 'id':str,'gene':str,
                 'organism': str, 'product':str, 'protein_id':str, 'mol_type':str, 'virion': bool, 'translation':'protein'}
                 
     def _getAttrRep(self, records, feats_dim, records_dim):
@@ -161,7 +161,7 @@ class GERepresentor(wrapper.SourceRepresentor):
        
 
 
-featrec = ZeroOrMore(Group((LineStart() | Word('\n')) +  Suppress('/') + Word(alphas + '_') + Optional(Suppress('=') + (Word(nums).setParseAction(lambda x: map(int,x)) | QuotedString(quoteChar='"',  escQuote='""', multiline=True).setParseAction(lambda x: [e.replace('\n','') for e in x])))))
+featrec = ZeroOrMore(Group((LineStart() | Word('\n')) +  Suppress('/') + Word(alphas + '_') + Optional(Suppress('=') + (Word(nums).setParseAction(lambda x: map(int,x)) | QuotedString(quoteChar='"',  escQuote='""', multiline=True).setParseAction(lambda x: [e.replace('\n',' ') for e in x])))))
 
 num = Word(nums)
 date = num + Suppress('-') + Word(alphas) + Suppress('-') + num 
@@ -244,10 +244,10 @@ class GEParser(object):
                 self.reader.pushBack()
                 break
             key = line[5:20].rstrip()
-            data = [line[21:].rstrip()]
+            data = [line[21:].rstrip('\n')]
             
             while(self.reader.peekAhead()[:20].strip() in check):
-                data.append(self.reader.next()[21:].rstrip())
+                data.append(self.reader.next()[21:].rstrip('\n'))
            
             end_loc = 0
             while len(data) > end_loc and not data[end_loc].lstrip().startswith('/'):
@@ -306,7 +306,7 @@ class GEParser(object):
             res[key] = res[key] + '; ' + value
         else:
             res[key] = value
-    attrnote = attrconcat
+    attrnote = attrMulti
     attrinference = attrconcat
 
     def attrdb_xref(self, res, key, value):
@@ -370,7 +370,7 @@ class GEParser(object):
            if 'gap' in loc_results:
                 nres['start'] = 1
                 nres['stop'] = 100
-                nres['complement'] = False
+                nres['complement'] = False 
                 nres['type'] = 'gap'
                 nres['fuzzy_before'] = False
                 nres['fuzzy_after'] = False
@@ -518,6 +518,7 @@ class EMBLParser(GEParser):
         rc['organism_class'].extend([e for e in [e.strip() for e in line.split(';')] if e])
             
     def emblOG(self, code, line):
+        rc = self.record['record']
         rc['organelle'] = line               
 
 

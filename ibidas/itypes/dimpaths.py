@@ -823,18 +823,19 @@ def extendParentDim(path, sourcepaths, length=1):#{{{
             r = spath[:(lastpos + 1 - len(path))]
             xpaths.add(r)
         
-    while(all([len(xpath) > 0 for xpath in xpaths])and (len(ndims) < length or length == -1)):
+    while((len(ndims) < length or length == -1)):
         xdims = set()
         nxpaths = set()
         for xpath in xpaths:
-           xdims.add(xpath[-1])
-           nxpaths.add(xpath[:-1])
+           if xpath:
+               xdims.add(xpath[-1])
+               nxpaths.add(xpath[:-1])
         
         if(not xdims or len(xdims) > 1):
             if length == -1:
                 break
             else:
-               raise RuntimeError, "Cannot find unique parent for dim: " + str(path[0])
+                raise RuntimeError, "Cannot find unique parent for dim: " + str(path[0])
         xpaths = nxpaths
         ndims.append(xdims.pop())
 

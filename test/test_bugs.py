@@ -12,7 +12,28 @@ class TestBugs(unittest.TestCase):
         str(yeastract |Match(_.target)| yeastract[:,newdim])
         str(yeastract |Match(_.target,mode="pos")| yeastract[:,newdim])
 
-    
+    def test_to(self):
+        v = Rep((1,2,3),unpack=False)
+        v = v.To(_, Do=_.Each(lambda x: x).Fields()) 
+        self.assertTrue(len(v.Slices) == 3)
+
+    def test_flat(self):
+        n = Rep(([1,2,3,4], [1,2,3], [[1,2,3],[1,2,3],[1,2,3],[1,2,3]]))
+        self.assertTrue(n.Flat().Shape()() == 12)
+        self.assertTrue(n.Flat(_.f2).Shape()() == 12)
+        self.assertTrue(n.Flat(_.f1).Shape()() == 12)
+
+        self.assertTrue(n.To(_.f2, Do=_.Transpose()).Flat().Shape()() == 12)
+        self.assertTrue(n.To(_.f2, Do=_.Transpose()).Flat(_.f2).Shape()() == 12)
+        self.assertTrue(n.To(_.f2, Do=_.Transpose()).Flat(_.f0).Shape()() == 12)
+
+
+    def test_merge_same(self):
+        n = Rep([1,2,3,4,5,6,7])
+        res = n |Match(_.data, _.data2, merge_same='equi')| (n/'data2')
+        self.assertTrue(len(res.Slices) == 1)
+
+
     def test_filterafter_complexmatch(self):
         yeastract = Get.yeast.yeastract()
         yeastract = yeastract.GroupBy(_.trans_factor)[:10].Copy()
