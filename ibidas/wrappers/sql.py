@@ -273,6 +273,16 @@ def open_db(*args, **kwargs):
     con = sqlalchemy.create_engine(*args, **kwargs)
     return Connection(con)
 
+def tosqlnames(*slices):
+    names = []
+    for slice in slices:
+        sqlname = slice.name
+        bookmarks = list(slice.bookmarks)
+        bookmarks.sort()
+        sqlname = util.valid_name(''.join(bookmarks) + slice.name)
+        names.append(sqlname)
+    return names
+
 class Connection(object):
     def __init__(self, engine, schemaname=None):#{{{
         self._engine = engine
@@ -342,12 +352,20 @@ class Connection(object):
         if(not name in self._tabledict):
             columns = defaultdict(list)
             rowinfo = []
+            
+            seen_names = set() #prevent repeated names
+            sqlnames = tosqlnames(*rep._slices)
+
             rep = rep.Copy()
             for pos, slice in enumerate(rep._slices):
                 packdepth = max(len(slice.dims) - 1,0)
                 if(packdepth):
                     slice = ops.PackArrayOp(slice,len(slice.dims) - 1)
                 
+                sqlname = sqlnames[pos]
+                assert not sqlname in seen_names, 'Slice name %s repeated: change name, or distinguish using bookmarks' % slice.name
+                seen_names.add(sqlname)
+
                 if(slice.dims):
                     stype = tosa_typemapper.convert(slice.type) 
                     if(stype is False):
@@ -356,15 +374,16 @@ class Connection(object):
                     else:
                         pickled = False
                     nullable = slice.type.has_missing
-                    columns[slice.dims[0]].append(sqlalchemy.Column(slice.name, stype, nullable = nullable))
+
+                    columns[slice.dims[0]].append(sqlalchemy.Column(sqlname, stype, nullable = nullable))
                     dimname = str(slice.dims[0].name)
-                    rowinfo.append({'spos':pos, 'name':slice.name, 'pickle':pickled, 'type':str(slice.type), 'packdepth': packdepth, 'dimname':dimname,'val':"",'bookmarks':':'.join(slice.bookmarks)})
+                    rowinfo.append({'spos':pos, 'name':slice.name, 'sqlname':sqlname, 'pickle':pickled, 'type':str(slice.type), 'packdepth': packdepth, 'dimname':dimname,'val':"",'bookmarks':':'.join(slice.bookmarks)})
                 else:
                     dimname = Missing
                     pickled = True
                     val = rep.Get(slice.name).Cast("pickle").Each(buffer,dtype="pickle").ToPython()
-                    rowinfo.append({'spos':pos, 'name':slice.name, 'pickle':pickled, 'type':str(slice.type), 'packdepth': packdepth, 'dimname':dimname, 'val':val, 'bookmarks':':'.join(slice.bookmarks)})
-            
+                    rowinfo.append({'spos':pos, 'name':slice.name, 'sqlname':slice.name, 'pickle':pickled, 'type':str(slice.type), 'packdepth': packdepth, 'dimname':dimname, 'val':val, 'bookmarks':':'.join(slice.bookmarks)})
+
             tables = {}
             for key, value in columns.iteritems():
                 if(len(columns) > 1):
@@ -376,7 +395,7 @@ class Connection(object):
                 tables[key] = newtable
             
             if NeedInfo: #(len(columns) > 1 or any([row['pickle'] or row['dimname'] is None for row in rowinfo])):
-                self.Store(name + "__info__",python.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,pickle=bool,type=bytes,dimname=bytes?,packdepth=int,val=bytes,bookmarks=bytes}"), NeedInfo=False)
+                self.Store(name + "__info__",python.Rep(rowinfo, dtype="[info:*]<{spos=int,name=bytes,sqlname=bytes,pickle=bool,type=bytes,dimname=bytes?,packdepth=int,val=bytes,bookmarks=bytes}"), NeedInfo=False)
                
                 tablelist = []
                 for t in tables.values():
@@ -400,14 +419,15 @@ class Connection(object):
     def _append(self, name, rep):#{{{
         tbl = self._tabledict[name]
         if(isinstance(tbl,CombineRepresentor)):
-            rep = rep.Array(tolevel=1) 
-            pickle = tbl._info[tbl._info.pickle == True].name()
+            rep = rep.Array(tolevel=1)
+            rep = rep / tuple(tosqlnames(*rep._slices))
+            pickle = tbl._info[tbl._info.pickle == True].sqlname()
             rep = rep.To(*pickle, Do=_.Cast("pickle").Each(buffer,dtype="pickle"))
             rep = rep.Copy()
             for col in tbl._info.Dict().ToPython():
                 if 'dimname' in col:
                     continue
-                val = rep.Get(col['name']).ToPython()
+                val = rep.Get(col['sqlname']).ToPython()
                 assert col['val'] == val, "Scalar value field: " + col['name']  + " does not match."
             for table in tbl._tablelist:
                 self._append_to_table(table,rep)
@@ -433,7 +453,8 @@ class Connection(object):
                     stored as a table"
 
         values = rep.Dict(with_missing=True).ToPython()
-        self._engine.execute(self._sa_tables[table._tablename].insert(), values)#}}}
+        if len(values) > 0:
+            self._engine.execute(self._sa_tables[table._tablename].insert(), values)#}}}
 
     def Drop(self, name):#{{{
         tbl = self._tabledict[name]
@@ -450,6 +471,7 @@ class Connection(object):
             self._sa_tables[name].drop(bind=self._engine, checkfirst=True)
             del self._sa_tables[name]
         del self._tabledict[name]#}}}
+
 
 class CombineRepresentor(wrapper.SourceRepresentor):#{{{
     def __init__(self, engine, info, tablelist):
@@ -485,16 +507,19 @@ class CombineRepresentor(wrapper.SourceRepresentor):#{{{
             elif(len(tablelist) > 1):
                 assert row['dimname'] in tablepos, "Cannot find table for dim : " + row['dimname']
                 tslices = nslicelist[tablepos[row['dimname']]]
-                res_slice = tslices[row['name']]
+                res_slice = tslices[row.get('sqlname', row['name'])]
             else:
                 tslices = nslicelist[0]
-                res_slice = tslices[row['name']]
+                res_slice = tslices[row.get('sqlname', row['name'])]
                
             if not res_slice.type == rtype:
                 res_slice = ops.CastOp(res_slice,rtype)
             if ('bookmarks' in row) and (row['bookmarks']):
                 for bname in row['bookmarks'].split(':'):
                     res_slice = ops.ChangeBookmarkOp(res_slice, bname)
+
+            if not res_slice.name == row['name']:
+                res_slice = ops.ChangeNameOp(res_slice, row['name'])
 
             if row['pickle']:
                 res_slice = ops.CastOp(res_slice,ctype)

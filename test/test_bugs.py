@@ -81,6 +81,8 @@ class TestBugs(unittest.TestCase):
         z    = Rep(data);
         db   = Get.in_memory_db();
         db.Store('t', z[:0]);
+        db.Store('t', z);
+        db.Store('t', z);
 
 
     def test_groupby(self):
