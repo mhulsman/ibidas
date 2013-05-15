@@ -132,6 +132,10 @@ def fimport_fasta(url, **kwargs):
     from wrappers.fasta import read_fasta;
     return read_fasta(url, **kwargs);
 
+def fimport_fastq(url, **kwargs):
+    from wrappers.fasta import read_fastq;
+    return read_fastq(url, **kwargs)
+
 def fimport_vcf(url, **kwargs):
     from wrappers.vcf import VCFRepresentor
     return VCFRepresentor(url, **kwargs)
@@ -173,6 +177,7 @@ formats_import = { 'tsv' : fimport_tsv, 'csv' : fimport_tsv,
                    'xml' : fimport_xml,
                    'psimi' : fimport_psimi,
                    'fasta' : fimport_fasta, 'fa' : fimport_fasta, 'fas' : fimport_fasta,
+                   'fastq' : fimport_fastq,
                    'vcf': fimport_vcf,
                    'gbff':fimport_genbank, 'gb': fimport_genbank, 'genbank': fimport_genbank, 'gbk':fimport_genbank,  'embl':fimport_embl,
                  };

@@ -124,3 +124,31 @@ def save_fasta_rep(data, fout, **kwargs):
   return write_fasta_text(title, seq, nseq, fout, sep=sep);
 
 #edef
+
+##############################################################################
+
+def read_fastq(fname, **kwargs):
+  print fname
+  fd = util.open_file(fname, mode='rU');
+  
+  seqs = [];
+  
+  while True:
+    seqid = fd.readline();
+
+    if seqid == '':
+      break;
+    #fi
+
+    if seqid[0] == '@':
+      seq = fd.readline();
+      fd.readline() # Remove '+'
+      qlty = fd.readline();
+      seqs = seqs + [ (seqid[0:-1], seq[0:-1], qlty[0:-1]) ];
+    #fi
+  #ewhile
+  fd.close()
+  
+  return Rep(seqs) / ('sequenceid', 'sequence', 'quality');
+#edef
+
