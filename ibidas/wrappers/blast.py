@@ -89,6 +89,10 @@ def blast(data, type, folder, reciprocal = True, normalize = False, overwrite = 
   ab = [ [ list(p[0]) + h for h in p[1] ] for p in ab.items() ];
   ab = [ item for sublist in ab for item in sublist];
 
+  if len(ab) == 0:
+    return tuple([ util.darray([],type) for type in sp_types ] )
+  #fi
+
   return tuple([ util.darray(row,type) for (type,row) in zip( sp_types, map(lambda *row: list(row), *ab)) ] );
 
 #edef

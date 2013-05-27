@@ -504,9 +504,9 @@ class Blast(repops.MultiOpRep):
         rightslice = ops.PackArrayOp(rslice)
 
         if folder is None:
-          folder = config.config["blast_dir"]
+          folder = os.path.expanduser(config.config["blast_dir"])
         if not os.path.exists(folder):
-            os.makedirs(folder)
+            os.makedirs(folder, 0755)
        
         ((bleftslice,brightslice),(leftplan,rightplan))= ops.broadcast((leftslice,rightslice),mode=mode)
 
