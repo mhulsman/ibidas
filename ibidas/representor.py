@@ -1766,15 +1766,16 @@ class Representor(Node):
         """
         return repops_slice.Bookmark(self, *names, **kwds)
 
-    def Each(self, eachfunc, named_params=False, keep_name=False, dtype=rtypes.unknown, **kwargs):
+    def Each(self, eachfunc, named_params=False, keep_name=False, dtype=rtypes.unknown, per_slice=False, **kwargs):
         """Applies 'eachfunc' to each element in this representor. 
         :param eachfunc: can be any (self-defined) python (lambda) function, or a context operation (e.g. _ + 3). 
         :param dtype: expected output type. If not given, this type is automatically detected if necessary for subsequent operations (which is slower). 
         :param keep_name: do not change name of slice to name of supplied function (default: False)
         :param named_params: give the function the slice values as named attributes (by slice name) instead of by position (default: False)
+        :param per_slice: run each on each slice separately instead of using each slice as a parameter (default: False)
 
         """        
-        return repops_slice.Each(self, eachfunc=eachfunc, dtype=dtype, named_params=named_params, keep_name=keep_name, **kwargs)
+        return repops_slice.Each(self, eachfunc=eachfunc, dtype=dtype, named_params=named_params, keep_name=keep_name, per_slice=per_slice, **kwargs)
     
     def Pos(self, dim=None):
         return repops_funcs.Pos(self, dim)

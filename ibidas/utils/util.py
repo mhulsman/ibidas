@@ -30,8 +30,11 @@ def resplit(str, sep=' ', sc=[]):
     containers = "";
     for c in sc:
         containers = containers + "|%s[^%s]*%s" %(c, c, c) ;
+
+    if isinstance(sep, (tuple,list)):
+        sep = "".join(sep)
   
-    pat = "%s(?=(?:[^%s]%s)*$)" % (sep, sc, containers);
+    pat = "[%s](?=(?:[^%s]%s)*$)" % (sep, sc, containers);
   
     return re.split(pat, str);
 
@@ -79,15 +82,18 @@ def save_rep(r, filename):
     s = zlib.compress(s)
     f.write(s)
 
-
-def save_csv(r, filename):
+def save_csv(r, filename, remove_line_end=True):
     f = open(filename,'wb')
     r= r.Array(tolevel=1)
-    data = r.Cast(str).Tuple().ToPython();
+    data = r.Cast(str)
     if filename.endswith('tsv'):
-        w = csv.writer(f,delimiter='\t');
+        w = csv.writer(f,delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL);
     else:
-        w = csv.writer(f);
+        w = csv.writer(f, quotechar='"', quoting=csv.QUOTE_MINIMAL);
+
+    if remove_line_end:
+        data = data.Each(lambda x: x.replace('\n',''), dtype=str, per_slice=True)
+    data = data.Tuple().ToPython();
     w.writerow(r.Names);
     w.writerows(data);
 

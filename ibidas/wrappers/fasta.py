@@ -3,7 +3,7 @@ from ..utils import util;
 
 ################################################################################
 
-def read_fasta(fname, sep='auto', split=1, fieldnames=()):
+def read_fasta(fname, sep='auto', fieldnames=()):
 
     f = util.open_file(fname,mode='rU');
     fas  = [];
@@ -17,7 +17,7 @@ def read_fasta(fname, sep='auto', split=1, fieldnames=()):
         if not line or line[0] == ">":
             if seqid:
                 fas.append(seqid);
-		seqs.append(seq);
+                seqs.append(seq.replace(' ',''));
             seqid = line[1:];
             seq = "";
             continue;
@@ -28,25 +28,28 @@ def read_fasta(fname, sep='auto', split=1, fieldnames=()):
       # check for one last sequence
     if seq:
         fas.append(seqid);
-	seqs.append(seq);
+        seqs.append(seq.replace(' ',''));
 
     maxf = 0;
-    if split:
-        if sep == 'auto':
-            sep_search = ['\t','|',', ',',']
-            for sep in sep_search:
-                if all([sep in fas[i][0] for i in xrange(min(len(fas),100))]):
-                    break
-            else:
-                util.warning('Could not determine FASTA separator. Please specify through sep parameter')
-                sep = ''
+    if sep == 'auto':
+        sep_search = ['\t','|',', ',',']
+        for sep in sep_search:
+            if all([sep in fas[i][0] for i in xrange(min(len(fas),100))]):
+                break
+        else:
+            util.warning('Could not determine FASTA separator. Please specify through sep parameter')
+            sep = ''
+    
+    if sep:
+        fsid = [ tuple(x.strip() for x in util.resplit(row, sep, "\"'")) for row in fas ];
+        maxf = max([ len(x) for x in fsid]);
+        fas = [ tuple([ fsid[i][j] if j < len(fsid[i]) else '' for j in xrange(maxf)]) + (seqs[i],) for i in xrange(len(fas)) ]
+    else:
+        fas = [ (fas[i], seqs[i]) for i in xrange(len(fas)) ];
+        maxf = 1
 
-        if sep:
-	    fsid = [ tuple(x.strip() for x in util.resplit(row, sep, "\"'")) for row in fas ];
-	    maxf = max([ len(x) for x in fsid]);
-	    fas = [ tuple([ fsid[i][j] if j < len(fsid[i]) else '' for j in xrange(maxf)]) + (seqs[i],) for i in xrange(len(fas)) ]
-	else:
-	    fas = [ (fas[i], seqs[i]) for i in xrange(len(fas)) ];
+    if not fieldnames:
+        fieldnames = tuple(['f%d' %i for i in range(maxf)] + ['seq'])
             
     return Rep(fas)/fieldnames;
 
@@ -134,18 +137,18 @@ def read_fastq(fname, **kwargs):
   seqs = [];
   
   while True:
-    seqid = fd.readline();
+        seqid = fd.readline();
 
-    if seqid == '':
-      break;
-    #fi
+        if seqid == '':
+            break;
+        #fi
 
-    if seqid[0] == '@':
-      seq = fd.readline();
-      fd.readline() # Remove '+'
-      qlty = fd.readline();
-      seqs = seqs + [ (seqid[0:-1], seq[0:-1], qlty[0:-1]) ];
-    #fi
+        if seqid[0] == '@':
+            seq = fd.readline();
+            fd.readline() # Remove '+'
+            qlty = fd.readline();
+            seqs = seqs + [ (seqid[0:-1], seq[0:-1], qlty[0:-1]) ];
+        #fi
   #ewhile
   fd.close()
   
