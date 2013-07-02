@@ -837,7 +837,7 @@ registerTypeScanner(StringIntScanner)
 class StringProteinScanner(StringScanner):
     need_convert=False
     parentcls=StringScanner
-    regmatch = re.compile('^[AaBbCcDdEeFfGgHhIiKkLlMmNnOoPpQqRrSsTtUuVvWwYyZzXx*-]+$')
+    regmatch = re.compile('^[AaBbCcDdEeFfGgHhIiKkLlMmNnOoPpQqRrSsTtUuVvWwYyZzXx\*\-]+$')
     ntype = rtypes.TypeProteinSequence
 
     def __init__(self, detector):
@@ -891,7 +891,7 @@ registerTypeScanner(StringProteinScanner);
 class StringDNAScanner(StringProteinScanner):
     need_convert=False
     parentcls=StringProteinScanner
-    regmatch = re.compile('^[acgtnACGTNurykmswbdhvnx-URYKMSWBDHVNX]+$')
+    regmatch = re.compile('^[acgtnACGTNurykmswbdhvnx\-URYKMSWBDHVNX]+$')
     ntype = rtypes.TypeDNASequence
     
     def unregister(self, create_parent=False):
