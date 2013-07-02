@@ -1,11 +1,12 @@
 from ..utils import util;
-from fasta import write_fasta_text
-import numpy
-import tempfile
-import csv
-import math
-import os
-import fnmatch
+from fasta import write_fasta_text;
+import numpy;
+import tempfile;
+import csv;
+import math;
+import os;
+import fnmatch;
+import multiprocessing;
 
 ###############################################################################
 
@@ -22,7 +23,7 @@ r_pident = lambda x: x[9]
 r_evalue = lambda x: x[10] 
 r_bitscore = lambda x: x[11];
 
-def blast(data, type, folder, reciprocal = True, normalize = False, overwrite = False, blastopts=''):
+def blast(data, type, folder, reciprocal = True, normalize = False, overwrite = False, blastopts='-num_threads %d' % multiprocessing.cpu_count()):
 
   seq_1 = data[0];
   seq_2 = data[1];
@@ -150,7 +151,6 @@ def blast_reciprocal(ab, ba):
 ###############################################################################
 
 def blast_reciprocal_match(ab, ba):
-
   m = [];
 
   ab = sorted(ab, key=r_qstart)
@@ -158,17 +158,21 @@ def blast_reciprocal_match(ab, ba):
 
   i = 0;
   j = 0;
+  bestov = 0.6;
 
   while i < len(ab) and j < len(ba):
-    if r_qstart(ab[i]) > r_send(ba[j]):
+    if r_qstart(ab[i]) > r_send(ba[j]): 
       j = j + 1
-    elif r_sstart(ba[j]) > r_qend(ab[i]):
+      continue;
+    if r_sstart(ba[j]) > r_qend(ab[i]):
       i = i + 1
-    elif (r_qstart(ab[i]) == r_sstart(ba[j]) and r_qend(ab[i]) == r_send(ba[j])) or \
-         (blast_hit_overlap(r_qstart(ab[i]), r_qend(ab[i]), 
-                            r_sstart(ba[j]), r_send(ba[j]), 
-                            r_length(ab[i]), r_length(ba[j])) > 0.6):
+      continue;
+    hitov = blast_hit_overlap(r_qstart(ab[i]), r_qend(ab[i]), r_sstart(ba[j]), r_send(ba[j]), r_length(ab[i]), r_length(ba[j]));
+    if (r_qstart(ab[i]) == r_sstart(ba[j]) and r_qend(ab[i]) == r_send(ba[j])) or \
+       (r_qstart(ab[i]) == r_send(ba[j])   and r_qend(ab[i]) == r_sstart(ba[j])) or \
+       (hitov > bestov):
       m = m + [ab[i]]
+      bestov = hitov;
       i = i + 1
       j = j + 1
     else:
@@ -195,7 +199,7 @@ def blast_hit_overlap(s1,e1, s2, e2, l1, l2):
     ov = e2 - s2
   #fi
 
-  return float(ov) / float(min(l1, l2));
+  return math.fabs(float(ov) / float(min(l1, l2)));
 #edef
 
 ###############################################################################
