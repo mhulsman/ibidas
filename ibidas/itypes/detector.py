@@ -891,7 +891,7 @@ registerTypeScanner(StringProteinScanner);
 class StringDNAScanner(StringProteinScanner):
     need_convert=False
     parentcls=StringProteinScanner
-    regmatch = re.compile('^[acgtnACGTN]+$')
+    regmatch = re.compile('^[acgtnACGTNurykmswbdhvnx-URYKMSWBDHVNX]+$')
     ntype = rtypes.TypeDNASequence
     
     def unregister(self, create_parent=False):
