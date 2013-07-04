@@ -120,24 +120,29 @@ def rep_completer(self,event, line = None):
     except: 
         raise TryNext
 
-
-if oldip:
-    ipshell = IPShellEmbed(argv=sys.argv[1:],banner='Welcome to the IBIDAS system',exit_msg='IBIDAS shutting down ...',rc_override={'cache_size':0, 'readline_omit__names':2})
-    del ipshell.IP.user_ns['_']
-    ipshell()
+if len(sys.argv) == 2:
+    with open(sys.argv[1], 'r') as argv:
+        sys.argv = [ x[:-1] for x in argv.readlines() ];
+        execfile(sys.argv[0]);
+    #ewith
 else:
-    #Hack to get 'In' to show in Ipython, instead of the builtin 'In' history.
-    #Requires a) setting builtin In, b) user_ns to globals(), c) del ipshell.user_ns['In']
-    #Probably a bit fragile..
-    import __builtin__
-    __builtin__.__dict__['In'] = In
-    cfg = Config()
-    cfg.InteractiveShellEmbed.cache_size = 0
-    #rc_override={'cache_size':0, 'readline_omit__names':2}
-    ipshell = InteractiveShellEmbed(config=cfg, user_ns=globals(), banner2='Welcome to the IBIDAS system', exit_msg='IBIDAS shutting down ...')
-    del ipshell.user_ns['_']
-    del ipshell.user_ns['In']
-    ipshell()
+    if oldip:
+        ipshell = IPShellEmbed([],banner='Welcome to the IBIDAS system',exit_msg='IBIDAS shutting down ...',rc_override={'cache_size':0, 'readline_omit__names':2})
+        del ipshell.IP.user_ns['_']
+        ipshell()
+    else:
+        #Hack to get 'In' to show in Ipython, instead of the builtin 'In' history.
+        #Requires a) setting builtin In, b) user_ns to globals(), c) del ipshell.user_ns['In']
+        #Probably a bit fragile..
+        import __builtin__
+        __builtin__.__dict__['In'] = In
+        cfg = Config()
+        cfg.InteractiveShellEmbed.cache_size = 0
+        #rc_override={'cache_size':0, 'readline_omit__names':2}
+        ipshell = InteractiveShellEmbed(config=cfg, user_ns=globals(), banner2='Welcome to the IBIDAS system', exit_msg='IBIDAS shutting down ...')
+        del ipshell.user_ns['_']
+        del ipshell.user_ns['In']
+        ipshell()
 
 #ipshell.IP.set_hook('complete_command', rep_completer, re_key = '.*')
 

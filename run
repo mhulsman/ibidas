@@ -5,5 +5,19 @@ scriptloc=$(dirname "$0");
 
 source "$scriptloc/ibidas_env.sh"
 chmod 755 "$scriptloc/bin/ibidas"
-"$scriptloc/bin/ibidas"
+
+
+
+if [ $# -ge 1 ]; then
+  tmp=`mktemp`
+  for i in `seq 1 $#`; do
+    echo "$1" >> $tmp;
+    shift;
+  done
+  "$scriptloc/bin/ibidas" $tmp;
+else
+  "$scriptloc/bin/ibidas"
+fi
+
+rm $tmp;
 
