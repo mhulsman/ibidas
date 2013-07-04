@@ -67,7 +67,7 @@ def blast(data, type, folder, reciprocal = True, normalize = False, overwrite = 
   #fi
 
   util.run_par_cmds(mkdb_CMDs);
-  util.run_par_cmds(blst_CMDs);
+  util.run_seq_cmds(blst_CMDs);
 
   del_CMDs = [ "rm -f '/tmp/%s'" % f for f in os.listdir('/tmp') if (fnmatch.fnmatch(f, "*%s*" % fas_1.name.split('/')[2])) or  (fnmatch.fnmatch(f, "*%s*" % fas_2.name.split('/')[2])) ];
   util.run_seq_cmds(del_CMDs);

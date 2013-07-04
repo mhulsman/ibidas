@@ -20,7 +20,7 @@ import csv
 from logging import error,warning,info,debug
 import random
 import re
-
+import time
 import shlex, subprocess, os;
 
 def resplit(str, sep=' ', sc=[]):
@@ -577,21 +577,70 @@ def append_name(name, exclude):
         if not z in exclude:
             return z
         
+###############################################################################
 
-def run_par_cmds(cmd_list):
-  
-    for cmd in [ x for x in cmd_list if x ]:
-        subprocess.Popen(shlex.split(cmd));
-    for cmd in [ x for x in cmd_list if x ]:
-        os.wait();
+def run_par_cmds(cmd_list, max_threads=12, stdin=None, stdout=None, stderr=None):
 
-def run_cmd(cmd):
-    subprocess.call(shlex.split(cmd))
+  p = [];
+  i = 0;
+  retval = 0;
+  cmds = len(cmd_list);
 
-def run_seq_cmds(cmd_list):
-    for cmd in [ x for x in cmd_list if x ]:
-        run_cmd(cmd);
+  while i < cmds:
+    while len(p) < max_threads and i < cmds:
+      print "RUNNING: %s" % cmd_list[i]; sys.stdout.flush();
+      p.append( (run_cmd(cmd_list[i], bg=True, stdin=stdin, stdout=stdout, stderr=stderr),i) );
+      i = i + 1;
+    #ewhile
+    
+    time.sleep(0.5);
+    
+    running   = [ (j, k) for (j,k) in p if j.poll() == None ];
+    completed = [ (j, k) for (j,k) in p if j.poll() != None ];
+    
+    for (j,k) in completed:
+      if j.returncode != 0:
+        retval = retval + j.returncode;
+        print "ERROR: Failed in cmd: %s" % cmd_list[k]; sys.stdout.flush();
+      else:
+        print "COMPLETED: cmd : %s" % cmd_list[k]; sys.stdout.flush();
+      #fi
+    #efor
+    p = running;
+  #ewhile
 
+  return retval;
+#edef
+
+
+###############################################################################
+
+def run_seq_cmds(cmd_list, stdin=None, stdout=None, stderr=None):
+
+  for cmd in [ x for x in cmd_list if x ]:
+    retval = run_cmd(cmd, stdin=stdin, stdout=stdout, stderr=stderr);
+    if retval != 0:
+      print "ERROR: Failed on cmd: %s" % cmd;
+      return retval;
+    #fi
+  #efor
+
+  return 0;
+#edef
+
+###############################################################################
+
+def run_cmd(cmd, bg=False, stdin=None, stdout=None, stderr=None):
+  p = subprocess.Popen(shlex.split(cmd), stdin=stdin, stdout=stdout, stderr=stderr);
+  if bg:
+    return p;
+  else:
+    (pid, r) = os.waitpid(p.pid, 0);
+    return r;
+  #fi
+#edef
+
+###############################################################################
 
 class PeekAheadFileReader(object):
     def __init__(self, filename):
