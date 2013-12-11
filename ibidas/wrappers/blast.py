@@ -103,13 +103,13 @@ def blast(data, type, folder, reciprocal = True, normalize = False, overwrite = 
 def blast_res_to_dict(blast_res, max=False):
 
   bm = {};
-  br = open(blast_res, 'r');
+  br = open(blast_res, 'rb');
 
     #         qseqid  sseqid qlen qstart qend slen sstart send length mismatch gapopen pident evalue bitscore
   sp_types = (int,    int,    int,  int, int, int,  int,    int,  int,   int,      int,     float,  float,  float)
 
   rdr = csv.reader(br, delimiter='\t', quotechar='"');
-  for row in rdr:
+  for (i, row) in enumerate(rdr):
     row = [ sp_types[i](row[i]) for i in xrange(len(row)) ];
     k = (row[0], row[1]);
     if max == True:
