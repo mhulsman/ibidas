@@ -81,6 +81,7 @@ def save_rep(r, filename):
     s = cPickle.dumps(r,protocol=2)
     s = zlib.compress(s)
     f.write(s)
+    f.close()
 
 def save_csv(r, filename, remove_line_end=True):
     f = open(filename,'wb')
@@ -96,6 +97,7 @@ def save_csv(r, filename, remove_line_end=True):
     data = data.Tuple().ToPython();
     w.writerow(r.Names);
     w.writerows(data);
+    f.close()
 
 def load_rep(filename):
     f = open(filename, 'rb')

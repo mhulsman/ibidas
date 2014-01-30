@@ -72,9 +72,9 @@ def write_fasta_text(title, seq, nseq, fout, sep=70):
       fout.write(line);
       m.update(line);
     #efor
-    line = "\n";
-    fout.write(line);
-    m.update(line);
+    #line = "\n";
+    #fout.write(line);
+    #m.update(line);
   #efor
   return m.hexdigest();
 

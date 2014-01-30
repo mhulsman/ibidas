@@ -419,7 +419,7 @@ class Match(repops.MultiOpRep):
         if((lslice.name == rslice.name or collapse_equi) and lslice in lslices and rslice in rslices):
             if jointype== 'inner':                
                 rslices.pop(rslices.index(rslice))
-            if collapse_equi:
+            elif collapse_equi:
                 if jointype == 'left':
                     rslices.pop(rslices.index(rslice))
                 elif jointype == 'right':
