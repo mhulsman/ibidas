@@ -23,15 +23,19 @@ import IPython
 
 ipversion = IPython.__version__.split('.')
 oldip = int(ipversion[0]) == 0 and int(ipversion[1]) <= 10
+oldip2 = int(ipversion[0]) == 1 and int(ipversion[1]) < 1
 
 if oldip:
     from IPython.Shell import IPShellEmbed
     from IPython.ipapi import TryNext
     from IPython.genutils import dir2
     import IPython.rlineimpl as readline
-else:   
+elif oldip2:
     from IPython.config.loader import Config
     from IPython.frontend.terminal.embed import InteractiveShellEmbed
+else:   
+    from IPython.config.loader import Config
+    from IPython.terminal.embed import InteractiveShellEmbed
     
     #from IPython.ipapi import TryNext
     #from IPython.genutils import dir2
