@@ -83,7 +83,7 @@ def save_rep(r, filename):
     f.write(s)
     f.close()
 
-def save_csv(r, filename, remove_line_end=True):
+def save_csv(r, filename, remove_line_end=True, names=True):
     f = open(filename,'wb')
     r= r.Array(tolevel=1)
     data = r.Cast(str)
@@ -95,7 +95,8 @@ def save_csv(r, filename, remove_line_end=True):
     if remove_line_end:
         data = data.Each(lambda x: x.replace('\n',''), dtype=str, per_slice=True)
     data = data.Tuple().ToPython();
-    w.writerow(r.Names);
+    if names:
+        w.writerow(r.Names);
     w.writerows(data);
     f.close()
 
@@ -588,18 +589,18 @@ def run_par_cmds(cmd_list, max_threads=12, stdin=None, stdout=None, stderr=None)
   retval = 0;
   cmds = len(cmd_list);
 
-  while i < cmds:
+  while True:
     while len(p) < max_threads and i < cmds:
       print "RUNNING: %s" % cmd_list[i]; sys.stdout.flush();
       p.append( (run_cmd(cmd_list[i], bg=True, stdin=stdin, stdout=stdout, stderr=stderr),i) );
       i = i + 1;
     #ewhile
-    
+
     time.sleep(0.5);
-    
+
     running   = [ (j, k) for (j,k) in p if j.poll() == None ];
     completed = [ (j, k) for (j,k) in p if j.poll() != None ];
-    
+
     for (j,k) in completed:
       if j.returncode != 0:
         retval = retval + j.returncode;
@@ -609,6 +610,9 @@ def run_par_cmds(cmd_list, max_threads=12, stdin=None, stdout=None, stderr=None)
       #fi
     #efor
     p = running;
+    if len(p) == 0:
+      break;
+    #fi
   #ewhile
 
   return retval;
@@ -625,6 +629,8 @@ def run_seq_cmds(cmd_list, stdin=None, stdout=None, stderr=None):
       print "ERROR: Failed on cmd: %s" % cmd;
       return retval;
     #fi
+    print "COMPLETED: cmd : %s" % cmd;
+    sys.stdout.flush();
   #efor
 
   return 0;

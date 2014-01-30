@@ -243,11 +243,11 @@ def Connect(url, **kwargs):
         raise RuntimeError("Unknown format specified")
 
 
-def Save(r, filename):
+def Save(r, filename, **kwargs):
     if filename.endswith('tsv') or filename.endswith('csv') or filename.endswith('tab'):
-        save_csv(r, filename);
+        save_csv(r, filename, **kwargs);
     else:
-        save_rep(r, filename);
+        save_rep(r, filename, **kwargs);
 
 
 def Load(filename,**kwargs):
