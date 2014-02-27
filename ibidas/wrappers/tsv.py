@@ -91,6 +91,8 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             #sniff last 20 lines
             lines = lines[-20:]
             dialect = csv.Sniffer().sniff("\n".join(lines),delimiters=delimiter)
+            dialect.doublequote=True
+            dialect.skipinitialspace=True
             if not quotechar is None:
                 if quotechar == '':
                     dialect.quoting = csv.QUOTE_NONE
@@ -119,13 +121,12 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                     break
             elif(len(splitsize) > 500):
                 raise RuntimeError, "Cannot find correct number of columns. Incorrect delimiter?" 
-        
         real_split  = splitsize[-1]
         skiprows = 0
         for pos, split in enumerate(splitsize):
             if(split != real_split):
                 skiprows = pos + 1
-        info('Skipping first %d rows', skiprows)                
+        warning('Skipping first %d rows. Use "skiprows" parameter to override', skiprows)                
         file.seek(0)
         return skiprows        
 
