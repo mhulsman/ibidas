@@ -5,11 +5,11 @@ import xlsxwriter as xw;
 
 ################################################################################
 
-def write_xslx(R, filename, **kwargs):
+def write_xlsx(R, filename, **kwargs):
 
   formats = kwargs.pop('formats', { None : {} });
 
-  wb = xw.Workbook(output);
+  wb = xw.Workbook(filename);
   ws = wb.add_worksheet();
 
   formats[None] = {};
