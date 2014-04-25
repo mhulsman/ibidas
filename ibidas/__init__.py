@@ -169,6 +169,10 @@ def fexport_fasta(data, url, **kwargs):
     from wrappers.fasta import write_fasta;
     return write_fasta(data, url, **kwargs);
 
+def fexport_xlsx(data, url, **kwargs):
+    from wrappers.xlsx import write_xlsx;
+    return write_xlsx(data, url, **kwargs);
+
 ##########################################################################
 
 
@@ -186,7 +190,8 @@ formats_export = { 'tsv' : fexport_tsv, 'csv' : fexport_tsv,
                    'tsv_matrix' : fexport_matrixtsv,
                    'xml' : fexport_xml,
                    'psimi' : fexport_psimi,
-                   'fasta' : fexport_fasta, 'fa' : fexport_fasta, 'fas' : fexport_fasta
+                   'fasta' : fexport_fasta, 'fa' : fexport_fasta, 'fas' : fexport_fasta,
+                   'xlsx' : fexport_xlsx, 'xls' : fexport_xlsx
                  };
 
 
