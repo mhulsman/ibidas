@@ -15,7 +15,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
     def __init__(self, filename, dialect=False, skiprows=-1, dtype=rtypes.unknown, fieldnames=None, delimiter=None, quotechar=None):
         file = util.open_file(filename,mode='rU')
   
-        reader, dialect = self.getReader(file, dialect, delimiter=delimiter, quotechar=quotechar)
+        reader, dialect = self.getReader(file, dialect, delimiter=delimiter, quotechar=quotechar, skiprows=skiprows)
         
         #determine number of rows to skip (e.g. comments)
         if(skiprows == -1):
@@ -79,15 +79,18 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         file.close()
         self._initialize(tuple(nslices))
 
-    def getReader(self, file, dialect=False, delimiter=None, quotechar=None):
+    def getReader(self, file, dialect=False, delimiter=None, quotechar=None, skiprows=-1):
         #determine dialect, create csv parser
         if(dialect is False):
             lines = []
             #get sample
             for line in file:
                 lines.append(line)
-                if(len(lines) > 500):
+                if(len(lines) > 500 + skiprows):
                     break
+
+            if skiprows > 0:
+                lines = lines[skiprows:]
             #sniff last 20 lines
             lines = lines[-20:]
             dialect = csv.Sniffer().sniff("\n".join(lines),delimiters=delimiter)

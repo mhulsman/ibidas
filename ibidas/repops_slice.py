@@ -9,6 +9,7 @@ _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","python")
 _delay_import_(globals(),"utils","util","context")
 _delay_import_(globals(),"itypes","rtypes","dimpaths","casts")
+_delay_import_(globals(),"repops_dim")
 
 
 class ProjectSimple(repops.UnaryOpRep):
@@ -197,7 +198,7 @@ class Unproject(Project):
 
 
 class AddSlice(repops.UnaryOpRep):
-    def _sprocess(self, source, data, name=None, dtype=None):
+    def _sprocess(self, source, data, name=None, dtype=None,promote=False):
         if not dtype is None:
             refdims = sum([slice.dims for slice in source._slices],tuple())
             dtype = rtypes.createType(dtype,refdims=refdims)
@@ -212,6 +213,11 @@ class AddSlice(repops.UnaryOpRep):
 
         nslices = list(source._slices)
         nslices.extend(data._slices)
+        if not promote is False:
+            promotepath = dimpaths.identifyUniqueDimPathSource(source, promote).strip()
+            promotepath = dimpaths.extendEssentialParentDim(promotepath,[s.dims for s in source._slices])
+            print promotepath
+            nslices = repops_dim.Promote._apply(nslices,data._slices,promotepath)
         return self._initialize(tuple(nslices)) 
        
 class UnpackTuple(repops.UnaryOpRep):

@@ -220,6 +220,9 @@ class Representor(Node):
     #    return str(self.__class__)
     __repr__ = __str__
 
+    def __iter__(self):
+        return self.Tuple()()
+
     def _axisF(self, name): 
         if(name == ""):
             name = None
@@ -1856,6 +1859,10 @@ class Representor(Node):
         """Bring all slices to same dimension height throug packing and broadcasting"""
         return repops_dim.Level(self, tolevel)
 
+    def Promote(self, slices, dim=LASTCOMMONDIM):
+        """Broadcast references 'slices' to 'dim'. By default, dim refers to last common dimension (-1L)"""
+        return repops_dim.Promote(self, slices, dim)
+
     def Tuple(self):
         """Combines slices into a tuple type"""
         return repops_slice.Tuple(self)
@@ -1918,8 +1925,10 @@ class Representor(Node):
         return repops_slice.To(self, *slices, **kwargs)
               
               
-    def AddSlice(self, name, data, dtype=None):
-        return repops_slice.AddSlice(self, data, name, dtype)
+    def AddSlice(self, name, data, dtype=None, promote=False):
+        """Add slice with 'name' and 'data'. Optional type (+ dimensions) can be specified. 
+        Also, to broadcast dimensions, use promote, e.g. promote=LCDIM or promote=1 or promote='dim_name'"""
+        return repops_slice.AddSlice(self, data, name, dtype, promote)
 
 
     def Get(self, *slices, **kwds):

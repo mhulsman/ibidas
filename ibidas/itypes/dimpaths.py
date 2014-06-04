@@ -795,7 +795,7 @@ def selectOrderDim(paths, idx):
     try: 
         dim = opath[idx]
     except IndexError:
-        raise RuntimeError, "Dimension at depth " + str(dim_selector) + " does not exist"
+        raise RuntimeError, "Dimension at depth " + str(idx) + " does not exist"
 
     selpath = extendParentDim(DimPath(dim), [DimPath(root, *p) for p in paths], -1)
     selpaths = deconvertDoubleDim([selpath],translate)
@@ -806,6 +806,13 @@ def getOrderDim(paths):
     opath = orderAllDimPath(paths)
     selpaths = deconvertDoubleDim([opath],translate)
     return selpaths[0]
+
+def extendEssentialParentDim(path, sourcepaths):
+    numberextend = 0
+    for o, d in enumerate(path):
+        numberextend = max(numberextend, len(d) - o)
+    return extendParentDim(path, sourcepaths, numberextend + len(path))
+  
 
 def extendParentDim(path, sourcepaths, length=1):#{{{
     if length >= 0:

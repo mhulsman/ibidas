@@ -34,6 +34,7 @@ class VCFRepresentor(wrapper.SourceRepresentor):
                         continue
                     dim = dimensions.Dim(shape=s, name=dimnames.next())
                 else:
+                    s = s.lower()
                     if not s in cdimensions:
                         cdimensions[s] = dimensions.Dim(shape=UNDEFINED, dependent=(True,) * (pos + 1), name=s)
                     dim = cdimensions[s]
@@ -195,11 +196,12 @@ class VCFParser(object):
 
         xformat = []
         for name, number, type, description in self.format_fields:
+            func = lambda x: type(x) if x.strip() != '.' else Missing
             if name in dformat:
                 if number == 1:
-                    xformat.append([type(elem) for elem in dformat[name]])
+                    xformat.append([func(elem) for elem in dformat[name]])
                 else:
-                    xformat.append([[type(elem) for elem in xelem.split(',')] for xelem in dformat[name]])
+                    xformat.append([[func(elem) for elem in xelem.split(',')] for xelem in dformat[name]])
             else:
                 xformat.append([self._genMissing(number, alt)] * len(elems[9:]))
 

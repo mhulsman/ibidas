@@ -1,6 +1,7 @@
 from constants import *
 import repops
 from itertools import izip_longest, chain
+from collections import defaultdict
 
 _delay_import_(globals(),"itypes","rtypes","dimpaths","dimensions")
 _delay_import_(globals(),"ops")
@@ -202,6 +203,27 @@ class Level(repops.UnaryOpRep):
         nslices,plan = ops.broadcast(nslices, mode="dim")
         return self._initialize(tuple(nslices))
 
+class Promote(repops.UnaryOpRep):
+    def __init__(self, source, slicesel, dim=LASTCOMMONDIM):
+        repops.UnaryOpRep.__init__(self,source,slicesel,dim=dim)
+
+    def _sprocess(self, source, slicesel, dim=LASTCOMMONDIM):
+        applysource = source.Get(slicesel)
+        promotepath = dimpaths.identifyUniqueDimPathSource(source, dim).strip()
+        promotepath = dimpaths.extendParentDim(promotepath,[s.dims for s in source._slices],-1)
+
+        nslices = self._apply(source._slices, applysource._slices, promotepath)
+        return self._initialize(tuple(nslices))
+
+    @classmethod
+    def _apply(cls, sourceslices, applyslices, promotepath):
+        nslices = []
+        for slice in sourceslices:
+            if slice in applyslices:
+                nbcdims, bcdims, bcplan = dimpaths.planBroadcastMatchDim((promotepath, slice.dims))
+                slice,splan = ops.broadcast_fromplan(slice,sourceslices,bcplan[1],slice.dims,bcdims)
+            nslices.append(slice)          
+        return nslices
 
 class FlatAll(repops.UnaryOpRep):
     def _sprocess(self,source,name=None):
