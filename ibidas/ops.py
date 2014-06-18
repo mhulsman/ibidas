@@ -501,8 +501,8 @@ class UnpackTupleOp(UnaryUnaryOp):#{{{
 
         ntype = slice.type.subtypes[idx]
         
-        if(slice.type.fieldnames):
-            name = slice.type.fieldnames[idx]
+        if slice.type.fieldnames and idx < len(slice.type.fieldnames):
+            name = slice.type.fieldnames[idx];
         else:
             name = "f" + str(idx)
 
