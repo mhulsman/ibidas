@@ -54,7 +54,6 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
         self.server.addNodeAttributes("rep","STRING",self.node_rep,False)
         self.server.addEdgeAttributes("type","STRING",dict(zip(self.edgeids,self.edge_type)))
         self.server.addEdgeAttributes("attr","STRING",dict(zip(self.edgeids,self.edge_attr)))
-
         for attribute,attribute_dict in self.graph.node_attributes.iteritems():
             attribute_name_dict = {}
             if(isinstance(attribute_dict.values()[0], float)):
@@ -73,6 +72,8 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
                         r = str(r.__class__.__name__)
                     else:
                         r = cls(r)
+                    if len(r) > 500:
+                        r = r[:500] + ' ...'
                     attribute_name_dict[node_name] = r
                 except:
                     pass

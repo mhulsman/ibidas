@@ -489,8 +489,10 @@ def fill(data, x, pos):
         x[:] = data
 
 def replace_darray(data, type=object, maxdim=1, mindim=0):
-    if isinstance(data,numpy.ndarray) and len(data.shape) >= mindim and len(data.shape) <= maxdim:
-        return data
+    if isinstance(data,numpy.ndarray):
+        lshape = len(data.shape)
+        if lshape >= mindim and lshape <= maxdim:
+            return data
 
     if maxdim == 1 and type == object:
         if not check_realseq(data):

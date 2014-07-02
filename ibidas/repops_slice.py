@@ -216,7 +216,6 @@ class AddSlice(repops.UnaryOpRep):
         if not promote is False:
             promotepath = dimpaths.identifyUniqueDimPathSource(source, promote).strip()
             promotepath = dimpaths.extendEssentialParentDim(promotepath,[s.dims for s in source._slices])
-            print promotepath
             nslices = repops_dim.Promote._apply(nslices,data._slices,promotepath)
         return self._initialize(tuple(nslices)) 
        

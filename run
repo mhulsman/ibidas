@@ -19,5 +19,7 @@ else
   "$scriptloc/bin/ibidas"
 fi
 
-rm $tmp;
+if [ $# -ge 1 ]; then
+    rm $tmp;
+fi    
 

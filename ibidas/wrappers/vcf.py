@@ -7,6 +7,7 @@ from ..itypes import detector, rtypes, dimpaths, dimensions
 import wrapper
 from .. import ops
 import python
+import numpy
 
 class VCFRepresentor(wrapper.SourceRepresentor):
     def __init__(self, filename):
@@ -19,6 +20,15 @@ class VCFRepresentor(wrapper.SourceRepresentor):
         dimnames = util.gen_seq_names()
 
         cdimensions = {}
+        
+        
+        #add samples dimension / slice
+        cdimensions['samples'] = dimensions.Dim(shape=len(self.parser.sample_names),name='samples')
+        sdim = cdimensions['samples']
+        subtype = rtypes.createType(str)
+        rtype2 = rtypes.TypeArray(dims=dimpaths.DimPath(sdim),subtypes=(subtype,))
+
+        #add variants
         subtypes = []
         for hasmissing, shape, type in zip(hasmissing, shapes,types):
             subtype = rtypes.createType(type)
@@ -40,18 +50,27 @@ class VCFRepresentor(wrapper.SourceRepresentor):
                     dim = cdimensions[s]
                 subtype = rtypes.TypeArray(dims=dimpaths.DimPath(dim),subtypes=(subtype,))
             subtypes.append(subtype)
+        
+
         rtype = rtypes.TypeTuple(subtypes=tuple(subtypes), fieldnames=tuple(fieldnames))
         dim = dimensions.Dim(shape=UNDEFINED, name='variants')
         rtype = rtypes.TypeArray(dims=dimpaths.DimPath(dim), subtypes=(rtype,))
         
-        slice = VCFOp(self.parser, rtype, 'vcf')
-        slice = ops.UnpackArrayOp(slice)
-        nslices = [ops.UnpackTupleOp(slice, idx) for idx in range(len(slice.type.subtypes))]
-        for pos, nslice in enumerate(nslices):
+        #combine samples slice and variant slices
+        alltype = rtypes.TypeTuple(subtypes=(rtype, rtype2), fieldnames=('variants','samples'))
+      
+        #unpack
+        slice = VCFOp(self.parser, alltype, 'vcf')
+        slices = [ops.UnpackTupleOp(slice, idx) for idx in range(len(slice.type.subtypes))]
+        variant_slice = ops.UnpackArrayOp(slices[0])
+        
+        all_slices = [ops.UnpackTupleOp(variant_slice, idx) for idx in range(len(variant_slice.type.subtypes))]
+        all_slices.append(slices[1])
+        for pos, nslice in enumerate(all_slices):
             while(nslice.type.__class__ is rtypes.TypeArray):
                 nslice = ops.UnpackArrayOp(nslice)
-            nslices[pos] = nslice
-        self._initialize(tuple(nslices))
+            all_slices[pos] = nslice
+        self._initialize(tuple(all_slices))
 
 class VCFOp(ops.ExtendOp):
     __slots__ = ['parser']
@@ -61,7 +80,7 @@ class VCFOp(ops.ExtendOp):
 
     def py_exec(self):
         data = [row for row in self.parser]
-        ndata = nested_array.NestedArray(data, self.type)
+        ndata = nested_array.NestedArray((data, self.parser.sample_names), self.type)
         return python.ResultOp.from_slice(ndata, self)
 
 class VCFParser(object):
@@ -90,12 +109,18 @@ class VCFParser(object):
                 res = info_pattern.match(line)
                 if res is None:
                     raise RuntimeError, 'INFO line does not conform to specification: %s' % line
-                info_fields.append((res.group('name'), self._numberConvert(res.group('name'),res.group('number')), self._toType(res.group('type')), res.group('description')))
+                number = self._numberConvert(res.group('name'),res.group('number'))
+                xtype = self._toType(res.group('type'))
+                info_fields.append((res.group('name'), number, xtype, self._toDType(xtype, number), res.group('description')))
             elif line.startswith('##FORMAT'):
                 res = format_pattern.match(line)
                 if res is None:
                     raise RuntimeError, 'FORMAT line does not conform to specification: %s' % line
-                format_fields.append((res.group('name'), self._numberConvert(res.group('name'), res.group('number')), self._toType(res.group('type')), res.group('description')))
+                number = self._numberConvert(res.group('name'),res.group('number'))
+                xtype = self._toType(res.group('type'))
+                format_fields.append((res.group('name'), number, xtype, self._toDType(xtype, number), res.group('description')))
+            elif line.startswith("#CHROM"):
+                self.sample_names = line.strip().split('\t')[9:]
             elif not line.startswith('#'):
                 break
         file.close()                
@@ -106,8 +131,8 @@ class VCFParser(object):
   
     def fieldNames(self):
         names = ('chrom','pos', 'id', 'ref','alt','qual','filter',)
-        inames = tuple([name.lower() for name, number, type, description in self.info_fields])
-        fnames = tuple([name.lower() for name, number, type, description in self.format_fields])
+        inames = tuple([name.lower() for name, number, type, dtype, description in self.info_fields])
+        fnames = tuple([name.lower() for name, number, type, dtype, description in self.format_fields])
         return names + inames + fnames
 
     def _numberConvert(self, name, number):
@@ -126,22 +151,22 @@ class VCFParser(object):
     def shapes(self):
         shapes = (1,1,'ids',1,'alt_alleles',1,'filters',)
 
-        ishapes = [number for name, number, type, description in self.info_fields]
-        fshapes = [('samples', number) for name, number, type, description in self.format_fields]
+        ishapes = [number for name, number, type, dtype, description in self.info_fields]
+        fshapes = [('samples', number) for name, number, type, dtype, description in self.format_fields]
        
         return shapes + tuple(ishapes) + tuple(fshapes)
 
     def types(self):
         types = (str, int, str, 'DNA', 'DNA', float, str,)
-        itypes = [type for name, number, type, description in self.info_fields]
-        ftypes = [type for name, number, type, description in self.format_fields]
+        itypes = [type for name, number, type, dtype, description in self.info_fields]
+        ftypes = [type for name, number, type, dtype, description in self.format_fields]
 
         return types + tuple(itypes) + tuple(ftypes)
 
     def hasMissing(self):
-        hasmissing = (False, False, False, False, False, False, False,)
-        ihasmissing = [True for name, number, type, description in self.info_fields]
-        fhasmissing = [True for name, number, type, description in self.format_fields]
+        hasmissing = (False, False, False, False, False, True, False,)
+        ihasmissing = [isinstance(number, int) or number in set(['alt_alleles','genotypes']) for name, number, type, dtype, description in self.info_fields]
+        fhasmissing = [isinstance(number, int) or number in set(['alt_alleles','genotypes']) for name, number, type, dtype, description in self.format_fields]
         return hasmissing + tuple(ihasmissing) + tuple(fhasmissing)
 
     def _toType(self, typename):
@@ -170,7 +195,6 @@ class VCFParser(object):
         qual = Missing if qual == '.' else 10.0**(float(qual)/-10.0)
         filter = [] if filter == '.' or filter == 'PASS' else filter.split(',')
 
-
         dinfo = {}
         for elem in info.split(';'):
             if not '=' in elem:
@@ -181,45 +205,51 @@ class VCFParser(object):
 
         
         xinfo = []
-        for name, number, type, description in self.info_fields:
+        for name, number, type, dtype, description in self.info_fields:
             if name in dinfo:
                 if number == 1 or number == 0:
                     xinfo.append(type(dinfo[name]))
                 else:
-                    xinfo.append([type(elem) for elem in dinfo[name].split(',')])
+                    xinfo.append(numpy.array([type(elem) for elem in dinfo[name].split(',')],dtype=dtype))
             else:
-                xinfo.append(self._genMissing(number, alt))
+                xinfo.append(self._genMissing(number, alt, type))
                 
         format = zip(*[elem.split(':') for elem in format])
         dformat = dict([(ffield,list(values)) for ffield, values in zip(format_fields, format)])
 
 
         xformat = []
-        for name, number, type, description in self.format_fields:
+        for name, number, type, dtype, description in self.format_fields:
             func = lambda x: type(x) if x.strip() != '.' else Missing
             if name in dformat:
                 if number == 1:
                     xformat.append([func(elem) for elem in dformat[name]])
                 else:
-                    xformat.append([[func(elem) for elem in xelem.split(',')] for xelem in dformat[name]])
+                    xformat.append([numpy.array(xelem.split(','),dtype=self._toDType(type, number)) if xelem != '.' else self._genMissing(number, alt, type) for xelem in dformat[name]])
             else:
-                xformat.append([self._genMissing(number, alt)] * len(elems[9:]))
+                xformat.append([self._genMissing(number, alt, type)] * len(elems[9:]))
 
         return (chrom, pos, id, ref, alt, qual, filter,) + tuple(xinfo) + tuple(xformat)
 
-    def _genMissing(self, number, alt):
+    def _toDType(self, type, number):
+        if isinstance(type,str) or isinstance(number, int) or number == 'alt_alleles' or number == 'genotypes':
+            return object
+        else: 
+            return numpy.dtype(type)
+
+    def _genMissing(self, number, alt, type=None):
         if number == 0 and type is bool:
             res = False
         elif number == 1:
             res = Missing
         elif isinstance(number,int):
-            res = [Missing] * number
+            res = numpy.array([Missing] * number,dtype=object)
         elif number == 'alt_alleles':
-            res = [Missing] * len(alt)
+            res = numpy.array([Missing] * len(alt),dtype=object)
         elif number == 'genotypes':
-            res = [Missing] * (((len(alt) + 1) * (len(alt) + 2)) / 2)
+            res = numpy.array([Missing] * (((len(alt) + 1) * (len(alt) + 2)) / 2),dtype=object)
         else:
-            res = []
+            res = numpy.array([],dtype=self._toDType(type, number))
         return res
 
 

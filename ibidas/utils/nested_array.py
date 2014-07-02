@@ -98,13 +98,13 @@ class NestedArray(object):
                 res = []
                 for pos in xrange(len(cdata)):
                     elem = cdata[pos]
-                    if(variable):
-                        if(elem is Missing):
-                            idxres[pos,:] = -1
-                            continue
-                        idxres[pos,0] = curpos
-                        curpos = curpos + len(elem)
-                        idxres[pos,1] = curpos
+                    
+                    if(elem is Missing):
+                        idxres[pos,:] = -1
+                        continue
+                    idxres[pos,0] = curpos
+                    curpos = curpos + len(elem)
+                    idxres[pos,1] = curpos
                 
                     #check that elem shape is not smaller or larger than expected 
                     if(not isinstance(elem,numpy.ndarray)):
@@ -880,7 +880,8 @@ def drop_prev_shapes_dim(ndata,shapes):
  
 
 def validate_array(seq, cdepth, dtype):
-    if(len(seq.shape) < cdepth):
+    lshape = len(seq.shape)
+    if(lshape < cdepth):
         oshape = seq.shape
         rem_ndims = cdepth - len(seq.shape) + 1
         if len(seq) == 0:
@@ -890,7 +891,7 @@ def validate_array(seq, cdepth, dtype):
             seq = util.darray(list(seq.ravel()),dtype,rem_ndims,rem_ndims)
             seq.shape = oshape + seq.shape[1:]
         assert len(seq.shape) == cdepth, "Non array values encountered for dims " + str(dims[len(seq.shape):])
-    elif(len(seq.shape) > cdepth):
+    elif(lshape > cdepth):
         oshape = seq.shape
         seq = dimpaths.flatFirstDims(seq,cdepth-1)
         seq = util.darray([subelem for subelem in seq],object,1,1)
