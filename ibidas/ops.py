@@ -501,8 +501,9 @@ class UnpackTupleOp(UnaryUnaryOp):#{{{
 
         ntype = slice.type.subtypes[idx]
         
-        if(slice.type.fieldnames):
-            name = slice.type.fieldnames[idx]
+        if slice.type.fieldnames:
+            assert idx < len(slice.type.fieldnames), "Number of slices exceeds number of field names, check your input data";
+            name = slice.type.fieldnames[idx];
         else:
             name = "f" + str(idx)
 
