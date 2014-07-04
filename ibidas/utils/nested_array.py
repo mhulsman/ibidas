@@ -96,27 +96,40 @@ class NestedArray(object):
 
             if(variable):
                 res = []
-                for pos in xrange(len(cdata)):
-                    elem = cdata[pos]
-                    
-                    if(elem is Missing):
-                        idxres[pos,:] = -1
-                        continue
-                    idxres[pos,0] = curpos
-                    curpos = curpos + len(elem)
-                    idxres[pos,1] = curpos
-                
-                    #check that elem shape is not smaller or larger than expected 
-                    if(not isinstance(elem,numpy.ndarray)):
-                        elem = util.darray(list(elem),dtype,cdepth,cdepth)
+                #fast loops
+                if cdepth == 1 and len(cdata) > 0 and not tot_dimpath[0].has_missing:
+                    if not isinstance(cdata[0],numpy.ndarray):
+                        ndata = util.darray([value for elem in cdata for value in elem],dtype,1,1)
+                        pos = numpy.cumsum([len(elem) for elem in cdata])
+                        idxres[1:,0] = pos[:-1]
+                        idxres[:,1] = pos
                     else:
-                        elem = validate_array(elem,cdepth,dtype)
-                        assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
-                    res.append(elem)
-                if not res:
-                    ndata = util.darray([])
-                else:
-                    ndata = numpy.concatenate(res)
+                        ndata = numpy.concatenate([validate_array(elem,cdepth,dtype) for elem in cdata])
+                        pos = numpy.cumsum([len(elem) for elem in cdata])
+                        idxres[1:,0] = pos[:-1]
+                        idxres[:,1] = pos
+                else:    
+                    for pos in xrange(len(cdata)):
+                        elem = cdata[pos]
+                        
+                        if(elem is Missing):
+                            idxres[pos,:] = -1
+                            continue
+                        idxres[pos,0] = curpos
+                        curpos = curpos + len(elem)
+                        idxres[pos,1] = curpos
+                    
+                        #check that elem shape is not smaller or larger than expected 
+                        if(not isinstance(elem,numpy.ndarray)):
+                            elem = util.darray(list(elem),dtype,cdepth,cdepth)
+                        else:
+                            elem = validate_array(elem,cdepth,dtype)
+                            assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
+                        res.append(elem)
+                    if not res:
+                        ndata = util.darray([])
+                    else:
+                        ndata = numpy.concatenate(res)
             else:
                 #if(cdepth == 1):
                 #    r = []
@@ -125,17 +138,24 @@ class NestedArray(object):
                 #    ndata = util.darray(r,dtype,1,1)
                 #else:
                 res = []
-                for elem in cdata:
-                    #check that elem shape is not smaller or larger than expected 
-                    if(not isinstance(elem,numpy.ndarray)):
-                        elem = util.darray(list(elem),dtype,cdepth,cdepth)
+                # fast loop
+                if cdepth == 1 and len(cdata) > 0 and not tot_dimpath[0].has_missing:
+                    if not isinstance(cdata[0],numpy.ndarray):
+                        ndata = util.darray([value for elem in cdata for value in elem],dtype,1,1)
                     else:
-                        elem = validate_array(elem,cdepth,dtype)
-                    res.append(elem)
-                if not res:
-                    ndata = util.darray([])
+                        ndata = numpy.concatenate([validate_array(elem,cdepth,dtype) for elem in cdata])
                 else:
-                    ndata = numpy.concatenate(res)
+                    for elem in cdata:
+                        #check that elem shape is not smaller or larger than expected 
+                        if(not isinstance(elem,numpy.ndarray)):
+                            elem = util.darray(list(elem),dtype,cdepth,cdepth)
+                        else:
+                            elem = validate_array(elem,cdepth,dtype)
+                        res.append(elem)
+                    if not res:
+                        ndata = util.darray([])
+                    else:
+                        ndata = numpy.concatenate(res)
 
 
             if(variable):

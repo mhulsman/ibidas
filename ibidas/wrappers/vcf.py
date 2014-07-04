@@ -210,9 +210,9 @@ class VCFParser(object):
                 if number == 1 or number == 0:
                     xinfo.append(type(dinfo[name]))
                 else:
-                    xinfo.append(numpy.array([type(elem) for elem in dinfo[name].split(',')],dtype=dtype))
+                    xinfo.append([type(elem) for elem in dinfo[name].split(',')])
             else:
-                xinfo.append(self._genMissing(number, alt, type))
+                xinfo.append(self._genMissing(number, alt, dtype))
                 
         format = zip(*[elem.split(':') for elem in format])
         dformat = dict([(ffield,list(values)) for ffield, values in zip(format_fields, format)])
@@ -220,14 +220,14 @@ class VCFParser(object):
 
         xformat = []
         for name, number, type, dtype, description in self.format_fields:
-            func = lambda x: type(x) if x.strip() != '.' else Missing
+            #func = lambda x: type(x) if x.strip() != '.' else Missing
             if name in dformat:
                 if number == 1:
-                    xformat.append([func(elem) for elem in dformat[name]])
+                    xformat.append([type(elem) if elem.strip() != '.' else Missing for elem in dformat[name]])
                 else:
-                    xformat.append([numpy.array(xelem.split(','),dtype=self._toDType(type, number)) if xelem != '.' else self._genMissing(number, alt, type) for xelem in dformat[name]])
+                    xformat.append([xelem.split(',') if xelem != '.' else self._genMissing(number, alt, dtype) for xelem in dformat[name]])
             else:
-                xformat.append([self._genMissing(number, alt, type)] * len(elems[9:]))
+                xformat.append([self._genMissing(number, alt, dtype)] * len(elems[9:]))
 
         return (chrom, pos, id, ref, alt, qual, filter,) + tuple(xinfo) + tuple(xformat)
 
@@ -237,19 +237,19 @@ class VCFParser(object):
         else: 
             return numpy.dtype(type)
 
-    def _genMissing(self, number, alt, type=None):
+    def _genMissing(self, number, alt, dtype=None):
         if number == 0 and type is bool:
             res = False
         elif number == 1:
             res = Missing
         elif isinstance(number,int):
-            res = numpy.array([Missing] * number,dtype=object)
+            res = [Missing] * number
         elif number == 'alt_alleles':
-            res = numpy.array([Missing] * len(alt),dtype=object)
+            res = [Missing] * len(alt)
         elif number == 'genotypes':
-            res = numpy.array([Missing] * (((len(alt) + 1) * (len(alt) + 2)) / 2),dtype=object)
+            res = [Missing] * (((len(alt) + 1) * (len(alt) + 2)) / 2)
         else:
-            res = numpy.array([],dtype=self._toDType(type, number))
+            res = []
         return res
 
 
