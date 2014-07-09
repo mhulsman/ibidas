@@ -9,7 +9,7 @@ _delay_import_(globals(),"utils","util","context","config","missing")
 _delay_import_(globals(),"ops")
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","python")
-_delay_import_(globals(),"itypes","rtypes","dimensions","dimpaths")
+_delay_import_(globals(),"itypes","rtypes","dimensions","dimpaths","casts")
 _delay_import_(globals(),"repops_dim")
 _delay_import_(globals(),"repops_slice")
 
@@ -619,16 +619,15 @@ class Stack(repops.MultiOpRep):
                 for name in source.Names:
                     if name in nms and name not in nmslist:
                         nmslist.append(name)
-
-            for source in sources:
-                if not stack_missing:
-                    onms = set(source.Names) - nms
-                    if onms:
-                        nslices.extend(source.Get(*onms)._slices)
-                nsources.append(source.Get(*nmslist))
             
-            full_sources = sources                    
-            sources = nsources
+            if not stack_missing:
+                for source in sources:
+                    if not stack_missing:
+                        onms = set(source.Names) - nms
+                        if onms:
+                            nslices.extend(source.Get(*onms)._slices)
+                    nsources.append(source.Get(*nmslist))
+                sources = nsources
         
         seldimpaths = [] 
         if not isinstance(dims,tuple):
@@ -638,20 +637,44 @@ class Stack(repops.MultiOpRep):
         
         if stack_missing:
             assert slices == COMMON_NAME, 'stack_missing=True, but slices!=COMMON_NAME'
-            all_names = set(sum([source.Names for source in full_sources],[]))
+            all_names = set(sum([source.Names for source in sources],[]))
             remaining_names = all_names - nms
 
             all_names_list = [] #all_names_list with ordering
-            for source in full_sources:
-                for name in source.Names:
+            slicecols = {} #construct list of slices for each remaining_name
+            for name in remaining_names:
+                slicecols[name] = []
+
+            for source in sources:
+                assert len(set(source.Names)) == len(source.Names), 'Duplicate slice names not supported with slices=COMMON_NAME'
+                for slice in source._slices:
+                    name = slice.name
                     if name not in all_names_list:
                         all_names_list.append(name)
-            
+                    if name in remaining_names:
+                        slicecols[name].append(slice)
+
+            dtype_dict = {}
+            for name, slicecol in slicecols.iteritems():
+                dtypes = []
+                for slice,dpath in zip(slicecol, seldimpaths):
+                    lastpos = slice.dims.matchDimPath(dpath)
+                    if len(lastpos) != 1 and promote is True:
+                        dtypes.append(slice.type)
+                    else:
+                        pd = len(slice.dims) - lastpos[0] - 1
+                        if(pd > 0):
+                            slice = ops.PackArrayOp(slice, pd)
+                        dtypes.append(slice.type)
+                dtype = casts.castImplicitCommonType(*dtypes).copy()
+                dtype.has_missing = True
+                dtype_dict[name] = dtype
+                
             nsources = []
-            for source,seldimpath in zip(full_sources,seldimpaths):
+            for source,seldimpath in zip(sources,seldimpaths):
                 to_add = remaining_names - set(source.Names) 
                 for ta in to_add:
-                    source = repops_slice.AddSlice(source, missing.Missing, name=ta, dtype='?',promote=seldimpath)
+                    source = repops_slice.AddSlice(source, missing.Missing, name=ta, dtype=dtype_dict[ta],promote=seldimpath)
                 nsources.append(source.Get(*all_names_list))
             sources = nsources
             

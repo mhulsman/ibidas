@@ -1213,6 +1213,8 @@ def createType(name, dimpos=0, refdims=[], env={}):#{{{
         >>> createType("tuple(int64,unicode)")
 
     """
+    if isinstance(name, Type):
+        return name
 
     if(not isinstance(name, basestring)):
         if(not isinstance(name, numpy.dtype)):

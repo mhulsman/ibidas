@@ -61,7 +61,14 @@ def canCast(intype, outtype, dimdepth):
                 return (otype, pos_cast.name)
     return False
 
-def castImplicitCommonType(type1, type2):
+def castImplicitCommonType(*types):
+    types = list(types)
+    while len(types) > 1:
+        t1 = types.pop()
+        types[-1] = castImplicitCommonTypeDual(t1,types[-1])
+    return types[-1]
+
+def castImplicitCommonTypeDual(type1, type2):
     if(type1 == type2):
         return type1
 
