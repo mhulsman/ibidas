@@ -1879,8 +1879,8 @@ class Representor(Node):
         """Combines slices into a tuple type"""
         return repops_slice.IndexDict(self)
 
-    def TakeFrom(self, other, allow_missing=False,keep_missing=False):
-        return repops_multi.Take(other, self, allow_missing,keep_missing)
+    def TakeFrom(self, other, allow_missing=False,keep_missing=False, keep_name=False):
+        return repops_multi.Take(other, self, allow_missing,keep_missing,keep_name)
 
     def ToPython(self, **args):
         """Converts data into python data structure"""

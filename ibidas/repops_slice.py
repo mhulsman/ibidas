@@ -199,8 +199,18 @@ class Unproject(Project):
 
 class AddSlice(repops.UnaryOpRep):
     def _sprocess(self, source, data, name=None, dtype=None,promote=False):
+        if not promote is False:
+            promotepath = dimpaths.identifyUniqueDimPathSource(source, promote).strip()
+            promotepath = dimpaths.extendEssentialParentDim(promotepath,[s.dims for s in source._slices])
+        else:
+            promotepath = False
+        nslices = self._apply(source._slices, data, name, dtype, promotepath)
+        return self._initialize(tuple(nslices)) 
+
+    @classmethod
+    def _apply(cls, slices, data, name=None, dtype=None, promotepath=False):
         if not dtype is None:
-            refdims = sum([slice.dims for slice in source._slices],tuple())
+            refdims = sum([slice.dims for slice in slices],tuple())
             dtype = rtypes.createType(dtype,refdims=refdims)
             if isinstance(data, representor.Representor):
                 data = data()
@@ -211,14 +221,14 @@ class AddSlice(repops.UnaryOpRep):
             else:
                 data = data / name
 
-        nslices = list(source._slices)
+        nslices = list(slices) 
         nslices.extend(data._slices)
-        if not promote is False:
-            promotepath = dimpaths.identifyUniqueDimPathSource(source, promote).strip()
-            promotepath = dimpaths.extendEssentialParentDim(promotepath,[s.dims for s in source._slices])
+        
+        if not promotepath is False:
             nslices = repops_dim.Promote._apply(nslices,data._slices,promotepath)
-        return self._initialize(tuple(nslices)) 
-       
+        return nslices        
+        
+
 class UnpackTuple(repops.UnaryOpRep):
     def _process(self,source,name=None,unpack=True):
         """

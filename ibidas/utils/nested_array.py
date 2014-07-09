@@ -125,7 +125,8 @@ class NestedArray(object):
                         else:
                             elem = validate_array(elem,cdepth,dtype)
                             assert len(elem.shape) == cdepth, "Number of dimensions incorrect"
-                        res.append(elem)
+                        if not 0 in elem.shape:
+                            res.append(elem)
                     if not res:
                         ndata = util.darray([])
                     else:

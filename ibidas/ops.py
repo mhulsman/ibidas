@@ -684,7 +684,7 @@ class PackIndexDictOp(MultiUnaryOp):#{{{
 
 class TakeOp(MultiUnaryOp):
     __slots__ = ['allow_missing','keep_missing']
-    def __init__(self, source_slice, take_slice, allow_missing=False, keep_missing=False):
+    def __init__(self, source_slice, take_slice, allow_missing=False, keep_missing=False, keep_name=False):
         assert isinstance(source_slice.type, rtypes.TypeIndexDict), "Take left op should have type index dict"
         source_slice, take_slice = broadcast((source_slice, take_slice), mode="dim")[0]
         ntype = source_slice.type.subtypes[1].subtypes[0]
@@ -693,7 +693,7 @@ class TakeOp(MultiUnaryOp):
         elif keep_missing:
             ntype = casts.castImplicitCommonType(ntype,take_slice.type)
 
-        if keep_missing:
+        if keep_missing or keep_name:
             name = take_slice.name
         else:
             name = source_slice.type.fieldnames[1]

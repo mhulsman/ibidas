@@ -5,7 +5,7 @@ import repops
 import repops_funcs
 import os
 
-_delay_import_(globals(),"utils","util","context","config")
+_delay_import_(globals(),"utils","util","context","config","missing")
 _delay_import_(globals(),"ops")
 _delay_import_(globals(),"representor")
 _delay_import_(globals(),"wrappers","python")
@@ -578,12 +578,12 @@ class Replace(repops.MultiOpRep):
 
 
 class Take(repops.MultiOpRep):
-    def __init__(self, source, take_source, allow_missing=False, keep_missing=False):
+    def __init__(self, source, take_source, allow_missing=False, keep_missing=False, keep_name=False):
         if (isinstance(source,dict)):
              source = python.Rep(list(source.iteritems()),name="data").IndexDict()
-        repops.MultiOpRep.__init__(self,(source, take_source), allow_missing = allow_missing, keep_missing=keep_missing)
+        repops.MultiOpRep.__init__(self,(source, take_source), allow_missing = allow_missing, keep_missing=keep_missing, keep_name=keep_name)
    
-    def _sprocess(self, sources, allow_missing,keep_missing):
+    def _sprocess(self, sources, allow_missing, keep_missing, keep_name):
         source, take_source = sources
         if len(source._slices) == 2:
             source = source.IndexDict()
@@ -592,7 +592,7 @@ class Take(repops.MultiOpRep):
 
         nslices = []
         for take_slice in take_source._slices:
-            nslices.append(ops.TakeOp(source_slice, take_slice, allow_missing, keep_missing))
+            nslices.append(ops.TakeOp(source_slice, take_slice, allow_missing, keep_missing, keep_name))
         return self._initialize(tuple(nslices))
 
 
@@ -600,7 +600,7 @@ class Stack(repops.MultiOpRep):
     def __init__(self, *sources, **kwargs):
         repops.MultiOpRep.__init__(self,sources, **kwargs)
 
-    def _sprocess(self, sources, slices=COMMON_POS, mode='dim', dims=LCDIM):
+    def _sprocess(self, sources, slices=COMMON_POS, mode='dim', dims=LCDIM, stack_missing=False, promote=False):
         nslices = []
         if slices == COMMON_POS:
             slicelens = set([len(source._slices) for source in sources])
@@ -613,13 +613,21 @@ class Stack(repops.MultiOpRep):
                 assert len(source.Names) == len(xnms), ('Cannot have duplicate names in %s while matching slices on name' % self.__class__.__name__)
                 nms &= xnms
             assert nms, ('Cannot find shared names in %s while matching slices on name' % self.__class__.__name__)
-
             nsources = []
+            nmslist = [] #nms_list with ordering
             for source in sources:
-                onms = set(source.Names) - nms
-                if onms:
-                    nslices.extend(source.Get(*onms)._slices)
-                nsources.append(source.Get(*nms))
+                for name in source.Names:
+                    if name in nms and name not in nmslist:
+                        nmslist.append(name)
+
+            for source in sources:
+                if not stack_missing:
+                    onms = set(source.Names) - nms
+                    if onms:
+                        nslices.extend(source.Get(*onms)._slices)
+                nsources.append(source.Get(*nmslist))
+            
+            full_sources = sources                    
             sources = nsources
         
         seldimpaths = [] 
@@ -627,14 +635,38 @@ class Stack(repops.MultiOpRep):
             dims = (dims,) * len(sources)
         for source, dim  in zip(sources, dims):
             seldimpaths.append(dimpaths.identifyUniqueDimPathSource(source, dim))
+        
+        if stack_missing:
+            assert slices == COMMON_NAME, 'stack_missing=True, but slices!=COMMON_NAME'
+            all_names = set(sum([source.Names for source in full_sources],[]))
+            remaining_names = all_names - nms
 
+            all_names_list = [] #all_names_list with ordering
+            for source in full_sources:
+                for name in source.Names:
+                    if name not in all_names_list:
+                        all_names_list.append(name)
+            
+            nsources = []
+            for source,seldimpath in zip(full_sources,seldimpaths):
+                to_add = remaining_names - set(source.Names) 
+                for ta in to_add:
+                    source = repops_slice.AddSlice(source, missing.Missing, name=ta, dtype='?',promote=seldimpath)
+                nsources.append(source.Get(*all_names_list))
+            sources = nsources
+            
         slicelists = [source._slices for source in sources]
         ndim = None
         for slicecol in zip(*slicelists):
             packdepths = []
             ncol = []
-            for slice,dpath in zip(slicecol, seldimpaths):
+            for slicelist, slice,dpath in zip(slicelists, slicecol, seldimpaths):
                 lastpos = slice.dims.matchDimPath(dpath)
+                if len(lastpos) != 1 and promote is True:
+                    pos = slicelist.index(slice)
+                    slice = repops_dim.Promote._apply(slicelist,[slice],dpath.strip())[pos]
+                    lastpos = slice.dims.matchDimPath(dpath)
+
                 assert len(lastpos) == 1, "Cannot choose between or find dims in slice: " + str(slice)
                 packdepths.append(len(slice.dims) - lastpos[0])
                 if(packdepths[-1] > 0):

@@ -106,10 +106,8 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             file.seek(0)
             reader = csv.reader(file, dialect)
         else:
-            if(issubclass(dialect, csv.Dialect)):
-                reader = csv.reader(file, dialect)
-            else:
-                reader = csv.reader(file, delimiter=dialect)
+            reader = csv.reader(file, dialect)
+
         return (reader, dialect)
 
     def determineSkipRows(self, file, reader):
@@ -146,10 +144,10 @@ class TSVOp(ops.ExtendOp):
         file = util.open_file(self.filename,mode='rU')
         file.seek(self.startpos)
 
-        if(issubclass(self.dialect, csv.Dialect)):
-            reader = csv.reader(file, self.dialect)
-        else:
+        if(isinstance(self.dialect, str)):
             reader = csv.reader(file, delimiter=self.dialect)
+        else:
+            reader = csv.reader(file, self.dialect)
         data = [tuple(row) for row in reader]
         file.close()
         ndata = nested_array.NestedArray(data,self.type)
