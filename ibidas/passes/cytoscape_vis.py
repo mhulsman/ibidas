@@ -72,7 +72,7 @@ class DebugVisualizer(VisitorFactory(prefixes=("node",), flags=NF_ELSE),
                         r = str(r.__class__.__name__)
                     else:
                         r = cls(r)
-                    if len(r) > 500:
+                    if isinstance(r,str) and len(r) > 500:
                         r = r[:500] + ' ...'
                     attribute_name_dict[node_name] = r
                 except:

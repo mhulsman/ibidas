@@ -10,6 +10,7 @@ from query_graph import Node
 
 _delay_import_(globals(),"itypes","dimensions","typeops","convertors","casts")
 _delay_import_(globals(),"itypes.type_attribute_freeze","freeze_protocol")
+_delay_import_(globals(),"repops_funcs")
 
 class Op(Node):
     __slots__ = ["link"]

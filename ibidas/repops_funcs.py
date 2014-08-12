@@ -122,18 +122,25 @@ class UnaryFuncElemOp(UnaryFuncOp):
     def _process(self, source, **kwargs):
         if not source._typesKnown():
             return
-        nslices = []
-        for slice in source._slices:
-            slice = self._prepareSlice(slice)
-            sig, nkwargs, outparam = self._findSignature(slice=slice,**kwargs)
-            s = self.__class__._slicecls(self.__class__.__name__, sig, outparam.name, outparam.type, **nkwargs)
-            s = self._finishSlice(s)
-            nslices.append(s)
+        nslices = self._apply(source._slices, **kwargs)
         return self._initialize(tuple(nslices))
 
+    @classmethod
+    def _apply(cls, slices, **kwargs):
+        nslices = []
+        for slice in slices:
+            slice = cls._prepareSlice(slice)
+            sig, nkwargs, outparam = cls._findSignature(slice=slice,**kwargs)
+            s = cls._slicecls(cls.__name__, sig, outparam.name, outparam.type, **nkwargs)
+            s = cls._finishSlice(s)
+            nslices.append(s)
+        return nslices
+
+    @classmethod
     def _prepareSlice(self,slice):
         return slice
-
+    
+    @classmethod
     def _finishSlice(self, slice):
         return slice
 
@@ -184,17 +191,21 @@ class UnaryFuncSegregateOp(UnaryFuncElemOp):
         if not source._typesKnown():
             return
         exclude_dimnames = [dim.name for dim in source.DimsUnique]
-        nslices = []
-        for slice in source._slices:
-            slice = self._prepareSlice(slice)
-            sig, nkwargs, outparam = self._findSignature(slice=slice,exclude_dimnames=exclude_dimnames,**kwargs)
-            nkwargs.pop('exclude_dimnames')
-            s = self.__class__._slicecls(self.__class__.__name__, sig, outparam.name, outparam.type, **nkwargs)
-            for i in range(self._unpackdepth):
-                s = ops.UnpackArrayOp(s)
-            s = self._finishSlice(s)
-            nslices.append(s)
+        nslices = self._apply(source._slices, exclude_dimnames, **kwargs)
         return self._initialize(tuple(nslices))
+
+    def _apply(cls, slices, exclude_dimnames, **kwargs):
+        nslices = []
+        for slice in slices:
+            slice = cls._prepareSlice(slice)
+            sig, nkwargs, outparam = cls._findSignature(slice=slice,exclude_dimnames=exclude_dimnames,**kwargs)
+            nkwargs.pop('exclude_dimnames')
+            s = cls._slicecls(cls.__name__, sig, outparam.name, outparam.type, **nkwargs)
+            for i in range(cls._unpackdepth):
+                s = ops.UnpackArrayOp(s)
+            s = cls._finishSlice(s)
+            nslices.append(s)
+        return nslices
 
 class BinaryFuncOp(repops.MultiOpRep, Func):
     def __init__(self, lsource, rsource, **kwargs):
@@ -824,7 +835,8 @@ corrsig = CorrSignature("corr")
 class Corr(UnaryFuncElemOp):
     _sigs = [corrsig]
 
-    def _finishSlice(self,slice):
+    @classmethod
+    def _finishSlice(cls,slice):
         return ops.UnpackArrayOp(slice,2)
 
         

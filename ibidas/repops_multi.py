@@ -1,5 +1,6 @@
 import operator
 
+from logging import warning
 from constants import *
 import repops
 import repops_funcs
@@ -205,6 +206,9 @@ class Filter(repops.MultiOpRep):
             seldimpath = cslice.dims[-1:]
             dimset = dimpaths.createDimSet([slice.dims for slice in fslices])
             assert seldimpath[0] in dimset, "Cannot find last dimension of boolean filter in filter source (" + str(cslice.dims) + ")"
+            if cslice.type.has_missing:
+                cslice = repops_funcs.ReplaceMissing._apply([cslice])[0]
+                warning('Filtering with Missing values: Missing values are considered False')                
             cslice = ops.PackArrayOp(cslice,1)
         else:
             assert seldimpath, "Filter dimpath is empty"
@@ -645,21 +649,21 @@ class Stack(repops.MultiOpRep):
             for name in remaining_names:
                 slicecols[name] = []
 
-            for source in sources:
+            for source,dpath in zip(sources,seldimpaths):
                 assert len(set(source.Names)) == len(source.Names), 'Duplicate slice names not supported with slices=COMMON_NAME'
                 for slice in source._slices:
                     name = slice.name
                     if name not in all_names_list:
                         all_names_list.append(name)
                     if name in remaining_names:
-                        slicecols[name].append(slice)
+                        slicecols[name].append((slice,dpath))
 
             dtype_dict = {}
             for name, slicecol in slicecols.iteritems():
                 dtypes = []
-                for slice,dpath in zip(slicecol, seldimpaths):
+                for slice,dpath in slicecol:
                     lastpos = slice.dims.matchDimPath(dpath)
-                    if len(lastpos) != 1 and promote is True:
+                    if len(lastpos) != 1:
                         dtypes.append(slice.type)
                     else:
                         pd = len(slice.dims) - lastpos[0] - 1

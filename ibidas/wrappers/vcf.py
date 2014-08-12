@@ -184,6 +184,7 @@ class VCFParser(object):
             raise RuntimeError,'Unknown type %s' % typename
 
     def processLine(self, line):
+        line = line.strip()
         elems =  line.split('\t')
         chrom, pos, id, ref, alt, qual, filter, info = elems[:8]
         format_fields = elems[8].split(':')
