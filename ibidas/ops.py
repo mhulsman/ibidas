@@ -389,6 +389,16 @@ class FilterOp(UnaryUnaryOp):#{{{
         self.constraint = constraint
         UnaryUnaryOp.__init__(self, slice, rtype=ntype)#}}}
 
+class CombinedUnaryUnaryOp(UnaryUnaryOp):
+    __slots__ = ["ops", "combine_type"]
+
+    def __init__(self, slice, ops, combine_type):
+        self.ops = ops
+        self.combine_type = combine_type
+        lastop = [op for op in ops if not op is None][-1]
+        UnaryUnaryOp.__init__(self, slice, rtype=lastop.type, dims=lastop.dims)#}}}
+
+
 def filter(slice,constraint,seldimpath, ndim, mode="dim"):#{{{
     used_dims = [False,] * len(slice.dims)
     while True:

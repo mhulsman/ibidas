@@ -44,6 +44,54 @@ class PythonPeepHole(VisitorFactory(prefixes=("visit",), flags=NF_ERROR), manage
                 node = self.graph.copyNode(node)
                 node.plan = nplans
 
+
+    def visitFilterOp(self, node):
+        pack_node = self.graph.getDataEdge(node).source
+        if not isinstance(pack_node, ops.PackArrayOp):
+            return 
+        if len(self.graph.edge_source[pack_node]) > 1:
+            return
+        source = self.graph.getDataEdge(pack_node).source
+        
+        target_edges = list(self.graph.edge_source[node])
+        if len(target_edges)!= 1:
+            unpack_node = None
+        else:
+            target = target_edges[0].target
+            if not isinstance(target, ops.UnpackArrayOp):
+                unpack_node = None
+            else:
+                unpack_node = target
+
+        if unpack_node is None:
+            last_node = node
+        else:
+            last_node = unpack_node
+      
+        source_edge = self.graph.getDataEdge(pack_node)
+        self.graph.dropEdge(source_edge)
+
+        nslice = ops.CombinedUnaryUnaryOp(source, [pack_node, node, unpack_node], 'PackFilterUnpackOp')
+        self.graph.addNode(nslice)
+        self.graph.addEdge(query_graph.ParamEdge(source, nslice, "slice"))
+
+        constraint_edge = self.graph.getDataEdge(node, name="constraint")
+        self.graph.dropEdge(constraint_edge)
+        constraint_edge.target = nslice
+        self.graph.addEdge(constraint_edge)
+
+        ttarget_edges = list(self.graph.edge_source[last_node])
+        for edge in ttarget_edges:
+            self.graph.dropEdge(edge)
+            edge.source = nslice
+            self.graph.addEdge(edge)
+        
+        self.graph.dropNode(pack_node)
+        self.graph.dropNode(node)
+        if unpack_node:
+            self.graph.dropNode(unpack_node)
+       
+
     def remove_compare_slice(self, node, pos):
         for edge in list(self.graph.edge_target[node]):
             if edge.name == "compare_slices":

@@ -300,6 +300,27 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
         ndata=slice.data.pack(node.type, len(node.pack_dims))
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
 
+
+    def visitCombinedUnaryUnaryOp(self, node, slice, *args, **kwargs):
+        return getattr(self, 'combined' + node.combine_type)(node, slice, *args, **kwargs)
+
+    def combinedPackFilterUnpackOp(self, node, slice, constraint):
+        pack_node, filter_node, unpack_node = node.ops
+        
+        ndata=slice.data.pack(pack_node.type, len(pack_node.pack_dims))
+        slice = slice.modify(data=ndata,rtype=pack_node.type,dims=pack_node.dims)
+        
+        ndata = nested_array.co_map(speedfilter,[slice.data, constraint.data],
+                                       has_missing = filter_node.has_missing,ctype=constraint.type,stype=filter_node.type,
+                                       res_type=filter_node.type)
+        slice = slice.modify(data=ndata,rtype=filter_node.type, dims=filter_node.dims)
+        
+        if unpack_node:
+            ndata=slice.data.unpack(unpack_node.unpack_dims, subtype=unpack_node.type)
+            slice =slice.modify(data=ndata,rtype=unpack_node.type,dims=unpack_node.dims)
+        return slice
+
+
     def visitInsertDimOp(self,node,slice):
         ndata = slice.data.insertDim(node.matchpoint)
         return slice.modify(data=ndata,rtype=node.type,dims=node.dims)
