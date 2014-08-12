@@ -202,7 +202,51 @@ class NestedArray(object):
             depth -= 1
         nself.cur_type = subtype
         return nself                
- 
+    
+    def packfilter(self, constraint, subtype, depth=1):
+        constraint = constraint.getStructuredData()
+        
+        pdepth = 0
+        while depth > 1 and (isinstance(self.idxs[-1-pdepth],int)
+                             or (len(self.idxs[-1-pdepth].shape) - 1) < depth):
+            pdepth +=1 
+            depth -=1
+        
+        if pdepth > 0:
+            nself = self.pack(rtypes.unknown, pdepth) #accurate subtype does not matter, as we set it below again
+        else:
+            nself = self.copy()
+      
+        assert len(nself.idxs) > 1, "Pack operation on nestedarray without index?!"
+        idx = nself.idxs.pop()
+
+        if(not isinstance(idx,int)): #refers to fixed dim in data
+            assert depth > 1, 'Depth should be > 1'
+            idx = idx[(Ellipsis,constraint) + (slice(None),) * (depth-1)]
+            res = []
+            data = nself.data
+            fidx = dimpaths.flatFirstDims(idx,len(idx.shape)-2)
+            for pos in xrange(len(fidx)):
+                start = fidx[pos,0]
+                stop = fidx[pos,1]
+                if(start == -1):
+                    res.append(Missing)
+                else:
+                    res.append(data[start:stop])
+            nself.data = util.darray(res,object)
+            nself.data.shape = idx.shape[:-1]
+            
+            if depth > 1:
+                nself = nself.pack(rtypes.unknown,depth-1)
+        else:
+            seq,rshape = nself._flatData()
+            ndata = seq[:,constraint]
+            ndata.shape = rshape + ndata.shape[1:]
+            nself.data = ndata
+
+        nself.cur_type = subtype
+        return nself                
+
     def getStructuredData(self):
         return self.pack(rtypes.unknown, len(self.idxs)-1).data[0]
 

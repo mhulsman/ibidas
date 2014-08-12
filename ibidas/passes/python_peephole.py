@@ -46,6 +46,14 @@ class PythonPeepHole(VisitorFactory(prefixes=("visit",), flags=NF_ERROR), manage
 
 
     def visitFilterOp(self, node):
+        if node.has_missing:
+            return
+
+        constraint_edge = self.graph.getDataEdge(node, name="constraint")
+        constraint = constraint_edge.source
+        if len(constraint.dims) > 0:
+            return
+
         pack_node = self.graph.getDataEdge(node).source
         if not isinstance(pack_node, ops.PackArrayOp):
             return 
@@ -75,7 +83,6 @@ class PythonPeepHole(VisitorFactory(prefixes=("visit",), flags=NF_ERROR), manage
         self.graph.addNode(nslice)
         self.graph.addEdge(query_graph.ParamEdge(source, nslice, "slice"))
 
-        constraint_edge = self.graph.getDataEdge(node, name="constraint")
         self.graph.dropEdge(constraint_edge)
         constraint_edge.target = nslice
         self.graph.addEdge(constraint_edge)
