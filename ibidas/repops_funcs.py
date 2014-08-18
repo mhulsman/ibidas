@@ -194,6 +194,7 @@ class UnaryFuncSegregateOp(UnaryFuncElemOp):
         nslices = self._apply(source._slices, exclude_dimnames, **kwargs)
         return self._initialize(tuple(nslices))
 
+    @classmethod
     def _apply(cls, slices, exclude_dimnames, **kwargs):
         nslices = []
         for slice in slices:
