@@ -127,6 +127,7 @@ class VCFParser(object):
 
         self.info_fields = info_fields
         self.format_fields = format_fields
+        self.has_genotypes = len(self.sample_names) > 0
 
   
     def fieldNames(self):
@@ -187,8 +188,6 @@ class VCFParser(object):
         line = line.strip()
         elems =  line.split('\t')
         chrom, pos, id, ref, alt, qual, filter, info = elems[:8]
-        format_fields = elems[8].split(':')
-        format = elems[9:]
         
         pos = int(pos)
         id = '' if id == '.' else id.split(';')
@@ -214,23 +213,28 @@ class VCFParser(object):
                     xinfo.append([type(elem) for elem in dinfo[name].split(',')])
             else:
                 xinfo.append(self._genMissing(number, alt, dtype))
-                
-        format = zip(*[elem.split(':') for elem in format])
-        dformat = dict([(ffield,list(values)) for ffield, values in zip(format_fields, format)])
-
-
+        
         xformat = []
-        for name, number, type, dtype, description in self.format_fields:
-            #func = lambda x: type(x) if x.strip() != '.' else Missing
-            if name in dformat:
-                if number == 1:
-                    xformat.append([type(elem) if elem.strip() != '.' else Missing for elem in dformat[name]])
+        if self.has_genotypes:
+            format_fields = elems[8].split(':')
+            format = elems[9:]
+
+            format = zip(*[elem.split(':') for elem in format])
+            dformat = dict([(ffield,list(values)) for ffield, values in zip(format_fields, format)])
+
+
+            for name, number, type, dtype, description in self.format_fields:
+                #func = lambda x: type(x) if x.strip() != '.' else Missing
+                if name in dformat:
+                    if number == 1:
+                        xformat.append([type(elem) if elem.strip() != '.' else Missing for elem in dformat[name]])
+                    else:
+                        xformat.append([[type(elem) for elem in xelem.split(',')] if xelem != '.' else self._genMissing(number, alt, dtype) for xelem in dformat[name]])
                 else:
-                    xformat.append([xelem.split(',') if xelem != '.' else self._genMissing(number, alt, dtype) for xelem in dformat[name]])
-            else:
-                xformat.append([self._genMissing(number, alt, dtype)] * len(elems[9:]))
+                    xformat.append([self._genMissing(number, alt, dtype)] * len(elems[9:]))
 
         return (chrom, pos, id, ref, alt, qual, filter,) + tuple(xinfo) + tuple(xformat)
+        
 
     def _toDType(self, type, number):
         if isinstance(type,str) or isinstance(number, int) or number == 'alt_alleles' or number == 'genotypes':
@@ -239,7 +243,7 @@ class VCFParser(object):
             return numpy.dtype(type)
 
     def _genMissing(self, number, alt, dtype=None):
-        if number == 0 and type is bool:
+        if number == 0 and dtype is bool:
             res = False
         elif number == 1:
             res = Missing

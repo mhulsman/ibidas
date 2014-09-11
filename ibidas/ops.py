@@ -564,6 +564,7 @@ def ensure_frozen(slice):#{{{
 class UnaryFuncOp(UnaryUnaryOp):#{{{
     __slots__ = ["funcname","sig", "kwargs"]
     def __init__(self, slice, funcname, sig, name, dtype, dims=None, **kwargs):
+        assert isinstance(funcname,str),'Funcname not a str'
         self.funcname = funcname
         self.sig = sig
         self.kwargs = kwargs
