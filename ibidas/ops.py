@@ -144,7 +144,6 @@ class DetectAndCastOp(DetectTypeOp):#{{{
 class DetectFixedShapesOp(UnaryUnaryOp):
     __slots__ = []
 
-
 class UnpackArrayOp(UnaryUnaryOp):#{{{
     """An slice which is the result of unpacking a source slice."""
     __slots__ = ["unpack_dims"]
