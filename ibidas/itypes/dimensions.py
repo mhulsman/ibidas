@@ -145,8 +145,11 @@ class Dim(object):
     def copy(self, reid=False):
         """Returns a copy of this object"""
         res = copy.copy(self)
+        
         if(reid):
             res.id = getNewDimid()
+        else:
+            res.redim_cache = self._getRedimCache()
         return res
 
     def __eq__(self, other):

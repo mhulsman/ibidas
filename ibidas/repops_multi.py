@@ -176,7 +176,6 @@ class Filter(repops.MultiOpRep):
         source,constraint = repops_dim.makeDimNamesUnique(*sources)
         if not source._slicesKnown() or not constraint._typesKnown():
             return
-        
         assert len(constraint._slices) == 1, "Filter constraint should have 1 slice"
         cslice = constraint._slices[0]
 

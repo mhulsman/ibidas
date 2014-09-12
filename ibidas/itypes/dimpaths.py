@@ -118,10 +118,10 @@ class DimPath(tuple):
     def changeNames(self,newname_dict):#{{{
         newpath = []
         for dim in self:
-            if(dim in newname_dict):
+            if(dim in newname_dict and dim.name != newname_dict[dim]):
                 dim = dim.copy()
                 dim.name = newname_dict[dim]
-            elif(dim.name in newname_dict):
+            elif(dim.name in newname_dict and dim.name != newname_dict[dim.name]):
                 dim = dim.copy()
                 dim.name = newname_dict[dim.name]
             newpath.append(dim)
