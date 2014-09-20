@@ -116,6 +116,11 @@ def fimport_tsv(url, **kwargs):
     from wrappers.tsv import TSVRepresentor
     return TSVRepresentor(url, **kwargs) 
 
+def fimport_tsv2(url, **kwargs):
+    from wrappers.tsv2 import TSVRepresentor
+    return TSVRepresentor(url, **kwargs) 
+
+
 def fimport_matrixtsv(url, **kwargs):
     from wrappers.matrix_tsv import MatrixTSVRepresentor
     return MatrixTSVRepresentor(url, **kwargs)
@@ -177,6 +182,7 @@ def fexport_xlsx(data, url, **kwargs):
 
 
 formats_import = { 'tsv' : fimport_tsv, 'csv' : fimport_tsv,
+                    'tsv2' :fimport_tsv2,
                    'tsv_matrix' : fimport_matrixtsv,
                    'xml' : fimport_xml,
                    'psimi' : fimport_psimi,
