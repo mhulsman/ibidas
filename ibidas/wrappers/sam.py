@@ -4,6 +4,7 @@ from ..utils import util;
 ##############################################################################
 
 sam_fieldnames = ('qname', 'flag', 'rname', 'pos', 'mapq', 'cigar', 'rnext', 'pnext', 'tlen', 'seq', 'qual', 'optional');
+max_fieldnames = len(sam_fieldnames) - 1;
 
 ##############################################################################
 
@@ -13,7 +14,7 @@ def read_sam(fname, **kwargs):
     hds = "";
     i   = 0;
 
-    maxfields = len(sam_fieldnames) - 1;
+    maxfields = max_fieldnames;
 
     for line in f:
       i    = i+1;
@@ -23,14 +24,14 @@ def read_sam(fname, **kwargs):
         continue;
       #fi
 
-      fields    = line.split('\t', len(sam_fieldnames) - 1);
-      fieldslen  = len(fields);
+      fields    = line.split('\t', max_fieldnames);
+      fieldslen = len(fields);
       maxfields = maxfields if maxfields > fieldslen else fieldslen;
 
       print line;
       print fieldslen, len(sam_fieldnames);
 
-      if fieldslen < len(sam_fieldnames) - 1:
+      if fieldslen < max_fieldnames:
         util.warning('Line %d does not have all the mandatory fields. Skipping' % i);
       else:
         als.append(tuple(fields));
