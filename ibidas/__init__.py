@@ -145,6 +145,10 @@ def fimport_sam(url, **kwargs):
     from wrappers.sam import read_sam;
     return read_sam(url, **kwargs)
 
+def fimport_gff(url, **kwargs):
+    from wrappers.gff import read_gff3;
+    return read_gff3(url, **kwargs);
+
 def fimport_vcf(url, **kwargs):
     from wrappers.vcf import VCFRepresentor
     return VCFRepresentor(url, **kwargs)
@@ -197,6 +201,7 @@ formats_import = { 'tsv' : fimport_tsv, 'csv' : fimport_tsv,
                    'fasta' : fimport_fasta, 'fa' : fimport_fasta, 'fas' : fimport_fasta,
                    'fastq' : fimport_fastq,
                    'sam'   : fimport_sam,
+                   'gff'   : fimport_gff,
                    'vcf': fimport_vcf,
                    'gbff':fimport_genbank, 'gb': fimport_genbank, 'genbank': fimport_genbank, 'gbk':fimport_genbank,  'embl':fimport_embl,
                  };

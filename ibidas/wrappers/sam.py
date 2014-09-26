@@ -4,6 +4,7 @@ from ..utils import util;
 ##############################################################################
 
 sam_fieldnames = ('qname', 'flag', 'rname', 'pos', 'mapq', 'cigar', 'rnext', 'pnext', 'tlen', 'seq', 'qual', 'optional');
+sam_fieldtypes = (str,     int,    str,     int,   int,    str,     str,     int,     int,    str,   str,    str);
 max_fieldnames = len(sam_fieldnames) - 1;
 
 ##############################################################################
@@ -41,6 +42,11 @@ def read_sam(fname, **kwargs):
     f.close();
 
     R = Rep(als) / sam_fieldnames[0:maxfields];
+
+    for (name, type) in zip(sam_fieldnames, sam_fieldtypes):
+      R = R.To(name, Do=_.Cast(type));
+    #efor
+
     R.__dict__['sam_hds'] = hds;
 
     return R;
