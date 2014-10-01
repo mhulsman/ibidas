@@ -141,6 +141,14 @@ def fimport_fastq(url, **kwargs):
     from wrappers.fasta import read_fastq;
     return read_fastq(url, **kwargs)
 
+def fimport_sam(url, **kwargs):
+    from wrappers.sam import read_sam;
+    return read_sam(url, **kwargs)
+
+def fimport_gff(url, **kwargs):
+    from wrappers.gff import read_gff3;
+    return read_gff3(url, **kwargs);
+
 def fimport_vcf(url, **kwargs):
     from wrappers.vcf import VCFRepresentor
     return VCFRepresentor(url, **kwargs)
@@ -174,6 +182,10 @@ def fexport_fasta(data, url, **kwargs):
     from wrappers.fasta import write_fasta;
     return write_fasta(data, url, **kwargs);
 
+def fexport_sam(data, url, **kwargs):
+    from wrappers.sam import write_sam;
+    return write_sam(data, url, **kwargs);
+
 def fexport_xlsx(data, url, **kwargs):
     from wrappers.xlsx import write_xlsx;
     return write_xlsx(data, url, **kwargs);
@@ -188,6 +200,8 @@ formats_import = { 'tsv' : fimport_tsv, 'csv' : fimport_tsv,
                    'psimi' : fimport_psimi,
                    'fasta' : fimport_fasta, 'fa' : fimport_fasta, 'fas' : fimport_fasta,
                    'fastq' : fimport_fastq,
+                   'sam'   : fimport_sam,
+                   'gff'   : fimport_gff,
                    'vcf': fimport_vcf,
                    'gbff':fimport_genbank, 'gb': fimport_genbank, 'genbank': fimport_genbank, 'gbk':fimport_genbank,  'embl':fimport_embl,
                  };
@@ -197,6 +211,7 @@ formats_export = { 'tsv' : fexport_tsv, 'csv' : fexport_tsv,
                    'xml' : fexport_xml,
                    'psimi' : fexport_psimi,
                    'fasta' : fexport_fasta, 'fa' : fexport_fasta, 'fas' : fexport_fasta,
+                   'sam'   : fexport_sam,
                    'xlsx' : fexport_xlsx, 'xls' : fexport_xlsx
                  };
 

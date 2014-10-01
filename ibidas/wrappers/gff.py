@@ -1,6 +1,79 @@
-from .. import repops_multi
-import python
+from .. import repops_multi;
+from python import Rep;
 from ..utils import util
+
+entry_field_names = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attr'];
+entry_field_types = [ str,       str,      str,       int,     int,   str,     str,      str,     str   ];
+
+def read_gff3(fname, **kwargs):
+
+    gff3_fieldnames = ( 'seqname', 'source', 'id', 'parent', 'name', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attr' );
+
+    f       = util.open_file(fname,mode='rU');
+    entries = [];
+
+    i = 0;
+    for line in f:
+        i = i + 1;
+
+        line = line.strip();
+        if line[0] in [ '#', '%' ]:
+            continue;
+        #fi
+        entry = split_entry(line);
+
+        entries.append(entry);
+    #efor
+
+    loci = [];
+
+    for entry in entries:
+      e = [ entry[field] if field in entry else '' for field in gff3_fieldnames ];
+      e[-1] = ';'.join([ '='.join(attr) for attr in e[-1].items() ]);
+      loci.append(tuple(e));
+    #efor
+
+    R = Rep(loci) / gff3_fieldnames;
+    
+    for (name, type) in zip(entry_field_names, entry_field_types):
+      R = R.To(name, Do=_.Cast(type));
+    #efor
+
+    return R.Copy();
+#edef
+
+
+
+
+    
+
+def split_entry(raw):
+
+    fields = raw.split('\t', len(entry_field_names));
+
+    entry           = dict( zip(entry_field_names, fields ) );
+    entry['attr']   = dict(tuple(attr.split('=')) for attr in entry['attr'].split(';'));
+    entry['id']     = entry['attr']['ID'] if 'ID' in entry['attr'] else '';
+    entry['parent'] = entry['attr']['Parent'] if 'Parent' in entry['attr'] else '';
+    entry['name']   = entry['attr']['Name'] if 'Name' in entry['attr'] else '';
+
+    if 'ID' in entry['attr']:
+      del entry['attr']['ID'];
+    #fi
+
+    if 'Parent' in entry['attr']:
+      del entry['attr']['Parent'];
+    #fi
+
+    if 'Name' in entry['attr']:
+      del entry['attr']['Name'];
+    #fi
+
+    return entry;
+
+#edef
+    
+
 
 def save_gff3(data, filename, seqid, source='unknown'):
     """
