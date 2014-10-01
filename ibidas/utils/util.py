@@ -83,14 +83,14 @@ def save_rep(r, filename):
     f.write(s)
     f.close()
 
-def save_csv(r, filename, remove_line_end=True, names=True):
+def save_csv(r, filename, remove_line_end=True, names=True, lineterminator='\n'):
     f = open(filename,'wb')
     r= r.Array(tolevel=1)
     data = r.Cast(str)
     if filename.endswith('tsv'):
-        w = csv.writer(f,delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL);
+        w = csv.writer(f,delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
     else:
-        w = csv.writer(f, quotechar='"', quoting=csv.QUOTE_MINIMAL);
+        w = csv.writer(f, quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
 
     if remove_line_end:
         data = data.Each(lambda x: x.replace('\n',''), dtype=str, per_slice=True)
@@ -722,4 +722,8 @@ class PeekAheadFileReader(object):
 getNumber = re.compile('^([\d]+)')
 
 
-
+def unique_count(a):
+    unique, inverse = numpy.unique(a, return_inverse=True)
+    count = numpy.zeros(len(unique), np.int)
+    numpy.add.at(count, inverse, 1)
+    return dict(zip(unique,count))
