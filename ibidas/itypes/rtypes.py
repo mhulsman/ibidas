@@ -2119,6 +2119,11 @@ TypeArrays = set(TypeArray.getDescendantTypes())
 TypeIntegers = set(TypeInteger.getDescendantTypes())
 TypeReals = set(TypeReal64.getDescendantTypes()) - TypeIntegers
 
+def byteType(ndepth=1):
+    ndim = dimensions.Dim(UNDEFINED, (True,) * ndepth)
+    ndims = dimpaths.DimPath(ndim)
+    return TypeBytes(dims=ndims)
+
 if(platform.architecture()[0] == "32bit"):
     TypePlatformInt = TypeInt32
 else:

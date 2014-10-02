@@ -469,7 +469,18 @@ class Match(repops.MultiOpRep):
 
 
 class Blast(repops.MultiOpRep):
-    def __init__(self, lsource, rsource, lslice=None, rslice=None, blast_type = None, folder = None, reciprocal = True, normalize = False, overwrite = False, blastopts='', mode="dim"):
+    def __init__(self, lsource, rsource, lslice=None, rslice=None, blast_type = None, folder = None, algorithm='blast', mode='dim', **kwargs):
+        if algorithm == 'blast':
+            kwargs['reciprocal'] = kwargs.get('reciprocal', True)
+            kwargs['normalize'] = kwargs.get('normalize',   True)
+            kwargs['overwrite'] = kwargs.get('overwrite',   True)
+            kwargs['blastopts'] = kwargs.get('blastopts',   '')
+        elif algorithm == 'last':
+            kwargs['alargs'] = kwargs.get('alargs','')
+            kwargs['dbargs'] = kwargs.get('dbargs','')
+        else:
+            raise RuntimeError, 'Unknown algorithm: %s' % algorithm
+    
         assert blast_type in set(["nucl","prot", None]), "blast_type should be nucl or prot"
         assert (not isinstance(lslice,representor.Representor)), "Representor objects not allowed as lslice. Use context, string or int to indicate slice in lsource"
         assert (not isinstance(rslice,representor.Representor)), "Representor objects not allowed as rslice. Use context, string or int to indicate slice in rsource"
@@ -477,9 +488,9 @@ class Blast(repops.MultiOpRep):
         if rslice is None and lslice is None:
             lsource,rsource = repops_dim.makeDimNamesUnique(lsource, rsource) 
 
-        repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice), blast_type=blast_type, folder=folder, reciprocal=reciprocal, normalize=normalize, overwrite=overwrite, blastopts=blastopts, mode=mode)
+        repops.MultiOpRep.__init__(self,(lsource,rsource,lslice,rslice), blast_type=blast_type, folder=folder, algorithm=algorithm, mode=mode, **kwargs)
 
-    def _process(self, sources, blast_type, folder, reciprocal, normalize, overwrite, blastopts, mode):
+    def _process(self, sources, blast_type, folder, algorithm, mode, **kwargs):
         lsource, rsource, lslice, rslice = sources
         if not lsource._slicesKnown() or not rsource._slicesKnown():
             return
@@ -498,12 +509,12 @@ class Blast(repops.MultiOpRep):
         self._sources = (lsource, rsource, lslice, rslice)
         lslice = lslice._slices[0]
         rslice = rslice._slices[0]
-        nslices = self._apply(lsource, rsource, lslice, rslice, blast_type, folder, reciprocal, normalize, overwrite, blastopts, mode)
+        nslices = self._apply(lsource, rsource, lslice, rslice, blast_type, folder, algorithm, mode, **kwargs)
         return self._initialize(tuple(nslices))
 
 
     @classmethod
-    def _apply(cls,lsource, rsource, lslice, rslice, blast_type = None, folder = None, reciprocal = True, normalize = False, overwrite = False, blastopts='', mode="dim"):
+    def _apply(cls,lsource, rsource, lslice, rslice, blast_type, folder, algorithm, mode, **kwargs):
         leftslice = ops.PackArrayOp(lslice)
         rightslice = ops.PackArrayOp(rslice)
 
@@ -514,7 +525,7 @@ class Blast(repops.MultiOpRep):
        
         ((bleftslice,brightslice),(leftplan,rightplan))= ops.broadcast((leftslice,rightslice),mode=mode)
 
-        r = ops.BlastIndexOp(bleftslice,brightslice, blast_type=blast_type, folder=folder, reciprocal=reciprocal, normalize=normalize, overwrite=overwrite, blastopts=blastopts).results
+        r = ops.BlastIndexOp(bleftslice,brightslice, blast_type, folder, algorithm, **kwargs).results
         blastres = [ ops.UnpackArrayOp(s,1) for s in r[2:] ]
         lindex = r[0]
         rindex = r[1]
@@ -529,7 +540,7 @@ class Blast(repops.MultiOpRep):
         rslices = list(Filter._apply(rslices, rindex, rslice.dims[-1:], "dim"))
 
         return Combine._apply(tuple(lslices),tuple(blastres),tuple(rslices))
-
+    
     def find_seqslice(self, source, seqslice, blast_type=None):
         if seqslice is None:
             seqslice = [ i for i in xrange(len(source._slices)) if isinstance(source._slices[i].type, rtypes.TypeSequence) ];
@@ -555,6 +566,8 @@ class Blast(repops.MultiOpRep):
             else:
                 raise RuntimeError, "Selected slice not of type sequence type, pass blast_type parameter."
         return ss
+
+
 
 class Replace(repops.MultiOpRep):
     def __init__(self, source, slice, translator, fromslice=0, toslice=1):

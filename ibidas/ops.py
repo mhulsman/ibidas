@@ -808,9 +808,9 @@ class EquiJoinIndexOp(MultiMultiOp):#{{{
 
 
 class BlastIndexOp(MultiMultiOp):#{{{
-    __slots__ = ["blast_type", "folder", "reciprocal", "normalize", "overwrite", "blastopts"]
+    __slots__ = ["blast_type", "folder", "algorithm", "kwargs"]
 
-    def __init__(self, leftslice, rightslice,  blast_type, folder, reciprocal = True, normalize = False, overwrite = False, blastopts='' ):
+    def __init__(self, leftslice, rightslice, blast_type, folder, algorithm, **kwargs):
         assert leftslice.dims == rightslice.dims, "Parent dims of join fields should be equal"
         if leftslice.type.dims[0].name == rightslice.type.dims[0].name:
             name= leftslice.type.dims[0].name
@@ -818,20 +818,26 @@ class BlastIndexOp(MultiMultiOp):#{{{
             name= leftslice.type.dims[0].name + "_" + rightslice.type.dims[0].name
         ndim = dimensions.Dim(UNDEFINED, (True,) * len(leftslice.dims), name=name)
 
-        types = (rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(),  rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypeReal64(), rtypes.TypeReal64(), rtypes.TypeReal64())
-        names = ("qseqid", "sseqid", "qlen", "qstart", "qend", "slen", "sstart", "send", "length", "mismatch", "gapopen", "pident", "evalue", "bitscore" ) 
+        if algorithm == 'last':
+            nsubdim = dimensions.Dim(UNDEFINED, (True,) * (len(leftslice.dims) + 1), name='mapping')
+            ndepth = len(leftslice.dims) + 1
+            mtype = rtypes.TypeArray(subtypes=(rtypes.TypeAny(),), dims=dimpaths.DimPath(nsubdim))
+            types = (rtypes.TypeReal64(), rtypes.byteType(ndepth), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.byteType(ndepth), rtypes.TypePlatformInt(), rtypes.byteType(ndepth), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(),  rtypes.byteType(ndepth), rtypes.TypePlatformInt(),          mtype)
+            names = ('score',                  'chrom1',                    'pos1',             'length1',                'strand1',          'chromlength1',           'chrom2',           'pos2',                   'length2',                  'strand2',          'chromlength2',          'mapping')
+        elif algorithm == 'blast':
+            types = (rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(),  rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypeReal64(), rtypes.TypeReal64(), rtypes.TypeReal64())
+            names = ("qseqid", "sseqid", "qlen", "qstart", "qend", "slen", "sstart", "send", "length", "mismatch", "gapopen", "pident", "evalue", "bitscore" ) 
+        else:
+            raise RuntimeError, ('Unknown algorithm %s' % algorithm)
+        
         slice_types = [ rtypes.TypeArray(subtypes=(t,), dims=dimpaths.DimPath(ndim)) for t in types ];
-
         r = tuple([ SelectOp(self, i, names[i], slice_types[i] ,leftslice.dims, set([])) for i in xrange(len(slice_types)) ]);
         
         self.blast_type = blast_type
         self.folder = folder
-        self.reciprocal = reciprocal
-        self.normalize = normalize
-        self.overwrite = overwrite
-        self.blastopts= blastopts
+        self.algorithm = algorithm
+        self.kwargs=kwargs
 
         MultiMultiOp.__init__(self, (leftslice,rightslice),r)#}}}
-
 
 
