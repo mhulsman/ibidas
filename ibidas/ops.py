@@ -822,8 +822,14 @@ class BlastIndexOp(MultiMultiOp):#{{{
             nsubdim = dimensions.Dim(UNDEFINED, (True,) * (len(leftslice.dims) + 1), name='mapping')
             ndepth = len(leftslice.dims) + 1
             mtype = rtypes.TypeArray(subtypes=(rtypes.TypeAny(),), dims=dimpaths.DimPath(nsubdim))
-            types = (rtypes.TypeReal64(), rtypes.byteType(ndepth), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.byteType(ndepth), rtypes.TypePlatformInt(), rtypes.byteType(ndepth), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(),  rtypes.byteType(ndepth), rtypes.TypePlatformInt(),          mtype)
-            names = ('score',                  'chrom1',                    'pos1',             'length1',                'strand1',          'chromlength1',           'chrom2',           'pos2',                   'length2',                  'strand2',          'chromlength2',          'mapping')
+            itype = rtypes.TypePlatformInt()
+            if kwargs.get('pos_mode','last') == 'last':
+                types = (itype, itype, itype, itype, itype, rtypes.byteType(ndepth), itype, itype, itype, rtypes.byteType(ndepth), rtypes.TypeReal64(), mtype)
+                names = ('qseqid', 'sseqid', 'qlen','qstart', 'qend', 'qstrand', 'slen', 'sstart', 'send', 'sstrand', 'score', 'mapping')
+            else:
+                types = (itype, itype, itype, itype, itype, itype, itype, itype, rtypes.TypeReal64(), mtype)
+                names = ('qseqid', 'sseqid', 'qlen','qstart', 'qend', 'slen', 'sstart', 'send', 'score', 'mapping')
+
         elif algorithm == 'blast':
             types = (rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(),  rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypeReal64(), rtypes.TypeReal64(), rtypes.TypeReal64())
             names = ("qseqid", "sseqid", "qlen", "qstart", "qend", "slen", "sstart", "send", "length", "mismatch", "gapopen", "pident", "evalue", "bitscore" ) 

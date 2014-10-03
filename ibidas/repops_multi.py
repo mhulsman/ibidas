@@ -478,6 +478,7 @@ class Blast(repops.MultiOpRep):
         elif algorithm == 'last':
             kwargs['alargs'] = kwargs.get('alargs','')
             kwargs['dbargs'] = kwargs.get('dbargs','')
+            kwargs['pos_mode'] = kwargs.get('pos_mode', 'blast')
         else:
             raise RuntimeError, 'Unknown algorithm: %s' % algorithm
     

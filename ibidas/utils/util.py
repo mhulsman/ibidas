@@ -623,10 +623,10 @@ def run_par_cmds(cmd_list, max_threads=12, stdin=None, stdout=None, stderr=None)
 
 ###############################################################################
 
-def run_seq_cmds(cmd_list, stdin=None, stdout=None, stderr=None):
+def run_seq_cmds(cmd_list, stdin=None, stdout=None, stderr=None, shell=False):
 
   for cmd in [ x for x in cmd_list if x ]:
-    retval = run_cmd(cmd, stdin=stdin, stdout=stdout, stderr=stderr);
+    retval = run_cmd(cmd, stdin=stdin, stdout=stdout, stderr=stderr, shell=shell);
     if retval != 0:
       print "ERROR: Failed on cmd: %s" % cmd;
       return retval;
@@ -640,8 +640,12 @@ def run_seq_cmds(cmd_list, stdin=None, stdout=None, stderr=None):
 
 ###############################################################################
 
-def run_cmd(cmd, bg=False, stdin=None, stdout=None, stderr=None):
-  p = subprocess.Popen(shlex.split(cmd), stdin=stdin, stdout=stdout, stderr=stderr);
+def run_cmd(cmd, bg=False, stdin=None, stdout=None, stderr=None, shell=False, verbose=False):
+  if verbose:
+    print cmd
+  if not shell:
+    cmd = shlex.split(cmd)
+  p = subprocess.Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr, shell=shell);
   if bg:
     return p;
   else:
