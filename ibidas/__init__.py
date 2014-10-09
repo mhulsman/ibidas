@@ -186,6 +186,10 @@ def fexport_sam(data, url, **kwargs):
     from wrappers.sam import write_sam;
     return write_sam(data, url, **kwargs);
 
+def fexport_gff(data, url, **kwargs):
+    from wrappers.gff import save_gff3
+    return save_gff3(data, url, **kwargs);
+
 def fexport_xlsx(data, url, **kwargs):
     from wrappers.xlsx import write_xlsx;
     return write_xlsx(data, url, **kwargs);
@@ -212,6 +216,7 @@ formats_export = { 'tsv' : fexport_tsv, 'csv' : fexport_tsv,
                    'psimi' : fexport_psimi,
                    'fasta' : fexport_fasta, 'fa' : fexport_fasta, 'fas' : fexport_fasta,
                    'sam'   : fexport_sam,
+                   'gff'   : fexport_gff,
                    'xlsx' : fexport_xlsx, 'xls' : fexport_xlsx
                  };
 
