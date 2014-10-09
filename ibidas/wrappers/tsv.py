@@ -1,5 +1,8 @@
 import os
 import csv
+import sys
+
+csv.field_size_limit(2**31-1)
 from logging import info, warning
 
 import wrapper

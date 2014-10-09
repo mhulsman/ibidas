@@ -83,14 +83,14 @@ def save_rep(r, filename):
     f.write(s)
     f.close()
 
-def save_csv(r, filename, remove_line_end=True, names=True):
+def save_csv(r, filename, remove_line_end=True, names=True, lineterminator='\n'):
     f = open(filename,'wb')
     r= r.Array(tolevel=1)
     data = r.Cast(str)
     if filename.endswith('tsv'):
-        w = csv.writer(f,delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL);
+        w = csv.writer(f,delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
     else:
-        w = csv.writer(f, quotechar='"', quoting=csv.QUOTE_MINIMAL);
+        w = csv.writer(f, quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
 
     if remove_line_end:
         data = data.Each(lambda x: x.replace('\n',''), dtype=str, per_slice=True)
@@ -623,10 +623,10 @@ def run_par_cmds(cmd_list, max_threads=12, stdin=None, stdout=None, stderr=None)
 
 ###############################################################################
 
-def run_seq_cmds(cmd_list, stdin=None, stdout=None, stderr=None):
+def run_seq_cmds(cmd_list, stdin=None, stdout=None, stderr=None, shell=False):
 
   for cmd in [ x for x in cmd_list if x ]:
-    retval = run_cmd(cmd, stdin=stdin, stdout=stdout, stderr=stderr);
+    retval = run_cmd(cmd, stdin=stdin, stdout=stdout, stderr=stderr, shell=shell);
     if retval != 0:
       print "ERROR: Failed on cmd: %s" % cmd;
       return retval;
@@ -640,8 +640,12 @@ def run_seq_cmds(cmd_list, stdin=None, stdout=None, stderr=None):
 
 ###############################################################################
 
-def run_cmd(cmd, bg=False, stdin=None, stdout=None, stderr=None):
-  p = subprocess.Popen(shlex.split(cmd), stdin=stdin, stdout=stdout, stderr=stderr);
+def run_cmd(cmd, bg=False, stdin=None, stdout=None, stderr=None, shell=False, verbose=False):
+  if verbose:
+    print cmd
+  if not shell:
+    cmd = shlex.split(cmd)
+  p = subprocess.Popen(cmd, stdin=stdin, stdout=stdout, stderr=stderr, shell=shell);
   if bg:
     return p;
   else:
@@ -722,4 +726,8 @@ class PeekAheadFileReader(object):
 getNumber = re.compile('^([\d]+)')
 
 
-
+def unique_count(a):
+    unique, inverse = numpy.unique(a, return_inverse=True)
+    count = numpy.zeros(len(unique), np.int)
+    numpy.add.at(count, inverse, 1)
+    return dict(zip(unique,count))
