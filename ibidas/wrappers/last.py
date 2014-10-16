@@ -31,10 +31,10 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='-c -uMAM8', alargs=
   fas_1.flush()
   fas_2.flush()
 
-  util.run_cmd(last_make_db_CMD(db_2, fas_2.name, type, dbargs), verbose=True)
-  util.run_cmd(last_run_CMD(db_2, fas_1.name, alargs, lpargs, last_split), shell=True, stdout=res, verbose=True)
+  util.run_cmd(last_make_db_CMD(db_2, fas_1.name, type, dbargs), verbose=False)
+  util.run_cmd(last_run_CMD(db_2, fas_2.name, alargs, lpargs, last_split), shell=True, stdout=res, verbose=False)
   res.flush()
-  data = last_result(db_2, fas_1.name, res.name, pos_mode); # if reciprocal blast_reciprocal(file_12.name, file_21.name) else blast_res_to_dict(file_12.name)
+  data = last_result(db_2, res.name, pos_mode); # if reciprocal blast_reciprocal(file_12.name, file_21.name) else blast_res_to_dict(file_12.name)
 
   fas_1.close();
   fas_2.close();
@@ -47,7 +47,7 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='-c -uMAM8', alargs=
 
 ###############################################################################
 
-def last_result(dbname, fas_file, resfile, pos_mode = 'last'):
+def last_result(dbname, resfile, pos_mode = 'last'):
   bm = {};
   br = open(resfile, 'rb');
 
@@ -75,14 +75,14 @@ def last_result(dbname, fas_file, resfile, pos_mode = 'last'):
   #         0'score',  1'chrom1', 2'pos1',3'length1',4'strand1', 5'chromlength1', 6'chrom2', 7'pos2', 8'length2', 9'strand2', 10'chromlength2',11'mapping'
 
   if pos_mode == 'last':
-        res = (cols[6],      cols[1], cols[10], cols[7], cols[7] + cols[8], cols[9],cols[5], cols[2], cols[2] + cols[3], cols[4], cols[0], cols[11])
+        res = (cols[1],      cols[6], cols[5], cols[2], cols[2] + cols[3], cols[4], cols[10], cols[7], cols[7] + cols[8], cols[9],cols[0], cols[11])
   elif pos_mode == 'blast':
-        qstart, qend = remove_strand_baseone(cols[7] + 1, cols[7] + cols[8], cols[9], cols[10])
-        sstart, send = remove_strand_baseone(cols[2] + 1, cols[2] + cols[3], cols[4], cols[5])
+        sstart, send = remove_strand_baseone(cols[7] + 1, cols[7] + cols[8], cols[9], cols[10])
+        qstart, qend = remove_strand_baseone(cols[2] + 1, cols[2] + cols[3], cols[4], cols[5])
         f = cols[9] == '-'
         qstart, qend = switch_pos_baseone(qstart, qend, f)
         sstart, send = switch_pos_baseone(sstart, send, f)
-        res = (cols[6],cols[1], cols[10], qstart, qend, cols[5], sstart, send, cols[0], cols[11])
+        res = (cols[1],cols[6], cols[5], qstart, qend, cols[10], sstart, send, cols[0], cols[11])
   else:
     raise RuntimeError, 'unknown positioni mode %s' % pos_mode
   br.close();
@@ -98,8 +98,8 @@ def switch_strand_baseone(start, end, strand, chromlength, switch_filter=None):
     if switch_filter is None:
         switch_filter = strand == '-'
     f = ~switch_filter 
-    nstart[f] = start
-    nend[f] = end
+    nstart[f] = start[f]
+    nend[f] = end[f]
     return (nstart, nend)
 
 def switch_pos_baseone(start, end, switch_filter):

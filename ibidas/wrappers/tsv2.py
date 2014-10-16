@@ -6,12 +6,11 @@ csv.field_size_limit(2**31-1)
 from logging import info, warning
 
 import wrapper
-from ..itypes import rtypes
 from .. import ops
 from ..constants import *
 
 import python
-from ..itypes import detector
+from ..itypes import detector, rtypes, dimpaths, dimensions
 from ..utils import nested_array, util
 import numpy
 import StringIO
@@ -39,7 +38,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         dialect, sniff_message = self.sniff(sample_lines, delimiter=delimiter, quotechar=quotechar, escapechar=escapechar, commentchar=commentchar, skipinitialspace=skipinitialspace, doublequote=doublequote, skiprows=skiprows)
 
         if verbose:
-            print "Determined parameters:"
+            print "Determined parameters for file %s:" % filename
             print sniff_message,
 
        
@@ -101,13 +100,25 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                 data = [tuple(row) for row in reader if len(row) > 0]
             file.seek(startpos)
 
-            det = detector.Detector()
-            det.process(data)
-            dtype = det.getType()
-            if(not fieldnames is None and not fieldnames is False and dtype != rtypes.unknown):
-                assert isinstance(dtype,rtypes.TypeArray),"Error while determining type"
-                assert isinstance(dtype.subtypes[0],rtypes.TypeTuple),"Error while determining type"
-                dtype.subtypes[0].fieldnames = tuple(fieldnames)
+            if len(data) == 0:
+                if fieldnames:
+                    any = rtypes.TypeAny()
+                    ndim = dimensions.Dim(0)
+                    subtypes = (any,) * len(fieldnames)
+                    subtype = rtypes.TypeTuple(subtypes=subtypes, fieldnames=fieldnames)
+                    rarray = rtypes.TypeArray(subtypes=(subtype,), dims=dimpaths.DimPath(ndim))
+                    dtype =rarray
+                else:
+                    dtype = rtypes.unknown
+                
+            else:
+                det = detector.Detector()
+                det.process(data)
+                dtype = det.getType()
+                if(not fieldnames is None and not fieldnames is False and dtype != rtypes.unknown):
+                    assert isinstance(dtype,rtypes.TypeArray),"Error while determining type"
+                    assert isinstance(dtype.subtypes[0],rtypes.TypeTuple),"Error while determining type"
+                    dtype.subtypes[0].fieldnames = tuple(fieldnames)
         elif(isinstance(dtype,basestring)):
             dtype = rtypes.createType(dtype)
             if(fieldnames is True):
@@ -121,9 +132,9 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         else:
             raise RuntimeError, "Not a valid type specified"
 
-        if comments:
+        if comments and verbose:
             print 'Comments:'
-            print "\n".join(comments)
+            print "".join(comments)
     
         slice = TSVOp(filename, dialect, startpos, dtype, "data", lines=data)
         if(slice.type.__class__ is rtypes.TypeArray):
@@ -185,59 +196,70 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         message += '- skiprows:\t' + str(rskiprows) + '\n' #+ ('\t!\n' if skiprows >= 0 else '\n')
         sample_lines = [sl for sl in sample_lines if len(sl) == 0 or sl[0] != commentchar]
         
-
-        if not sample_lines:
-            warning('No data, cannot sniff file format! Assuming standard tsv format')
-            class sniff_dialect(csv.excel):
-                pass
-            sniff_dialect.commentchar = commentchar
-            sniff_dialect.skiprows = rskiprows
-            return sniff_dialect
-
-
         class sniff_dialect(csv.Dialect):
             _name='sniffed'
             lineterminator = '\r\n'
             quoting = csv.QUOTE_MINIMAL
 
-        sniff_dialect.doublequote=doublequote
-        sniff_dialect.delimiter=delimiter
-        sniff_dialect.quotechar=quotechar or '"'
-        sniff_dialect.skipinitialspace=skipinitialspace
-        if not escapechar is None:
-            sniff_dialect.escapechar=escapechar
-        sniff_dialect.commentchar=commentchar
-        sniff_dialect.skiprows = rskiprows
-
-
-        if quotechar is None or delimiter is None or skipinitialspace is None:
+        if not sample_lines:
+            warning('No data, cannot sniff file format! Assuming standard tsv format')
+            sniff_dialect.doublequote=doublequote
+            sniff_dialect.delimiter=delimiter
+            sniff_dialect.quotechar=quotechar or '"'
+            sniff_dialect.skipinitialspace=skipinitialspace
+            if not escapechar is None:
+                sniff_dialect.escapechar=escapechar
+            sniff_dialect.commentchar = commentchar
+            sniff_dialect.skiprows = rskiprows
+            if quotechar is None:
+                sniff_dialect.quotechar = '"'
             if delimiter is None:
-                delimiters = ''.join(possible_delimiters)
-            else:
-                delimiters = delimiter
+                sniff_dialect.delimiter = '\t'
+            if skipinitialspace is None:
+                sniff_dialect.skipinitialspace = True
+            if doublequote is None and escapechar is None:
+                sniff_dialect.doublequote=True
 
-            try:
-                dialect = csv.Sniffer().sniff('\n'.join(sample_lines), delimiters=delimiters)
-            
-                if quotechar is None:
-                    sniff_dialect.quotechar = dialect.quotechar
+        else:
+
+            sniff_dialect.doublequote=doublequote
+            sniff_dialect.delimiter=delimiter
+            sniff_dialect.quotechar=quotechar or '"'
+            sniff_dialect.skipinitialspace=skipinitialspace
+            if not escapechar is None:
+                sniff_dialect.escapechar=escapechar
+            sniff_dialect.commentchar=commentchar
+            sniff_dialect.skiprows = rskiprows
+
+
+            if quotechar is None or delimiter is None or skipinitialspace is None:
                 if delimiter is None:
-                    sniff_dialect.delimiter = dialect.delimiter
-                if skipinitialspace is None:
-                    sniff_dialect.skipinitialspace = dialect.skipinitialspace
-                if doublequote is None:
-                    sniff_dialect.doublequote = dialect.doublequote
-                if not escapechar is None:
-                    sniff_dialect.doublequote=False
-            except csv.Error:
-                if quotechar is None:
-                    sniff_dialect.quotechar = '"'
-                if delimiter is None:
-                    sniff_dialect.delimiter = '\t'
-                if skipinitialspace is None:
-                    sniff_dialect.skipinitialspace = True
-                if doublequote is None and escapechar is None:
-                    sniff_dialect.doublequote=True
+                    delimiters = ''.join(possible_delimiters)
+                else:
+                    delimiters = delimiter
+
+                try:
+                    dialect = csv.Sniffer().sniff('\n'.join(sample_lines), delimiters=delimiters)
+                
+                    if quotechar is None:
+                        sniff_dialect.quotechar = dialect.quotechar
+                    if delimiter is None:
+                        sniff_dialect.delimiter = dialect.delimiter
+                    if skipinitialspace is None:
+                        sniff_dialect.skipinitialspace = dialect.skipinitialspace
+                    if doublequote is None:
+                        sniff_dialect.doublequote = dialect.doublequote
+                    if not escapechar is None:
+                        sniff_dialect.doublequote=False
+                except csv.Error:
+                    if quotechar is None:
+                        sniff_dialect.quotechar = '"'
+                    if delimiter is None:
+                        sniff_dialect.delimiter = '\t'
+                    if skipinitialspace is None:
+                        sniff_dialect.skipinitialspace = True
+                    if doublequote is None and escapechar is None:
+                        sniff_dialect.doublequote=True
 
         message += '- delimiter:\t' + repr(sniff_dialect.delimiter) + '\n' #+ '\t!\n' if delimiter is None else '\n'
         message += '- quotechar:\t' + sniff_dialect.quotechar +'\n' #+ '\t!\n' if quotechar is None else '\n'
@@ -261,6 +283,8 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         # rows except for the first are the same length, it's a header.
         # Finally, a 'vote' is taken at the end for each column, adding or
         # subtracting from the likelihood of the first row being a header.
+        if len(sample) == 0:
+            return -1
 
         rdr = csv.reader(StringIO.StringIO(sample), dialect)
 
