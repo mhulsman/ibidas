@@ -83,14 +83,14 @@ def save_rep(r, filename):
     f.write(s)
     f.close()
 
-def save_csv(r, filename, remove_line_end=True, names=True, lineterminator='\n'):
+def save_csv(r, filename, remove_line_end=True, names=True, lineterminator='\n', delimiter=',', quotechar='"'):
     f = open(filename,'wb')
     r= r.Array(tolevel=1)
     data = r.Cast(str)
     if filename.endswith('tsv'):
-        w = csv.writer(f,delimiter='\t', quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
+        w = csv.writer(f,delimiter='\t', quotechar=quotechar, quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
     else:
-        w = csv.writer(f, quotechar='"', quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
+        w = csv.writer(f,delimiter=delimiter,quotechar=quotechar, quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
 
     if remove_line_end:
         data = data.Each(lambda x: x.replace('\n',''), dtype=str, per_slice=True)

@@ -29,9 +29,6 @@ def read_sam(fname, **kwargs):
       fieldslen = len(fields);
       maxfields = maxfields if maxfields > fieldslen else fieldslen;
 
-      print line;
-      print fieldslen, len(sam_fieldnames);
-
       if fieldslen < max_fieldnames:
         util.warning('Line %d does not have all the mandatory fields. Skipping' % i);
       else:

@@ -73,9 +73,26 @@ def split_entry(raw):
 
 #edef
     
+def save_gff3(G, filename, **kwargs):
+    import md5;
 
+    m = md5.new()
+    fout = open(filename, 'w');
+    for e in zip(*G()):
+        seqname, source, id, parent, name, feature, start, end, score, strand, frame, attr = e;
+        attr = ('ID=%s; ' % id) if id else '' + ('Parent=%s; ' % parent) if parent else '' + ('Name=%s; ' % name) if name else '' + attr;
 
-def save_gff3(data, filename, seqid, source='unknown'):
+        l = [seqname, source, feature, start, end, score, strand, frame, attr];
+        l = '\t'.join([str(i) for i in l]) + '\n';
+        m.update(l);
+        fout.write(l);
+    #efor
+
+    fout.close();
+    return m.hexdigest();
+#edef
+
+def save_gff(data, filename, seqid, source='unknown'):
     """
     Saves data in gff3 format. 
     :param seqid: name of e.g. chromosome described by dataset
