@@ -80,7 +80,7 @@ def save_gff3(G, filename, **kwargs):
     fout = open(filename, 'w');
     for e in zip(*G()):
         seqname, source, id, parent, name, feature, start, end, score, strand, frame, attr = e;
-        attr = ('ID=%s; ' % id) if id else '' + ('Parent=%s; ' % parent) if parent else '' + ('Name=%s; ' % name) if name else '' + attr;
+        attr = (('ID=%s; ' % id) if id else '') + (('Parent=%s; ' % parent) if parent else '') + (('Name=%s; ' % name) if name else '' + attr);
 
         l = [seqname, source, feature, start, end, score, strand, frame, attr];
         l = '\t'.join([str(i) for i in l]) + '\n';
