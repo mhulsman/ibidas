@@ -122,7 +122,8 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         elif(isinstance(dtype,basestring)):
             dtype = rtypes.createType(dtype)
             if(fieldnames is True):
-                dummy = file.readline()
+                fieldnames = file.readline()
+                fieldnames = csv.reader([fieldnames],dialect=dialect).next()
                 startpos = file.tell()
                 if verbose:
                     print '- fieldnames:\t' + ', '.join(fieldnames)

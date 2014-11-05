@@ -31,7 +31,7 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='-c -uMAM8', alargs=
   fas_1.flush()
   fas_2.flush()
 
-  util.run_cmd(last_make_db_CMD(db_2, fas_1.name, type, dbargs), verbose=False)
+  util.run_cmd(last_make_db_CMD(db_2, fas_1.name, type[1], dbargs), verbose=False)
   util.run_cmd(last_run_CMD(db_2, fas_2.name, alargs, lpargs, last_split), shell=True, stdout=res, verbose=False)
   res.flush()
   data = last_result(db_2, res.name, pos_mode); # if reciprocal blast_reciprocal(file_12.name, file_21.name) else blast_res_to_dict(file_12.name)
@@ -121,7 +121,7 @@ def remove_strand_baseone(start, end, strand, chromlength):
 
 def last_make_db_CMD(dbname, fas_file, type, args=''):
   arguments = []
-  if type == 'prot':
+  if type == 'p':
       arguments.append('-p')
   arguments.append(args)
 

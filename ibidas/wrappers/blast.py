@@ -46,24 +46,24 @@ def blast(data, type, folder, reciprocal = True, normalize = False, overwrite = 
 
     # perform blast for 12
   file_12 = "%s/%s-%s.tsv" % (folder, md5_1, md5_2);
-  mkdb_CMDs = mkdb_CMDs + [ blast_make_db_CMD(fas_2.name, db_2, type) ];
-  blst_CMDs = blst_CMDs + [ blast_run_CMD(fas_1.name, db_2, type, file_12, blastopts, overwrite) ];
+  mkdb_CMDs = mkdb_CMDs + [ blast_make_db_CMD(fas_2.name, db_2, type[1]) ];
+  blst_CMDs = blst_CMDs + [ blast_run_CMD(fas_1.name, db_2, type[0], file_12, blastopts, overwrite) ];
 
   if reciprocal:
       # perform blast for 21
     file_21 = "%s/%s-%s.tsv" % (folder, md5_2, md5_1);
-    mkdb_CMDs = mkdb_CMDs + [ blast_make_db_CMD(fas_1.name, db_1, type) ];
-    blst_CMDs = blst_CMDs + [ blast_run_CMD(fas_2.name, db_1, type, file_21, blastopts, overwrite) ];
+    mkdb_CMDs = mkdb_CMDs + [ blast_make_db_CMD(fas_1.name, db_1, type[1]) ];
+    blst_CMDs = blst_CMDs + [ blast_run_CMD(fas_2.name, db_1, type[0], file_21, blastopts, overwrite) ];
   #fi
 
   if normalize:
       # perform blast for 11
     file_11 = "%s/%s-%s.tsv" % (folder, md5_1, md5_1);
-    blst_CMDs = blst_CMDs + [ blast_run_CMD(fas_1.name, db_1, type, file_11, blastopts, overwrite) ];
+    blst_CMDs = blst_CMDs + [ blast_run_CMD(fas_1.name, db_1, type[0], file_11, blastopts, overwrite) ];
 
       # perform blast for 22
     file_22 = "%s/%s-%s.tsv" % (folder, md5_2, md5_2);
-    blst_CMDs = blst_CMDs + [ blast_run_CMD(fas_2.name, db_2, type, file_22, blastopts, overwrite) ];
+    blst_CMDs = blst_CMDs + [ blast_run_CMD(fas_2.name, db_2, type[1], file_22, blastopts, overwrite) ];
   #fi
 
   util.run_par_cmds(mkdb_CMDs);
@@ -224,13 +224,14 @@ def blast_bitscore_normalize(ab, aa, bb):
 
 def blast_make_db_CMD(fas_file, filename, type):
   #makeblastdb -in "fas_file" -out "filename" -dbtype "prot"
+  type = 'nucl' if type == 'n' else 'prot'
   return "makeblastdb -in '%s' -out '%s' -dbtype '%s'" % (fas_file, filename, type);
 #edef
 
 ###############################################################################
 
 def blast_run_CMD(query, db, type, filename, blastopts, overwrite):
-  prog = "blastp" if (type == 'prot') else "blastn";
+  prog = "blastp" if (type == 'p') else "blastn";
   #       0      1      2    3      4    5    6      7    8      9        10      11     12     13
   opts = "qseqid sseqid qlen qstart qend slen sstart send length mismatch gapopen pident evalue bitscore"
   if (not os.path.isfile(filename)) or (overwrite == True):

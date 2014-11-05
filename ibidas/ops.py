@@ -831,6 +831,7 @@ class BlastIndexOp(MultiMultiOp):#{{{
                 names = ('qseqid', 'sseqid', 'qlen','qstart', 'qend', 'slen', 'sstart', 'send', 'score', 'mapping')
 
         elif algorithm == 'blast':
+            assert kwargs.get('pos_mode', None) != 'last', 'Last pos-mode not (yet) supported for blast algorithm'
             types = (rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(),  rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypeReal64(), rtypes.TypeReal64(), rtypes.TypeReal64())
             names = ("qseqid", "sseqid", "qlen", "qstart", "qend", "slen", "sstart", "send", "length", "mismatch", "gapopen", "pident", "evalue", "bitscore" ) 
         else:

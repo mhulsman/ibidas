@@ -482,7 +482,11 @@ class Blast(repops.MultiOpRep):
         else:
             raise RuntimeError, 'Unknown algorithm: %s' % algorithm
     
-        assert blast_type in set(["nucl","prot", None]), "blast_type should be nucl or prot"
+        convert = {'nucl':('n','n'), 'prot':('p':'p'), 'nuclprot':('n','p'), 'protnucl': ('p','n')}
+        assert blast_type in convert or blast_type is None, "blast_type should be nucl, prot, nuclprot or protnucl"
+        blast_type = convert.get(blast_type, None)
+
+
         assert (not isinstance(lslice,representor.Representor)), "Representor objects not allowed as lslice. Use context, string or int to indicate slice in lsource"
         assert (not isinstance(rslice,representor.Representor)), "Representor objects not allowed as rslice. Use context, string or int to indicate slice in rsource"
         
@@ -496,16 +500,19 @@ class Blast(repops.MultiOpRep):
         if not lsource._slicesKnown() or not rsource._slicesKnown():
             return
 
-        lslice = self.find_seqslice(lsource, lslice)
-        rslice = self.find_seqslice(rsource, rslice)
+        lslice = self.find_seqslice(lsource, lslice, None if blast_type is None else blast_type[0])
+        rslice = self.find_seqslice(rsource, rslice, None if blast_type is None else blast_type[1])
 
         if not lslice._typesKnown() or not rslice._typesKnown():
             return
 
-        assert lslice.Type == rslice.Type, "Can not perform BLAST on different types of sequences, convert one to the other and try, try again."
         if blast_type is None:
-            blast_type = "nucl" if (isinstance(lslice.Type, rtypes.TypeDNASequence)) else "prot"
-        assert (isinstance(lslice.Type , rtypes.TypeDNASequence) and blast_type == 'nucl' ) or (isinstance(lslice.Type , rtypes.TypeProteinSequence) and blast_type == 'prot' ), "Can not perform this BLAST with this sequence type."
+            b1 = "n" if (isinstance(lslice.Type, rtypes.TypeDNASequence)) else "p"
+            b2 = "n" if (isinstance(rslice.Type, rtypes.TypeDNASequence)) else "p"
+            blast_type = (b1, b2)
+
+        assert (isinstance(lslice.Type , rtypes.TypeDNASequence) and blast_type[0] == 'n' ) or (isinstance(lslice.Type , rtypes.TypeProteinSequence) and blast_type[0] == 'p' ), "Can not perform this BLAST with this sequence type."
+        assert (isinstance(rslice.Type , rtypes.TypeDNASequence) and blast_type[1] == 'n' ) or (isinstance(rslice.Type , rtypes.TypeProteinSequence) and blast_type[1] == 'p' ), "Can not perform this BLAST with this sequence type."
         
         self._sources = (lsource, rsource, lslice, rslice)
         lslice = lslice._slices[0]
@@ -560,9 +567,9 @@ class Blast(repops.MultiOpRep):
         ss = source.Get(seqslice);
 
         if not isinstance(ss.Type, rtypes.TypeSequence):
-            if blast_type == 'nucl':
+            if blast_type == 'n':
                 ss = ss.Cast("DNA");
-            elif blast_type == 'prot':
+            elif blast_type == 'p':
                 ss = ss.Cast("protein");
             else:
                 raise RuntimeError, "Selected slice not of type sequence type, pass blast_type parameter."
