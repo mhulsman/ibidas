@@ -145,6 +145,10 @@ def fimport_sam(url, **kwargs):
     from wrappers.sam import read_sam;
     return read_sam(url, **kwargs)
 
+def fimport_maf(url, **kwargs):
+    from wrappers.maf import read_maf
+    return read_maf(url, **kwargs)
+
 def fimport_gff(url, **kwargs):
     from wrappers.gff import read_gff3;
     return read_gff3(url, **kwargs);
@@ -206,6 +210,7 @@ formats_import = { 'tsv' : fimport_tsv, 'csv' : fimport_tsv,
                    'fastq' : fimport_fastq,
                    'sam'   : fimport_sam,
                    'gff'   : fimport_gff,
+                   'maf'   : fimport_maf,
                    'vcf': fimport_vcf,
                    'gbff':fimport_genbank, 'gb': fimport_genbank, 'genbank': fimport_genbank, 'gbk':fimport_genbank,  'embl':fimport_embl,
                  };

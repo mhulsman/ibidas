@@ -111,6 +111,17 @@ class Detector(object):
         self.processSeq(sparse_arrays.FullSparse(util.darray([obj])))
 
     def processSeq(self, seq):
+        if isinstance(seq,numpy.ndarray) and len(seq.shape) == 1:
+            dtype = seq.dtype
+            if dtype == numpy.object:
+                pass
+            elif dtype.char == 'S': #FIXME: speedup possible
+                pass
+            elif dtype.char == 'U': #FIXME: speedup possible
+                pass
+            else:
+                seq = seq.ravel()[:1]
+        
         if not isinstance(seq, (sparse_arrays.FullSparse)):
             if isinstance(seq, (set, frozenset)):
                 seq = util.darray(list(seq))
@@ -678,12 +689,36 @@ class ContainerScanner(TypeScanner):
                     dr.processLengths(nelems.ravel(), has_missing=has_missing)
         
         d = self.getSubDetector()
-        if(self.min_dim == 1 and not has_missing):
-            d.processSeq(list(chain(*seq.ravel())))
-        else: 
-            for subseq in seq.ravel():
-                if not (subseq is Missing):
-                    d.processSeq(subseq)
+        done=False
+        #shortcut for numpy.arrays
+        if self.min_dim == 1 and not has_missing and len(self.detector.objectclss) == 1 and numpy.ndarray in self.detector.objectclss:
+            dtypes = set([elem for elem in seq.map(lambda x: x.dtype, otype=object, out_empty=None, has_missing=has_missing) if not elem is None])
+            
+            if len(dtypes) == 1:
+                dtype = dtypes.pop()
+                if dtype == numpy.object:
+                    pass
+                elif dtype.char == 'S': #FIXME: speedup possible
+                    pass
+                elif dtype.char == 'U': #FIXME: speedup possible
+                    pass
+                else:
+                    done=True
+                    elem=[]
+                    seqs = seq.ravel()
+                    pos = 0
+                    while len(elem) == 0 and pos < len(seqs):
+                        s=seqs[pos]
+                        elem.extend(s[:1])
+                        pos+=1
+                    d.processSeq(elem)
+        if not done: 
+            if(self.min_dim == 1 and not has_missing):
+                d.processSeq(list(chain(*seq.ravel())))
+            else: 
+                for subseq in seq.ravel():
+                    if not (subseq is Missing):
+                        d.processSeq(subseq)
         return True
 
 def getshape(elem):

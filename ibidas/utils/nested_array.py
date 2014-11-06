@@ -34,7 +34,8 @@ class NestedArray(object):
 
     def flat(self):
         data,rshape = self._flatData()
-        data= util.darray([subelem for subelem in data],object,1,1)
+        if len(data.shape) > 1:
+            data= util.darray([subelem for subelem in data],object,1,1)
         return data
 
     def _flatData(self,depth=-1):

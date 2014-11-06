@@ -22,12 +22,16 @@ class FullSparse(numpy.ndarray):
     val = property(fget=getVal)
     
     def _getClasses(self):
+        if hasattr(self, '_class_cache'):
+           return self._class_cache
+                    
         classes = set()
         if(self.dtype == object):
             classes |= set([value.__class__ for value in self.ravel()])
         else:
             classes.add(self.dtype.type)
-
+        
+        self._class_cache = classes
         return classes
     classes=property(fget=_getClasses)
 

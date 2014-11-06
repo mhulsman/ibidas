@@ -13,10 +13,27 @@ import subprocess
 ###############################################################################
 
 
-def last(data, type, folder=None, pos_mode = 'last', dbargs='-c -uMAM8', alargs='-e10 -m100', lpargs='', last_split=True):
+def last(data, type, folder=None, pos_mode = 'last', dbargs='-c -uMAM8', alargs='-x50 -m100', lsargs='', trf=False, last_split=True, calc_evalue=True):
+  alargs = [alargs]
+  dbargs = [dbargs]
+  lsargs = [lsargs]
 
   seq_1 = data[0];
   seq_2 = data[1];
+
+  if type[0] != type[1]:
+    if type[0] == 'n' and type[1] == 'p':
+        util.warning('Reversing order, last supports only Prot to DNA and not DNA to Prot')
+        seq_1,seq_2 = seq_2,seq_1
+        type = (type[1],type[0])
+  
+  if trf:
+    seq_1 = seq_1.upper()
+    seq_2 = seq_2.upper()
+    if not_contains(dbargs, '-c'):
+        dbargs.append('-c')
+    if not_contains(alargs, '-u'):
+        alargs.append('-u2')
 
   title_1 = [ "%d" % i for i in xrange(len(seq_1)) ];
   title_2 = [ "%d" % i for i in xrange(len(seq_2)) ];
@@ -24,30 +41,49 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='-c -uMAM8', alargs=
   fas_1 = tempfile.NamedTemporaryFile(suffix='.fasta')
   fas_2 = tempfile.NamedTemporaryFile(suffix='.fasta')
   res = tempfile.NamedTemporaryFile(suffix='.tsv')
+  
+  db_1  = fas_1.name[:-6]
   db_2  = fas_2.name[:-6]
 
   md5_1 = write_fasta_text(title_1, seq_1, len(seq_1), fas_1);
   md5_2 = write_fasta_text(title_2, seq_2, len(seq_2), fas_2);
+  
   fas_1.flush()
   fas_2.flush()
+  
+  if trf:
+    fas_1 = run_trf(fas_1, type[0])
+    fas_2 = run_trf(fas_2, type[2])
 
-  util.run_cmd(last_make_db_CMD(db_2, fas_1.name, type[1], dbargs), verbose=False)
-  util.run_cmd(last_run_CMD(db_2, fas_2.name, alargs, lpargs, last_split), shell=True, stdout=res, verbose=False)
+  if type[0] != type[1]:
+    calc_evalue = False
+
+  util.run_cmd(last_make_db_CMD(db_1, fas_1.name, type[0], dbargs), verbose=False)
+  if calc_evalue:
+     util.run_cmd(last_make_db_CMD(db_2, fas_2.name, type[1], dbargs), verbose=False)
+
+  util.run_cmd(last_run_CMD(db_1, type[0], db_2, fas_2.name, type[1], alargs, lsargs, last_split, calc_evalue), shell=True, stdout=res, verbose=False)
   res.flush()
-  data = last_result(db_2, res.name, pos_mode); # if reciprocal blast_reciprocal(file_12.name, file_21.name) else blast_res_to_dict(file_12.name)
+
+  data = last_result(res.name, pos_mode); 
 
   fas_1.close();
   fas_2.close();
   res.close()
-  util.run_cmd('rm %s.*' % db_2, shell=True)
+  util.run_cmd('rm %s.*' % db_1, shell=True)
+  if calc_evalue:
+    util.run_cmd('rm %s.*' % db_2, shell=True)
 
   return data
 
 #edef
 
+def not_contains(args):
+    return any([value in arg for arg in args])
+
 ###############################################################################
 
-def last_result(dbname, resfile, pos_mode = 'last'):
+def last_result(resfile, pos_mode = 'last'):
   bm = {};
   br = open(resfile, 'rb');
 
@@ -119,23 +155,36 @@ def remove_strand_baseone(start, end, strand, chromlength):
     return (nnstart, nend)
    
 
-def last_make_db_CMD(dbname, fas_file, type, args=''):
-  arguments = []
+def last_make_db_CMD(dbname, fas_file, type, arguments):
   if type == 'p':
       arguments.append('-p')
-  arguments.append(args)
-
   return "lastdb %s %s %s" % (' '.join(arguments), dbname, fas_file);
 #edef
 
 ###############################################################################
 
-def last_run_CMD(dbname, fas_file, args='', lpargs='', last_split=True):
+def run_trf(fas_file, type):
+    if type == 'p':
+        return
+
+    return fas_file
+
+def last_run_CMD(dbname1, type1, dbname2, fas_file2, type2, arguments, lsargs, last_split=True, calc_evalue=True):
+  lsargs = ' '.join(lsargs)
+  if type1 == 'p' and type2 == 'n':
+     arguments.append('-F 15')
+  args = ' '.join(arguments)
+
+  base = "lastal %s %s %s" % (args, dbname1, fas_file2)
+
   if last_split:
-      return "lastal %s %s %s | last-split %s | maf-convert.py tab" % (args, dbname, fas_file, lpargs);
-  else:
-      return "lastal %s %s %s | maf-convert.py tab" % (args, dbname, fas_file);
-#edef
+        base += ' | last-split %s' % lsargs
+  if calc_evalue:
+        base += ' | lastex %s.prj %s.prj -' % (dbname1,dbname2)
+  base += ' | maf-convert.py tab'
+
+  return base
+
 
 def parsemapping(mapping):#{{{
     #parses LAST tab mapping format to list of integers and tuples of integers. 

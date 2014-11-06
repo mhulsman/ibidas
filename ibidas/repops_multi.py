@@ -482,7 +482,7 @@ class Blast(repops.MultiOpRep):
         else:
             raise RuntimeError, 'Unknown algorithm: %s' % algorithm
     
-        convert = {'nucl':('n','n'), 'prot':('p':'p'), 'nuclprot':('n','p'), 'protnucl': ('p','n')}
+        convert = {'nucl':('n','n'), 'prot':('p','p'), 'nuclprot':('n','p'), 'protnucl': ('p','n')}
         assert blast_type in convert or blast_type is None, "blast_type should be nucl, prot, nuclprot or protnucl"
         blast_type = convert.get(blast_type, None)
 
