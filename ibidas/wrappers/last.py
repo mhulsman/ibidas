@@ -12,10 +12,13 @@ import time
 import subprocess
 import maf
 import argparse
+from ibidas import *
+
+  #         0'score',  1'chrom1', 2'pos1',3'length1',4'strand1', 5'chromlength1', 6'chrom2', 7'pos2', 8'length2', 9'strand2', 10'chromlength2',11'mapping'
 ###############################################################################
 
 
-def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsargs='', probs=0, trf=False, last_split=True, calc_evalue=True):
+def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsargs='', probs=0, trf=False, last_split=True, calc_evalue=True,softmask=False):
   alargs = [alargs]
   dbargs = [dbargs]
   lsargs = [lsargs]
@@ -33,8 +36,8 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsarg
         type = (type[1],type[0])
   
   if trf:
-    seq_1 = seq_1.upper()
-    seq_2 = seq_2.upper()
+    seq_1 = [s.upper() for s in seq_1]
+    seq_2 = [s.upper() for s in seq_2]
     if not_contains(dbargs, '-c'):
         dbargs.append('-c')
     if not_contains(alargs, '-u'):
@@ -57,8 +60,8 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsarg
   fas_2.flush()
   
   if trf:
-    fas_1 = run_trf(fas_1, type[0])
-    fas_2 = run_trf(fas_2, type[2])
+    fas_1 = trf_run_CMD(fas_1, seq_1, type[0],softmask=softmask)
+    fas_2 = trf_run_CMD(fas_2, seq_2, type[1],softmask=softmask)
 
   if type[0] != type[1]:
     calc_evalue = False
@@ -83,7 +86,7 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsarg
 
 #edef
 
-def not_contains(args):
+def not_contains(args, value):
     return any([value in arg for arg in args])
 
 ###############################################################################
@@ -113,8 +116,6 @@ def last_result2(resfile, pos_mode = 'last',has_prob=False, last_split=False, ca
       cols = result.Get(*last_fields)()
       cols = tuple([util.darray(col, type) for col,type in zip(cols, array_types)])
   
-  #         qseqid     sseqid   qlen      qstart   qend               slen sstart send length mismatch gapopen pident evalue bitscore
-  #         0'score',  1'chrom1', 2'pos1',3'length1',4'strand1', 5'chromlength1', 6'chrom2', 7'pos2', 8'length2', 9'strand2', 10'chromlength2',11'mapping'
 
   if pos_mode == 'last':
       res = cols
@@ -170,12 +171,6 @@ def last_make_db_CMD(dbname, fas_file, type, arguments):
 
 ###############################################################################
 
-def run_trf(fas_file, type):
-    if type == 'p':
-        return
-
-    return fas_file
-
 def last_run_CMD(dbname1, type1, dbname2, fas_file2, type2, arguments, lsargs, last_split=True, calc_evalue=True):
   lsargs = ' '.join(lsargs)
   if type1 == 'p' and type2 == 'n':
@@ -191,6 +186,32 @@ def last_run_CMD(dbname1, type1, dbname2, fas_file2, type2, arguments, lsargs, l
   #base += ' | maf-convert.py tab'
 
   return base
+
+
+def trf_run_CMD(fas_file, seq, seqtype,softmask=False):
+    if seqtype == 'p':
+        return fas_file
+
+    olddir = os.chdir(os.path.dirname(fas_file.name))
+    f = open(os.devnull, 'w')
+    util.run_cmd("trf %s 2 7 7 80 10 50 2000 -m -h" % fas_file.name, verbose=False,stdout=f)
+
+    fileres = fas_file.name + '.2.7.7.80.10.50.2000.mask'
+    result = Read(fileres,sep='\t')
+    util.run_cmd('rm %s' % fileres, shell=True)
+    fas_file.close()
+     
+    fas_new = tempfile.NamedTemporaryFile(suffix='.fasta')
+    if softmask:
+        nresult = []
+        for seqold,seqnew in zip(seq, result.seq()):
+            seqnew = ''.join([c1 if c2 != 'N' or c1 == 'N' else c1.lower() for c1,c2 in zip(seqold, seqnew)])
+            nresult.append(seqnew)
+        write_fasta_text(result.Get(0)(), nresult, len(nresult), fas_new)
+    else:
+        write_fasta_text(result.Get(0)(), result.seq(), len(result), fas_new)
+    fas_new.flush()
+    return fas_new
 
 
 def parsemapping(mapping):#{{{
