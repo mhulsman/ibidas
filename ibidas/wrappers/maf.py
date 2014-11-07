@@ -25,6 +25,10 @@ def read_maf(fname, types=()):
             elements = line.split(' ')
             arguments = [elem.split('=') for elem in elements if elem]
             arguments = [(util.valid_name(key), value) for key,value in arguments]
+            arguments = dict(arguments)
+            if 'score' in arguments: arguments['score'] = float(arguments['score'])
+            if 'mismap' in arguments: arguments['mismap'] = float(arguments['mismap'])
+            if 'expect' in arguments: arguments['expect'] = float(arguments['expect'])
             cur_rec.update(dict(arguments))
         elif line_type == 's':
             i = 1

@@ -10,13 +10,18 @@ import multiprocessing;
 import os.path;
 import time
 import subprocess
+import maf
+import argparse
 ###############################################################################
 
 
-def last(data, type, folder=None, pos_mode = 'last', dbargs='-c -uMAM8', alargs='-x50 -m100', lsargs='', trf=False, last_split=True, calc_evalue=True):
+def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsargs='', probs=0, trf=False, last_split=True, calc_evalue=True):
   alargs = [alargs]
   dbargs = [dbargs]
   lsargs = [lsargs]
+
+  if probs:
+    alargs.append('-j %d' % (probs+4))
 
   seq_1 = data[0];
   seq_2 = data[1];
@@ -40,7 +45,7 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='-c -uMAM8', alargs=
 
   fas_1 = tempfile.NamedTemporaryFile(suffix='.fasta')
   fas_2 = tempfile.NamedTemporaryFile(suffix='.fasta')
-  res = tempfile.NamedTemporaryFile(suffix='.tsv')
+  res = tempfile.NamedTemporaryFile(suffix='.maf')
   
   db_1  = fas_1.name[:-6]
   db_2  = fas_2.name[:-6]
@@ -65,7 +70,7 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='-c -uMAM8', alargs=
   util.run_cmd(last_run_CMD(db_1, type[0], db_2, fas_2.name, type[1], alargs, lsargs, last_split, calc_evalue), shell=True, stdout=res, verbose=False)
   res.flush()
 
-  data = last_result(res.name, pos_mode); 
+  data = last_result2(res.name, pos_mode, probs>0, last_split, calc_evalue); 
 
   fas_1.close();
   fas_2.close();
@@ -82,47 +87,49 @@ def not_contains(args):
     return any([value in arg for arg in args])
 
 ###############################################################################
-
-def last_result(resfile, pos_mode = 'last'):
-  bm = {};
-  br = open(resfile, 'rb');
-
-  #              'score',  'chrom1', 'pos1','length1','strand1', 'chromlength1', 'chrom2', 'pos2', 'length2', 'strand2', 'chromlength2','mapping'
-  sp_types = (float,    int,          int,   int,      str,        int,            int,      int,    int,       str,      int,          parsemapping)
-
-  rdr = csv.reader(br, delimiter='\t', quotechar='"');
-  rows = []
-  for row in rdr:
-    if row[0].startswith('#'):
-        continue
-    row = [ sp_type(elem) for sp_type,elem in zip(sp_types, row) ];
-    rows.append(row)
+def last_result2(resfile, pos_mode = 'last',has_prob=False, last_split=False, calc_evalue=False):
+  result = maf.read_maf(resfile)
+  #base_last_fields = ('qseqid', 'sseqid', 'qlen','qstart', 'qend', 'qstrand', 'slen', 'sstart', 'send', 'sstrand')
+  last_fields = ('name1', 'name2', 'seq_size1', 'start1', _.start1 + _.aln_size1, 'strand1', 'seq_size2', 'start2', _.start2 + _.aln_size2, 'strand2','score','mapping')
+  array_types = (int, int, int, int, int, str, int, int, int, str, float, object)
   
-  #              'score',  'chrom1', 'pos1','length1','strand1', 'chromlength1', 'chrom2', 'pos2', 'length2', 'strand2', 'chromlength2','mapping'
-  array_types = (float,    int,      int,   int,      str,        int,            int,      int,    int,       str,      int,     object)
- 
-  if len(rows) > 0:
-    cols = util.transpose_table(rows)
-    cols = tuple([util.darray(col, type) for col,type in zip(cols, array_types)])
+  lastprob = 1
+  if has_prob:
+      last_fields = last_fields + ('prob%d' % lastprob, )
+      array_types = array_types + (object,)
+      lastprob += 1
+
+  if last_split:
+      last_fields = last_fields + ('mismap','prob%d' % lastprob)
+      array_types = array_types + (float,object)
+
+  if calc_evalue:
+      last_fields = last_fields + ('expect',)
+      array_types = array_types + (float,)
+
+  if len(result) == 0:
+      cols = tuple([ util.darray([],type) for type in array_types ] )
   else:
-    cols = tuple([ util.darray([],type) for type in array_types ] )
+      cols = result.Get(*last_fields)()
+      cols = tuple([util.darray(col, type) for col,type in zip(cols, array_types)])
   
   #         qseqid     sseqid   qlen      qstart   qend               slen sstart send length mismatch gapopen pident evalue bitscore
   #         0'score',  1'chrom1', 2'pos1',3'length1',4'strand1', 5'chromlength1', 6'chrom2', 7'pos2', 8'length2', 9'strand2', 10'chromlength2',11'mapping'
 
   if pos_mode == 'last':
-        res = (cols[1],      cols[6], cols[5], cols[2], cols[2] + cols[3], cols[4], cols[10], cols[7], cols[7] + cols[8], cols[9],cols[0], cols[11])
+      res = cols
   elif pos_mode == 'blast':
-        sstart, send = remove_strand_baseone(cols[7] + 1, cols[7] + cols[8], cols[9], cols[10])
-        qstart, qend = remove_strand_baseone(cols[2] + 1, cols[2] + cols[3], cols[4], cols[5])
-        f = cols[9] == '-'
-        qstart, qend = switch_pos_baseone(qstart, qend, f)
-        sstart, send = switch_pos_baseone(sstart, send, f)
-        res = (cols[1],cols[6], cols[5], qstart, qend, cols[10], sstart, send, cols[0], cols[11])
+      #base_last_fields = (0'qseqid', 1'sseqid', 2'qlen',3'qstart', 4'qend', 5'qstrand', 6'slen', 7'sstart', 8'send', 9'sstrand')
+      sstart, send = remove_strand_baseone(cols[7] + 1, cols[8], cols[9], cols[6])
+      qstart, qend = remove_strand_baseone(cols[3] + 1, cols[4], cols[5], cols[2])
+      f = cols[9] == '-'
+      qstart, qend = switch_pos_baseone(qstart, qend, f)
+      sstart, send = switch_pos_baseone(sstart, send, f)
+      res = (cols[0],cols[1], cols[2], qstart, qend, cols[6], sstart, send) + cols[10:]
   else:
-    raise RuntimeError, 'unknown positioni mode %s' % pos_mode
-  br.close();
+      raise RuntimeError, 'unknown position mode %s' % pos_mode
   return res;
+
 
 ###############################################################################
 
@@ -181,7 +188,7 @@ def last_run_CMD(dbname1, type1, dbname2, fas_file2, type2, arguments, lsargs, l
         base += ' | last-split %s' % lsargs
   if calc_evalue:
         base += ' | lastex %s.prj %s.prj -' % (dbname1,dbname2)
-  base += ' | maf-convert.py tab'
+  #base += ' | maf-convert.py tab'
 
   return base
 

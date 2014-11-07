@@ -774,6 +774,13 @@ countsig = CountSignature("count")
 
 class Count(UnaryFuncAggregateOp):
     _sigs = [countsig]
+    
+    def _process(self, source, dim=None, **kwargs):
+        if not source._slicesKnown():
+            return
+        nslices = self._apply(source._slices, dim, **kwargs)
+        return self._initialize(tuple(nslices))
+
 
 class SetSignature(UnaryFixShapeSignature):
     def check(self, slice, packdepth):#{{{

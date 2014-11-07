@@ -241,7 +241,10 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
             det = detector.Detector()
             det.setParentDimensions(node.dims)
             det.processSeq(slice.data.flat())
-            return slice.modify(rtype=det.getType())
+            ntype = det.getType()
+            if ntype == rtypes.unknown: #remove unknown type to prevent type detection loops
+                ntype = rtypes.TypeAny(has_missing=True)#use most general possible type
+            return slice.modify(rtype=ntype)
         else:
             return slice
     

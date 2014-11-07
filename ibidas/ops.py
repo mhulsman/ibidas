@@ -807,6 +807,10 @@ class EquiJoinIndexOp(MultiMultiOp):#{{{
         MultiMultiOp.__init__(self, (leftslice,rightslice),(r1,r2))#}}}
 
 
+
+base_blast_fields = ('qseqid', 'sseqid', 'qlen','qstart', 'qend', 'slen', 'sstart', 'send')
+base_last_fields = ('qseqid', 'sseqid', 'qlen','qstart', 'qend', 'qstrand', 'slen', 'sstart', 'send', 'sstrand') 
+
 class BlastIndexOp(MultiMultiOp):#{{{
     __slots__ = ["blast_type", "folder", "algorithm", "kwargs"]
 
@@ -818,22 +822,44 @@ class BlastIndexOp(MultiMultiOp):#{{{
             name= leftslice.type.dims[0].name + "_" + rightslice.type.dims[0].name
         ndim = dimensions.Dim(UNDEFINED, (True,) * len(leftslice.dims), name=name)
 
-        if algorithm == 'last':
-            nsubdim = dimensions.Dim(UNDEFINED, (True,) * (len(leftslice.dims) + 1), name='mapping')
-            ndepth = len(leftslice.dims) + 1
-            mtype = rtypes.TypeArray(subtypes=(rtypes.TypeAny(),), dims=dimpaths.DimPath(nsubdim))
-            itype = rtypes.TypePlatformInt()
-            if kwargs.get('pos_mode','last') == 'last':
-                types = (itype, itype, itype, itype, itype, rtypes.byteType(ndepth), itype, itype, itype, rtypes.byteType(ndepth), rtypes.TypeReal64(), mtype)
-                names = ('qseqid', 'sseqid', 'qlen','qstart', 'qend', 'qstrand', 'slen', 'sstart', 'send', 'sstrand', 'score', 'mapping')
-            else:
-                types = (itype, itype, itype, itype, itype, itype, itype, itype, rtypes.TypeReal64(), mtype)
-                names = ('qseqid', 'sseqid', 'qlen','qstart', 'qend', 'slen', 'sstart', 'send', 'score', 'mapping')
+        ndepth = len(leftslice.dims) + 1
+        rtype = rtypes.TypeReal64()
+        itype = rtypes.TypePlatformInt()
+        posmode = kwargs.get('pos_mode','blast')
+        if posmode == 'last':
+            assert algorithm != 'blast', 'Last pos-mode not (yet) supported for blast algorithm'
 
+            
+            types = (itype, itype, itype, itype, itype, rtypes.byteType(ndepth), itype, itype, itype, rtypes.byteType(ndepth))
+            names = base_last_fields
+        else:
+            types = (itype,) * 8 
+            names = base_blast_fields
+
+        if algorithm == 'last':
+            nsubdim = dimensions.Dim(UNDEFINED, (True,) * ndepth, name='mapping')
+            mtype = rtypes.TypeArray(subtypes=(rtypes.TypeAny(),), dims=dimpaths.DimPath(nsubdim))
+            
+            nsubdim = dimensions.Dim(UNDEFINED, (True,) * ndepth, name='probs')
+            rarraytype = rtypes.TypeArray(subtypes=(rtype,), dims=dimpaths.DimPath(nsubdim))
+            
+            types = types + (rtype, mtype)
+            names = names + ('score', 'mapping')
+
+            if kwargs.get('probs',0) > 0:
+                names = names + ('align_probs',)
+                types = types + (rarraytype,)
+            
+            if kwargs.get('last_split',True):
+                names = names + ('mismap','mismap_probs')
+                types = types + (rtype, rarraytype)
+
+            if kwargs.get('calc_evalue',True):
+                names = names + ('evalue',)
+                types = types + (rtype,)
         elif algorithm == 'blast':
-            assert kwargs.get('pos_mode', None) != 'last', 'Last pos-mode not (yet) supported for blast algorithm'
-            types = (rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypePlatformInt(),  rtypes.TypePlatformInt(), rtypes.TypePlatformInt(), rtypes.TypeReal64(), rtypes.TypeReal64(), rtypes.TypeReal64())
-            names = ("qseqid", "sseqid", "qlen", "qstart", "qend", "slen", "sstart", "send", "length", "mismatch", "gapopen", "pident", "evalue", "bitscore" ) 
+            types = types + (itype,  itype, itype, rtype, rtype, rtype)
+            names = names + ("length", "mismatch", "gapopen", "pident", "evalue", "bitscore" ) 
         else:
             raise RuntimeError, ('Unknown algorithm %s' % algorithm)
         

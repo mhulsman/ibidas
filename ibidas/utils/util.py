@@ -492,7 +492,10 @@ def replace_darray(data, type=object, maxdim=1, mindim=0):
     if isinstance(data,numpy.ndarray):
         lshape = len(data.shape)
         if lshape >= mindim and lshape <= maxdim:
+            if not data.dtype == type:
+                data = numpy.cast[type](data)
             return data
+        
 
     if maxdim == 1 and type == object:
         if not check_realseq(data):
