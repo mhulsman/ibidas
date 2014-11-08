@@ -18,7 +18,7 @@ from ibidas import *
 ###############################################################################
 
 
-def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsargs='', probs=0, trf=False, last_split=True, calc_evalue=True,softmask=False):
+def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsargs='', probs=0, trf=False, last_split=True, calc_evalue=True,softmask=False,tmpdir=None):
   alargs = [alargs]
   dbargs = [dbargs]
   lsargs = [lsargs]
@@ -46,9 +46,9 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsarg
   title_1 = [ "%d" % i for i in xrange(len(seq_1)) ];
   title_2 = [ "%d" % i for i in xrange(len(seq_2)) ];
 
-  fas_1 = tempfile.NamedTemporaryFile(suffix='.fasta')
-  fas_2 = tempfile.NamedTemporaryFile(suffix='.fasta')
-  res = tempfile.NamedTemporaryFile(suffix='.maf')
+  fas_1 = tempfile.NamedTemporaryFile(suffix='.fasta',dir=tmpdir)
+  fas_2 = tempfile.NamedTemporaryFile(suffix='.fasta',dir=tmpdir)
+  res = tempfile.NamedTemporaryFile(suffix='.maf',dir=tmpdir)
   
   db_1  = fas_1.name[:-6]
   db_2  = fas_2.name[:-6]
@@ -60,8 +60,8 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsarg
   fas_2.flush()
   
   if trf:
-    fas_1 = trf_run_CMD(fas_1, seq_1, type[0],softmask=softmask)
-    fas_2 = trf_run_CMD(fas_2, seq_2, type[1],softmask=softmask)
+    fas_1 = trf_run_CMD(fas_1, seq_1, type[0],softmask=softmask, tmpdir=tmpdir)
+    fas_2 = trf_run_CMD(fas_2, seq_2, type[1],softmask=softmask, tmpdir=tmpdir)
 
   if type[0] != type[1]:
     calc_evalue = False
@@ -188,20 +188,23 @@ def last_run_CMD(dbname1, type1, dbname2, fas_file2, type2, arguments, lsargs, l
   return base
 
 
-def trf_run_CMD(fas_file, seq, seqtype,softmask=False):
+def trf_run_CMD(fas_file, seq, seqtype,softmask=False,tmpdir=None):
     if seqtype == 'p':
         return fas_file
 
-    olddir = os.chdir(os.path.dirname(fas_file.name))
+    olddir = os.getcwd()
+    os.chdir(os.path.dirname(fas_file.name))
     f = open(os.devnull, 'w')
     util.run_cmd("trf %s 2 7 7 80 10 50 2000 -m -h" % fas_file.name, verbose=False,stdout=f)
 
     fileres = fas_file.name + '.2.7.7.80.10.50.2000.mask'
+    fileres2 = fas_file.name + '.2.7.7.80.10.50.2000.dat'
     result = Read(fileres,sep='\t')
     util.run_cmd('rm %s' % fileres, shell=True)
+    util.run_cmd('rm %s' % fileres2, shell=True)
     fas_file.close()
      
-    fas_new = tempfile.NamedTemporaryFile(suffix='.fasta')
+    fas_new = tempfile.NamedTemporaryFile(suffix='.fasta', tmpdir=tmpdir)
     if softmask:
         nresult = []
         for seqold,seqnew in zip(seq, result.seq()):
@@ -211,6 +214,8 @@ def trf_run_CMD(fas_file, seq, seqtype,softmask=False):
     else:
         write_fasta_text(result.Get(0)(), result.seq(), len(result), fas_new)
     fas_new.flush()
+
+    os.chdir(olddir)
     return fas_new
 
 
