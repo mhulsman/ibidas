@@ -204,7 +204,7 @@ def trf_run_CMD(fas_file, seq, seqtype,softmask=False,tmpdir=None):
     util.run_cmd('rm %s' % fileres2, shell=True)
     fas_file.close()
      
-    fas_new = tempfile.NamedTemporaryFile(suffix='.fasta', tmpdir=tmpdir)
+    fas_new = tempfile.NamedTemporaryFile(suffix='.fasta', dir=tmpdir)
     if softmask:
         nresult = []
         for seqold,seqnew in zip(seq, result.seq()):
