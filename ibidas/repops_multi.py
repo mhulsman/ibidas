@@ -470,16 +470,16 @@ class Match(repops.MultiOpRep):
 
 class Blast(repops.MultiOpRep):
     def __init__(self, lsource, rsource, lslice=None, rslice=None, blast_type = None, folder = None, algorithm='blast', mode='dim', **kwargs):
-        if algorithm == 'blast':
-            kwargs['reciprocal'] = kwargs.get('reciprocal', True)
-            kwargs['normalize'] = kwargs.get('normalize',   True)
-            kwargs['overwrite'] = kwargs.get('overwrite',   True)
-            kwargs['blastopts'] = kwargs.get('blastopts',   '')
-        elif algorithm == 'last':
+        #if algorithm == 'blast':
+            #kwargs['reciprocal'] = kwargs.get('reciprocal', True)
+            #kwargs['normalize'] = kwargs.get('normalize',   True)
+            #kwargs['overwrite'] = kwargs.get('overwrite',   True)
+            #kwargs['blastopts'] = kwargs.get('blastopts',   '')
+        if algorithm == 'last':
             kwargs['alargs'] = kwargs.get('alargs','')
             kwargs['dbargs'] = kwargs.get('dbargs','')
             kwargs['pos_mode'] = kwargs.get('pos_mode', 'blast')
-        else:
+        elif algorithm != 'blast':
             raise RuntimeError, 'Unknown algorithm: %s' % algorithm
     
         convert = {'nucl':('n','n'), 'prot':('p','p'), 'nuclprot':('n','p'), 'protnucl': ('p','n')}
