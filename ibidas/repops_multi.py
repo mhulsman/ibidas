@@ -472,8 +472,8 @@ class Blast(repops.MultiOpRep):
     def __init__(self, lsource, rsource, lslice=None, rslice=None, blast_type = None, folder = None, algorithm='blast', mode='dim', **kwargs):
         #if algorithm == 'blast':
             #kwargs['reciprocal'] = kwargs.get('reciprocal', True)
-            #kwargs['normalize'] = kwargs.get('normalize',   True)
-            #kwargs['overwrite'] = kwargs.get('overwrite',   True)
+            #kwargs['normalize'] = kwargs.get('normalize',   False)
+            #kwargs['overwrite'] = kwargs.get('overwrite',   False)
             #kwargs['blastopts'] = kwargs.get('blastopts',   '')
         if algorithm == 'last':
             kwargs['alargs'] = kwargs.get('alargs','')

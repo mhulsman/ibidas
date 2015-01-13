@@ -759,25 +759,50 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
     def simple_cmpGeneral(self, data, type1, type2, typeo, op):
         #a numpy bug gives all true arrays when using
         #bool as outtype in comparison
-        return numpy_cmp[op](data[0], data[1])
+        data1,data2 = data
+        res =  numpy_cmp[op](data1, data2)
+        if type1.has_missing or type2.has_missing:
+            res = numpy.cast[object](res)
+        if type1.has_missing:
+            for i in range(len(data1)):
+                if data1[i] is Missing:
+                    res[i] = Missing
+        if type2.has_missing:
+            for i in range(len(data2)):
+                if data2[i] is Missing:
+                    res[i] = Missing
+        return res
 
     def string_cmpGeneral(self, data, type1, type2, typeo, op):
+        data1,data2 = data 
         #a numpy bug gives NotImplemented when performing operations,
         #such as "numpy.equal" on string arrays
         #so use direct operations ("__eq__")
         op = python_op[op]
         #Note: numpy seems to segfault, when using reverse operations on string comparision
         #using as first argument an  object array and as second a string array. 
-        if(isinstance(data[0],numpy.ndarray) and data[0].dtype == object and isinstance(data[1],numpy.ndarray) and data[1].dtype != object):
-            data = (data[0], numpy.cast[object](data[1]))
+        if(isinstance(data1,numpy.ndarray) and data1.dtype == object and isinstance(data2,numpy.ndarray) and data2.dtype != object):
+            data = (data1, numpy.cast[object](data2))
 
-        res = getattr(data[0], op)(data[1])
+        res = getattr(data1, op)(data2)
         if(res is NotImplemented):
-            if(isinstance(data[0],numpy.ndarray) and data[0].dtype != object and isinstance(data[1],numpy.ndarray) and data[1].dtype == object):
-                data = (numpy.cast[object](data[0]), data[1])
-            res = getattr(data[1], reverse_op[op])(data[0])
+            if(isinstance(data1,numpy.ndarray) and data1.dtype != object and isinstance(data2,numpy.ndarray) and data2.dtype == object):
+                data = (numpy.cast[object](data1), data2)
+            res = getattr(data2, reverse_op[op])(data1)
         assert not res is NotImplemented, "Not implemented error in stringstringGeneral for " \
                                             + str(op) + " and " + str(type1) + ", " + str(type2)
+        
+        if type1.has_missing or type2.has_missing:
+            res = numpy.cast[object](res)
+        if type1.has_missing:
+            for i in range(len(data1)):
+                if data1[i] is Missing:
+                    res[i] = Missing
+        if type2.has_missing:
+            for i in range(len(data2)):
+                if data2[i] is Missing:
+                    res[i] = Missing
+       
         return res
 
 

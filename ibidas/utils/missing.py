@@ -17,6 +17,7 @@
     use a pointer comparision shortcut). Maybe we can find a better solution in the future. 
 """
 import util
+import numpy
 
 hash_counter = 0
 class MissingType(object):#{{{
