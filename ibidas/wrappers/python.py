@@ -641,12 +641,18 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
     
     def caststring_to_string(self, castname, node, slice):
         return slice.data
+    
+    def castarray_to_array(self, castname, node, slice):
+        return slice.data
 
     def castto_array(self, castname, node, slice):
         func = stringset_to_array
         dtype = node.type.toNumpy()
         return slice.data.mapseq(func, dtype=dtype, res_type=node.type)
-    
+   
+
+    def castarray_to_array(self, castname, node, slice):
+        return slice.data
     
     def castto_bytes(self, castname, node, slice):
         if(node.type.has_missing):

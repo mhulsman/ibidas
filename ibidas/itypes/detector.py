@@ -650,7 +650,7 @@ class ContainerScanner(TypeScanner):
                 if issubclass(cls, tuple):
                     return False
 
-            l = seq.map(operator.isSequenceType, otype=bool, out_empty=True, has_missing=has_missing)
+            l = seq.map(lambda x: operator.isSequenceType(x) and hasattr(x,'__len__'), otype=bool, out_empty=True, has_missing=has_missing)
             if not l.all(has_missing=False):
                 return False
         
