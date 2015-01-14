@@ -447,6 +447,14 @@ class Representor(Node):
      
     def Redim(self, *args, **kwds):
         """Assign new dimensions
+        
+        example: .Redim('new_dimname', ['d1','d2'])
+        Replace dimensions with name 'd1' or 'd2' with
+        new common dim with name 'new_dimname' 
+
+        example: .Redim('new_dimname', ['d1','d2'])
+        Replace dimensions with name 'd1' or 'd2' with
+        new common dimension with random name
 
         example: .Redim('new_dimname', _.f0)
         Assign new dim with name 'new_dimname' to first

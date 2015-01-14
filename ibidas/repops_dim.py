@@ -58,13 +58,18 @@ class DimRename(repops.UnaryOpRep):#{{{
 class Redim(repops.UnaryOpRep):
 
     def _sprocess(self, source, *args, **kwds):
+        if isinstance(args[0], list):
+            args = [None] + list(args)
         dimname = args[0]
         dimsel = []
         slicesel = []
+        dimnames = set()
 
         for arg in args[1:]:
             if isinstance(arg, dict):
                 kwds.update(arg)
+            elif isinstance(arg, list):
+                dimnames.update(arg)
             else:
                 tslices = source.__getattr__(arg)._slices
                 dimsel.extend([0] * len(tslices))
@@ -74,6 +79,14 @@ class Redim(repops.UnaryOpRep):
             tslices = source.__getattr__(k)._slices
             dimsel.extend([v] * len(tslices))
             slicesel.extend(tslices)
+
+        assert not (dimnames and dimsel), 'Redim only supports dimnames or slices/dimpositions, not both'
+        if dimnames:
+            for s in source._slices:
+                for pos, dim in enumerate(s.dims):
+                    if dim.name in dimnames:
+                        slicesel.append(s)
+                        dimsel.append(pos)
            
         nslices = list(source._slices)
         dims = set()
