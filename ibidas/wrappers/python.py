@@ -642,7 +642,7 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
     def caststring_to_string(self, castname, node, slice):
         return slice.data
     
-    def castarray_to_array(self, castname, node, slice):
+    def castcopy(self, castname, node, slice):
         return slice.data
 
     def castto_array(self, castname, node, slice):

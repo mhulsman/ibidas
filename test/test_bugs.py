@@ -12,6 +12,10 @@ class TestBugs(unittest.TestCase):
         str(yeastract |Match(_.target)| yeastract[:,newdim])
         str(yeastract |Match(_.target,mode="pos")| yeastract[:,newdim])
 
+    def test_harray(self):
+        x = Rep(([[1,2],[2,3],[3,4]], [[2,3],[4,5],[6,7]]))
+        self.assertTrue(All(HArray(x.Array()).values.Elems() == HArray(x).values))
+
     def test_to(self):
         v = Rep((1,2,3),unpack=False)
         v = v.To(_, Do=_.Each(lambda x: x).Fields()) 
