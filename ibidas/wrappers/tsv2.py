@@ -29,7 +29,7 @@ possible_commentchars = numpy.array(['#','/','*','%','@','!','~','?','|','>'],dt
 
 class TSVRepresentor(wrapper.SourceRepresentor):
     def __init__(self, filename, skiprows=None, dtype=rtypes.unknown, fieldnames=None, 
-                  delimiter=None, quotechar=None, escapechar=None, commentchar=None, skipinitialspace=None, doublequote=None, verbose=True):
+                  delimiter=None, quotechar=None, escapechar=None, commentchar=None, skipinitialspace=None, doublequote=None, verbose=True,scan=True):
         
         file = util.open_file(filename,mode='rU')
        
@@ -41,17 +41,16 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             print "Determined parameters for file %s:" % filename
             print sniff_message,
 
-       
         #find sample to determine field names
         sample_lines = self.get_sample(file, length=25, skiprows=dialect.skiprows, commentchar=dialect.commentchar)
 
         #find start position
         file.seek(0)
         comments = []
-        for i in xrange(dialect.skiprows-1):
+        for i in xrange(dialect.skiprows):
             comments.append(file.readline())
         if skiprows is None and dialect.skiprows > 0: #last comment line could be fieldnames
-            possible_fieldnames = file.readline().rstrip('\r\n')
+            possible_fieldnames = comments[-1].rstrip('\r\n')
         else:
             possible_fieldnames = ""
         startpos = file.tell()
@@ -71,12 +70,11 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                 if score1 > score2 and score1 > 0:
                     fieldnames = possible_fieldnames[1:]
                     fieldnames = csv.reader([fieldnames],dialect=dialect).next()
+                    comments.pop()
                 elif score2 >= score1 and score2 > 0:
                     file.seek(startpos)
                     fieldnames = file.readline()
                     fieldnames = csv.reader([fieldnames],dialect=dialect).next()
-                    if len(possible_fieldnames) > 0 and possible_fieldnames[0] == dialect.commentchar:
-                        comments.append(possible_fieldnames)
 
             elif(fieldnames is True):
                 fieldnames = file.readline()
@@ -100,11 +98,22 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                 data = [tuple(row) for row in reader if len(row) > 0]
             file.seek(startpos)
 
-            if len(data) == 0:
+            if scan is False or len(data) == 0:
                 if fieldnames:
+                    nfield = len(fieldnames)
+                elif len(data) > 0:
+                    z = [len(row) for row in data]
+                    nfield = max(z)
+                    minz = min(z)
+                    fieldnames = ['f' + str(i) for i in xrange(nfield)]
+                else:
+                    nfield = 0
+
+                if nfield > 0:
                     any = rtypes.TypeAny()
+                    anym = rtypes.TypeAny(has_missing=True)
                     ndim = dimensions.Dim(0)
-                    subtypes = (any,) * len(fieldnames)
+                    subtypes = (any,) * nfield + (anym,) * (nfield - minz)
                     subtype = rtypes.TypeTuple(subtypes=subtypes, fieldnames=fieldnames)
                     rarray = rtypes.TypeArray(subtypes=(subtype,), dims=dimpaths.DimPath(ndim))
                     dtype =rarray
