@@ -109,6 +109,9 @@ class Type(object):#{{{
     def toDefval(self):
         """Returns default value."""
         return self._defval
+
+    def getAllDims(self):
+        return []
   
     def toMissingval(self):
         return Missing
@@ -379,6 +382,13 @@ class TypeTuple(TypeAny):#{{{
             self._defval = tuple((subtype.toDefval() 
                                   for subtype in self.subtypes))
         return self._defval
+    
+    
+    def getAllDims(self):
+        res =  []
+        for subtype in self.subtypes:
+            res = res + subtype.getAllDims()
+        return res
    
     def getSubTypeNumber(self):
         """Returns number of subtypes of this type"""
@@ -668,7 +678,12 @@ class TypeArray(TypeAny):#{{{
             res[:] = subdv
         return res
     
-
+    def getAllDims(self):
+        res =  list(self.dims)
+        for subtype in self.subtypes:
+            res = res + subtype.getAllDims()
+        return res
+    
     def getSubTypeNumber(self):
         """Returns number of subtypes of this type"""
         return len(self.subtypes)

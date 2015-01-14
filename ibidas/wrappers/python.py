@@ -1233,7 +1233,7 @@ def speedeach(seqs, dtype, eachfunc, extra_params, named_params):
     return nseq
 
 def speedarrayify(seqs,dtype):
-    nseq = numpy.array(seqs,dtype).T
+    nseq = numpy.array(seqs,dtype).transpose([1,0] + range(2, len(seqs[0].shape)+1))
     return nseq
 
 

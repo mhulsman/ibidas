@@ -369,10 +369,8 @@ class TSVOp(ops.ExtendOp):
             else:
                 reader = csv.reader(file, self.dialect)
             
-            data = [tuple(row) for row in reader]
-            
-            if dialect.commentchar:
-                commentchar = dialect.commentchar
+            if self.dialect.commentchar:
+                commentchar = self.dialect.commentchar
                 data = [tuple(row) for row in reader if len(row) > 0 and not row[0][0] == commentchar]
             else:
                 data = [tuple(row) for row in reader if len(row) > 0]

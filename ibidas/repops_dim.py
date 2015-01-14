@@ -143,7 +143,7 @@ class SplitDim(repops.UnaryOpRep):
         nslices = []
 
         if not lname or not rname:
-            dimnames = util.seq_names(2, exclude=set([d.name for d in source.DimsUnique]))
+            dimnames = util.seq_names(2, exclude=set([d.name for d in source.AllDims]))
             if not lname:
                 lname = dimnames[0]
             if not rname:
