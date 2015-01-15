@@ -25,11 +25,10 @@ class FullSparse(numpy.ndarray):
         if hasattr(self, '_class_cache'):
            return self._class_cache
                     
-        classes = set()
         if(self.dtype == object):
-            classes |= set([value.__class__ for value in self.ravel()])
+            classes = set([value.__class__ for value in self.ravel()])
         else:
-            classes.add(self.dtype.type)
+            classes = set([self.dtype.type])
         
         self._class_cache = classes
         return classes

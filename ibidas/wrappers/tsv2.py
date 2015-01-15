@@ -101,6 +101,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             if scan is False or len(data) == 0:
                 if fieldnames:
                     nfield = len(fieldnames)
+                    minz=nfield
                 elif len(data) > 0:
                     z = [len(row) for row in data]
                     nfield = max(z)
@@ -108,6 +109,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
                     fieldnames = ['f' + str(i) for i in xrange(nfield)]
                 else:
                     nfield = 0
+                    minz=0
 
                 if nfield > 0:
                     any = rtypes.TypeAny()
