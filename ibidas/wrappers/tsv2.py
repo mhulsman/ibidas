@@ -61,7 +61,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             dtype = rtypes.unknown
         elif(dtype == rtypes.unknown):
             if(fieldnames is None):
-                if len(possible_fieldnames) > 0 and possible_fieldnames[0] == dialect.commentchar:
+                if len(possible_fieldnames) > 0 and possible_fieldnames[:1] == dialect.commentchar:
                     score1 = self.has_header([possible_fieldnames[1:]] + ["\n".join(sample_lines)],dialect)
                 else:
                     score1 = -1
@@ -93,7 +93,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             #parse data
             if dialect.commentchar:
                 commentchar = dialect.commentchar
-                data = [tuple(row) for row in reader if len(row) > 0 and not row[0][0] == commentchar]
+                data = [tuple(row) for row in reader if len(row) > 0 and not row[0][:1] == commentchar]
             else:
                 data = [tuple(row) for row in reader if len(row) > 0]
             file.seek(startpos)
@@ -206,7 +206,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
             sample_lines = sample_lines[rskiprows:]
             
         message += '- skiprows:\t' + str(rskiprows) + '\n' #+ ('\t!\n' if skiprows >= 0 else '\n')
-        sample_lines = [sl for sl in sample_lines if len(sl) == 0 or sl[0] != commentchar]
+        sample_lines = [sl for sl in sample_lines if len(sl) == 0 or sl[:1] != commentchar]
         
         class sniff_dialect(csv.Dialect):
             _name='sniffed'
@@ -382,7 +382,7 @@ class TSVOp(ops.ExtendOp):
             
             if self.dialect.commentchar:
                 commentchar = self.dialect.commentchar
-                data = [tuple(row) for row in reader if len(row) > 0 and not row[0][0] == commentchar]
+                data = [tuple(row) for row in reader if len(row) > 0 and not row[0][:1] == commentchar]
             else:
                 data = [tuple(row) for row in reader if len(row) > 0]
             

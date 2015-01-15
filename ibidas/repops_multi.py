@@ -609,14 +609,27 @@ class Take(repops.MultiOpRep):
    
     def _sprocess(self, sources, allow_missing, keep_missing, keep_name):
         source, take_source = sources
+        multi=False
         if len(source._slices) == 2:
             source = source.IndexDict()
+        elif len(source._slices) > 2:
+            assert keep_missing==False, 'Cannot combine multiple takefrom slices with keep_missing'
+            assert keep_name==False, 'Cannot combine multiple takefrom slices with keep_name'
+            multi=len(source._slices) - 1
+            source = source.Get(0, (_.Without(0),)).IndexDict()
+            
         assert len(source._slices) == 1, "Take source should have one slice"
         source_slice = source._slices[0]
 
         nslices = []
         for take_slice in take_source._slices:
-            nslices.append(ops.TakeOp(source_slice, take_slice, allow_missing, keep_missing, keep_name))
+            v = ops.TakeOp(source_slice, take_slice, allow_missing, keep_missing, keep_name)
+            if multi:
+                for i in range(multi):
+                    nslices.append(ops.UnpackTupleOp(v,i))
+            else:
+                nslices.append(v)
+
         return self._initialize(tuple(nslices))
 
 
