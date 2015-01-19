@@ -828,7 +828,7 @@ class Intersect(repops.MultiOpRep):
             res = self.opercls._apply((res,slice),mode)
 
         tslice = ops.UnpackArrayOp(res,1)
-        if(isinstance(tslice.type, rtypes.TypeTuple)):
+        if(len(pslices) > 1):
             pslices = [ops.UnpackTupleOp(tslice, idx) for idx in range(len(tslice.type.subtypes))]
         else:
             pslices = [tslice]
