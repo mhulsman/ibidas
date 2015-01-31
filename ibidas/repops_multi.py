@@ -420,6 +420,8 @@ class Match(repops.MultiOpRep):
 
         collapse_equi = (merge_same == 'equi' or merge_same == 'all' or merge_same is True) or (isinstance(merge_same, dict) and lslice.name in merge_same and rslice.name in merge_same[lslice.name])
 
+        lidx = None
+        ridx = None
         if((lslice.name == rslice.name or collapse_equi) and lslice in lslices and rslice in rslices):
             if jointype== 'inner':                
                 rslices.pop(rslices.index(rslice))
@@ -438,7 +440,7 @@ class Match(repops.MultiOpRep):
         lslices = list(Filter._apply(lslices, lindex, lslice.dims[-1:], "dim"))
         rslices = list(Filter._apply(rslices, rindex, rslice.dims[-1:], "dim"))
 
-        if collapse_equi and jointype == 'full':
+        if collapse_equi and jointype == 'full' and not (lidx is None or ridx is None):
             lslice = lslices[lidx]
             rslice = rslices[ridx]
             lslices[lidx] = repops_funcs.Merge._apply([lslice,rslice], "dim")
@@ -463,6 +465,7 @@ class Match(repops.MultiOpRep):
                     rpos = rnames.index(rname)
                     lslices[lpos] = repops_funcs.Merge._apply([lslices[lpos],rslices[rpos]], "dim")
                     del rslices[rpos]
+                    del rnames[rpos]
 
         return Combine._apply(lslices,rslices)
 
