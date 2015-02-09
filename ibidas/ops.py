@@ -374,16 +374,15 @@ class FilterOp(UnaryUnaryOp):#{{{
         else:
             sdims, subtype = sdims.updateDim(0, ndim, stype.subtypes[0])
         
-        
-        if(sdims):
-            ntype = dimpaths.dimsToArrays(sdims, subtype)
-        else:
-            ntype = subtype
-        
         if(has_missing):
-            ntype = ntype.setHasMissing(True)
+            ntype = subtype.setHasMissing(True)
             if not subtype.hasMissingValInfo():
                 slice = DetectFixedShapesOp(slice)
+        else:
+            ntype = subtype
+
+        if(sdims):
+            ntype = dimpaths.dimsToArrays(sdims, ntype)
       
         self.constraint = constraint
         UnaryUnaryOp.__init__(self, slice, rtype=ntype)#}}}
