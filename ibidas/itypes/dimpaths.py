@@ -190,7 +190,7 @@ class DimPath(tuple):
                     redim=False
                     for dp in deppos:
                         if dp < permute_start:
-                            ndep[permute_idx.index(dp + len(prevdims))] = True
+                            ndep[permute_idxs.index(dp + len(prevdims))] = True
                             redim=True
                         else:
                             ndep[dp + len(prevdims)] = True
