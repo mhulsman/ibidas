@@ -372,9 +372,10 @@ class Representor(Node):
     Slices=property(fget=_getSlices)
 
     def _getDepth(self):
-        """Returns max dimension depth (number of dimensins) of
+        """Returns max dimension depth (number of dimensions) of
            slices in this representor. 
         """
+        self._checkState()
         return max([len(slice.dims) for slice in self._slices])
     Depth=property(fget=_getDepth)
     
@@ -402,6 +403,16 @@ class Representor(Node):
         unique_dimpath = util.unique(sum([slice.dims for slice in self._slices],dimpaths.DimPath())) 
         return unique_dimpath
     DimsUnique=property(fget=_getDimsUnique)
+
+
+    def _getAllDims(self):
+        du = set(self.DimsUnique)
+        self._checkState()
+        for slice in self._slices:
+            du.update(slice.type.getAllDims())
+        return du
+    AllDims=property(fget=_getAllDims)            
+            
 
     def __getitem__(self, condition):
         self._checkState()
@@ -447,6 +458,14 @@ class Representor(Node):
      
     def Redim(self, *args, **kwds):
         """Assign new dimensions
+        
+        example: .Redim('new_dimname', ['d1','d2'])
+        Replace dimensions with name 'd1' or 'd2' with
+        new common dim with name 'new_dimname' 
+
+        example: .Redim('new_dimname', ['d1','d2'])
+        Replace dimensions with name 'd1' or 'd2' with
+        new common dimension with random name
 
         example: .Redim('new_dimname', _.f0)
         Assign new dim with name 'new_dimname' to first

@@ -420,6 +420,8 @@ class Match(repops.MultiOpRep):
 
         collapse_equi = (merge_same == 'equi' or merge_same == 'all' or merge_same is True) or (isinstance(merge_same, dict) and lslice.name in merge_same and rslice.name in merge_same[lslice.name])
 
+        lidx = None
+        ridx = None
         if((lslice.name == rslice.name or collapse_equi) and lslice in lslices and rslice in rslices):
             if jointype== 'inner':                
                 rslices.pop(rslices.index(rslice))
@@ -438,7 +440,7 @@ class Match(repops.MultiOpRep):
         lslices = list(Filter._apply(lslices, lindex, lslice.dims[-1:], "dim"))
         rslices = list(Filter._apply(rslices, rindex, rslice.dims[-1:], "dim"))
 
-        if collapse_equi and jointype == 'full':
+        if collapse_equi and jointype == 'full' and not (lidx is None or ridx is None):
             lslice = lslices[lidx]
             rslice = rslices[ridx]
             lslices[lidx] = repops_funcs.Merge._apply([lslice,rslice], "dim")
@@ -463,6 +465,7 @@ class Match(repops.MultiOpRep):
                     rpos = rnames.index(rname)
                     lslices[lpos] = repops_funcs.Merge._apply([lslices[lpos],rslices[rpos]], "dim")
                     del rslices[rpos]
+                    del rnames[rpos]
 
         return Combine._apply(lslices,rslices)
 
@@ -472,8 +475,8 @@ class Blast(repops.MultiOpRep):
     def __init__(self, lsource, rsource, lslice=None, rslice=None, blast_type = None, folder = None, algorithm='blast', mode='dim', **kwargs):
         #if algorithm == 'blast':
             #kwargs['reciprocal'] = kwargs.get('reciprocal', True)
-            #kwargs['normalize'] = kwargs.get('normalize',   True)
-            #kwargs['overwrite'] = kwargs.get('overwrite',   True)
+            #kwargs['normalize'] = kwargs.get('normalize',   False)
+            #kwargs['overwrite'] = kwargs.get('overwrite',   False)
             #kwargs['blastopts'] = kwargs.get('blastopts',   '')
         if algorithm == 'last':
             kwargs['alargs'] = kwargs.get('alargs','')
@@ -609,14 +612,27 @@ class Take(repops.MultiOpRep):
    
     def _sprocess(self, sources, allow_missing, keep_missing, keep_name):
         source, take_source = sources
+        multi=False
         if len(source._slices) == 2:
             source = source.IndexDict()
+        elif len(source._slices) > 2:
+            assert keep_missing==False, 'Cannot combine multiple takefrom slices with keep_missing'
+            assert keep_name==False, 'Cannot combine multiple takefrom slices with keep_name'
+            multi=len(source._slices) - 1
+            source = source.Get(0, (_.Without(0),)).IndexDict()
+            
         assert len(source._slices) == 1, "Take source should have one slice"
         source_slice = source._slices[0]
 
         nslices = []
         for take_slice in take_source._slices:
-            nslices.append(ops.TakeOp(source_slice, take_slice, allow_missing, keep_missing, keep_name))
+            v = ops.TakeOp(source_slice, take_slice, allow_missing, keep_missing, keep_name)
+            if multi:
+                for i in range(multi):
+                    nslices.append(ops.UnpackTupleOp(v,i))
+            else:
+                nslices.append(v)
+
         return self._initialize(tuple(nslices))
 
 
@@ -815,7 +831,7 @@ class Intersect(repops.MultiOpRep):
             res = self.opercls._apply((res,slice),mode)
 
         tslice = ops.UnpackArrayOp(res,1)
-        if(isinstance(tslice.type, rtypes.TypeTuple)):
+        if(len(pslices) > 1):
             pslices = [ops.UnpackTupleOp(tslice, idx) for idx in range(len(tslice.type.subtypes))]
         else:
             pslices = [tslice]

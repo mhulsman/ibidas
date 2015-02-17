@@ -510,6 +510,8 @@ class UnpackTupleOp(UnaryUnaryOp):#{{{
             raise RuntimeError, "Tuple index invalid, outside range of available attributes"
 
         ntype = slice.type.subtypes[idx]
+        if slice.type.has_missing and not ntype.has_missing:
+            ntype = ntype.setHasMissing(True)
         
         if slice.type.fieldnames:
             assert idx < len(slice.type.fieldnames), "Number of slices exceeds number of field names, check your input data";

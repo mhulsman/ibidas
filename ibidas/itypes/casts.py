@@ -115,7 +115,10 @@ addCasts(set([rtypes.TypeUnknown, rtypes.TypeAny]) | rtypes.TypeStrings, rtypes.
 addCasts(set([rtypes.TypeUnknown, rtypes.TypeAny]) | rtypes.TypeStrings, rtypes.TypeStrings, checkDefault, simDefault,"string_to_string")
 
 
-def checkStringString(intype, outtype):#{{{
+
+
+
+def checkStringString(intype, outtype):
     if(intype.has_missing and not outtype.has_missing):
         return False
 
@@ -128,7 +131,7 @@ def simStringString(intype, outtypecls, dimdepth):
 
 addCasts([rtypes.TypeBytes,rtypes.TypePickle], [rtypes.TypeBytes,rtypes.TypePickle], checkStringString, simStringString,"string_to_string")#}}}
 
-def checkPickle(intype, outtype):#{{{
+def checkPickle(intype, outtype):
     if(intype.has_missing and not outtype.has_missing):
         return False
 
@@ -148,7 +151,7 @@ def simDePickle(intype, outtypecls, dimdepth):
 addCasts(rtypes.TypePickle, rtypes.TypeAll, checkDefault, simDePickle,"from_pickle")
 
 
-def checkArray(intype, outtype):#{{{
+def checkStringSetToArray(intype, outtype):
     if(intype.has_missing and not outtype.has_missing):
         return False
     
@@ -162,10 +165,10 @@ def checkArray(intype, outtype):#{{{
         return False
     return True
 
-def simArray(intype, outtypecls, dimdepth):
+def simStringSetToArray(intype, outtypecls, dimdepth):
     return rtypes.TypeArray(has_missing=intype.has_missing, dims=intype.dims, subtypes=intype.subtypes)
 
-addCasts(rtypes.TypeStrings | set([rtypes.TypeSet]), rtypes.TypeArray, checkArray, simArray,"to_array")
+addCasts(rtypes.TypeStrings | set([rtypes.TypeSet]), rtypes.TypeArray, checkStringSetToArray, simStringSetToArray,"to_array")
     
 
 def checkBytes(intype, outtype):
@@ -178,4 +181,64 @@ def simBytes(intype, outtypecls, dimdepth):
     return types.TypeBytes(dims=dimpaths.DimPath(ndim),has_missing=intype.has_missing)
 
 addCasts(rtypes.TypeAll, rtypes.TypeBytes, checkBytes, simBytes,"to_bytes")
+
+
+
+
+def checkArrayToArray(intype, outtype):
+    if(intype.has_missing and not outtype.has_missing):
+        return False
+   
+    if len(intype.dims) != len(outtype.dims):
+        return False
+
+    for d1,d2 in zip(intype.dims, outtype.dims):
+        if d1.shape == d2.shape:
+            if d1.shape == UNDEFINED:
+                #TODO: cast undefined fixed shape to undefined fixed shape
+                #we would have to check if they are the same during runtime
+                return False
+            if d1.dependent != d2.dependent:
+                return False
+
+    if not checkSubType(intype.subtypes[0], outtype.subtypes[0]):
+        return False
+    return True
+   
+def simArrayToArray(intype, outtypecls, dimdepth):
+    return outtypecls(has_missing=intype.has_missing, dims=intype.dims, subtypes=intype.subtypes)
+
+
+addCasts(set([rtypes.TypeArray]), set([rtypes.TypeArray]), checkArrayToArray, simArrayToArray,"copy")
+
+def checkTupleToTuple(intype, outtype):
+    if(intype.has_missing and not outtype.has_missing):
+        return False
+    
+    for s1,s2 in zip(intype.subtypes, outtype.subtypes):
+        if not checkSubType(s1,s2):
+            return False
+
+    return True
+
+def simTupleToTuple(intype, outtypecls, dimdepth):
+    return outtypecls(has_missing=intype.has_missing, dims=intype.dims, subtypes=intype.subtypes)
+
+addCasts(set([rtypes.TypeTuple]), set([rtypes.TypeTuple]), checkTupleToTuple, simTupleToTuple,"copy")
+
+def checkSubType(intype, outtype):
+    if isinstance(intype,rtypes.TypeArray):
+        if not checkArrayToArray(intype,outtype):
+            return False
+    elif isinstance(intype, rtypes.TypeTuple):
+        if not checkTupleToTuple(intype, outtype):
+            return False
+    else:
+        if not intype == outtype:
+            return False
+    return True
+   
+
+
+
 

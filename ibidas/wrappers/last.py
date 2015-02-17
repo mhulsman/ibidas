@@ -78,9 +78,9 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsarg
   fas_1.close();
   fas_2.close();
   res.close()
-  util.run_cmd('rm %s.*' % db_1, shell=True)
+  util.run_cmd('rm %s*' % db_1, shell=True)
   if calc_evalue:
-    util.run_cmd('rm %s.*' % db_2, shell=True)
+    util.run_cmd('rm %s*' % db_2, shell=True)
 
   return data
 

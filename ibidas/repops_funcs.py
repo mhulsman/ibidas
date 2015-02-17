@@ -190,7 +190,7 @@ class UnaryFuncSegregateOp(UnaryFuncElemOp):
     def _process(self, source, **kwargs):
         if not source._typesKnown():
             return
-        exclude_dimnames = [dim.name for dim in source.DimsUnique]
+        exclude_dimnames = [dim.name for dim in source.AllDims]
         nslices = self._apply(source._slices, exclude_dimnames, **kwargs)
         return self._initialize(tuple(nslices))
 

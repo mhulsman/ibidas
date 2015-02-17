@@ -164,8 +164,11 @@ class Detector(object):
         assert not len(restypes) == 0,'BUG: no valid type could be detected'
 
         if len(restypes) > 1:
-            if not all([r.has_missing for r in restypes]):
-                raise RuntimeError, 'Could not decide between types: ' + str(restypes)
+            restypes_nm = [r for r in restypes if not r.has_missing]
+            if len(restypes_nm) == 1:
+                return restypes_nm[0]
+            elif not all([r.has_missing for r in restypes]):
+                util.warning('Could not decide between types: ' + str(restypes) + '. Using any as type.')
             else:
                 return rtypes.TypeAny(has_missing=True);
         return restypes[0]
@@ -650,7 +653,7 @@ class ContainerScanner(TypeScanner):
                 if issubclass(cls, tuple):
                     return False
 
-            l = seq.map(operator.isSequenceType, otype=bool, out_empty=True, has_missing=has_missing)
+            l = seq.map(lambda x: operator.isSequenceType(x) and hasattr(x,'__len__'), otype=bool, out_empty=True, has_missing=has_missing)
             if not l.all(has_missing=False):
                 return False
         

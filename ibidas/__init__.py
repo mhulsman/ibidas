@@ -201,8 +201,9 @@ def fexport_xlsx(data, url, **kwargs):
 ##########################################################################
 
 
-formats_import = { 'tsv' : fimport_tsv, 'csv' : fimport_tsv,
+formats_import = { 'tsv' : fimport_tsv2, 'csv' : fimport_tsv2,
                     'tsv2' :fimport_tsv2,
+                    'tsv1' :fimport_tsv,
                    'tsv_matrix' : fimport_matrixtsv,
                    'xml' : fimport_xml,
                    'psimi' : fimport_psimi,
@@ -288,7 +289,7 @@ def Save(r, filename, **kwargs):
 
 def Load(filename,**kwargs):
     if filename.endswith('tsv') or filename.endswith('csv') or filename.endswith('tab'):
-        from wrappers.tsv import TSVRepresentor
+        from wrappers.tsv2 import TSVRepresentor
         return TSVRepresentor(filename, **kwargs) 
     else:
         return load_rep(filename)

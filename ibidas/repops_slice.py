@@ -415,7 +415,7 @@ class HArray(repops.UnaryOpRep):
         
 
         if name is None:
-            dimname = util.seq_names(1, exclude=set([d.name for d in source.DimsUnique]))[0]
+            dimname = util.seq_names(1, exclude=set([d.name for d in source.AllDims]))[0]
             name = 'names'
         else:
             dimname=name

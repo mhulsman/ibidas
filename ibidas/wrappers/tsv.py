@@ -130,7 +130,8 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         for pos, split in enumerate(splitsize):
             if(split != real_split):
                 skiprows = pos + 1
-        warning('Skipping first %d rows. Use "skiprows" parameter to override', skiprows)                
+        if skiprows > 0:
+            warning('Skipping first %d rows. Use "skiprows" parameter to override', skiprows)                
         file.seek(0)
         return skiprows        
 
