@@ -52,7 +52,7 @@ def split_entry(raw):
     fields = raw.split('\t', len(entry_field_names));
 
     entry           = dict( zip(entry_field_names, fields ) );
-    entry['attr']   = dict(tuple(attr.split('=')) for attr in entry['attr'].split(';'));
+    entry['attr']   = dict(tuple(attr.strip().split('=')) if ('=' in attr.strip()) else (attr, '') for attr in entry['attr'].split(';') if len(attr.strip()) > 0);
     entry['id']     = entry['attr']['ID'] if 'ID' in entry['attr'] else '';
     entry['parent'] = entry['attr']['Parent'] if 'Parent' in entry['attr'] else '';
     entry['name']   = entry['attr']['Name'] if 'Name' in entry['attr'] else '';
