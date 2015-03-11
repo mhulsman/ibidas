@@ -100,6 +100,56 @@ def save_csv(r, filename, remove_line_end=True, names=True, lineterminator='\n',
     w.writerows(data);
     f.close()
 
+def save_matrixcsv(r, filename, remove_line_end=True, names=True, lineterminator='\n', delimiter=',', quotechar='"'):
+    f = open(filename,'wb')
+    r = r.Array(tolevel=2)
+    if len(r.Dims) <= 1:
+        return save_csv(r, filename, remove_line_end, names, lineterminator, delimiter, quotechar)
+
+    data = r.Cast(str)
+    if filename.endswith('tsv'):
+        delimiter = '\t'
+        w = csv.writer(f,delimiter='\t', quotechar=quotechar, quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
+    else:
+        w = csv.writer(f,delimiter=delimiter,quotechar=quotechar, quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
+
+
+    if remove_line_end:
+        data = data.Each(lambda x: x.replace('\n',''), dtype=str, per_slice=True)
+    
+    data = data.Copy()
+
+    d1 = []
+    d2 = []
+    d1d2 = []
+
+    dims = data.Dims
+    for pos, slice in enumerate(data.Slices): 
+        if len(slice.dims) == 1:
+            if dims[0] in slice.dims:
+                d1.append(pos)
+            else:
+                d2.append(pos)
+        else:
+            d1d2.append(pos)
+
+    assert len(d1d2) == 1, "Can only store a single matrix in a file"
+        
+    ndatcol = 0
+    for pos in d2:
+        row = data.Get(pos).ToPython()
+        w.writerow([""] * len(d1) + [data.Get(pos).Names[0]] + list(row))
+        ndatcol = len(row)
+
+    dx = data.Get(*d1).Tuple().ToPython()
+    dmat = data.Get(*d1d2)()
+    debug_here()
+    w.writerow(data.Get(d1).Names + [""] * (ndatcol + 1))
+    for colrow, matrow in zip(dx,dmat):
+        row = colrow + ("",) + tuple(matrow)
+        w.writerow(row)
+    f.close()
+
 def load_rep(filename):
     f = open(filename, 'rb')
     s = zlib.decompress(f.read())

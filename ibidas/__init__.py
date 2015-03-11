@@ -23,7 +23,7 @@ __all__ = ["Rep","Read", "Write", "Import", "Export", "Connect","_","CyNetwork",
            ]
 
 from utils import delay_import
-from utils.util import save_rep, load_rep, save_csv
+from utils.util import save_rep, load_rep, save_csv, save_matrixcsv
 from utils.context import _
 from utils.missing import Missing
 from utils.infix import Infix
@@ -171,8 +171,7 @@ def fexport_tsv(data, url, **kwargs):
     return save_csv(data, url, **kwargs)
 
 def fexport_matrixtsv(data, url, **kwargs):
-    from wrappers.matrix_tsv import MatrixTSVRepresentor
-    return MatrixTSVRepresentor(data, url, **kwargs)
+    return save_matrixcsv(data,url, **kwargs)
 
 def fexport_xml(data, url, **kwargs):
     from wrappers.xml_wrapper import XMLRepresentor
