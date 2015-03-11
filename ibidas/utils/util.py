@@ -143,7 +143,6 @@ def save_matrixcsv(r, filename, remove_line_end=True, names=True, lineterminator
 
     dx = data.Get(*d1).Tuple().ToPython()
     dmat = data.Get(*d1d2)()
-    debug_here()
     w.writerow(data.Get(d1).Names + [""] * (ndatcol + 1))
     for colrow, matrow in zip(dx,dmat):
         row = colrow + ("",) + tuple(matrow)
