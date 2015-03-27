@@ -124,10 +124,10 @@ def rep_completer(self,event, line = None):
     except: 
         raise TryNext
 
-if len(sys.argv) == 2:
-    with open(sys.argv[1], 'r') as argv:
-        sys.argv = [ x[:-1] for x in argv.readlines() ];
-        execfile(sys.argv[0]);
+if len(sys.argv) >= 2:
+    file = sys.argv[1]
+    sys.argv = sys.argv[1:]
+    execfile(file)
     #ewith
 else:
     if oldip:

@@ -83,6 +83,10 @@ class VCFOp(ops.ExtendOp):
         ndata = nested_array.NestedArray((data, self.parser.sample_names), self.type)
         return python.ResultOp.from_slice(ndata, self)
 
+
+def fill_in(list, nfield):
+    return list + ["."] * (nfield - len(list))
+
 class VCFParser(object):
     accepted_formats = set(['VCFv4.1'])
     def __init__(self, filename):
@@ -218,8 +222,10 @@ class VCFParser(object):
         if self.has_genotypes:
             format_fields = elems[8].split(':')
             format = elems[9:]
+            
+            nformat = len(format_fields)
 
-            format = zip(*[elem.split(':') for elem in format])
+            format = zip(*[fill_in(elem.split(':'),nformat) for elem in format])
             dformat = dict([(ffield,list(values)) for ffield, values in zip(format_fields, format)])
 
 
