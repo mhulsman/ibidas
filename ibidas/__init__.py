@@ -41,6 +41,7 @@ from algs import predefined_algs as Alg
 from wrappers.cytoscape import CyNetwork
 from server import Serve
 from constants import *
+from os.path import splitext;
 
 Fetch = DownloadCache()
 In = Infix(repops_funcs.Within)
@@ -253,7 +254,6 @@ def Import(url, **kwargs):
 Read = Import
 
 def Export(r, url, **kwargs):
-  from os.path import splitext;
   base = url;
 
   while True:
@@ -280,7 +280,11 @@ def Connect(url, **kwargs):
 
 
 def Save(r, filename, **kwargs):
-    if filename.endswith('tsv') or filename.endswith('csv') or filename.endswith('tab'):
+    (base, ext) = splitext(filename);
+    ext = ext.split('.')[1] if ext else 'dat';
+    format = kwargs.pop('format', ext).lower()
+
+    if format in set(['csv','tab','tsv']):
         save_csv(r, filename, **kwargs);
     else:
         save_rep(r, filename, **kwargs);
