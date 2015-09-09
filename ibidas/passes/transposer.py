@@ -189,8 +189,7 @@ class Transposer(VisitorFactory(prefixes=("visit",), flags=NF_ERROR), manager.Pa
         
 
         #redo aggregate
-        outparam = repops_funcs.Param(aggnode.name, aggnode.type)
-        newnode = ops.UnaryFuncAggregateOp(aggnode.funcname, aggnode.sig, outparam, 
+        newnode = ops.UnaryFuncAggregateOp(aggnode.funcname, aggnode.sig, aggnode.name, aggnode.type, 
                                             len(after) + 1, data_source_node, **aggnode.kwargs)
         self.graph.addNode(newnode)
         self.graph.addEdge(query_graph.ParamEdge(data_source_node, newnode,"slice"))

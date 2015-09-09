@@ -464,7 +464,12 @@ class Each(repops.UnaryOpRep):
     @classmethod
     def _apply(cls, slices, eachfunc, dtype=rtypes.unknown, named_params=False, keep_name=False, per_slice=False, **kwargs):
         if(not isinstance(dtype,rtypes.TypeUnknown)):
-            dtype = rtypes.createType(dtype,len(slices[0].dims)) 
+            refdims = []
+            for slice in slices:
+                refdims.extend(slice.dims)
+                refdims.extend(slice.type.getAllDims())
+
+            dtype = rtypes.createType(dtype,len(slices[0].dims), refdims=refdims)
         if per_slice:   
             return tuple([ops.EachOp((slice,), eachfunc, dtype, named_params, keep_name, kwargs) for slice in slices])
         else:
