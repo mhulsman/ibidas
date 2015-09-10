@@ -155,14 +155,14 @@ class WalkContigIter(object):
         if not node is None:
             if self.walk_users:
                 edges = self.graph.edge_source[self.node]
-                if len(edges) > 1:
+                if len(edges) > 1 or len(edges) == 0:
                     self.node = None
                 else:
                     edge = list(edges)[0]
                     self.node = edge.target
             else: #walk_source
                 edges = self.graph.edge_target[self.node]
-                if len(edges) > 1:
+                if len(edges) > 1 or len(edges) == 0:
                     self.node = None
                 else:
                     edge = list(edges)[0]

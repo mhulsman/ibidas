@@ -147,7 +147,7 @@ def yeast_chipchip(translator=None):
 predefined_sources.register(yeast_chipchip,name="chipchip_macisaac",category="yeast")  
         
         
-def yeastract(translator=None, url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20111009.tsv.gz"):
+def yeastract(translator=None, url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_2013927.tsv.gz"):
     """Downloads documented transcription factor regulation interactions from yeastract"""
     rtype = "[tftargets:*]<(trans_factor=bytes, target=bytes)"
     res = Read(Fetch(url),dtype=rtype)
@@ -197,8 +197,8 @@ def omim_genemap():
     return res.Without(_.f8, _.f12, _.disease1, _.disease2, _.disease3).Copy()
 predefined_sources.register(omim_genemap, category="human")
 
-def omim_disease_parse(x):
-    elems = x.replace('{','').replace('}','').split('; ')
+def omim_disease_parse(disease):
+    elems = disease.replace('{','').replace('}','').split('; ')
     return [elem.split(', ')[0] for elem in elems]
 
 

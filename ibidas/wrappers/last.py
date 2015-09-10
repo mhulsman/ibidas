@@ -18,7 +18,7 @@ from ibidas import *
 ###############################################################################
 
 
-def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsargs='', probs=0, trf=False, last_split=True, calc_evalue=True,softmask=False,tmpdir=None):
+def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsargs='', probs=0, trf=False, last_split=True, calc_evalue=False,softmask=False,tmpdir=None):
   alargs = [alargs]
   dbargs = [dbargs]
   lsargs = [lsargs]
@@ -50,7 +50,7 @@ def last(data, type, folder=None, pos_mode = 'last', dbargs='', alargs='', lsarg
   fas_2 = tempfile.NamedTemporaryFile(suffix='.fasta',dir=tmpdir)
   res = tempfile.NamedTemporaryFile(suffix='.maf',dir=tmpdir)
   
-  db_1  = fas_1.name[:-6]
+  db_1  = fas_1.name[:-4]
   db_2  = fas_2.name[:-6]
 
   md5_1 = write_fasta_text(title_1, seq_1, len(seq_1), fas_1);
@@ -92,6 +92,7 @@ def not_contains(args, value):
 ###############################################################################
 def last_result2(resfile, pos_mode = 'last',has_prob=False, last_split=False, calc_evalue=False):
   result = maf.read_maf(resfile)
+  return result
   #base_last_fields = ('qseqid', 'sseqid', 'qlen','qstart', 'qend', 'qstrand', 'slen', 'sstart', 'send', 'sstrand')
   last_fields = ('name1', 'name2', 'seq_size1', 'start1', _.start1 + _.aln_size1, 'strand1', 'seq_size2', 'start2', _.start2 + _.aln_size2, 'strand2','score','mapping')
   array_types = (int, int, int, int, int, str, int, int, int, str, float, object)
@@ -171,7 +172,7 @@ def last_make_db_CMD(dbname, fas_file, type, arguments):
 
 ###############################################################################
 
-def last_run_CMD(dbname1, type1, dbname2, fas_file2, type2, arguments, lsargs, last_split=True, calc_evalue=True):
+def last_run_CMD(dbname1, type1, dbname2, fas_file2, type2, arguments, lsargs, last_split=True, calc_evalue=False):
   lsargs = ' '.join(lsargs)
   if type1 == 'p' and type2 == 'n':
      arguments.append('-F 15')
@@ -181,8 +182,8 @@ def last_run_CMD(dbname1, type1, dbname2, fas_file2, type2, arguments, lsargs, l
 
   if last_split:
         base += ' | last-split %s' % lsargs
-  if calc_evalue:
-        base += ' | lastex %s.prj %s.prj -' % (dbname1,dbname2)
+  #if calc_evalue:
+  #      base += ' | lastex %s.prj %s.prj -' % (dbname1,dbname2)
   #base += ' | maf-convert.py tab'
 
   return base

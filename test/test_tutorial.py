@@ -8,7 +8,7 @@ from ibidas import *
 class TestTutorial(unittest.TestCase):
     
     def test_yeastract_inoutdegree(self):
-        url = "http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20111009.tsv.gz"
+        url = "http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_2013927.tsv.gz"
         yeastract = Read(Fetch(url))
         
         str(yeastract)
@@ -34,7 +34,7 @@ class TestTutorial(unittest.TestCase):
 
 
     def test_yeastract_inoutdegreeb(self):
-        def yeastract2(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_20111009.tsv.gz"):
+        def yeastract2(url="http://www.yeastract.com/download/RegulationTwoColumnTable_Documented_2013927.tsv.gz"):
             """Downloads documented transcription factor regulation interactions from yeastract"""
 
             res = Read(Fetch(url),dtype="[tftargets:*]<(trans_factor=bytes, target=bytes)")

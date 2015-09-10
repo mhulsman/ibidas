@@ -65,6 +65,12 @@ class StableTopoSortGraph(object):
         self.ancestors[after].add(before)
         self.ancestors[after].update(self.ancestors[before])
 
+        #FIXME: add descendant tracking:
+        for node,node_ancestors in self.ancestors.items():
+            if after in node_ancestors:
+                self.ancestors[node].update(self.ancestors[after])
+
+
     def getParents(self,node):
         return self.parents[node]
 
