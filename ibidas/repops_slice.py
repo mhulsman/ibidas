@@ -230,7 +230,7 @@ class AddSlice(repops.UnaryOpRep):
         
 
 class UnpackTuple(repops.UnaryOpRep):
-    def _process(self,source,name=None,unpack=True):
+    def _process(self,source,name=None,unpack=True, attach_name=False):
         """
         Parameters:
         source: source to unpack active slices from
@@ -240,18 +240,23 @@ class UnpackTuple(repops.UnaryOpRep):
         if not source._typesKnown():
             return
 
-        if not len(source._slices) == 1:                
+
+        if len(source._slices) == 0:                
             if(name):
                 raise AttributeError, "Asked to unpack tuple attribute '" + \
                     name + "', but cannot find a tuple."
             else:
                 raise AttributeError, "No tuple to unpack"
-        slice = source._slices[0]
-        nslices = self._apply(slice,name,unpack=unpack)
+        
+        
+        nslices = []
+        for slice in source._slices:
+            nslices.extend(self._apply(slice,name, unpack=unpack, attach_name=attach_name))
+
         return self._initialize(tuple(nslices))
 
     @classmethod
-    def _apply(cls, slice, name=None, unpack=True):
+    def _apply(cls, slice, name=None, unpack=True, attach_name=False):
         if(not isinstance(slice.type, rtypes.TypeTuple)):
             if(name):
                 raise AttributeError, "Asked to unpack tuple attribute '" + \
@@ -278,6 +283,10 @@ class UnpackTuple(repops.UnaryOpRep):
                 while(nslice.type.__class__ is rtypes.TypeArray):
                     nslice = ops.UnpackArrayOp(nslice)
                 nslices[pos] = nslice
+
+        if(attach_name):
+            nslices = [ops.ChangeNameOp(nslice, slice.name + '_' + nslice.name) for nslice in nslices]
+            
         return nslices
 
 class Bookmark(repops.UnaryOpRep):

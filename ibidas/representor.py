@@ -2019,9 +2019,23 @@ class Representor(Node):
         return repops_dim.UnpackArray(self, name)
     Elem = Elems
 
-    def Fields(self, name=None):
+    def Fields(self, name=None, attach_name=False):
         """Unpacks tuple type into slices"""
-        return repops_slice.UnpackTuple(self, name)
+
+        return repops_slice.UnpackTuple(self, name, attach_name=attach_name)
+
+
+    def PrefixName(self, name):
+        self._checkState()
+        return repops_slice.SliceRename(self, *[name + n for n in self.Names])
+
+        
+
+
+    def PostfixName(self, name):
+        self._checkState()
+        return repops_slice.SliceRename(self, *[n + name for n in self.Names])
+
 
     def GetRepeatedSliceNames(self):
         Pos = repops.delayable()(repops_funcs.Pos)
