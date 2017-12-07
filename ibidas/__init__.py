@@ -23,7 +23,7 @@ __all__ = ["Rep","Read", "Write", "Import", "Export", "Connect","_","CyNetwork",
            ]
 
 from utils import delay_import
-from utils.util import save_rep, load_rep, save_csv, save_matrixcsv
+from utils.util import save_rep, load_rep, save_rep2, load_rep2, save_csv, save_matrixcsv
 from utils.context import _
 from utils.missing import Missing
 from utils.infix import Infix
@@ -284,16 +284,20 @@ def Save(r, filename, **kwargs):
     ext = ext.split('.')[1] if ext else 'dat';
     format = kwargs.pop('format', ext).lower()
 
-    if format in set(['csv','tab','tsv']):
+    if format in set(['csv','tab','tsv', 'txt']):
         save_csv(r, filename, **kwargs);
+    elif format == 'ldat':
+        save_rep2(r, filename, **kwargs);
     else:
         save_rep(r, filename, **kwargs);
 
 
 def Load(filename,**kwargs):
-    if filename.endswith('tsv') or filename.endswith('csv') or filename.endswith('tab'):
+    if filename.endswith('tsv') or filename.endswith('csv') or filename.endswith('tab') or filename.endswith('txt'):
         from wrappers.tsv2 import TSVRepresentor
         return TSVRepresentor(filename, **kwargs) 
+    elif filename.endswith('ldat'):
+        return load_rep2(filename)
     else:
         return load_rep(filename)
 

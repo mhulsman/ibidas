@@ -180,8 +180,12 @@ class Representor(Node):
             for i in range(maxlen):
                 row = [col[i] for col in cols]
                 rows.append(row)
-        
-        console_height, console_width = console.getTerminalSize()
+       
+        try:
+            console_height, console_width = console.getTerminalSize()
+        except:
+            console_width=250
+            console_height=80
         widths = tableprint.calc_width(rows)
         indices = tableprint.advise_splits(console_width, widths, 3)
 

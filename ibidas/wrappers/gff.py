@@ -3,7 +3,7 @@ from python import Rep;
 from ..utils import util
 
 entry_field_names = [ 'seqname', 'source', 'feature', 'start', 'end', 'score', 'strand', 'frame', 'attr'];
-entry_field_types = [ str,       str,      str,       int,     int,   str,     str,      str,     str   ];
+entry_field_types = [ str,       str,      str,       int,     int,   str,     str,      str  ];
 
 def read_gff3(fname, **kwargs):
 
@@ -29,7 +29,7 @@ def read_gff3(fname, **kwargs):
 
     for entry in entries:
       e = [ entry[field] if field in entry else '' for field in gff3_fieldnames ];
-      e[-1] = ';'.join([ '='.join(attr) for attr in e[-1].items() ]);
+      #e[-1] = ';'.join([ '='.join(attr) for attr in e[-1].items() ]);
       loci.append(tuple(e));
     #efor
 
@@ -52,21 +52,21 @@ def split_entry(raw):
     fields = raw.split('\t', len(entry_field_names));
 
     entry           = dict( zip(entry_field_names, fields ) );
-    entry['attr']   = dict(tuple(attr.strip().split('=')) if ('=' in attr.strip()) else (attr, '') for attr in entry['attr'].split(';') if len(attr.strip()) > 0);
-    entry['id']     = entry['attr']['ID'] if 'ID' in entry['attr'] else '';
-    entry['parent'] = entry['attr']['Parent'] if 'Parent' in entry['attr'] else '';
-    entry['name']   = entry['attr']['Name'] if 'Name' in entry['attr'] else '';
+    entry['attr']   = dict((util.valid_name(attr.strip().split('=')[0]), attr.strip().split('=')[1]) if ('=' in attr.strip()) else (util.valid_name(attr), '') for attr in entry['attr'].split(';') if len(attr.strip()) > 0);
+    entry['id']     = entry['attr']['id'] if 'id' in entry['attr'] else '';
+    entry['parent'] = entry['attr']['parent'] if 'parent' in entry['attr'] else '';
+    entry['name']   = entry['attr']['name'] if 'name' in entry['attr'] else '';
 
-    if 'ID' in entry['attr']:
-      del entry['attr']['ID'];
+    if 'id' in entry['attr']:
+      del entry['attr']['id'];
     #fi
 
-    if 'Parent' in entry['attr']:
-      del entry['attr']['Parent'];
+    if 'parent' in entry['attr']:
+      del entry['attr']['parent'];
     #fi
 
-    if 'Name' in entry['attr']:
-      del entry['attr']['Name'];
+    if 'name' in entry['attr']:
+      del entry['attr']['name'];
     #fi
 
     return entry;
