@@ -407,7 +407,7 @@ class DimEqualizer(object):
         else:
             name = "d" + str(self.dimid())
         if dimrep.length_type == LENGTH_FIXED:
-            ndim = dimensions.Dim(dimrep.lengths, tuple(), dimrep.has_missing,name=name)
+            ndim = dimensions.Dim(dimrep.lengths, (True,) * dimrep.has_missing, dimrep.has_missing,name=name)
         else:
             ndim = dimensions.Dim(UNDEFINED, (True,) * len(parents), dimrep.has_missing,name=name)
         dimrep._setDim(ndim)

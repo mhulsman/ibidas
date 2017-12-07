@@ -294,8 +294,12 @@ class Bookmark(repops.UnaryOpRep):
         nslices = source._slices
         if(len(names) == 1):
             nslices = [ops.ChangeBookmarkOp(slice,names[0]) for slice in nslices]
+        elif(len(names) == len(source._slices)):
+            nslices = [ops.ChangeBookmarkOp(slice,name) 
+                    for slice, name in zip(source._slices, names)]
         elif(len(names) > 1):
             unique_first_dims = util.unique([slice.dims[0] for slice in source._slices])
+
             assert (len(names) == len(unique_first_dims)), \
                 "Number of new slice names does not match number of slices"
             for name,dim in zip(names,unique_first_dims):

@@ -61,11 +61,11 @@ class FullSparse(numpy.ndarray):
         return nval.view(FullSparse)
 
     def hasSparse(self):
-        return numpy.equal(self,Missing).any()
+        return numpy.array([elem is Missing for elem in self.ravel()]).any()
 
     def replace_missing(self,empty_replace=Missing,otype=None):
         if(not empty_replace is Missing):
-            missing_filter = numpy.equal(self,Missing)
+            missing_filter = numpy.array([elem is Missing for elem in self.ravel()])
             res = self.copy()
             res[missing_filter] = empty_replace
         else:
@@ -76,7 +76,7 @@ class FullSparse(numpy.ndarray):
     
     def without_missing(self):
         val = self.copy()
-        missing_filter = numpy.equal(self, Missing)
+        missing_filter = numpy.array([elem is Missing for elem in self.ravel()])
         return val[~missing_filter]
 
 

@@ -291,7 +291,10 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
     def unpackCastTypeScalar(self, rtype, oslice, nslice):
         newnode = ops.CastOp(oslice, nslice.type)
         return self.visitCastOp(newnode, oslice)
-    
+   
+    def unpackCastTypeUnknown(self, rtype, oslice, nslice):
+        return oslice
+
     unpackCastTypeString = unpackCastTypeScalar
     unpackCastTypeAny = unpackCastTypeScalar
 
@@ -1013,7 +1016,7 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
     def countCount(self, data, type_in, type_out, op, packdepth):
         dtype = type_out.toNumpy()
         if(len(data.shape) == 1):
-            return util.darray([len(row) for row in data],dtype)
+            return util.darray([len(row) if not row is Missing else 0 for row in data],dtype)
         else:
             return util.darray([data.shape[1]] * data.shape[0],dtype)
     
@@ -1055,7 +1058,8 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
             res = []
             for row in data:
                 pos = numpy.arange(len(row))
-                filter = ~numpy.equal(row, Missing)
+
+                filter = ~numpy.array([elem is Missing for elem in self])
                 pos = pos[filter]
                 row = row[filter]
                 res.append(pos[func(row,axis=0)])

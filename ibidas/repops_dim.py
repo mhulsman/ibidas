@@ -287,7 +287,7 @@ class Flat(repops.UnaryOpRep):
         dependent = tuple([left or right for left,right in 
                         izip_longest(selpath[-2].dependent, selpath[-1].dependent[1:],fillvalue=False)])
 
-        ndim = dimensions.Dim(shape, dependent=dependent, has_missing = selpath[-1].has_missing or selpath[-2].has_missing, name=name)
+        ndim = dimensions.Dim(shape, dependent=dependent, has_missing = selpath[-2].has_missing, name=name)
         
         bcdim = dimensions.Dim(1)
 

@@ -106,7 +106,7 @@ class NestedArray(object):
                         idxres[:,1] = pos
                     else:
                         ndata = numpy.concatenate([validate_array(elem,cdepth,dtype) for elem in cdata])
-                        pos = numpy.cumsum([len(elem) for elem in cdata])
+                        pos = numpy.cumsum([len(elem) if not elem is Missing else 0 for elem in cdata])
                         idxres[1:,0] = pos[:-1]
                         idxres[:,1] = pos
                 else:    
@@ -963,6 +963,10 @@ def drop_prev_shapes_dim(ndata,shapes):
  
 
 def validate_array(seq, cdepth, dtype):
+    if seq is Missing:
+        seq = util.darray([],dtype)
+        seq.shape = (0,) * cdepth
+        
     lshape = len(seq.shape)
     if(lshape < cdepth):
         oshape = seq.shape

@@ -32,6 +32,7 @@ class Dim(object):
         else:
             self.id = did
 
+        assert has_missing == False or len(dependent) > 0, 'If dimension has missing values, it should be dependent on its parent dimension(s)'
         assert isinstance(self.id, int), "ID should be a integer"
 
         if(name is None):
@@ -168,8 +169,8 @@ class Dim(object):
             res = self.name + ":*"
         else:
             res = self.name + ":" + str(self.shape)
-        if(self.has_missing):
-            res += "?"
+        #if(self.has_missing):
+        #    res += "?"
         return res
 
 

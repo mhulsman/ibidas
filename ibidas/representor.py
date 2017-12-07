@@ -193,7 +193,7 @@ class Representor(Node):
                 col0 = tableprint.select_cols(rows,0)
                 srows = tableprint.prepend_col(srows,col0)
             widths = tableprint.calc_width(srows)
-            nwidths = tableprint.optimize_width(console_width, widths, 3)
+            nwidths = numpy.cast[int](tableprint.optimize_width(console_width, numpy.cast[float](widths), 3))
             srows = tableprint.row_crop(nwidths, srows)
             res += tableprint.indent(srows,hasHeader=True) 
         
