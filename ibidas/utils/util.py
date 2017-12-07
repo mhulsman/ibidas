@@ -83,9 +83,21 @@ def save_rep(r, filename):
     f.write(s)
     f.close()
 
+def save_rep2(r, filename):
+    import backports.lzma
+    f = backports.lzma.open(filename, 'wb')
+    cPickle.dump(r,f, protocol=2)
+    f.close()
+
 def save_csv(r, filename, remove_line_end=True, names=True, lineterminator='\n', delimiter=',', quotechar='"'):
     f = open(filename,'wb')
     r= r.Array(tolevel=1)
+
+    #convert bool to int
+    for pos, e in enumerate(list(r.Slices)):
+        if str(e.type).startswith('bool'):
+            r = r.To(pos, Do=_.Cast(str(e.type).replace('bool', 'int64')))
+
     data = r.Cast(str)
     if filename.endswith('tsv'):
         w = csv.writer(f,delimiter='\t', quotechar=quotechar, quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
@@ -153,6 +165,12 @@ def load_rep(filename):
     f = open(filename, 'rb')
     s = zlib.decompress(f.read())
     return cPickle.loads(s)
+
+def load_rep2(filename):
+    import backports.lzma
+    f = backports.lzma.open(filename, 'rb')
+    return cPickle.load(f)
+    
 
 
 def valid_name(name):

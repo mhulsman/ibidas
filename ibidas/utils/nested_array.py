@@ -952,11 +952,11 @@ def validate_array(seq, cdepth, dtype):
         rem_ndims = cdepth - len(seq.shape) + 1
         if len(seq) == 0:
             seq = util.darray([],dtype)
-            seq.shape = (0,) * rem_ndims
+            seq.shape = (0,) * cdepth
         else:
             seq = util.darray(list(seq.ravel()),dtype,rem_ndims,rem_ndims)
             seq.shape = oshape + seq.shape[1:]
-        assert len(seq.shape) == cdepth, "Non array values encountered for dims " + str(dims[len(seq.shape):])
+        assert len(seq.shape) == cdepth, "Non array values encountered for last %d dims " % (cdepth - len(seq.shape))
     elif(lshape > cdepth):
         oshape = seq.shape
         seq = dimpaths.flatFirstDims(seq,cdepth-1)

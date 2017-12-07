@@ -1283,7 +1283,12 @@ def speedfilter(seqs,has_missing, ctype, stype):
     try:
         res = data[constraint]
     except Exception:
-        res = util.darray(data)[constraint]
+        try:
+            res = util.darray(data)[constraint]
+        except:
+            print data.shape, data
+            print constraint.shape, constraint
+            raise
     return res
 
 def ensure_fixeddims(seqs,packdepth,dtype):
