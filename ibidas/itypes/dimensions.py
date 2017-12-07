@@ -181,12 +181,14 @@ class Dim(object):
         redim_cache = self._getRedimCache()
         key = (self,other)
         if not key in redim_cache:
-            if(self.shape == UNDEFINED or other.shape == UNDEFINED):
+            if(self.shape == UNDEFINED or other.shape == UNDEFINED) or self.shape != other.shape:
                 rshape = UNDEFINED
+                ndep = tuple([ldep or rdep for ldep, rdep in itertools.izip_longest(self.dependent, other.dependent,fillvalue=False)])
+                if not ndep:
+                    ndep = (True,) #FIXME, maybe more than 1 dependent dimension?
             else:
-                rshape = max(self.shape, other.shape)
-
-            ndep = tuple([ldep or rdep for ldep, rdep in itertools.izip_longest(self.dependent, other.dependent,fillvalue=False)])
+                rshape = self.shape
+                ndep = tuple([ldep or rdep for ldep, rdep in itertools.izip_longest(self.dependent, other.dependent,fillvalue=False)])
 
             if(self.name == other.name):
                 nname = self.name

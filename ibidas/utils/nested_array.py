@@ -249,7 +249,16 @@ class NestedArray(object):
         return nself                
 
     def getStructuredData(self):
-        return self.pack(rtypes.unknown, len(self.idxs)-1).data[0]
+        d = self.pack(rtypes.unknown, len(self.idxs)-1).data
+        assert d.shape[0] <= 1, 'Unexpected shape'
+        if len(d.shape) > 1:
+            d.shape = d.shape[1:]
+        elif d.shape == 0:
+            d = d
+        else:
+            d = d[0]
+            
+        return d
 
     def map(self, func, *args, **kwargs):
         restype= kwargs.get("res_type")
@@ -437,8 +446,12 @@ class NestedArray(object):
         else:
             if(isinstance(lidx,int)):  #fixed-var
                 oshape = ridx.shape
-                nshape = oshape[:-2] + (2 * oshape[-2],)
-                nridx = ridx.reshape(nshape)[...,[0, -1]]
+                if 0 in oshape[:-1]:
+                    nshape = oshape[:-3] + (0, 2)
+                    nridx = ridx.reshape(nshape)
+                else:
+                    nshape = oshape[:-2] + (2 * oshape[-2],)
+                    nridx = ridx.reshape(nshape)[...,[0, -1]]
                 nself.idxs[matchpoint] = nridx
             else:     #var-var
                 nlidx = numpy.zeros(lidx.shape,dtype=lidx.dtype)
@@ -458,9 +471,13 @@ class NestedArray(object):
         diff = idx[...,-1] - idx[...,0]
         diffset = set(diff.ravel())
 
-        assert len(diffset)==1, "Multiple lengths encountered while expecting fixed dim"
+        assert len(diffset)<=1, "Multiple lengths encountered while expecting fixed dim"
         
-        nshape = diffset.pop()
+        if not diffset:
+            nshape= 0
+        else:
+            nshape = diffset.pop()
+        
         nextobj = nextobj.reshape(diff.shape + (nshape,) + nextobj.shape[1:])
 
         if(pos > 0 and isinstance(self.idxs[pos-1],int)):

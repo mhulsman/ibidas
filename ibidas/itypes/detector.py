@@ -66,14 +66,14 @@ d.getType()
 
 import numpy
 import array
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import operator
 import platform
 from itertools import chain
 
 import rtypes
 from ..constants import *
-from ..utils import sparse_arrays, module_types
+from ..utils import sparse_arrays, module_types, custom_collections
 from ..utils.missing import *
 import re
 
@@ -222,7 +222,7 @@ class DimRep(object):
         self.dirty = True
 
         if has_missing:
-            lenghts = lengths.replace_missing(-1, otype=int)
+            lengths = lengths.replace_missing(-1, otype=int)
 
         if self.length_type == LENGTH_FIXED or self.length_type == LENGTH_NOINIT:
             lenset = set(lengths)
@@ -382,6 +382,9 @@ class DimEqualizer(object):
                 continue
             if dimrep.length_type != dr.length_type:
                 continue
+            if hasattr(dimrep, 'dim_name') and hasattr(dr,'dim_name'):
+                if dimrep.dim_name != dr.dim_name:
+                    continue
             if dr.lengths != dimrep.lengths:
                 continue
             if dimrep.length_type == LENGTH_FIXED:
@@ -398,10 +401,15 @@ class DimEqualizer(object):
             else:
                 dimrep._setDim(dr.dim)
                 return dr.dim
-        if dimrep.length_type == LENGTH_FIXED:
-            ndim = dimensions.Dim(dimrep.lengths, tuple(), dimrep.has_missing,name="d"+str(self.dimid()))
+
+        if hasattr(dimrep, 'dim_name'):
+            name = dimrep.dim_name
         else:
-            ndim = dimensions.Dim(UNDEFINED, (True,) * len(parents), dimrep.has_missing,name="d"+str(self.dimid()))
+            name = "d" + str(self.dimid())
+        if dimrep.length_type == LENGTH_FIXED:
+            ndim = dimensions.Dim(dimrep.lengths, tuple(), dimrep.has_missing,name=name)
+        else:
+            ndim = dimensions.Dim(UNDEFINED, (True,) * len(parents), dimrep.has_missing,name=name)
         dimrep._setDim(ndim)
         return ndim
 
@@ -577,11 +585,11 @@ class NamedTupleScanner(TypeScanner):
 registerTypeScanner(NamedTupleScanner)
 
 class RecordDictScanner(TypeScanner):
-    good_cls = set([dict, module_types.soap_struct, MissingType])
+    good_cls = set([dict, defaultdict, OrderedDict, module_types.soap_struct, MissingType])
 
     def __init__(self, detector):
         TypeScanner.__init__(self, detector)
-        self.names = set()
+        self.names = custom_collections.OrderedSet()
 
     def getType(self):
         fieldnames = [name for name in self.names]
@@ -593,8 +601,7 @@ class RecordDictScanner(TypeScanner):
             return False
         
         names = self.names.copy()
-        if dict in self.detector.objectclss:
-            assert not module_types.soap_struct in self.detector.objectclss, "dict cannot be mixed with SOAPpy struct type"
+        if not module_types.soap_struct in self.detector.objectclss:
             for elem in seq:
                 if not (elem is Missing):
                     names.update(elem.keys())
@@ -610,6 +617,7 @@ class RecordDictScanner(TypeScanner):
                 return False
         self.names = names
 
+        
         if(len(self.names) > 100):
             return False
 
@@ -628,7 +636,7 @@ registerTypeScanner(RecordDictScanner)
 
 
 class ContainerScanner(TypeScanner):
-    good_cls = set([set, frozenset, MissingType, list, array.array, numpy.ndarray])
+    good_cls = set([set, frozenset, custom_collections.NamedList, MissingType, list, array.array, numpy.ndarray])
     bad_cls = set([tuple, str, unicode, numpy.unicode_, numpy.string_, module_types.soap_struct])
 
     def __init__(self, detector):
@@ -648,7 +656,7 @@ class ContainerScanner(TypeScanner):
         if not self.detector.objectclss.issubset(self.good_cls):
             if not self.detector.objectclss.isdisjoint(self.bad_cls):
                 return False
-
+        
             for cls in self.detector.objectclss:
                 if issubclass(cls, tuple):
                     return False
@@ -690,7 +698,15 @@ class ContainerScanner(TypeScanner):
                         f = operator.itemgetter(i)
                     nelems = shapes.map(f, otype=object, out_empty=Missing, has_missing=has_missing)
                     dr.processLengths(nelems.ravel(), has_missing=has_missing)
-        
+       
+        if custom_collections.NamedList in self.detector.objectclss and self.min_dim == 1:
+            names = set([elem for elem in seq.map(lambda x: x.name, otype=object, out_empty=None, has_missing=has_missing) if not elem is None])
+            assert len(names) == 1, 'Multiple names given for same dimension'
+            dr = self.getDimRep(0)
+            dr.dim_name = list(names)[0]
+
+                
+
         d = self.getSubDetector()
         done=False
         #shortcut for numpy.arrays
@@ -797,10 +813,10 @@ class StringScanner(TypeScanner):
             ntype = rtypes.TypeBytes
         else:
             ntype = rtypes.TypeString
-        if self.max_nchars < 32:
-            d = dimensions.Dim(self.max_nchars, tuple(), self.detector.hasMissing())
-        else:
-            d = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
+        #if self.max_nchars < 32 and self.max_nchars != 0:
+        #    d = dimensions.Dim(self.max_nchars, tuple(), self.detector.hasMissing())
+        #else:
+        d = dimensions.Dim(UNDEFINED, (True,) * len(self.getDimReps(0)), self.detector.hasMissing())
 
         dims = dimpaths.DimPath(d)
         return ntype(self.detector.hasMissing(), dims)
@@ -906,7 +922,6 @@ class StringProteinScanner(StringScanner):
         res = StringScanner.scan(self, seq)
         rm = self.regmatch
         if res:
-            minsize = numpy.inf
             minseq  = ""
             for elem in seq.ravel():
                 if not elem:
@@ -920,7 +935,7 @@ class StringProteinScanner(StringScanner):
                     self.evidence += size
                     self.nelem += 1
 
-        if minsize < 25:
+        if (self.nelem == 0) or (self.evidence / self.nelem) < 25:
             return False
         return res
 registerTypeScanner(StringProteinScanner);

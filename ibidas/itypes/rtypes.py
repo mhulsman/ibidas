@@ -274,22 +274,18 @@ class TypeAny(TypeUnknown):#{{{
     def __le__(self, other):
         if(isinstance(other, basestring)):
             other = createType(other)
-        if(other.__class__ == self.__class__):
+        if(other.__class__ == self.__class__ or other.__class__ in self.__class__.__mro__):
             if(self.has_missing):
                 return other.has_missing
-            return True
-        if(other.__class__ in self.__class__.__mro__):
             return True
         return False
     
     def __ge__(self, other):
         if(isinstance(other, basestring)):
             other = createType(other)
-        if(other.__class__ == self.__class__):
+        if(other.__class__ == self.__class__ or self.__class__ in other.__class__.__mro__):
             if(other.has_missing):
                 return self.has_missing
-            return True
-        if(self.__class__ in other.__class__.__mro__):
             return True
         return False
 
@@ -299,6 +295,8 @@ class TypeAny(TypeUnknown):#{{{
         if(other.__class__ == self.__class__):
             return self.has_missing and not other.has_missing
         if(self.__class__ in other.__class__.__mro__):
+            if not self.has_missing and other.has_missing:
+                return False
             return True
         return False
     
@@ -308,6 +306,8 @@ class TypeAny(TypeUnknown):#{{{
         if(other.__class__ == self.__class__):
             return not self.has_missing and other.has_missing
         if(other.__class__ in self.__class__.__mro__):
+            if self.has_missing and not other.has_missing:
+                return False
             return True
         return False
 

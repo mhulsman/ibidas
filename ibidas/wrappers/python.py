@@ -686,7 +686,7 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
             zipdata = numpy.broadcast(data1,data2)
         else:
             zipdata = zip(data1,data2)
-        res = [elem in arr for elem,arr in zipdata]
+        res = [elem in list(arr) for elem,arr in zipdata]
         return util.darray(res,bool)
 
     def withinContains(self, data, type1, type2, typeo, op, bcdepth=1):
@@ -696,7 +696,7 @@ class PyExec(VisitorFactory(prefixes=("visit","unpackCast"), flags=NF_ELSE),
             zipdata = numpy.broadcast(data1,data2)
         else:
             zipdata = zip(data1,data2)
-        res = [elem in arr for elem,arr in zipdata]
+        res = [elem in list(arr) for elem,arr in zipdata]
         return util.darray(res,bool)
     
     def mergeMerge(self, data, type1, type2, typeo, op):
@@ -1233,7 +1233,11 @@ def speedeach(seqs, dtype, eachfunc, extra_params, named_params):
     return nseq
 
 def speedarrayify(seqs,dtype):
-    nseq = numpy.array(seqs,dtype).transpose([1,0] + range(2, len(seqs[0].shape)+1))
+    if all([isinstance(s, numpy.ndarray) for s in seqs]) and len(set([s.shape for s in seqs])) > 1:
+        z = [list(s) for s in seqs] #FIXME: can also go deeper if shape allows
+        nseq = numpy.array(z,dtype).transpose([1,0])
+    else:
+        nseq = numpy.array(seqs,dtype).transpose([1,0] + range(2, len(seqs[0].shape)+1))
     return nseq
 
 

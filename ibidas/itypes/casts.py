@@ -118,11 +118,14 @@ addCasts(set([rtypes.TypeUnknown, rtypes.TypeAny]) | rtypes.TypeStrings, rtypes.
 
 
 
+
 def checkStringString(intype, outtype):
     if(intype.has_missing and not outtype.has_missing):
         return False
 
-    if not intype.dims[0].shape == UNDEFINED and not outtype.dims[0].shape == UNDEFINED:
+    if intype.dims[0].shape == UNDEFINED and not outtype.dims[0].shape == UNDEFINED:
+        return False
+    elif intype.dims[0].shape != UNDEFINED and intype.dims[0].shape > outtype.dims[0].shape:
         return False
     return True
 
@@ -227,14 +230,17 @@ def simTupleToTuple(intype, outtypecls, dimdepth):
 addCasts(set([rtypes.TypeTuple]), set([rtypes.TypeTuple]), checkTupleToTuple, simTupleToTuple,"copy")
 
 def checkSubType(intype, outtype):
-    if isinstance(intype,rtypes.TypeArray):
+    if isinstance(intype, tuple(rtypes.TypeStrings)):
+        if not checkStringString(intype, outtype):
+            return False
+    elif isinstance(intype,rtypes.TypeArray):
         if not checkArrayToArray(intype,outtype):
             return False
     elif isinstance(intype, rtypes.TypeTuple):
         if not checkTupleToTuple(intype, outtype):
             return False
     else:
-        if not intype == outtype:
+        if not intype <= outtype:
             return False
     return True
    
