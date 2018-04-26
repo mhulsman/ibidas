@@ -615,7 +615,7 @@ class TypeArray(TypeAny):#{{{
     def commonType(cls, type1, type2):
         if(not type1.dims or not type2.dims or
             len(type1.dims) != len(type2.dims)):
-            return TypeAny(type1.has_missing or type2.has_missins)
+            return TypeAny(type1.has_missing or type2.has_missing)
         else:
             subtypes = [casts.castImplicitCommonType(lstype, rstype)
                         for lstype, rstype in zip(type1.subtypes, type2.subtypes)]
