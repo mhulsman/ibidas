@@ -204,6 +204,7 @@ def fexport_xlsx(data, url, **kwargs):
 formats_import = { 'tsv' : fimport_tsv2, 'csv' : fimport_tsv2,
                     'tsv2' :fimport_tsv2,
                     'tsv1' :fimport_tsv,
+                    'bed':fimport_tsv,
                    'tsv_matrix' : fimport_matrixtsv,
                    'xml' : fimport_xml,
                    'psimi' : fimport_psimi,
@@ -217,6 +218,7 @@ formats_import = { 'tsv' : fimport_tsv2, 'csv' : fimport_tsv2,
                  };
 
 formats_export = { 'tsv' : fexport_tsv, 'csv' : fexport_tsv,
+                    'bed' : fexport_tsv,
                    'tsv_matrix' : fexport_matrixtsv,
                    'xml' : fexport_xml,
                    'psimi' : fexport_psimi,
@@ -284,7 +286,7 @@ def Save(r, filename, **kwargs):
     ext = ext.split('.')[1] if ext else 'dat';
     format = kwargs.pop('format', ext).lower()
 
-    if format in set(['csv','tab','tsv', 'txt']):
+    if format in set(['csv','tab','tsv', 'bed', 'txt']):
         save_csv(r, filename, **kwargs);
     elif format == 'ldat':
         save_rep2(r, filename, **kwargs);

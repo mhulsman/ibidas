@@ -1414,7 +1414,7 @@ def remove_independent(data,dim):
         #FIXME: handle variable prev dims (move to nested_array)
         if dep and len(wx) > pos:
             wx[-(pos+1)] = slice(None,None)
-    data = data[wx]
+    data = data[tuple(wx)]
     return data
 
 def add_independent(data,dim):

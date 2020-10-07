@@ -1788,7 +1788,9 @@ class TypeStringASTInterpreter(object):#{{{
                     dependent = tuple()
                 elif(dependent == "~"):
                     dependent = (True,) * dimpos
-                    
+                if has_missing is None:
+                    has_missing = False
+                   
                 if(shape is None):
                     shape = UNDEFINED
                 self.dims[name] = dimensions.Dim(shape,dependent,has_missing, name=name) 

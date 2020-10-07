@@ -22,6 +22,7 @@ import random
 import re
 import time
 import shlex, subprocess, os;
+import struct
 
 def resplit(str, sep=' ', sc=[]):
     if sc == []:
@@ -76,18 +77,61 @@ def find_names(objs, req_objs=[],skip_frames=True):
     return []
 
 _delay_import_(globals(),"missing","Missing")
-def save_rep(r, filename):
-    f = open(filename, 'wb')
-    s = cPickle.dumps(r,protocol=2)
-    s = zlib.compress(s)
-    f.write(s)
-    f.close()
+#def save_rep(r, filename):
+#    f = open(filename, 'wb')
+#    s = cPickle.dumps(r,protocol=2)
+#    s = zlib.compress(s)
+#    f.write(s)
+#    f.close()
 
 def save_rep2(r, filename):
     import backports.lzma
     f = backports.lzma.open(filename, 'wb')
     cPickle.dump(r,f, protocol=2)
     f.close()
+
+import logging
+import signal
+class DelayedKeyboardInterrupt(object):
+    def __enter__(self):
+        self.signal_received = False
+        self.old_handler = signal.signal(signal.SIGINT, self.handler)
+        self.counter = 0
+
+    def handler(self, sig, frame):
+        if self.counter < 2:
+            self.signal_received = (sig, frame)
+            print('SIGINT received. Delaying KeyboardInterrupt %d.' % self.counter)
+            self.counter += 1   
+        else:
+            signal.signal(signal.SIGINT, self.old_handler)
+            self.signal_received = False
+            self.counter = 0
+            self.old_handler(sig,frame)
+
+
+    def __exit__(self, type, value, traceback):
+        signal.signal(signal.SIGINT, self.old_handler)
+        if self.signal_received:
+            self.old_handler(*self.signal_received)
+
+
+def save_rep(r, filename):
+    s = cPickle.dumps(r,protocol=2)
+    with DelayedKeyboardInterrupt():
+        f = None
+        while s:
+            block = s[:1000000000]
+            s = s[1000000000:]
+            compressed_block = zlib.compress(block)
+            header = struct.pack('ll', len(compressed_block), len(block)) #magic value
+            if f is None: #delay opening file as long as possible.
+                f = open(filename, 'wb')
+                f.write(struct.pack('lll',123456789,987654321,1))
+            f.write(header)
+            f.write(compressed_block)
+        f.close()
+
 
 def save_csv(r, filename, remove_line_end=True, names=True, lineterminator='\n', delimiter=',', quotechar='"'):
     f = open(filename,'wb')
@@ -99,7 +143,7 @@ def save_csv(r, filename, remove_line_end=True, names=True, lineterminator='\n',
             r = r.To(pos, Do=_.Cast(str(e.type).replace('bool', 'int64')))
 
     data = r.Cast(str)
-    if filename.endswith('tsv'):
+    if filename.endswith('tsv') or filename.endswith("bed"):
         w = csv.writer(f,delimiter='\t', quotechar=quotechar, quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
     else:
         w = csv.writer(f,delimiter=delimiter,quotechar=quotechar, quoting=csv.QUOTE_MINIMAL, lineterminator=lineterminator);
@@ -161,18 +205,36 @@ def save_matrixcsv(r, filename, remove_line_end=True, names=True, lineterminator
         w.writerow(row)
     f.close()
 
-def load_rep(filename):
-    f = open(filename, 'rb')
-    s = zlib.decompress(f.read())
-    return cPickle.loads(s)
+#def load_rep(filename):
+#    f = open(filename, 'rb')
+#    s = zlib.decompress(f.read())
+#    return cPickle.loads(s)
 
 def load_rep2(filename):
     import backports.lzma
     f = backports.lzma.open(filename, 'rb')
     return cPickle.load(f)
     
+def load_rep(filename):
+    f = open(filename, 'rb')
+    s = f.read(24)
+    v1,v2,v3 = struct.unpack('lll', s)
+    if v1 == 123456789 and v2 == 987654321: # header
+        res = []
+        assert v3 == 1  #version 1
+        while True:
+            s = f.read(16)
+            if len(s) == 0:
+                break
+            csize, bsize = struct.unpack('ll', s)
+            res.append(zlib.decompress(f.read(csize),0,bsize))
+        return cPickle.loads(''.join(res))
+    else:
+        f.seek(0)
+        s = zlib.decompress(f.read())
+        return cPickle.loads(s)
 
-
+ 
 def valid_name(name):
     name = name.lower()
     newname = []

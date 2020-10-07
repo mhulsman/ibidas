@@ -180,7 +180,7 @@ class TSVRepresentor(wrapper.SourceRepresentor):
         if commentchar is None:
             fsample_lines = [sl for sl in sample_lines if len(sl) > 0]
             poscomchars = set(possible_commentchars)
-            if fsample_lines[0][0] in poscomchars:
+            if fsample_lines and fsample_lines[0][0] in poscomchars:
                 commentchar = fsample_lines[0][0]
             else:
                 x = set([sl[0] for sl in fsample_lines if sl[0] in poscomchars])
