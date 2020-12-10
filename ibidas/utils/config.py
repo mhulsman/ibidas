@@ -33,7 +33,8 @@ def writeConfig(filename, config):
     """
     cp = ConfigParser.ConfigParser()
     sections = set([k.split('.')[0] for k in config.keys()])
-    map(cp.add_section, sections)
+    for section in sections:
+        cp.add_section(section)
     for k,v in config.items():
         s, o = k.split('.')
         cp.set(s, o, v)
