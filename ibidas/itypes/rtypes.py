@@ -1170,7 +1170,7 @@ class TypeBool(TypeUInt8, TypeInt8):#{{{
     name = "bool"
     _minmax = (0, 1)
     _dtype = "bool"
-    _scalar = numpy.bool
+    _scalar = bool
     _defval = False
     _reqRPCcon=True
     _ptype = bool

@@ -273,9 +273,9 @@ def numpy_unique(ar, return_index=False, return_inverse=False):
 
     if ar.size == 0:
         if return_inverse and return_index:
-            return ar, np.empty(0, np.bool), np.empty(0, np.bool)
+            return ar, np.empty(0, bool), np.empty(0, bool)
         elif return_inverse or return_index:
-            return ar, np.empty(0, np.bool)
+            return ar, np.empty(0, bool)
         else:
             return ar
 
