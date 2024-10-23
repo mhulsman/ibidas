@@ -7,6 +7,7 @@ if not ((cur_version[0] > req_version[0]) or (cur_version[0] == req_version[0] a
     sys.stderr.write("Your python interpreter is too old. Ibidas needs at least Python 2.6. Please consider upgrading.\n")
     sys.exit(-1)
 
+print(cur_version, cur_version[0])
 if cur_version[0] > 2:
     sys.stderr.write("Ibidas only works with Python 2.x, not 3.x. Use 'python2', 'python2.7', 'python-2.7', 'python27' or something similar instead of 'python' to run the setup script.\n");
     sys.stderr.write("In case easy_install is used, use easy_install2, easy_install-2.7, or something similar (you can usetab-completion to find the available options).\n");

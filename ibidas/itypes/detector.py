@@ -618,7 +618,7 @@ class RecordDictScanner(TypeScanner):
         self.names = names
 
         
-        if(len(self.names) > 100):
+        if(len(self.names) > 1000):
             return False
 
         for name in self.names:
